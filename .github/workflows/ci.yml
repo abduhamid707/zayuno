@@ -36,6 +36,9 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
+      - name: Build All Monorepo Packages and Applications
+        run: pnpm build
+
       - name: Lint and Code Consistency
         run: pnpm lint
 
@@ -52,6 +55,3 @@ jobs:
           pnpm test:sensitive-dynamic-parameters
           pnpm test:provider-operations
           pnpm test:mcp-tool-consistency
-
-      - name: Build All Monorepo Packages and Applications
-        run: pnpm build
