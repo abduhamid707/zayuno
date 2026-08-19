@@ -1,0 +1,14 @@
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN npm install -g pnpm
+
+COPY package.json pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY apps/admin ./apps/admin
+
+RUN pnpm install --frozen-lockfile=false
+ARG VITE_API_URL=https://api.zayuno.uz
+ENV VITE_API_URL=$VITE_API_URL
+RUN pnpm --filter @zayuno/admin run build
+
+EXPOSE 3000
+CMD ["pnpm", "--filter", "@zayuno/admin", "run", "preview"]

@@ -1,0 +1,56 @@
+{
+  "name": "zayuno",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zayuno — Action Infrastructure and Action Layer for AI Agents",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "integrations/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "dev:core": "turbo run dev --filter=@zayuno/api --filter=@zayuno/mcp --filter=@zayuno/mock-evos --filter=@zayuno/worker",
+    "dev:apps": "turbo run dev --filter=@zayuno/admin --filter=@zayuno/provider-portal",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:mcp-tool-consistency": "tsx tests/test-mcp-tool-consistency.ts",
+    "test:action-guardrails": "tsx tests/test-action-guardrails.ts",
+    "test:location-and-quote-persistence": "tsx tests/test-location-and-quote-persistence.ts",
+    "test:webhook-guardrails": "tsx tests/test-webhook-guardrails.ts",
+    "test:action-state-machine": "tsx tests/test-action-state-machine.ts",
+    "test:poyez-sandbox": "tsx tests/test-poyez-sandbox-e2e.ts",
+    "test:dynamic-provider-context": "tsx tests/test-dynamic-provider-context.ts",
+    "test:sensitive-dynamic-parameters": "tsx tests/test-sensitive-dynamic-parameters.ts",
+    "test:docs-contract": "tsx tests/test-docs-contract.ts",
+    "test:provider-operations": "tsx tests/test-provider-operations-guardrails.ts",
+    "test:e2e": "turbo run test:e2e",
+    "db:generate": "pnpm --filter @zayuno/database run generate",
+    "db:migrate": "pnpm --filter @zayuno/database run migrate",
+    "db:migrate:deploy": "pnpm --filter @zayuno/database run migrate:deploy",
+    "db:push": "pnpm --filter @zayuno/database run push",
+    "db:seed": "pnpm --filter @zayuno/database run seed",
+    "db:studio": "pnpm --filter @zayuno/database run studio",
+    "setup": "pnpm install && pnpm db:generate && pnpm build",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "dotenv": "^16.4.7",
+    "localtunnel": "^2.0.2",
+    "prettier": "^3.4.2",
+    "rimraf": "^6.0.1",
+    "tsx": "^4.23.12",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "untun": "^0.2.2"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0"
+  }
+}

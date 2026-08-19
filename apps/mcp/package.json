@@ -1,0 +1,31 @@
+{
+  "name": "@zayuno/mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "zayuno-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts",
+    "lint": "echo 'No lint specified for mcp'"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "rimraf": "^6.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

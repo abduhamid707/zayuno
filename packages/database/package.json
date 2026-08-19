@@ -1,0 +1,33 @@
+{
+  "name": "@zayuno/database",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "push": "prisma db push",
+    "seed": "ts-node src/seed.ts",
+    "studio": "prisma studio",
+    "lint": "echo 'No lint specified for database'"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.1.0",
+    "@zayuno/contracts": "workspace:*",
+    "@zayuno/shared": "workspace:*",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^22.10.2",
+    "prisma": "^6.1.0",
+    "rimraf": "^6.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

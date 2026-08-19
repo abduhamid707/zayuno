@@ -1,0 +1,274 @@
+name: Build & Push Container Images to GHCR
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'integrations/**'
+      - 'infra/docker/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - 'tsconfig.base.json'
+      - '.github/workflows/build-images.yml'
+  workflow_dispatch:
+    inputs:
+      service_override:
+        description: 'Target service to build (leave "all" or select specific)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - api
+          - mcp
+          - admin
+          - provider-portal
+          - worker
+          - mock-evos
+          - mock-coffee-time
+          - mock-poyez
+      force_build_all:
+        description: 'Force build all services regardless of changed files'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_services: ${{ steps.set-matrix.outputs.has_services }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            root_infra:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
+              - 'infra/docker/**'
+              - '.github/workflows/build-images.yml'
+            contracts:
+              - 'packages/contracts/**'
+            database:
+              - 'packages/database/**'
+            event_schemas:
+              - 'packages/event-schemas/**'
+            observability:
+              - 'packages/observability/**'
+            provider_sdk:
+              - 'packages/provider-sdk/**'
+            shared:
+              - 'packages/shared/**'
+            sandbox_provider:
+              - 'integrations/sandbox-provider/**'
+            api:
+              - 'apps/api/**'
+            mcp:
+              - 'apps/mcp/**'
+            admin:
+              - 'apps/admin/**'
+            provider_portal:
+              - 'apps/provider-portal/**'
+            worker:
+              - 'apps/worker/**'
+            mock_evos:
+              - 'integrations/mock-evos/**'
+            mock_coffee_time:
+              - 'integrations/mock-coffee-time/**'
+            mock_poyez:
+              - 'integrations/mock-poyez/**'
+
+      - name: Calculate service matrix
+        id: set-matrix
+        shell: bash
+        run: |
+          FORCE_ALL="${{ github.event.inputs.force_build_all == 'true' || github.event_name == 'push' && steps.filter.outputs.root_infra == 'true' }}"
+          SELECTED="${{ github.event.inputs.service_override }}"
+
+          declare -A SERVICES
+
+          if [ "$FORCE_ALL" = "true" ] || [ "$SELECTED" = "all" ]; then
+            SERVICES["api"]=1
+            SERVICES["mcp"]=1
+            SERVICES["admin"]=1
+            SERVICES["provider-portal"]=1
+            SERVICES["worker"]=1
+            SERVICES["mock-evos"]=1
+            SERVICES["mock-coffee-time"]=1
+            SERVICES["mock-poyez"]=1
+          elif [ -n "$SELECTED" ] && [ "$SELECTED" != "all" ]; then
+            SERVICES["$SELECTED"]=1
+          else
+            # Path filter based resolution
+            if [ "${{ steps.filter.outputs.api }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.contracts }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.database }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.event_schemas }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.observability }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.provider_sdk }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.sandbox_provider }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
+              SERVICES["api"]=1
+            fi
+
+            if [ "${{ steps.filter.outputs.mcp }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.contracts }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
+              SERVICES["mcp"]=1
+            fi
+
+            if [ "${{ steps.filter.outputs.admin }}" = "true" ]; then
+              SERVICES["admin"]=1
+            fi
+
+            if [ "${{ steps.filter.outputs.provider_portal }}" = "true" ]; then
+              SERVICES["provider-portal"]=1
+            fi
+
+            if [ "${{ steps.filter.outputs.worker }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.contracts }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.database }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.event_schemas }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
+              SERVICES["worker"]=1
+            fi
+
+            if [ "${{ steps.filter.outputs.mock_evos }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.contracts }}" = "true" ]; then
+              SERVICES["mock-evos"]=1
+            fi
+
+            if [ "${{ steps.filter.outputs.mock_coffee_time }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.contracts }}" = "true" ]; then
+              SERVICES["mock-coffee-time"]=1
+            fi
+
+            if [ "${{ steps.filter.outputs.mock_poyez }}" = "true" ] || \
+               [ "${{ steps.filter.outputs.contracts }}" = "true" ]; then
+              SERVICES["mock-poyez"]=1
+            fi
+          fi
+
+          # Define metadata map for services: name, dockerfile, build_args
+          JSON_ITEMS=()
+          for s in "${!SERVICES[@]}"; do
+            case "$s" in
+              api)
+                JSON_ITEMS+=('{"service":"api","dockerfile":"infra/docker/Dockerfile.api","build_args":""}')
+                ;;
+              mcp)
+                JSON_ITEMS+=('{"service":"mcp","dockerfile":"infra/docker/Dockerfile.mcp","build_args":""}')
+                ;;
+              admin)
+                JSON_ITEMS+=('{"service":"admin","dockerfile":"infra/docker/Dockerfile.admin","build_args":"VITE_API_URL=https://api.zayuno.uz"}')
+                ;;
+              provider-portal)
+                JSON_ITEMS+=('{"service":"provider-portal","dockerfile":"infra/docker/Dockerfile.provider-portal","build_args":"VITE_API_URL=https://api.zayuno.uz"}')
+                ;;
+              worker)
+                JSON_ITEMS+=('{"service":"worker","dockerfile":"infra/docker/Dockerfile.worker","build_args":""}')
+                ;;
+              mock-evos)
+                JSON_ITEMS+=('{"service":"mock-evos","dockerfile":"infra/docker/Dockerfile.mock-evos","build_args":""}')
+                ;;
+              mock-coffee-time)
+                JSON_ITEMS+=('{"service":"mock-coffee-time","dockerfile":"infra/docker/Dockerfile.mock-coffee-time","build_args":""}')
+                ;;
+              mock-poyez)
+                JSON_ITEMS+=('{"service":"mock-poyez","dockerfile":"infra/docker/Dockerfile.mock-poyez","build_args":""}')
+                ;;
+            esac
+          done
+
+          if [ ${#JSON_ITEMS[@]} -eq 0 ]; then
+            echo "No services affected by this change."
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            echo "has_services=false" >> $GITHUB_OUTPUT
+          else
+            MATRIX_JSON=$(IFS=,; echo "{\"include\":[${JSON_ITEMS[*]}]}")
+            echo "Detected services matrix: $MATRIX_JSON"
+            echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+            echo "has_services=true" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-push:
+    name: Build & Push ${{ matrix.service }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_services == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set lowercased repo name for GHCR
+        id: repo_lower
+        shell: bash
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_BASE=ghcr.io/${REPO_LOWER}/${{ matrix.service }}" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Docker metadata and tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_BASE }}
+          tags: |
+            type=sha,prefix=,format=long
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=production,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          build-args: ${{ matrix.build_args }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          provenance: false
+
+      - name: Summary for ${{ matrix.service }}
+        shell: bash
+        run: |
+          echo "### Image Built: ${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image SHA Tag**: \`${{ env.IMAGE_BASE }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tags pushed**: \`latest\`, \`main\`, \`production\`, \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

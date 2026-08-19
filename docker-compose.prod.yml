@@ -1,0 +1,244 @@
+services:
+  # 1. PostgreSQL Database (Internal Only)
+  postgres:
+    image: postgres:16-alpine
+    container_name: zayuno-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: zayuno
+    volumes:
+      - zayuno_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zayuno"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zayuno_net
+
+  # 2. Redis Cache & Distributed Lock (Internal Only)
+  redis:
+    image: redis:7-alpine
+    container_name: zayuno-redis
+    restart: always
+    volumes:
+      - zayuno_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zayuno_net
+
+  # 3. NATS JetStream Message Broker (Internal Only)
+  nats:
+    image: nats:2.10-alpine
+    container_name: zayuno-nats
+    restart: always
+    command: ["-js", "-m", "8222"]
+    volumes:
+      - zayuno_nats_data:/data
+    networks:
+      - zayuno_net
+
+  # 4. Mock EVOS External Sandbox Provider & Checkout Simulator
+  mock-evos:
+    image: ${IMAGE_PREFIX:-ghcr.io/zayuno}/mock-evos:${DEPLOY_SHA:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.mock-evos
+    container_name: zayuno-mock-evos
+    restart: always
+    ports:
+      - "127.0.0.1:4101:4001"
+    environment:
+      - NODE_ENV=production
+      - PORT=4001
+      - PROVIDER_API_KEY=${MOCK_EVOS_SHARED_SECRET:?MOCK_EVOS_SHARED_SECRET is required}
+      - ZAYUNO_WEBHOOK_SECRET=${MOCK_EVOS_SHARED_SECRET:?MOCK_EVOS_SHARED_SECRET is required}
+      - ZAYUNO_API_URL=http://api:4000
+      - MOCK_EVOS_CHECKOUT_BASE_URL=https://evos-sandbox.shopla.uz
+      - PROVIDER_PUBLIC_BASE_URL=https://evos-sandbox.shopla.uz
+    depends_on:
+      - api
+    networks:
+      - zayuno_net
+
+  # Standalone Coffee Time sandbox provider API and checkout simulator.
+  mock-coffee-time:
+    image: ${IMAGE_PREFIX:-ghcr.io/zayuno}/mock-coffee-time:${DEPLOY_SHA:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.mock-coffee-time
+    container_name: zayuno-mock-coffee-time
+    restart: always
+    ports:
+      - "127.0.0.1:4105:4005"
+    environment:
+      - NODE_ENV=production
+      - PORT=4005
+      - PROVIDER_API_KEY=${COFFEE_TIME_SHARED_SECRET:?COFFEE_TIME_SHARED_SECRET is required}
+      - ZAYUNO_WEBHOOK_SECRET=${COFFEE_TIME_SHARED_SECRET:?COFFEE_TIME_SHARED_SECRET is required}
+      - ZAYUNO_API_URL=http://api:4000
+      - PROVIDER_PUBLIC_BASE_URL=https://coffee-time-sandbox.shopla.uz
+    depends_on:
+      - api
+    networks:
+      - zayuno_net
+
+  # Standalone dynamic railway ticketing sandbox. This is a fictional demo
+  # provider and never collects real identity documents or card details.
+  mock-poyez:
+    image: ${IMAGE_PREFIX:-ghcr.io/zayuno}/mock-poyez:${DEPLOY_SHA:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.mock-poyez
+    container_name: zayuno-mock-poyez
+    restart: always
+    ports:
+      - "127.0.0.1:4106:4006"
+    environment:
+      - NODE_ENV=production
+      - PORT=4006
+      - PROVIDER_API_KEY=${POYEZ_SANDBOX_SHARED_SECRET:?POYEZ_SANDBOX_SHARED_SECRET is required}
+      - ZAYUNO_WEBHOOK_SECRET=${POYEZ_SANDBOX_SHARED_SECRET:?POYEZ_SANDBOX_SHARED_SECRET is required}
+      - ZAYUNO_API_URL=http://api:4000
+      - PROVIDER_PUBLIC_BASE_URL=https://poyez-sandbox.shopla.uz
+      - CORS_ALLOWED_ORIGINS=https://zayuno.uz,https://admin.zayuno.uz,https://partners.zayuno.uz,https://developers.zayuno.uz,https://poyez-sandbox.shopla.uz
+    depends_on:
+      - api
+    networks:
+      - zayuno_net
+
+  # 5. Zayuno Core Public API
+  api:
+    image: ${IMAGE_PREFIX:-ghcr.io/zayuno}/api:${DEPLOY_SHA:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: zayuno-api
+    restart: always
+    ports:
+      - "127.0.0.1:4100:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/zayuno?schema=public
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - ALLOW_INSECURE_DEV_AUTH=false
+      - CORS_ORIGINS=https://zayuno.uz,https://developers.zayuno.uz,https://admin.zayuno.uz,https://partners.zayuno.uz
+      - ENABLE_SWAGGER=false
+      - ZAYUNO_WEBHOOK_SECRET=${ZAYUNO_WEBHOOK_SECRET:?ZAYUNO_WEBHOOK_SECRET is required}
+      - MOCK_EVOS_SHARED_SECRET=${MOCK_EVOS_SHARED_SECRET:?MOCK_EVOS_SHARED_SECRET is required}
+      - DEVELOPERS_PUBLIC_URL=https://developers.zayuno.uz
+      - API_PUBLIC_URL=https://api.zayuno.uz
+      - MCP_PUBLIC_URL=https://mcp.zayuno.uz
+      - API_BASE_URL=https://api.zayuno.uz
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    networks:
+      - zayuno_net
+
+  # 6. Internal operations console. Publish it through a separately protected
+  # admin.zayuno.uz reverse-proxy route; it is never exposed directly.
+  admin:
+    image: ${IMAGE_PREFIX:-ghcr.io/zayuno}/admin:${DEPLOY_SHA:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.admin
+      args:
+        VITE_API_URL: https://api.zayuno.uz
+    container_name: zayuno-admin
+    restart: always
+    ports:
+      - "127.0.0.1:4103:3000"
+    environment:
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=admin.zayuno.uz
+    depends_on:
+      - api
+    networks:
+      - zayuno_net
+
+  # 7. Remote MCP Server (Streamable HTTP / SSE)
+  mcp:
+    image: ${IMAGE_PREFIX:-ghcr.io/zayuno}/mcp:${DEPLOY_SHA:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.mcp
+    container_name: zayuno-mcp
+    restart: always
+    ports:
+      - "127.0.0.1:4102:4002"
+    environment:
+      - NODE_ENV=production
+      - PORT=4002
+      - API_BASE_URL=http://api:4000
+      - ZAYUNO_API_KEY=${ZAYUNO_API_KEY:?ZAYUNO_API_KEY is required}
+      - MCP_PUBLIC_BASE_URL=https://mcp.zayuno.uz
+      - MCP_MODE=http
+    depends_on:
+      - api
+    networks:
+      - zayuno_net
+
+  # 8. Asynchronous Background Worker
+  worker:
+    image: ${IMAGE_PREFIX:-ghcr.io/zayuno}/worker:${DEPLOY_SHA:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: zayuno-worker
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/zayuno?schema=public
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    networks:
+      - zayuno_net
+
+  # 9. Zayuno Developer & Provider Portal
+  provider-portal:
+    image: ${IMAGE_PREFIX:-ghcr.io/zayuno}/provider-portal:${DEPLOY_SHA:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.provider-portal
+      args:
+        VITE_API_URL: https://api.zayuno.uz
+    container_name: zayuno-provider-portal
+    restart: always
+    ports:
+      - "127.0.0.1:4104:3001"
+    environment:
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=partners.zayuno.uz
+    depends_on:
+      - api
+    networks:
+      - zayuno_net
+
+volumes:
+  zayuno_postgres_data:
+  zayuno_redis_data:
+  zayuno_nats_data:
+
+networks:
+  zayuno_net:
+    driver: bridge

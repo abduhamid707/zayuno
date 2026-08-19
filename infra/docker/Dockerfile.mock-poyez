@@ -1,0 +1,13 @@
+FROM node:20-alpine
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY packages/contracts/package.json ./packages/contracts/package.json
+COPY integrations/mock-poyez/package.json ./integrations/mock-poyez/package.json
+RUN pnpm install --filter @zayuno/mock-poyez... --frozen-lockfile
+COPY packages/contracts ./packages/contracts
+COPY integrations/mock-poyez ./integrations/mock-poyez
+RUN pnpm --filter @zayuno/contracts run build
+RUN pnpm --filter @zayuno/mock-poyez run build
+EXPOSE 4006
+CMD ["node", "integrations/mock-poyez/dist/index.js"]

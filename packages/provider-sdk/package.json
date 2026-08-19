@@ -1,0 +1,21 @@
+{
+  "name": "@zayuno/provider-sdk",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "lint": "echo 'No lint specified for provider-sdk'"
+  },
+  "dependencies": {
+    "@zayuno/contracts": "workspace:*",
+    "@zayuno/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2"
+  }
+}

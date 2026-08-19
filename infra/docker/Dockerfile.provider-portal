@@ -1,0 +1,14 @@
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN npm install -g pnpm
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY apps/provider-portal/package.json ./apps/provider-portal/package.json
+RUN pnpm install --filter @zayuno/provider-portal --frozen-lockfile
+COPY apps/provider-portal ./apps/provider-portal
+ARG VITE_API_URL=https://api.zayuno.uz
+ENV VITE_API_URL=$VITE_API_URL
+RUN pnpm --filter @zayuno/provider-portal run build
+
+EXPOSE 3001
+CMD ["pnpm", "--filter", "@zayuno/provider-portal", "run", "preview"]

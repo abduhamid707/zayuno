@@ -1,0 +1,162 @@
+services:
+  # 1. PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: zayuno-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: zayuno
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zayuno"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis Cache & Distributed Lock
+  redis:
+    image: redis:7-alpine
+    container_name: zayuno-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. NATS JetStream Message Broker
+  nats:
+    image: nats:2.10-alpine
+    container_name: zayuno-nats
+    restart: unless-stopped
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
+  # 4. Mock EVOS External API & Payment Simulator
+  mock-evos:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.mock-evos
+    container_name: zayuno-mock-evos
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      - PORT=4001
+      - MOCK_EVOS_PORT=4001
+      - API_BASE_URL=http://api:4000
+      - ZAYUNO_WEBHOOK_SECRET=zayuno_webhook_secret_evos_test_key_123
+
+  mock-poyez:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.mock-poyez
+    container_name: zayuno-mock-poyez
+    restart: unless-stopped
+    ports:
+      - "4006:4006"
+    environment:
+      - PORT=4006
+      - PROVIDER_API_KEY=poyez_local_provider_secret_12345
+      - ZAYUNO_WEBHOOK_SECRET=poyez_local_webhook_secret_12345
+      - ZAYUNO_API_URL=http://api:4000
+      - PROVIDER_PUBLIC_BASE_URL=http://localhost:4006
+    depends_on:
+      - api
+
+  # 5. Zayuno Core Public API & Webhooks
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: zayuno-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      mock-evos:
+        condition: service_started
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - API_PORT=4000
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/zayuno?schema=public
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      - JWT_SECRET=super-secret-jwt-key-for-zayuno-auth-change-in-production
+      - ZAYUNO_WEBHOOK_SECRET=zayuno_webhook_secret_evos_test_key_123
+      - MOCK_EVOS_BASE_URL=http://mock-evos:4001
+      - API_BASE_URL=http://localhost:4000
+
+  # 6. Zayuno MCP Server (SSE & Stdio Bridge)
+  mcp:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.mcp
+    container_name: zayuno-mcp
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "4002:4002"
+    environment:
+      - MCP_MODE=http
+      - MCP_PORT=4002
+      - API_BASE_URL=http://api:4000
+      - ZAYUNO_API_KEY=zy_live_agent_secret_key_12345
+
+  # 7. Zayuno Background Worker
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: zayuno-worker
+    restart: unless-stopped
+    depends_on:
+      - api
+      - nats
+    environment:
+      - NATS_URL=nats://nats:4222
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/zayuno?schema=public
+
+  # 8. Admin Console
+  admin:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.admin
+    container_name: zayuno-admin
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+
+  # 9. Provider Portal
+  provider-portal:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.provider-portal
+    container_name: zayuno-provider-portal
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+
+volumes:
+  postgres_data:
+  redis_data:

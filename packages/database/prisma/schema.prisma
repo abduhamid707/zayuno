@@ -1,0 +1,268 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ProviderStatus {
+  DRAFT
+  SANDBOX
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum ProviderType {
+  RETAIL
+  DELIVERY
+  SERVICES
+  BOOKINGS
+  TICKETING
+  DIGITAL
+  COMMERCE
+  OTHER
+}
+
+enum ProviderCapability {
+  METADATA
+  HEALTH
+  LOCATIONS
+  CATALOG
+  SEARCH
+  QUOTE
+  ACTION_CREATE
+  ACTION_STATUS
+  ACTION_CANCEL
+  PAYMENT_OPTIONS
+  WEBHOOK
+}
+
+enum ActionStatus {
+  DRAFT
+  PENDING_CONFIRMATION
+  AWAITING_PAYMENT
+  SUBMITTED
+  ACCEPTED
+  IN_PROGRESS
+  READY
+  FULFILLING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  PROVIDER_OWNER
+  PROVIDER_DEVELOPER
+  PROVIDER_ANALYST
+  API_CONSUMER
+}
+
+model Provider {
+  id              String               @id @default(uuid())
+  slug            String               @unique
+  name            String
+  logoUrl         String?
+  status          ProviderStatus       @default(SANDBOX)
+  type            ProviderType         @default(SERVICES)
+  adapterType     String               @default("sandbox") // Identifier used by AdapterRegistryService
+  capabilities    ProviderCapability[]
+  baseUrl         String?
+  encryptedSecret String               // AES-256-GCM encrypted provider credentials
+  webhookSecret   String               // HMAC secret for inbound webhook verification
+  config          Json                 @default("{}") // Provider adapter specific configuration
+  metadata        Json                 @default("{}")
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  locations       Location[]
+  actions         Action[]
+  quotes          Quote[]
+  apiKeys         ApiKey[]
+  webhookLogs     WebhookLog[]
+  integrationLogs IntegrationLog[]
+  users           User[]
+}
+
+model Location {
+  id                 String   @id @default(uuid())
+  providerId         String
+  providerLocationId String   // External identifier assigned by provider
+  name               String
+  address            String
+  latitude           Float?
+  longitude          Float?
+  operatingHours     Json     @default("{}")
+  serviceRadiusKm    Float    @default(10.0)
+  isActive           Boolean  @default(true)
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  provider           Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  actions            Action[]
+  quotes             Quote[]
+
+  @@unique([providerId, providerLocationId])
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         UserRole  @default(API_CONSUMER)
+  providerId   String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  provider     Provider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  actions      Action[]
+  apiKeys      ApiKey[]
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  name        String
+  keyHash     String    @unique // SHA-256 hash of API key
+  keyPrefix   String    // e.g. "zy_live_abc..."
+  role        UserRole  @default(API_CONSUMER)
+  userId      String?
+  providerId  String?
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    Provider? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+}
+
+model Quote {
+  id              String       @id @default(uuid())
+  providerId      String
+  locationId      String?
+  lines           Json         // Array of normalized quote lines
+  subtotal        Decimal      @db.Decimal(12, 2)
+  fees            Decimal      @db.Decimal(12, 2) @default(0)
+  discount        Decimal      @db.Decimal(12, 2) @default(0)
+  total           Decimal      @db.Decimal(12, 2)
+  currency        String       @default("UZS")
+  fulfillmentType String       @default("STANDARD")
+  destination     String?
+  parameters      Json         @default("{}")
+  expiresAt       DateTime
+  createdAt       DateTime     @default(now())
+
+  provider        Provider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  location        Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  actions         Action[]
+}
+
+model Action {
+  id               String        @id @default(uuid())
+  publicId         String        @unique // e.g. "ZY-SANDBOX-98421"
+  userId           String?
+  providerId       String
+  locationId       String?
+  quoteId          String?
+  status           ActionStatus  @default(AWAITING_PAYMENT)
+  
+  lines            Json          // Array of action lines with verified pricing
+  subtotal         Decimal       @db.Decimal(12, 2)
+  fees             Decimal       @db.Decimal(12, 2) @default(0)
+  discount         Decimal       @db.Decimal(12, 2) @default(0)
+  total            Decimal       @db.Decimal(12, 2)
+  currency         String        @default("UZS")
+  
+  customerName     String
+  customerPhone    String
+  destination      String?
+  latitude         Float?
+  longitude        Float?
+  fulfillmentType  String        @default("STANDARD")
+
+  externalActionId String?       // External action ID assigned by provider system
+  paymentMethod    String?       // "payme", "card", "cash", "invoice"
+  paymentStatus    PaymentStatus @default(PENDING)
+  paymentUrl       String?       // Provider-supplied external checkout URL
+
+  idempotencyKey   String?       @unique
+  parameters       Json          @default("{}")
+  metadata         Json          @default("{}")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  provider         Provider      @relation(fields: [providerId], references: [id])
+  location         Location?     @relation(fields: [locationId], references: [id])
+  quote            Quote?        @relation(fields: [quoteId], references: [id])
+  user             User?         @relation(fields: [userId], references: [id])
+  timeline         ActionEvent[]
+
+  @@index([providerId, status])
+  @@index([createdAt])
+}
+
+model ActionEvent {
+  id          String       @id @default(uuid())
+  actionId    String
+  status      ActionStatus
+  description String
+  source      String       // "AI_AGENT", "PROVIDER_WEBHOOK", "SYSTEM_WORKER"
+  payload     Json?
+  createdAt   DateTime     @default(now())
+
+  action      Action       @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@index([actionId, createdAt])
+}
+
+model WebhookLog {
+  id           String   @id @default(uuid())
+  providerId   String
+  event        String
+  headers      Json
+  payload      Json
+  signature    String?
+  isVerified   Boolean  @default(false)
+  isProcessed  Boolean  @default(false)
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  provider     Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, createdAt])
+}
+
+model IntegrationLog {
+  id           String   @id @default(uuid())
+  providerId   String
+  traceId      String
+  endpoint     String
+  method       String
+  requestBody  Json?
+  responseBody Json?
+  statusCode   Int
+  durationMs   Int
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  provider     Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([traceId])
+  @@index([providerId, createdAt])
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@zayuno/event-schemas",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "lint": "echo 'No lint specified for event-schemas'"
+  },
+  "dependencies": {
+    "@zayuno/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2"
+  }
+}

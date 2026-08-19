@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Zayuno Production Server Deployment Script
+# Executed on production host (158.220.100.58)
+# ==============================================================================
+
+DEPLOY_SHA="${1:?Deploy commit SHA is required}"
+SERVICES="${2:-mock-evos mock-coffee-time mock-poyez api mcp admin provider-portal worker}"
+IMAGE_PREFIX="${3:-ghcr.io/zayuno}"
+RUN_MIGRATIONS="${4:-true}"
+
+REMOTE_DIR="/root/zayuno"
+LOCK_FILE="/tmp/zayuno-deploy.lock"
+CURRENT_SHA_FILE="$REMOTE_DIR/.current_release_sha"
+PREVIOUS_SHA_FILE="$REMOTE_DIR/.previous_release_sha"
+BACKUP_DIR="/root/zayuno-backups"
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+log_info() { echo -e "${BLUE}[DEPLOY-INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[DEPLOY-OK]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[DEPLOY-WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[DEPLOY-ERROR]${NC} $1"; }
+
+# 1. Acquire exclusive lock
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
+  log_error "Another deployment is currently in progress. Aborting."
+  exit 1
+fi
+
+log_info "Starting zero-downtime deployment for SHA: $DEPLOY_SHA"
+log_info "Target services: $SERVICES"
+
+cd "$REMOTE_DIR"
+
+# 2. System and disk validation
+DISK_AVAIL_KB=$(df -k "$REMOTE_DIR" | awk 'NR==2 {print $4}')
+if [ "$DISK_AVAIL_KB" -lt 1048576 ]; then # 1GB minimum
+  log_error "Insufficient disk space (< 1GB available). Aborting deploy."
+  exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  log_error "Docker daemon is not responding. Aborting deploy."
+  exit 1
+fi
+
+# 3. Environment & Poyez Secret/TLS validation
+if [ ! -f "$REMOTE_DIR/.env" ]; then
+  log_error "Protected environment file $REMOTE_DIR/.env is missing."
+  exit 1
+fi
+
+if ! grep -Eq '^POYEZ_SANDBOX_SHARED_SECRET=.{16,}$' "$REMOTE_DIR/.env"; then
+  log_error "POYEZ_SANDBOX_SHARED_SECRET is missing or invalid in .env."
+  exit 1
+fi
+
+if [ ! -f "/etc/letsencrypt/live/poyez-sandbox.shopla.uz/fullchain.pem" ] || [ ! -f "/etc/letsencrypt/live/poyez-sandbox.shopla.uz/privkey.pem" ]; then
+  log_error "Poyez SSL certificate files are missing in /etc/letsencrypt/live/poyez-sandbox.shopla.uz/."
+  exit 1
+fi
+
+# 4. Record previous release SHA
+PREVIOUS_SHA=""
+if [ -f "$CURRENT_SHA_FILE" ]; then
+  PREVIOUS_SHA=$(cat "$CURRENT_SHA_FILE" | tr -d '[:space:]')
+  echo "$PREVIOUS_SHA" > "$PREVIOUS_SHA_FILE"
+  log_info "Previous working release SHA recorded: $PREVIOUS_SHA"
+fi
+
+# 5. Pull target images
+log_info "Pulling pre-built GHCR images for SHA $DEPLOY_SHA..."
+export IMAGE_PREFIX="$IMAGE_PREFIX"
+export DEPLOY_SHA="$DEPLOY_SHA"
+
+# Pull only the services we are deploying
+# shellcheck disable=SC2086
+docker compose -f docker-compose.prod.yml pull $SERVICES
+
+# 6. Run database migrations if requested (one-off before container recreation)
+if [ "$RUN_MIGRATIONS" = "true" ]; then
+  log_info "Executing database migration check..."
+  # Run migration in a temporary container
+  if ! docker compose -f docker-compose.prod.yml run --rm --no-deps api pnpm --filter @zayuno/database run migrate:deploy; then
+    log_error "Database migration failed! Deployment aborted before container switch."
+    exit 1
+  fi
+  log_success "Database migrations applied successfully."
+fi
+
+# 7. Recreate containers with new images
+log_info "Recreating target containers..."
+# shellcheck disable=SC2086
+docker compose -f docker-compose.prod.yml up -d --no-deps $SERVICES
+
+# 8. Run health check
+log_info "Running post-deploy health check..."
+chmod +x "$REMOTE_DIR/deploy/health-check.sh"
+
+if "$REMOTE_DIR/deploy/health-check.sh" all; then
+  log_success "Health check passed!"
+
+  # 9. Update Nginx configuration if needed
+  if [ -f "$REMOTE_DIR/deploy/nginx-zayuno.conf" ]; then
+    log_info "Verifying and reloading Nginx configuration..."
+    cp "$REMOTE_DIR/deploy/nginx-zayuno.conf" /etc/nginx/sites-available/zayuno.conf
+    nginx -t
+    systemctl reload nginx
+    log_success "Nginx reloaded."
+  fi
+
+  # Record new current release
+  echo "$DEPLOY_SHA" > "$CURRENT_SHA_FILE"
+  log_success "Deployment completed successfully for SHA: $DEPLOY_SHA"
+else
+  log_error "Health check FAILED for release $DEPLOY_SHA!"
+
+  # 10. Automatic Rollback
+  if [ -n "$PREVIOUS_SHA" ] && [ "$PREVIOUS_SHA" != "$DEPLOY_SHA" ]; then
+    log_warn "Initiating automatic rollback to previous working release SHA: $PREVIOUS_SHA..."
+    export DEPLOY_SHA="$PREVIOUS_SHA"
+    # shellcheck disable=SC2086
+    docker compose -f docker-compose.prod.yml up -d --no-deps $SERVICES
+    
+    log_info "Validating health of rolled-back release..."
+    if "$REMOTE_DIR/deploy/health-check.sh" internal; then
+      log_warn "Rollback to $PREVIOUS_SHA succeeded. System is stable on previous release."
+      echo "$PREVIOUS_SHA" > "$CURRENT_SHA_FILE"
+    else
+      log_error "CRITICAL: System remains unhealthy even after rollback attempt!"
+    fi
+  else
+    log_error "No valid previous SHA available to rollback to."
+  fi
+
+  exit 1
+fi

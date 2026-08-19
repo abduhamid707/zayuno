@@ -1,0 +1,10 @@
+{
+  "mockEvosUrl": "https://york-ontario-surveys-personality.trycloudflare.com",
+  "mockEvosPayUrl": "https://york-ontario-surveys-personality.trycloudflare.com/mock/pay",
+  "mcpUrl": "https://detail-directed-fabrics-skiing.trycloudflare.com",
+  "mcpSseUrl": "https://detail-directed-fabrics-skiing.trycloudflare.com/sse",
+  "mcpHttpUrl": "https://detail-directed-fabrics-skiing.trycloudflare.com/mcp",
+  "mcpHealthUrl": "https://detail-directed-fabrics-skiing.trycloudflare.com/health",
+  "mcpToolsUrl": "https://detail-directed-fabrics-skiing.trycloudflare.com/tools",
+  "createdAt": "2026-08-15T19:57:41.300Z"
+}

@@ -1,0 +1,139 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_sha:
+        description: 'Git commit SHA to deploy (defaults to current workflow commit)'
+        required: false
+        default: ''
+        type: string
+      services:
+        description: 'Services to recreate (space-separated or "all")'
+        required: false
+        default: 'all'
+        type: string
+      run_migrations:
+        description: 'Run database migrations prior to service restart'
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: zayuno-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Production Release
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Deploy SHA format
+        id: resolve-sha
+        shell: bash
+        run: |
+          TARGET_SHA="${{ github.event.inputs.deploy_sha }}"
+          if [ -z "$TARGET_SHA" ]; then
+            TARGET_SHA="${{ github.sha }}"
+          fi
+
+          if ! [[ "$TARGET_SHA" =~ ^[a-f0-9]{7,40}$ ]]; then
+            echo "::error::Invalid Git commit SHA: $TARGET_SHA. Must be 7-40 hex characters."
+            exit 1
+          fi
+
+          echo "TARGET_SHA=$TARGET_SHA" >> $GITHUB_ENV
+          echo "Target Release SHA: $TARGET_SHA"
+
+      - name: Resolve target services
+        id: resolve-services
+        shell: bash
+        run: |
+          INPUT_SERVICES="${{ github.event.inputs.services }}"
+          if [ -z "$INPUT_SERVICES" ] || [ "$INPUT_SERVICES" = "all" ]; then
+            RESOLVED="mock-evos mock-coffee-time mock-poyez api mcp admin provider-portal worker"
+          else
+            RESOLVED="$INPUT_SERVICES"
+          fi
+          echo "TARGET_SERVICES=$RESOLVED" >> $GITHUB_ENV
+          echo "Target Services: $RESOLVED"
+
+      - name: Set lowercased repo prefix for GHCR
+        id: repo-prefix
+        shell: bash
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_PREFIX=ghcr.io/${REPO_LOWER}" >> $GITHUB_ENV
+
+      - name: Configure SSH and Known Hosts
+        shell: bash
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # Write known hosts securely
+          echo "${{ secrets.PROD_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+          # Write SSH private key securely
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa_prod
+          chmod 600 ~/.ssh/id_rsa_prod
+
+      - name: Sync Deploy Manifest and Scripts to Server
+        shell: bash
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_PORT: ${{ secrets.PROD_PORT || '22' }}
+          PROD_USER: ${{ secrets.PROD_USER || 'root' }}
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/id_rsa_prod -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
+          SCP_CMD="scp -i ~/.ssh/id_rsa_prod -P ${PROD_PORT}"
+
+          echo "Ensuring deploy directories on server..."
+          $SSH_CMD "mkdir -p /root/zayuno/deploy"
+
+          echo "Copying docker-compose.prod.yml..."
+          $SCP_CMD docker-compose.prod.yml "${PROD_USER}@${PROD_HOST}:/root/zayuno/docker-compose.prod.yml"
+
+          echo "Copying deployment scripts..."
+          $SCP_CMD deploy/health-check.sh "${PROD_USER}@${PROD_HOST}:/root/zayuno/deploy/health-check.sh"
+          $SCP_CMD deploy/deploy-server.sh "${PROD_USER}@${PROD_HOST}:/root/zayuno/deploy/deploy-server.sh"
+          $SCP_CMD deploy/nginx-zayuno.conf "${PROD_USER}@${PROD_HOST}:/root/zayuno/deploy/nginx-zayuno.conf"
+
+          $SSH_CMD "chmod +x /root/zayuno/deploy/*.sh"
+
+      - name: Execute Server-side Zero-Downtime Deployment
+        shell: bash
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_PORT: ${{ secrets.PROD_PORT || '22' }}
+          PROD_USER: ${{ secrets.PROD_USER || 'root' }}
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/id_rsa_prod -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
+
+          echo "Triggering deployment on remote server..."
+          $SSH_CMD "/root/zayuno/deploy/deploy-server.sh '${{ env.TARGET_SHA }}' '${{ env.TARGET_SERVICES }}' '${{ env.IMAGE_PREFIX }}' '${{ github.event.inputs.run_migrations || 'true' }}'"
+
+      - name: Cleanup SSH Key
+        if: always()
+        shell: bash
+        run: |
+          rm -f ~/.ssh/id_rsa_prod
+
+      - name: Generate Deployment Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## 🚀 Zayuno Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed SHA**: \`${{ env.TARGET_SHA }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Services Recreated**: \`${{ env.TARGET_SERVICES }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Prefix**: \`${{ env.IMAGE_PREFIX }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Migrations Executed**: \`${{ github.event.inputs.run_migrations || 'true' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ job.status == 'success' && '✅ SUCCESS' || '❌ FAILED (Check logs & rollback state)' }}" >> $GITHUB_STEP_SUMMARY

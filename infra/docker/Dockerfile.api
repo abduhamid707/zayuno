@@ -1,0 +1,25 @@
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN npm install -g pnpm turbo
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY apps/api/package.json ./apps/api/package.json
+COPY packages/contracts/package.json ./packages/contracts/package.json
+COPY packages/database/package.json ./packages/database/package.json
+COPY packages/event-schemas/package.json ./packages/event-schemas/package.json
+COPY packages/observability/package.json ./packages/observability/package.json
+COPY packages/provider-sdk/package.json ./packages/provider-sdk/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
+COPY integrations/sandbox-provider/package.json ./integrations/sandbox-provider/package.json
+
+RUN pnpm install --filter @zayuno/api... --frozen-lockfile
+COPY packages ./packages
+COPY integrations/sandbox-provider ./integrations/sandbox-provider
+COPY apps/api ./apps/api
+RUN pnpm --filter @zayuno/database run generate
+RUN pnpm --filter "./packages/*" run build
+RUN pnpm --filter @zayuno/sandbox-provider run build
+RUN pnpm --filter @zayuno/api run build
+
+EXPOSE 4000
+CMD ["node", "apps/api/dist/main.js"]
