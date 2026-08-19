@@ -96,10 +96,14 @@ done
 # 6. Run database migrations if requested (one-off before container recreation)
 if [ "$RUN_MIGRATIONS" = "true" ]; then
   log_info "Executing database migration check..."
-  # Run migration in a temporary container
+  # Run migration in a temporary container with automatic baselining for existing schemas
   if ! docker compose -f docker-compose.prod.yml run --rm --no-deps api pnpm --filter @zayuno/database run migrate:deploy; then
-    log_error "Database migration failed! Deployment aborted before container switch."
-    exit 1
+    log_warn "Standard migrate deploy failed. Attempting baseline resolution for existing database..."
+    docker compose -f docker-compose.prod.yml run --rm --no-deps api pnpm --filter @zayuno/database exec prisma migrate resolve --applied 20260816000000_init || true
+    if ! docker compose -f docker-compose.prod.yml run --rm --no-deps api pnpm --filter @zayuno/database run migrate:deploy; then
+      log_error "Database migration failed! Deployment aborted before container switch."
+      exit 1
+    fi
   fi
   log_success "Database migrations applied successfully."
 fi

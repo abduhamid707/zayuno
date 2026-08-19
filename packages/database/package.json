@@ -9,7 +9,7 @@
     "clean": "rimraf dist",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
-    "migrate:deploy": "prisma migrate deploy",
+    "migrate:deploy": "prisma migrate deploy || (prisma migrate resolve --applied 20260816000000_init && prisma migrate deploy)",
     "push": "prisma db push",
     "seed": "ts-node src/seed.ts",
     "studio": "prisma studio",
