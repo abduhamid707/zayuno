@@ -76,14 +76,22 @@ if [ -f "$CURRENT_SHA_FILE" ]; then
   log_info "Previous working release SHA recorded: $PREVIOUS_SHA"
 fi
 
-# 5. Pull target images
+# 5. Pull target images with fallback to latest if specific SHA not found
 log_info "Pulling pre-built GHCR images for SHA $DEPLOY_SHA..."
 export IMAGE_PREFIX="$IMAGE_PREFIX"
 export DEPLOY_SHA="$DEPLOY_SHA"
 
-# Pull only the services we are deploying
-# shellcheck disable=SC2086
-docker compose -f docker-compose.prod.yml pull $SERVICES
+for svc in $SERVICES; do
+  log_info "Pulling image for service $svc..."
+  if ! docker pull "${IMAGE_PREFIX}/${svc}:${DEPLOY_SHA}" 2>/dev/null; then
+    log_warn "Tag ${DEPLOY_SHA} not found for ${svc}, falling back to latest..."
+    if docker pull "${IMAGE_PREFIX}/${svc}:latest" 2>/dev/null; then
+      docker tag "${IMAGE_PREFIX}/${svc}:latest" "${IMAGE_PREFIX}/${svc}:${DEPLOY_SHA}"
+    else
+      log_warn "Could not pull image for ${svc} (using local image if available)"
+    fi
+  fi
+done
 
 # 6. Run database migrations if requested (one-off before container recreation)
 if [ "$RUN_MIGRATIONS" = "true" ]; then

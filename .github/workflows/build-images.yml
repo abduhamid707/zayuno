@@ -103,7 +103,7 @@ jobs:
         id: set-matrix
         shell: bash
         run: |
-          FORCE_ALL="${{ github.event.inputs.force_build_all == 'true' || github.event_name == 'push' && steps.filter.outputs.root_infra == 'true' }}"
+          FORCE_ALL="${{ github.event.inputs.force_build_all == 'true' || github.event_name == 'push' }}"
           SELECTED="${{ github.event.inputs.service_override }}"
 
           declare -A SERVICES
