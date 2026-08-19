@@ -33,4 +33,10 @@ moderation changes must be recorded here.
   GHCR immutable container images with matrix build and changed-service detection.
 - Introduced image-based production compose, bounded backoff health checking,
   automatic rollback to previous working commit SHA, and isolated database migrations.
+- Implemented comprehensive Technical SEO for zayuno.uz: dynamic robots.txt,
+  XML sitemap (/sitemap.xml), canonical URLs, Open Graph / Twitter meta tags,
+  and JSON-LD structured data (Organization, WebSite, SoftwareApplication, FAQPage).
+- Redesigned public landing page into a high-converting, modern SaaS aesthetic with
+  interactive protocol visualizer, 3-step action workflow, and developer sandboxes.
+
 

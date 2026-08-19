@@ -133,6 +133,78 @@ function renderZayunoIcon(size: number): Buffer {
   });
 }
 
+function renderZayunoOgImage(): Buffer {
+  const width = 1200;
+  const height = 630;
+
+  return createPng(width, height, (x, y) => {
+    const nx = x / (width - 1);
+    const ny = y / (height - 1);
+
+    // Deep dark background with ambient emerald & cyan gradient glows
+    const distCenter = Math.sqrt((nx - 0.5) ** 2 + (ny - 0.5) ** 2);
+    const distGlowLeft = Math.sqrt((nx - 0.3) ** 2 + (ny - 0.4) ** 2);
+    const distGlowRight = Math.sqrt((nx - 0.7) ** 2 + (ny - 0.6) ** 2);
+
+    let bgR = Math.round(2 + Math.max(0, 1 - distGlowLeft * 1.8) * 15);
+    let bgG = Math.round(6 + Math.max(0, 1 - distGlowLeft * 1.8) * 45 + Math.max(0, 1 - distGlowRight * 2) * 20);
+    let bgB = Math.round(23 + Math.max(0, 1 - distGlowRight * 1.8) * 60 + Math.max(0, 1 - distCenter * 1.5) * 20);
+
+    // Subtle grid pattern
+    if (x % 40 === 0 || y % 40 === 0) {
+      bgR = Math.min(255, bgR + 6);
+      bgG = Math.min(255, bgG + 8);
+      bgB = Math.min(255, bgB + 14);
+    }
+
+    // Outer card badge for Zayuno Logo mark on left side: center (0.24, 0.50), size 260px
+    const logoCenterX = 0.24;
+    const logoCenterY = 0.50;
+    const logoSizeNormX = 220 / width;
+    const logoSizeNormY = 220 / height;
+
+    const lx = (nx - (logoCenterX - logoSizeNormX / 2)) / logoSizeNormX;
+    const ly = (ny - (logoCenterY - logoSizeNormY / 2)) / logoSizeNormY;
+
+    if (lx >= 0 && lx <= 1 && ly >= 0 && ly <= 1) {
+      const cornerRadius = 0.24;
+      const dx = Math.max(0, Math.abs(lx - 0.5) - (0.5 - cornerRadius));
+      const dy = Math.max(0, Math.abs(ly - 0.5) - (0.5 - cornerRadius));
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= cornerRadius) {
+        // Z emblem card background
+        const inTopBar = ly >= 0.26 && ly <= 0.36 && lx >= 0.24 && lx <= 0.76;
+        const inBottomBar = ly >= 0.64 && ly <= 0.74 && lx >= 0.24 && lx <= 0.76;
+        const x1 = 0.72, y1 = 0.30, x2 = 0.28, y2 = 0.70;
+        const lenSq = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+        const t = Math.max(0, Math.min(1, ((lx - x1) * (x2 - x1) + (ly - y1) * (y2 - y1)) / lenSq));
+        const projX = x1 + t * (x2 - x1);
+        const projY = y1 + t * (y2 - y1);
+        const diagDist = Math.sqrt((lx - projX) ** 2 + (ly - projY) ** 2);
+        const inDiagonal = diagDist <= 0.055 && ly >= 0.30 && ly <= 0.70;
+        const dotDist = Math.sqrt((lx - 0.76) ** 2 + (ly - 0.24) ** 2);
+        const inAccentDot = dotDist <= 0.045;
+
+        if (inTopBar || inBottomBar || inDiagonal) {
+          const gradT = (lx + ly) / 2;
+          return [Math.round(16 + gradT * 40), Math.round(185 + gradT * 40), Math.round(129 + gradT * 115), 255];
+        }
+        if (inAccentDot) {
+          return [245, 158, 11, 255];
+        }
+        return [15, 23, 42, 255];
+      }
+    }
+
+    // Top and bottom border accent line
+    if (y < 4 || y > height - 5) {
+      return [16, 185, 129, 200];
+    }
+
+    return [bgR, bgG, bgB, 255];
+  });
+}
+
 function main() {
   const assetsDir = path.join(process.cwd(), 'apps/api/public/assets');
   fs.mkdirSync(assetsDir, { recursive: true });
@@ -185,6 +257,13 @@ function main() {
   const faviconPath = path.join(assetsDir, 'favicon.ico');
   fs.writeFileSync(faviconPath, icon128); // Standard ICO fallback
   console.log(`✅ Generated Favicon: ${faviconPath}`);
+
+  // 5. Open Graph Image (1200x630)
+  const ogImage = renderZayunoOgImage();
+  const ogImagePath = path.join(assetsDir, 'og-image.png');
+  fs.writeFileSync(ogImagePath, ogImage);
+  console.log(`✅ Generated 1200×630 Open Graph Image: ${ogImagePath} (${ogImage.length} bytes)`);
 }
 
 main();
+

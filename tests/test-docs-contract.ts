@@ -50,8 +50,19 @@ assert.ok(deploymentDoc.includes('scripts/deploy-production.ps1'), 'docs/deploym
 assert.ok(observability.includes('.current_release_sha'), 'docs/operations-observability.md is missing release state tracking');
 assert.ok(changelog.includes('GHCR immutable container images'), 'docs/CHANGELOG.md is missing GHCR deployment entry');
 
+const publicPagesController = read('apps/api/src/modules/public-pages/public-pages.controller.ts');
+assert.ok(publicPagesController.includes('@Get(\'robots.txt\')'), 'PublicPagesController is missing robots.txt endpoint.');
+assert.ok(publicPagesController.includes('@Get(\'sitemap.xml\')'), 'PublicPagesController is missing sitemap.xml endpoint.');
+assert.ok(publicPagesController.includes('https://schema.org'), 'PublicPagesController is missing JSON-LD schema definitions.');
+assert.ok(publicPagesController.includes('canonicalUrl'), 'PublicPagesController is missing canonical URL logic.');
+assert.ok(publicPagesController.includes('google-site-verification'), 'PublicPagesController is missing google-site-verification.');
+assert.ok(publicPagesController.includes('yandex-verification'), 'PublicPagesController is missing yandex-verification.');
+assert.ok(publicPagesController.includes('yandex_f58af2445b7b4bbf.html'), 'PublicPagesController is missing Yandex verification file endpoint.');
+assert.ok(changelog.includes('Technical SEO'), 'CHANGELOG is missing Technical SEO entry.');
+
 assert.ok(!adminUi.includes('href="http://localhost:4000/api/docs"'), 'Production-facing Swagger link is hardcoded to localhost.');
 assert.ok(!adminUi.includes('href="http://localhost:4001/api/v1/info"'), 'Production-facing sandbox link is hardcoded to localhost.');
 
-console.log('Documentation contract checks passed.');
+console.log('Documentation and SEO contract checks passed.');
+
 
