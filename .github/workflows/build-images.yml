@@ -9,6 +9,8 @@ on:
       - 'packages/**'
       - 'integrations/**'
       - 'infra/docker/**'
+      - 'deploy/**'
+      - 'docker-compose.prod.yml'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
