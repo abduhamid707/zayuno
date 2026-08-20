@@ -135,6 +135,7 @@ services:
       - CORS_ORIGINS=https://zayuno.uz,https://developers.zayuno.uz,https://admin.zayuno.uz,https://partners.zayuno.uz
       - ENABLE_SWAGGER=false
       - ZAYUNO_WEBHOOK_SECRET=${ZAYUNO_WEBHOOK_SECRET:?ZAYUNO_WEBHOOK_SECRET is required}
+      - SIMULATOR_SESSION_SECRET=${SIMULATOR_SESSION_SECRET:-}
       - MOCK_EVOS_SHARED_SECRET=${MOCK_EVOS_SHARED_SECRET:?MOCK_EVOS_SHARED_SECRET is required}
       - DEVELOPERS_PUBLIC_URL=https://developers.zayuno.uz
       - API_PUBLIC_URL=https://api.zayuno.uz
