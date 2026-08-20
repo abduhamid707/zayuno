@@ -63,6 +63,40 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  isReady(): boolean {
+    return Boolean(this.client && this.client.status === 'ready');
+  }
+
+  /**
+   * Atomically increment a key and optionally set expiration if new.
+   */
+  async incr(key: string, ttlSeconds?: number): Promise<number> {
+    const val = await this.client.incr(key);
+    if (val === 1 && ttlSeconds) {
+      await this.client.expire(key, ttlSeconds);
+    }
+    return val;
+  }
+
+  async sadd(key: string, member: string, ttlSeconds?: number): Promise<void> {
+    await this.client.sadd(key, member);
+    if (ttlSeconds) {
+      await this.client.expire(key, ttlSeconds);
+    }
+  }
+
+  async srem(key: string, member: string): Promise<void> {
+    await this.client.srem(key, member);
+  }
+
+  async smembers(key: string): Promise<string[]> {
+    return await this.client.smembers(key);
+  }
+
+  async scard(key: string): Promise<number> {
+    return await this.client.scard(key);
+  }
+
   /**
    * Acquire a distributed lock. Returns true if acquired.
    */

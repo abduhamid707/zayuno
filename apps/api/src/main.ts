@@ -9,6 +9,10 @@ async function bootstrap() {
   // normalizes whitespace and must never be used as the HMAC input.
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
+  // Configure trusted proxy (e.g. loopback Nginx in production or TRUST_PROXY setting)
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', process.env.TRUST_PROXY || 'loopback');
+
   // Security Middleware
   app.use(helmet({
     contentSecurityPolicy: false,

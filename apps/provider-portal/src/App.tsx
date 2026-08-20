@@ -38,9 +38,20 @@ import {
   MessageCircle,
   CheckSquare,
   Activity,
-  Eye
+  Eye,
+  Sparkles,
+  Bot,
+  FileText
 } from 'lucide-react';
 import { DocsViewer } from './DocsViewer';
+import {
+  generateAiPrompt,
+  generateContractJson,
+  GOAL_OPTIONS,
+  FRAMEWORK_OPTIONS,
+  AiIntegrationGoal,
+  AiFramework
+} from './ai-integration-kit';
 
 const API_BASE =
   (import.meta as any).env?.VITE_API_URL ||
@@ -49,16 +60,17 @@ const API_BASE =
     : 'http://localhost:4000');
 const SHOW_LOCAL_SIMULATOR = (import.meta as any).env?.VITE_ENABLE_LOCAL_SIMULATOR === 'true' || true;
 
-const SANDBOX_DEMO_API_KEY = 'zy_live_agent_secret_key_12345';
 const SANDBOX_PROVIDER_SLUG = 'sandbox-provider';
 
 const PROVIDER_CAPABILITIES = [
   'METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE',
   'ACTION_CREATE', 'ACTION_STATUS', 'ACTION_CANCEL', 'PAYMENT_OPTIONS', 'WEBHOOK'
 ];
-const MANDATORY_PROVIDER_CAPABILITIES = new Set([
+const READONLY_CAPABILITIES = ['METADATA', 'HEALTH', 'CATALOG'];
+const TRANSACTIONAL_MANDATORY_CAPABILITIES = [
   'METADATA', 'HEALTH', 'CATALOG', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK'
-]);
+];
+const MANDATORY_PROVIDER_CAPABILITIES = new Set(TRANSACTIONAL_MANDATORY_CAPABILITIES);
 
 export default function App() {
   const [token, setToken] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('zayuno_provider_token') || '' : ''));
@@ -125,6 +137,7 @@ export default function App() {
   const [sandboxAction, setSandboxAction] = useState<any>(null);
   const [sandboxLoading, setSandboxLoading] = useState<boolean>(false);
   const [sandboxError, setSandboxError] = useState<string | null>(null);
+  const [simulatorSessionToken, setSimulatorSessionToken] = useState<string | null>(null);
 
   const [createdCredentials, setCreatedCredentials] = useState<any>(null);
   const [selectedProviderActionId, setSelectedProviderActionId] = useState<string | null>(null);
@@ -138,6 +151,13 @@ export default function App() {
     authMethod: 'API_KEY',
     capabilities: [...PROVIDER_CAPABILITIES]
   });
+
+  // AI Integration Kit Modal State
+  const [aiKitOpen, setAiKitOpen] = useState(false);
+  const [aiGoal, setAiGoal] = useState<AiIntegrationGoal>('create-new');
+  const [aiFramework, setAiFramework] = useState<AiFramework>('nodejs-express');
+  const [aiCopiedToast, setAiCopiedToast] = useState<string | null>(null);
+  const [locale, setLocale] = useState<'uz' | 'en'>('uz');
 
   // URL Query Sync
   useEffect(() => {
@@ -426,24 +446,36 @@ export default function App() {
     }
   });
 
+  // Helper to ensure simulator session
+  const getOrFetchSimulatorSession = async (): Promise<string> => {
+    if (simulatorSessionToken) return simulatorSessionToken;
+    const res = await fetch(`${API_BASE}/api/v1/developer/sandbox/session`, { method: 'POST' });
+    if (!res.ok) throw new Error('Simulator session creation failed');
+    const data = await res.json();
+    setSimulatorSessionToken(data.sessionToken);
+    return data.sessionToken;
+  };
+
   // Sandbox simulation actions
   const runSandboxDiscovery = async () => {
     setSandboxLoading(true);
     setSandboxError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/providers/find?category=general_services`, {
-        headers: {
-          'x-api-key': SANDBOX_DEMO_API_KEY
-        }
-      });
+      // 1. Obtain signed simulator session
+      const sessionRes = await fetch(`${API_BASE}/api/v1/developer/sandbox/session`, { method: 'POST' });
+      if (!sessionRes.ok) throw new Error('Session creation failed');
+      const sessionData = await sessionRes.json();
+      setSimulatorSessionToken(sessionData.sessionToken);
+
+      // 2. Discover sandbox provider
+      const res = await fetch(`${API_BASE}/api/v1/providers/find?category=general_services`);
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || `Discovery failed with status ${res.status}`);
+        throw new Error('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
       }
       await res.json();
       setSandboxStep(2);
     } catch (e: any) {
-      setSandboxError(e.message || 'Discovery xatosi');
+      setSandboxError('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
     } finally {
       setSandboxLoading(false);
     }
@@ -453,11 +485,12 @@ export default function App() {
     setSandboxLoading(true);
     setSandboxError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/quotes`, {
+      const sessionToken = await getOrFetchSimulatorSession();
+      const res = await fetch(`${API_BASE}/api/v1/developer/sandbox/quote`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': SANDBOX_DEMO_API_KEY
+          'x-simulator-session': sessionToken
         },
         body: JSON.stringify({
           providerSlug: SANDBOX_PROVIDER_SLUG,
@@ -465,14 +498,13 @@ export default function App() {
         })
       });
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || `Quote calculation failed with status ${res.status}`);
+        throw new Error('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
       }
       const data = await res.json();
       setSandboxQuote(data);
       setSandboxStep(3);
     } catch (e: any) {
-      setSandboxError(e.message || 'Kotirovka hisoblashda xatolik');
+      setSandboxError('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
     } finally {
       setSandboxLoading(false);
     }
@@ -482,14 +514,15 @@ export default function App() {
     setSandboxLoading(true);
     setSandboxError(null);
     try {
+      const sessionToken = await getOrFetchSimulatorSession();
       const idempKey = `sb_sim_${Date.now()}`;
       const quoteId = sandboxQuote?.id || sandboxQuote?.quoteId;
-      const res = await fetch(`${API_BASE}/api/v1/actions`, {
+      const res = await fetch(`${API_BASE}/api/v1/developer/sandbox/action`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'idempotency-key': idempKey,
-          'x-api-key': SANDBOX_DEMO_API_KEY
+          'x-simulator-session': sessionToken
         },
         body: JSON.stringify({
           idempotencyKey: idempKey,
@@ -501,14 +534,13 @@ export default function App() {
         })
       });
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || `Action dispatch failed with status ${res.status}`);
+        throw new Error('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
       }
       const data = await res.json();
       setSandboxAction(data);
       setSandboxStep(4);
     } catch (e: any) {
-      setSandboxError(e.message || 'Action yaratishda xatolik');
+      setSandboxError('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
     } finally {
       setSandboxLoading(false);
     }
@@ -519,21 +551,21 @@ export default function App() {
     setSandboxLoading(true);
     setSandboxError(null);
     try {
+      const sessionToken = await getOrFetchSimulatorSession();
       const actionId = sandboxAction.actionId || sandboxAction.publicId || sandboxAction.id;
-      const res = await fetch(`${API_BASE}/api/v1/actions/${actionId}`, {
+      const res = await fetch(`${API_BASE}/api/v1/developer/sandbox/action/${actionId}`, {
         headers: {
-          'x-api-key': SANDBOX_DEMO_API_KEY
+          'x-simulator-session': sessionToken
         }
       });
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || `Status check failed with status ${res.status}`);
+        throw new Error('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
       }
       const updated = await res.json();
       setSandboxAction(updated);
       setSandboxStep(5);
     } catch (e: any) {
-      setSandboxError(e.message || 'Webhook simulyatsiyasida xatolik');
+      setSandboxError('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
     } finally {
       setSandboxLoading(false);
     }
@@ -541,6 +573,53 @@ export default function App() {
 
   const provider = providerData || null;
   const certReport = certifyMutation.data;
+
+  // AI Integration Kit Actions
+  const copyAiPrompt = async (target: 'chatgpt' | 'claude' | 'cursor' | 'codex') => {
+    const prompt = generateAiPrompt({
+      goal: aiGoal,
+      framework: aiFramework,
+      provider: provider,
+      certReport: certReport,
+      isAiTarget: target
+    });
+    try {
+      await navigator.clipboard.writeText(prompt);
+      const targetName = target === 'chatgpt' || target === 'codex' ? 'ChatGPT / Codex' : 'Claude / Cursor';
+      setAiCopiedToast(`${targetName} uchun prompt nusxalandi!`);
+      setTimeout(() => setAiCopiedToast(null), 3000);
+    } catch {
+      setAiCopiedToast('Prompt clipboardga nusxalandi!');
+      setTimeout(() => setAiCopiedToast(null), 3000);
+    }
+  };
+
+  const downloadMarkdown = () => {
+    const prompt = generateAiPrompt({
+      goal: aiGoal,
+      framework: aiFramework,
+      provider: provider,
+      certReport: certReport
+    });
+    const blob = new Blob([prompt], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zayuno-${provider?.slug || 'provider'}-integration.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadContractJson = () => {
+    const jsonStr = generateContractJson(provider);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zayuno-${provider?.slug || 'provider'}-contract.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
@@ -636,8 +715,20 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Right Status & Account */}
-        <div className="flex items-center gap-3 text-xs">
+        {/* Right Status, Language & Account */}
+        <div className="flex items-center gap-2.5 text-xs">
+          <button
+            onClick={() => setAiKitOpen(true)}
+            className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold px-3 py-1.5 rounded-lg text-xs shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" /> AI Kit
+          </button>
+          <button
+            onClick={() => setLocale(l => l === 'uz' ? 'en' : 'uz')}
+            className="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white font-mono text-xs transition-colors"
+          >
+            {locale.toUpperCase()}
+          </button>
           {token ? (
             <div className="flex items-center gap-2">
               <div className="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2">
@@ -682,7 +773,7 @@ export default function App() {
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-slate-900 border border-indigo-500/20 p-8 shadow-2xl">
               <div className="max-w-3xl space-y-4">
                 <span className="text-xs font-mono bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full border border-indigo-500/30">
-                  Provider Integration Contract v1
+                  AI-First Provider Integration Contract v1
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
                   Connect Your Business to <br />
@@ -691,9 +782,15 @@ export default function App() {
                   </span>
                 </h1>
                 <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-                  Zayuno is a neutral action infrastructure platform. External providers (commerce, logistics, retail, bookings, and services) integrate against our open protocol so AI agents can discover services, calculate quotes, and trigger actions.
+                  AI yordamida provider API’ingizni Zayuno’ga ulang, test qiling va certificationdan o‘ting. ChatGPT, Claude va Cursor orqali xizmatlaringizni jonli AI agentlar qidiruviga chiqaring.
                 </p>
                 <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <button
+                    onClick={() => setAiKitOpen(true)}
+                    className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300" /> AI bilan integratsiya qilish
+                  </button>
                   <button
                     onClick={() => {
                       if (!token) {
@@ -703,13 +800,13 @@ export default function App() {
                         setActiveTab('apps');
                       }
                     }}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
+                    className="bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs px-5 py-2.5 rounded-xl border border-slate-700 transition-all flex items-center gap-2"
                   >
                     Provider bo‘lish <ArrowRight className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setActiveTab('docs')}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-5 py-2.5 rounded-xl border border-slate-700 transition-all flex items-center gap-2"
+                    className="bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs font-medium px-4 py-2.5 rounded-xl border border-slate-800 transition-all flex items-center gap-2"
                   >
                     <BookOpen className="w-3.5 h-3.5" /> Hujjatlarni o‘qish
                   </button>
@@ -734,7 +831,7 @@ export default function App() {
                   </div>
                   <h3 className="font-semibold text-white text-sm">Kimlar ro‘yxatdan o‘ta oladi?</h3>
                   <p className="text-slate-400">
-                    O‘zbekistonda xizmat ko‘rsatuvchi yuridik shaxslar, xususiy tadbirkorlar va raqamli servislar (yetkazib berish, do‘kon, transport, xizmatlar, band qilish).
+                    O‘zbekistonda xizmat ko‘rsatuvchi yuridik shaxslar, xususiy tadbirkorlar va raqamli servislar (yetkazib berish, do‘kon, transport, xizmatlar, band qilish, Telegram botlar).
                   </p>
                 </div>
 
@@ -742,9 +839,9 @@ export default function App() {
                   <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold border border-sky-500/20">
                     2
                   </div>
-                  <h3 className="font-semibold text-white text-sm">Kerakli API va xavfsizlik</h3>
+                  <h3 className="font-semibold text-white text-sm">Universal Capability Profillari</h3>
                   <p className="text-slate-400">
-                    Backend HTTP endpointlaringiz (7 ta majburiy capability), HTTPS/SSL sertifikati, HMAC-SHA256 imzosi va kotirovka aniqligi talab qilinadi.
+                    Sizning servisingizga mos profilni tanlang: Discovery / Read-only (3 ta endpoint) yoki To‘liq Tranzaksion (7 ta endpoint), HTTPS va HMAC-SHA256 xavfsizligi.
                   </p>
                 </div>
 
@@ -783,30 +880,39 @@ export default function App() {
               </div>
             </div>
 
-            {/* Capabilities Matrix Section */}
+            {/* Capabilities Profiles Section */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
               <h2 className="text-base font-semibold text-white flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-400" /> Mandatory vs Optional Capabilities
+                <Layers className="w-4 h-4 text-indigo-400" /> Universal Capability Profiles
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="space-y-2">
-                  <span className="text-[11px] font-mono font-bold text-emerald-400 tracking-wider">MANDATORY (7 OF 7 REQUIRED)</span>
+                <div className="space-y-3 bg-slate-950/60 border border-indigo-500/20 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold text-sky-400 tracking-wider">PROFILE A: DISCOVERY / READ-ONLY</span>
+                    <span className="text-[10px] bg-sky-500/10 text-sky-300 px-2 py-0.5 rounded-full border border-sky-500/20">3 Capabilities</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px]">Kataloglar, Telegram recruitment, ommaviy narxlar va qidiruv botlari uchun:</p>
                   <div className="space-y-1.5">
-                    {['METADATA (GET /provider-info)', 'HEALTH (GET /health)', 'CATALOG (GET /catalog, GET /offerings/:id)', 'QUOTE (POST /quote)', 'ACTION_CREATE (POST /actions with NextAction)', 'ACTION_STATUS (GET /actions/:id)', 'WEBHOOK (HMAC-SHA256 event push)'].map((c, i) => (
-                      <div key={i} className="flex items-center gap-2 bg-slate-950/60 border border-slate-800 px-3 py-2 rounded-lg">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    {['METADATA (GET /provider-info)', 'HEALTH (GET /health)', 'CATALOG (GET /catalog, GET /offerings/:id)'].map((c, i) => (
+                      <div key={i} className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
                         <span className="font-mono text-slate-300">{c}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <span className="text-[11px] font-mono font-bold text-slate-400 tracking-wider">OPTIONAL (AS APPLICABLE)</span>
+
+                <div className="space-y-3 bg-slate-950/60 border border-emerald-500/20 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 tracking-wider">PROFILE B: FULL TRANSACTIONAL</span>
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/20">7 Capabilities</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px]">Yetkazib berish, e-tijorat, xizmatlar va buyurtma platformalari uchun:</p>
                   <div className="space-y-1.5">
-                    {['LOCATIONS (GET /locations)', 'SEARCH (GET /search)', 'LIVE_AVAILABILITY (POST /availability extension)', 'ACTION_CANCEL (POST /actions/:id/cancel)', 'PAYMENT_OPTIONS (GET /actions/:id/payment-options)'].map((c, i) => (
-                      <div key={i} className="flex items-center gap-2 bg-slate-950/60 border border-slate-800 px-3 py-2 rounded-lg">
-                        <span className="w-3.5 h-3.5 rounded-full border border-slate-600 flex items-center justify-center text-[9px] text-slate-400">○</span>
-                        <span className="font-mono text-slate-400">{c}</span>
+                    {['METADATA, HEALTH, CATALOG', 'QUOTE (POST /quote)', 'ACTION_CREATE (POST /actions with NextAction)', 'ACTION_STATUS (GET /actions/:id)', 'WEBHOOK (HMAC-SHA256 push)'].map((c, i) => (
+                      <div key={i} className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                        <span className="font-mono text-slate-300">{c}</span>
                       </div>
                     ))}
                   </div>
@@ -820,7 +926,11 @@ export default function App() {
         {/* TAB 2: INTERACTIVE DOCUMENTATION (PUBLIC)                                  */}
         {/* ========================================================================= */}
         {activeTab === 'docs' && (
-          <DocsViewer selectedDoc={selectedDoc} onSelectDoc={setSelectedDoc} />
+          <DocsViewer
+            selectedDoc={selectedDoc}
+            onSelectDoc={setSelectedDoc}
+            onOpenAiKit={() => setAiKitOpen(true)}
+          />
         )}
 
         {/* ========================================================================= */}
@@ -828,7 +938,21 @@ export default function App() {
         {/* ========================================================================= */}
         {activeTab === 'apps' && (
           <div className="space-y-6 animate-fadeIn">
-            {!provider ? (
+            {!token ? (
+              <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
+                  <Lock className="w-7 h-7" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Bu bo‘lim uchun avval account yarating</h3>
+                <p className="text-xs text-slate-400">Provider dashboard, API kalitlari va webhook sozlamalarini boshqarish uchun avval tizimga kiring.</p>
+                <button
+                  onClick={() => { setAuthModalTab('signup'); setAuthModalOpen(true); }}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all inline-flex items-center gap-2"
+                >
+                  Ro‘yxatdan o‘tish / Kirish <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : !provider ? (
               /* APPLICATION WIZARD FOR NEW PROVIDERS */
               <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 max-w-4xl mx-auto">
                 <div className="border-b border-slate-800 pb-4">
@@ -1239,18 +1363,44 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div>
-                        <p className="text-xs text-slate-400 mb-2">Capabilities</p>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold text-white">Capabilities & Profile</p>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setIntegrationForm(current => ({
+                                ...current,
+                                capabilities: Array.from(new Set([...READONLY_CAPABILITIES]))
+                              }))}
+                              className="px-2.5 py-1 rounded-lg text-[10px] font-mono border border-sky-500/30 bg-sky-950/30 text-sky-300 hover:bg-sky-900/40 transition"
+                            >
+                              Discovery / Read-only
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIntegrationForm(current => ({
+                                ...current,
+                                capabilities: Array.from(new Set([...TRANSACTIONAL_MANDATORY_CAPABILITIES]))
+                              }))}
+                              className="px-2.5 py-1 rounded-lg text-[10px] font-mono border border-emerald-500/30 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-900/40 transition"
+                            >
+                              Transactional
+                            </button>
+                          </div>
+                        </div>
+
                         <div className="flex flex-wrap gap-2">
                           {PROVIDER_CAPABILITIES.map(capability => {
-                            const mandatory = MANDATORY_PROVIDER_CAPABILITIES.has(capability);
-                            const checked = mandatory || integrationForm.capabilities.includes(capability);
+                            const isReadOnlyMandatory = READONLY_CAPABILITIES.includes(capability);
+                            const isTransactionalMandatory = TRANSACTIONAL_MANDATORY_CAPABILITIES.includes(capability);
+                            const checked = integrationForm.capabilities.includes(capability);
                             return (
-                              <label key={capability} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] ${mandatory ? 'border-indigo-500/30 bg-indigo-950/30 text-indigo-200' : 'border-slate-700 bg-slate-950 text-slate-300'}`}>
+                              <label key={capability} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] cursor-pointer transition ${checked ? (isTransactionalMandatory ? 'border-indigo-500/40 bg-indigo-950/40 text-indigo-200' : 'border-emerald-500/40 bg-emerald-950/30 text-emerald-300') : 'border-slate-800 bg-slate-950 text-slate-400'}`}>
                                 <input
                                   type="checkbox"
                                   checked={checked}
-                                  disabled={mandatory || provider.status === 'ACTIVE'}
+                                  disabled={provider.status === 'ACTIVE'}
                                   onChange={event => setIntegrationForm(current => ({
                                     ...current,
                                     capabilities: event.target.checked
@@ -1258,12 +1408,13 @@ export default function App() {
                                       : current.capabilities.filter(value => value !== capability)
                                   }))}
                                 />
-                                {capability}{mandatory ? ' *' : ''}
+                                {capability}
+                                {isReadOnlyMandatory && <span className="text-[9px] text-sky-400 font-mono">RO</span>}
                               </label>
                             );
                           })}
                         </div>
-                        <p className="mt-2 text-[11px] text-slate-500">* Majburiy capability. Optional capability faqat API’ingiz haqiqatan qo‘llasa tanlanadi.</p>
+                        <p className="mt-1 text-[11px] text-slate-500">Discovery profili uchun [METADATA, HEALTH, CATALOG] yetarli. Tranzaksion xizmatlar uchun barcha 7 ta capability talab qilinadi.</p>
                       </div>
 
                       <button
@@ -1525,106 +1676,144 @@ export default function App() {
         {/* ========================================================================= */}
         {activeTab === 'certification' && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Automated Capability Certification</h2>
-                <p className="text-xs text-slate-400">Verifies provider compliance against mandatory contracts, idempotency, payment handoffs, and webhook signatures.</p>
+            {!token ? (
+              <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
+                  <Lock className="w-7 h-7" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Bu bo‘lim uchun avval account yarating</h3>
+                <p className="text-xs text-slate-400">Avtomatlashtirilgan capability certification testlarini o‘tkazish uchun avval tizimga kiring.</p>
+                <button
+                  onClick={() => { setAuthModalTab('login'); setAuthModalOpen(true); }}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all inline-flex items-center gap-2"
+                >
+                  Kirish <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <button
-                onClick={() => certifyMutation.mutate()}
-                disabled={certifyMutation.isPending || !provider?.slug}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2"
-              >
-                {certifyMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                Run Full Certification
-              </button>
-            </div>
-
-            {certReport ? (
-              <div className="space-y-6">
-                {/* Result Banner */}
-                <div className={`p-6 rounded-2xl border flex items-center justify-between ${
-                  certReport.isCertified
-                    ? 'bg-emerald-950/40 border-emerald-500/40'
-                    : 'bg-rose-950/40 border-rose-500/40'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    {certReport.isCertified ? (
-                      <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-                    ) : (
-                      <XCircle className="w-8 h-8 text-rose-400" />
-                    )}
-                    <div>
-                      <h3 className="text-base font-bold text-white">
-                        {certReport.isCertified ? 'Provider Integration Certified' : 'Certification Tests Failed'}
-                      </h3>
-                      <p className="text-xs text-slate-300">
-                        {certReport.passedCount} of {certReport.totalTests} tests passed. Production ready: {certReport.isProductionReady ? 'YES' : 'NO'}.
-                      </p>
-                    </div>
-                  </div>
-                  <span className={`text-xs font-mono font-bold px-3 py-1 rounded-full border ${
-                    certReport.isCertified
-                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                      : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                  }`}>
-                    {certReport.isCertified ? 'PASS' : 'FAIL'}
-                  </span>
+            ) : !provider?.slug ? (
+              <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
+                  <Building2 className="w-7 h-7" />
                 </div>
-
-                {/* Test Results Table */}
-                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-mono">
-                      <tr>
-                        <th className="p-3.5">Test Case</th>
-                        <th className="p-3.5">Capability</th>
-                        <th className="p-3.5">Type</th>
-                        <th className="p-3.5">Duration</th>
-                        <th className="p-3.5 text-right">Result</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {certReport.tests.map((t: any, i: number) => (
-                        <tr key={i} className="hover:bg-slate-800/30">
-                          <td className="p-3.5 font-medium text-white">{t.name}</td>
-                          <td className="p-3.5 font-mono text-indigo-300">{t.capability}</td>
-                          <td className="p-3.5">
-                            {t.isMandatory ? (
-                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded border border-emerald-500/30">
-                                MANDATORY
-                              </span>
-                            ) : (
-                              <span className="text-[10px] bg-slate-800 text-slate-400 font-mono px-2 py-0.5 rounded">
-                                OPTIONAL
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3.5 font-mono text-slate-400">{t.durationMs}ms</td>
-                          <td className="p-3.5 text-right">
-                            {t.passed ? (
-                              <span className="text-emerald-400 font-semibold flex items-center justify-end gap-1">
-                                <Check className="w-3.5 h-3.5" /> PASS
-                              </span>
-                            ) : (
-                              <span className="text-rose-400 font-semibold flex items-center justify-end gap-1">
-                                <XCircle className="w-3.5 h-3.5" /> FAIL
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <h3 className="text-lg font-bold text-white">Avval provider app yarating</h3>
+                <p className="text-xs text-slate-400">Certification testlarini o‘tkazish uchun avval Apps bo‘limida provider arizangizni yarating.</p>
+                <button
+                  onClick={() => setActiveTab('apps')}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all inline-flex items-center gap-2"
+                >
+                  Yangi App yaratish <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             ) : (
-              <div className="bg-slate-900/40 border border-slate-800 border-dashed rounded-2xl p-12 text-center space-y-3">
-                <ShieldCheck className="w-12 h-12 text-slate-600 mx-auto" />
-                <h3 className="text-sm font-semibold text-slate-300">Ready to execute compliance tests</h3>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  Click the button above to run the automated test suite against <code className="text-indigo-400 font-mono">{provider?.slug || 'your provider'}</code>.
-                </p>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Automated Capability Certification</h2>
+                    <p className="text-xs text-slate-400">Verifies provider compliance against mandatory contracts, idempotency, payment handoffs, and webhook signatures.</p>
+                  </div>
+                  <button
+                    onClick={() => certifyMutation.mutate()}
+                    disabled={certifyMutation.isPending || !provider?.slug}
+                    className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2"
+                  >
+                    {certifyMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    Run Full Certification
+                  </button>
+                </div>
+
+                {certReport ? (
+                  <div className="space-y-6">
+                    {/* Result Banner */}
+                    <div className={`p-6 rounded-2xl border flex items-center justify-between ${
+                      certReport.isCertified
+                        ? 'bg-emerald-950/40 border-emerald-500/40'
+                        : 'bg-rose-950/40 border-rose-500/40'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        {certReport.isCertified ? (
+                          <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                        ) : (
+                          <XCircle className="w-8 h-8 text-rose-400" />
+                        )}
+                        <div>
+                          <h3 className="text-base font-bold text-white">
+                            {certReport.isCertified ? 'Provider Integration Certified' : 'Certification Tests Failed'}
+                          </h3>
+                          <p className="text-xs text-slate-300">
+                            {certReport.passedCount} of {certReport.totalTests} tests passed. Production ready: {certReport.isProductionReady ? 'YES' : 'NO'}.
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`text-xs font-mono font-bold px-3 py-1 rounded-full border ${
+                        certReport.isCertified
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                      }`}>
+                        {certReport.isCertified ? 'CERTIFIED' : 'FAILED'}
+                      </span>
+                    </div>
+
+                    {/* Test Results Table */}
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-mono text-[11px]">
+                          <tr>
+                            <th className="p-3.5">Capability & Test</th>
+                            <th className="p-3.5">Category</th>
+                            <th className="p-3.5">Duration</th>
+                            <th className="p-3.5 text-right">Result</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60">
+                          {certReport.tests.map((t: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-slate-800/40 transition">
+                              <td className="p-3.5">
+                                <div className="font-semibold text-white">{t.name}</div>
+                                <div className="text-[11px] text-slate-400 font-mono">{t.capability}</div>
+                                {t.error && (
+                                  <div className="mt-1 text-[11px] text-rose-300 bg-rose-950/30 border border-rose-500/20 p-1.5 rounded-lg">
+                                    {t.error}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3.5">
+                                {t.isMandatory ? (
+                                  <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full text-[10px] font-mono">
+                                    MANDATORY
+                                  </span>
+                                ) : (
+                                  <span className="bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full text-[10px] font-mono">
+                                    OPTIONAL
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3.5 font-mono text-slate-400">{t.durationMs}ms</td>
+                              <td className="p-3.5 text-right">
+                                {t.passed ? (
+                                  <span className="text-emerald-400 font-semibold flex items-center justify-end gap-1">
+                                    <Check className="w-3.5 h-3.5" /> PASS
+                                  </span>
+                                ) : (
+                                  <span className="text-rose-400 font-semibold flex items-center justify-end gap-1">
+                                    <XCircle className="w-3.5 h-3.5" /> FAIL
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-900/40 border border-slate-800 border-dashed rounded-2xl p-12 text-center space-y-3">
+                    <ShieldCheck className="w-12 h-12 text-slate-600 mx-auto" />
+                    <h3 className="text-sm font-semibold text-slate-300">Ready to execute compliance tests</h3>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                      Click the button above to run the automated test suite against <code className="text-indigo-400 font-mono">{provider?.slug || 'your provider'}</code>.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1635,139 +1824,168 @@ export default function App() {
         {/* ========================================================================= */}
         {activeTab === 'inspector' && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-indigo-400" /> Live Provider API & Payload Inspector
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Real-time request/response audit logs, latencies, trace IDs, and sanitized payloads for {provider?.name || 'your provider'}.
-                </p>
+            {!token ? (
+              <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
+                  <Lock className="w-7 h-7" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Bu bo‘lim uchun avval account yarating</h3>
+                <p className="text-xs text-slate-400">Jonli API chaqiruvlari va webhook audit loglarini ko‘rish uchun avval tizimga kiring.</p>
+                <button
+                  onClick={() => { setAuthModalTab('login'); setAuthModalOpen(true); }}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all inline-flex items-center gap-2"
+                >
+                  Kirish <ArrowRight className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <button
-                onClick={() => refetchLogs()}
-                disabled={logsLoading}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${logsLoading ? 'animate-spin' : ''}`} />
-                Yangilash
-              </button>
-            </div>
+            ) : !provider?.slug ? (
+              <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
+                  <Building2 className="w-7 h-7" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Avval provider app yarating</h3>
+                <p className="text-xs text-slate-400">Live inspectorni ishlatish uchun avval Apps bo‘limida provider arizangizni yarating.</p>
+                <button
+                  onClick={() => setActiveTab('apps')}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all inline-flex items-center gap-2"
+                >
+                  Yangi App yaratish <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Activity className="w-5 h-5 text-indigo-400" /> Live Provider API & Payload Inspector
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Real-time request/response audit logs, latencies, trace IDs, and sanitized payloads for {provider?.name || 'your provider'}.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => refetchLogs()}
+                    disabled={logsLoading}
+                    className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${logsLoading ? 'animate-spin' : ''}`} />
+                    Yangilash
+                  </button>
+                </div>
 
-            {/* Filter Bar */}
-            <div className="grid gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:grid-cols-3 md:grid-cols-4">
-              <input
-                type="text"
-                placeholder="Trace ID bo‘yicha qidirish..."
-                value={inspectorFilters.traceId}
-                onChange={e => setInspectorFilters(cur => ({ ...cur, traceId: e.target.value }))}
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-              />
-              <input
-                type="date"
-                value={inspectorFilters.from}
-                onChange={e => setInspectorFilters(cur => ({ ...cur, from: e.target.value }))}
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-              />
-              <input
-                type="date"
-                value={inspectorFilters.to}
-                onChange={e => setInspectorFilters(cur => ({ ...cur, to: e.target.value }))}
-                className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-              />
-              <button
-                onClick={() => setInspectorFilters({ traceId: '', from: '', to: '' })}
-                className="rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3 py-2 text-xs text-slate-300 transition"
-              >
-                Filtrni tozalash
-              </button>
-            </div>
+                {/* Filter Bar */}
+                <div className="grid gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:grid-cols-3 md:grid-cols-4">
+                  <input
+                    type="text"
+                    placeholder="Trace ID bo‘yicha qidirish..."
+                    value={inspectorFilters.traceId}
+                    onChange={e => setInspectorFilters(cur => ({ ...cur, traceId: e.target.value }))}
+                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  />
+                  <input
+                    type="date"
+                    value={inspectorFilters.from}
+                    onChange={e => setInspectorFilters(cur => ({ ...cur, from: e.target.value }))}
+                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  />
+                  <input
+                    type="date"
+                    value={inspectorFilters.to}
+                    onChange={e => setInspectorFilters(cur => ({ ...cur, to: e.target.value }))}
+                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    onClick={() => setInspectorFilters({ traceId: '', from: '', to: '' })}
+                    className="rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3 py-2 text-xs text-slate-300 transition"
+                  >
+                    Filtrni tozalash
+                  </button>
+                </div>
 
-            {/* Logs Table */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-mono text-[11px]">
-                  <tr>
-                    <th className="p-3.5">Method & Endpoint</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5">Latency</th>
-                    <th className="p-3.5">Trace ID</th>
-                    <th className="p-3.5">Vaqt</th>
-                    <th className="p-3.5 text-right">Amal</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono">
-                  {logsLoading ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">
-                        Loglar yuklanmoqda...
-                      </td>
-                    </tr>
-                  ) : !providerLogsData?.logs || providerLogsData.logs.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">
-                        Hozircha hech qanday integration yoki webhook chaqiruvlari qayd etilmagan.
-                      </td>
-                    </tr>
-                  ) : (
-                    providerLogsData.logs.map((log: any) => (
-                      <tr key={log.id} className="hover:bg-slate-800/40 transition">
-                        <td className="p-3.5">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              log.method === 'POST' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-sky-500/20 text-sky-300'
-                            }`}>
-                              {log.method || 'EVENT'}
-                            </span>
-                            <span className="font-semibold text-slate-200">{log.endpoint || log.event}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 font-sans block mt-0.5">{log.source}</span>
-                        </td>
-                        <td className="p-3.5">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                            log.statusCode >= 200 && log.statusCode < 300
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                              : log.statusCode >= 400 && log.statusCode < 500
-                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                              : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                          }`}>
-                            {log.statusCode || 'ERR'}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-slate-400">
-                          {log.durationMs != null ? `${log.durationMs}ms` : '—'}
-                        </td>
-                        <td className="p-3.5 text-indigo-300 text-[11px]">
-                          {log.traceId ? (
-                            <div className="flex items-center gap-1">
-                              <span className="truncate max-w-[120px]">{log.traceId}</span>
-                              <button
-                                onClick={() => copyToClipboard(log.traceId, log.id)}
-                                title="Nusxalash"
-                                className="text-slate-500 hover:text-slate-300"
-                              >
-                                {copiedText === log.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                              </button>
-                            </div>
-                          ) : '—'}
-                        </td>
-                        <td className="p-3.5 text-slate-400 font-sans text-[11px]">
-                          {new Date(log.createdAt).toLocaleTimeString('uz-UZ')}
-                        </td>
-                        <td className="p-3.5 text-right">
-                          <button
-                            onClick={() => setSelectedInspectorLog(log)}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-lg text-xs font-sans font-medium transition flex items-center gap-1 ml-auto"
-                          >
-                            <Eye className="w-3.5 h-3.5" /> Ko‘rish
-                          </button>
-                        </td>
+                {/* Logs Table */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-mono text-[11px]">
+                      <tr>
+                        <th className="p-3.5">Method & Endpoint</th>
+                        <th className="p-3.5">Status</th>
+                        <th className="p-3.5">Latency</th>
+                        <th className="p-3.5">Trace ID</th>
+                        <th className="p-3.5">Vaqt</th>
+                        <th className="p-3.5 text-right">Amal</th>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono">
+                      {logsLoading ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">
+                            Loglar yuklanmoqda...
+                          </td>
+                        </tr>
+                      ) : !providerLogsData?.logs || providerLogsData.logs.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">
+                            Hozircha hech qanday integration yoki webhook chaqiruvlari qayd etilmagan.
+                          </td>
+                        </tr>
+                      ) : (
+                        providerLogsData.logs.map((log: any) => (
+                          <tr key={log.id} className="hover:bg-slate-800/40 transition">
+                            <td className="p-3.5">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  log.method === 'POST' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-sky-500/20 text-sky-300'
+                                }`}>
+                                  {log.method || 'EVENT'}
+                                </span>
+                                <span className="font-semibold text-slate-200">{log.endpoint || log.event}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 font-sans block mt-0.5">{log.source}</span>
+                            </td>
+                            <td className="p-3.5">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                log.statusCode >= 200 && log.statusCode < 300
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                  : log.statusCode >= 400 && log.statusCode < 500
+                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                  : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                              }`}>
+                                {log.statusCode || 'ERR'}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-slate-400">
+                              {log.durationMs != null ? `${log.durationMs}ms` : '—'}
+                            </td>
+                            <td className="p-3.5 text-indigo-300 text-[11px]">
+                              {log.traceId ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="truncate max-w-[120px]">{log.traceId}</span>
+                                  <button
+                                    onClick={() => copyToClipboard(log.traceId, log.id)}
+                                    title="Nusxalash"
+                                    className="text-slate-500 hover:text-slate-300"
+                                  >
+                                    {copiedText === log.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              ) : '—'}
+                            </td>
+                            <td className="p-3.5 text-right">
+                              <button
+                                onClick={() => setSelectedInspectorLog(log)}
+                                className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-lg text-xs font-sans font-medium transition flex items-center gap-1 ml-auto"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> Ko‘rish
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -2094,6 +2312,177 @@ export default function App() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* AI Integration Kit Modal */}
+      {aiKitOpen && (
+        <div className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-black/85 p-4 backdrop-blur-md animate-fadeIn">
+          <div className="my-8 w-full max-w-4xl rounded-2xl border border-indigo-500/30 bg-slate-900 p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white">
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                  </div>
+                  <span className="text-xs font-mono text-indigo-400 uppercase tracking-widest font-bold">
+                    AI Integration Kit
+                  </span>
+                </div>
+                <h2 className="text-xl font-bold text-white">
+                  {locale === 'uz' ? 'AI bilan integratsiya qilish (Copy for AI)' : 'AI Integration Assistant'}
+                </h2>
+                <p className="text-xs text-slate-400">
+                  {locale === 'uz'
+                    ? 'ChatGPT, Claude, Cursor yoki Codex uchun tayyor kontekst, kontrakt va vazifa promptini oling.'
+                    : 'Generate complete prompt, contracts, and code templates for ChatGPT, Claude, Cursor, or Codex.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setAiKitOpen(false)}
+                className="rounded-full bg-slate-800 p-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Zero Secrets Guarantee Alert */}
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3.5 flex items-center justify-between text-xs text-emerald-300">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  <strong>Maxfiylik kafolati:</strong> Ushbu prompt tarkibida hech qanday API key, webhook secret yoki mijoz ma’lumotlari (PII) mavjud emas.
+                </span>
+              </div>
+              <span className="text-[10px] font-mono bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">
+                100% SECURE
+              </span>
+            </div>
+
+            {/* Step 1: Goal Selector */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-white">
+                1. Integratsiya maqsadi (Goal):
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {GOAL_OPTIONS.map(g => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setAiGoal(g.id)}
+                    className={`p-3 rounded-xl border text-left text-xs transition-all flex flex-col justify-between gap-1.5 ${
+                      aiGoal === g.id
+                        ? 'border-indigo-500 bg-indigo-950/40 text-white shadow-lg shadow-indigo-500/10'
+                        : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="font-semibold text-slate-200 flex items-center justify-between">
+                      <span>{locale === 'uz' ? g.labelUz : g.labelEn}</span>
+                      {aiGoal === g.id && <Check className="w-3.5 h-3.5 text-indigo-400" />}
+                    </div>
+                    <p className="text-[11px] text-slate-500 line-clamp-2">
+                      {locale === 'uz' ? g.descriptionUz : g.descriptionEn}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 2: Framework Selector */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-white">
+                2. Texnologik stek / Framework:
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {FRAMEWORK_OPTIONS.map(fw => (
+                  <button
+                    key={fw.id}
+                    type="button"
+                    onClick={() => setAiFramework(fw.id)}
+                    className={`px-3 py-2 rounded-xl border text-xs font-medium transition-all flex items-center gap-2 ${
+                      aiFramework === fw.id
+                        ? 'border-sky-500 bg-sky-950/40 text-white shadow-md shadow-sky-500/10'
+                        : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>{fw.name}</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                      aiFramework === fw.id ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-900 text-slate-500'
+                    }`}>
+                      {fw.tag}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 3: Generated Prompt Preview */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-indigo-400" /> AI uchun tayyor prompt (Markdown Preview):
+                </label>
+                <span className="text-[11px] font-mono text-slate-500">
+                  Provider: {provider?.slug || 'demo-provider'}
+                </span>
+              </div>
+              <div className="relative rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
+                <pre className="p-4 text-[11px] font-mono text-indigo-200 max-h-64 overflow-y-auto whitespace-pre-wrap select-all">
+                  {generateAiPrompt({
+                    goal: aiGoal,
+                    framework: aiFramework,
+                    provider: provider,
+                    certReport: certReport
+                  })}
+                </pre>
+              </div>
+            </div>
+
+            {/* Step 4: Action Buttons Footer */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => copyAiPrompt('chatgpt')}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2"
+                >
+                  <Bot className="w-4 h-4 text-emerald-300" /> ChatGPT / Codex uchun nusxalash
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyAiPrompt('claude')}
+                  className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-purple-600/30 flex items-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" /> Claude / Cursor uchun nusxalash
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={downloadMarkdown}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-700 transition-all flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" /> Markdown (.md)
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadContractJson}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-700 transition-all flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" /> Contract (.json)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Toast Notification */}
+      {aiCopiedToast && (
+        <div className="fixed bottom-6 right-6 z-[100] bg-emerald-950 border border-emerald-500/50 text-emerald-200 px-4 py-3 rounded-xl shadow-2xl text-xs font-medium flex items-center gap-2 animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{aiCopiedToast}</span>
         </div>
       )}
 

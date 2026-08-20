@@ -41,6 +41,8 @@ import {
   UpdateProviderIntegrationInputSchema,
   ProviderCredentials,
   MANDATORY_CAPABILITIES,
+  getMandatoryCapabilitiesForProfile,
+  determineProviderCapabilityProfile,
   WelcomeInfo
 } from '@zayuno/contracts';
 import { ProviderCertificationRunner, CertificationReport } from '@zayuno/provider-sdk';
@@ -644,9 +646,11 @@ export class ProvidersService {
     if (invalidCapabilities.length > 0) {
       throw new BadRequestException(`Unknown capabilities: ${invalidCapabilities.join(', ')}`);
     }
-    const missingMandatory = MANDATORY_CAPABILITIES.filter(capability => !capabilities.includes(capability));
+    const mandatoryForProfile = getMandatoryCapabilitiesForProfile(capabilities, { type: provider.type as any });
+    const missingMandatory = mandatoryForProfile.filter(capability => !capabilities.includes(capability));
     if (missingMandatory.length > 0) {
-      throw new BadRequestException(`Missing mandatory capabilities: ${missingMandatory.join(', ')}`);
+      const profile = determineProviderCapabilityProfile(capabilities);
+      throw new BadRequestException(`Missing mandatory capabilities for ${profile} profile: ${missingMandatory.join(', ')}`);
     }
 
     const baseUrl = await this.validateRemoteBaseUrl(input.baseUrl);

@@ -67,6 +67,67 @@ export const MANDATORY_CAPABILITIES: readonly ProviderCapability[] = [
   ProviderCapability.WEBHOOK
 ] as const;
 
+export const READONLY_MANDATORY_CAPABILITIES: readonly ProviderCapability[] = [
+  ProviderCapability.METADATA,
+  ProviderCapability.HEALTH,
+  ProviderCapability.CATALOG
+] as const;
+
+export const TRANSACTIONAL_MANDATORY_CAPABILITIES: readonly ProviderCapability[] = [
+  ProviderCapability.METADATA,
+  ProviderCapability.HEALTH,
+  ProviderCapability.CATALOG,
+  ProviderCapability.QUOTE,
+  ProviderCapability.ACTION_CREATE,
+  ProviderCapability.ACTION_STATUS,
+  ProviderCapability.WEBHOOK
+] as const;
+
+export enum ProviderCapabilityProfile {
+  DISCOVERY_READONLY = 'DISCOVERY_READONLY',
+  TRANSACTIONAL = 'TRANSACTIONAL'
+}
+
+export function determineProviderCapabilityProfile(
+  capabilities: ProviderCapability[] = []
+): ProviderCapabilityProfile {
+  const isTransactional = capabilities.some(c =>
+    c === ProviderCapability.QUOTE ||
+    c === ProviderCapability.ACTION_CREATE ||
+    c === ProviderCapability.ACTION_STATUS ||
+    c === ProviderCapability.WEBHOOK
+  );
+  return isTransactional
+    ? ProviderCapabilityProfile.TRANSACTIONAL
+    : ProviderCapabilityProfile.DISCOVERY_READONLY;
+}
+
+export function getMandatoryCapabilitiesForProfile(
+  profileOrCapabilities: ProviderCapabilityProfile | ProviderCapability[],
+  options?: { isPhysical?: boolean; type?: ProviderType }
+): ProviderCapability[] {
+  const profile = Array.isArray(profileOrCapabilities)
+    ? determineProviderCapabilityProfile(profileOrCapabilities)
+    : profileOrCapabilities;
+
+  const baseMandatory: ProviderCapability[] =
+    profile === ProviderCapabilityProfile.DISCOVERY_READONLY
+      ? [...READONLY_MANDATORY_CAPABILITIES]
+      : [...TRANSACTIONAL_MANDATORY_CAPABILITIES];
+
+  const isPhysical =
+    options?.isPhysical ||
+    options?.type === ProviderType.DELIVERY ||
+    options?.type === ProviderType.RETAIL ||
+    options?.type === ProviderType.BOOKINGS;
+
+  if (isPhysical && !baseMandatory.includes(ProviderCapability.LOCATIONS)) {
+    baseMandatory.push(ProviderCapability.LOCATIONS);
+  }
+
+  return baseMandatory;
+}
+
 export const OPTIONAL_CAPABILITIES: readonly ProviderCapability[] = [
   ProviderCapability.LOCATIONS,
   ProviderCapability.SEARCH,

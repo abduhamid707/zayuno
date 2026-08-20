@@ -44,7 +44,11 @@ export class ActionsService {
     private redisService: RedisService
   ) {}
 
-  async createAction(input: CreateActionInput, userId?: string): Promise<NormalizedAction> {
+  async createAction(
+    input: CreateActionInput,
+    userId?: string,
+    options?: { allowSandboxSimulator?: boolean }
+  ): Promise<NormalizedAction> {
     if (!input.providerSlug) {
       throw new BadRequestException('providerSlug is required.');
     }
@@ -137,7 +141,10 @@ export class ActionsService {
     if (!provider) {
       throw new NotFoundError('Provider', cleanSlug);
     }
-    if (!isProviderPublished(provider)) {
+    const isSandboxSimulator = Boolean(
+      options?.allowSandboxSimulator && cleanSlug === 'sandbox-provider'
+    );
+    if (!isProviderPublished(provider) && !isSandboxSimulator) {
       throw new BadRequestException('Provider is not published for public actions.');
     }
 

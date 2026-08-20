@@ -13,7 +13,10 @@ import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
 export class QuotesService {
   constructor(private registry: ProviderRegistryService) {}
 
-  async requestQuote(input: RequestQuoteInput): Promise<NormalizedQuote> {
+  async requestQuote(
+    input: RequestQuoteInput,
+    options?: { allowSandboxSimulator?: boolean }
+  ): Promise<NormalizedQuote> {
     if (!input.providerSlug) {
       throw new BadRequestException('providerSlug is required.');
     }
@@ -27,7 +30,11 @@ export class QuotesService {
 
     const cleanSlug = input.providerSlug.toLowerCase().trim();
     const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
-    if (!provider || !isProviderPublished(provider)) {
+    const isSandboxSimulator = Boolean(
+      options?.allowSandboxSimulator && cleanSlug === 'sandbox-provider'
+    );
+
+    if (!provider || (!isProviderPublished(provider) && !isSandboxSimulator)) {
       throw new BadRequestException('Provider is not published for public quotes.');
     }
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.QUOTE);

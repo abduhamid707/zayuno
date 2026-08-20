@@ -18,6 +18,7 @@ import { NatsService } from './common/services/nats.service';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
+import { DeveloperSandboxModule } from './modules/developer-sandbox/developer-sandbox.module';
 import { CommonModule } from './common/common.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { CommonModule } from './common/common.module';
     WebhooksModule,
     AdminModule,
     PublicPagesModule,
+    DeveloperSandboxModule,
   ],
   providers: [
     RedisService,

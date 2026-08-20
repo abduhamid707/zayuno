@@ -4,6 +4,9 @@ import {
   ProviderCapability,
   MANDATORY_CAPABILITIES,
   OPTIONAL_CAPABILITIES,
+  ProviderCapabilityProfile,
+  determineProviderCapabilityProfile,
+  getMandatoryCapabilitiesForProfile,
   ActionStatus,
   PaymentMethodType,
   Offering,
@@ -29,6 +32,7 @@ export interface CertificationReport {
   isProductionReady: boolean;
   missingMandatoryCapabilities: ProviderCapability[];
   capabilitiesTested: ProviderCapability[];
+  profile: ProviderCapabilityProfile;
   tests: CertificationTestResult[];
 }
 
@@ -47,15 +51,17 @@ export class ProviderCertificationRunner {
   async runAllTests(): Promise<CertificationReport> {
     const results: CertificationTestResult[] = [];
     const declaredCaps = this.adapter.getCapabilities();
+    const profile = determineProviderCapabilityProfile(declaredCaps);
+    const mandatoryForProfile = getMandatoryCapabilitiesForProfile(declaredCaps);
 
-    // Check which mandatory capabilities are missing
-    const missingMandatoryCapabilities = MANDATORY_CAPABILITIES.filter(
+    // Check which mandatory capabilities are missing for this profile
+    const missingMandatoryCapabilities = mandatoryForProfile.filter(
       cap => !this.adapter.hasCapability(cap)
     );
 
     // 1. Metadata Capability (MANDATORY)
     if (this.adapter.hasCapability(ProviderCapability.METADATA) && this.adapter.getProviderInfo) {
-      await this.runTest(results, 'Provider Metadata Verification', ProviderCapability.METADATA, true, async () => {
+      await this.runTest(results, 'Provider Metadata Verification', ProviderCapability.METADATA, mandatoryForProfile.includes(ProviderCapability.METADATA), async () => {
         const info = await this.adapter.getProviderInfo!();
         if (!info.slug || !info.name) throw new Error('Invalid provider info: missing slug or name.');
         if (info.slug.toLowerCase().trim() !== this.adapter.providerSlug.toLowerCase().trim()) {
@@ -419,6 +425,7 @@ export class ProviderCertificationRunner {
       isProductionReady,
       missingMandatoryCapabilities,
       capabilitiesTested: declaredCaps,
+      profile,
       tests: results
     };
   }

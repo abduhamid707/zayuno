@@ -13,19 +13,26 @@ export interface RedactionOptions {
 }
 
 const SENSITIVE_KEY_PATTERN =
-  /password|secret|token|authorization|cookie|api.?key|key.?hash|private.?key|certificate|card|cvv|cvc|otp|passport|document|pin|pinfl|phone|email|customer|address|destination|latitude|longitude|coords|auth.?config|encrypted/i;
+  /password|secret|token|authorization|cookie|session|api.?key|key.?hash|private.?key|certificate|card|cvv|cvc|otp|passport|document|pin|pinfl|phone|email|customer|address|destination|latitude|longitude|coords|auth.?config|encrypted/i;
 
 const STRING_SCRUBBERS: Array<{ pattern: RegExp; replacement: string }> = [
-  // Bearer tokens
-  { pattern: /Bearer\s+[A-Za-z0-9._~+\/-]+/gi, replacement: 'Bearer [REDACTED]' },
+  // Bearer tokens & Authorization headers
+  { pattern: /(?:Authorization:\s*)?Bearer\s+[A-Za-z0-9._~+\/-]+/gi, replacement: 'Bearer [REDACTED]' },
+  { pattern: /Basic\s+[A-Za-z0-9+/=]+/gi, replacement: 'Basic [REDACTED]' },
+  // API key / header credential lines
+  { pattern: /(x-api-key|api-key|x-signature|webhook-secret|x-simulator-session):\s*["']?[A-Za-z0-9._~+\/-]+["']?/gi, replacement: '$1: [REDACTED]' },
+  // Cookie and Set-Cookie headers
+  { pattern: /(?:Set-Cookie|Cookie):\s*["']?[A-Za-z0-9._~+\/-]+(?:=[^;\r\n\s]+)?["']?/gi, replacement: 'Cookie: [REDACTED]' },
   // JWT tokens (3-part base64)
   { pattern: /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+\b/g, replacement: '[REDACTED_JWT]' },
   // Zayuno API keys and secrets
   { pattern: /\bzy_(?:live|test|sb|sec)_[A-Za-z0-9_-]+\b/gi, replacement: '[REDACTED_CREDENTIAL]' },
+  // Sensitive query parameter / key-value assignments
+  { pattern: /(?<=[?&]|\b)(apiKey|api_key|secret|webhookSecret|webhook_secret|password|token|sessionToken|auth)=[^&\s"'`]+/gi, replacement: '$1=[REDACTED]' },
   // Email addresses
   { pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi, replacement: '[REDACTED_EMAIL]' },
-  // Phone numbers (Uzbekistan / International)
-  { pattern: /(?:\+?998[\s-]?)?(?:\d{2}[\s-]?)?\d{3}[\s-]?\d{2}[\s-]?\d{2}\b/g, replacement: '[REDACTED_PHONE]' },
+  // Phone numbers (Uzbekistan / International / E.164)
+  { pattern: /(?:\+?998|\b998)?\s*(?:\(?\d{2}\)?[\s-]?)?\d{3}[\s-]?\d{2}[\s-]?\d{2}\b|(?:\+\d{9,15}\b)|(?:\b\d{9,15}\b)/g, replacement: '[REDACTED_PHONE]' },
   // Credit card 13-19 digit patterns
   { pattern: /\b(?:\d{4}[ -]?){3}\d{4}\b/g, replacement: '[REDACTED_CARD]' }
 ];

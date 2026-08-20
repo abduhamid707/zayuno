@@ -29,6 +29,7 @@ import {
 interface DocsViewerProps {
   selectedDoc: string;
   onSelectDoc: (id: string) => void;
+  onOpenAiKit?: () => void;
 }
 
 export const DOCS_MENU = [
@@ -48,7 +49,7 @@ export const DOCS_MENU = [
   { id: 'troubleshooting-faq', title: '14. Troubleshooting & FAQ', icon: AlertTriangle }
 ];
 
-export function DocsViewer({ selectedDoc, onSelectDoc }: DocsViewerProps) {
+export function DocsViewer({ selectedDoc, onSelectDoc, onOpenAiKit }: DocsViewerProps) {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
@@ -91,12 +92,22 @@ export function DocsViewer({ selectedDoc, onSelectDoc }: DocsViewerProps) {
         {/* ========================================================================= */}
         {selectedDoc === 'getting-started' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-800 pb-4">
-              <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-semibold">Guide 01</span>
-              <h2 className="text-2xl font-bold text-white mt-1">Getting Started with Zayuno Provider Integration</h2>
-              <p className="text-slate-400 mt-1">
-                Zayuno is the open, capability-based action infrastructure connecting AI agents (ChatGPT, Claude, autonomous workers) to real-world services.
-              </p>
+            <div className="border-b border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-semibold">Guide 01</span>
+                <h2 className="text-2xl font-bold text-white mt-1">Getting Started with Zayuno Provider Integration</h2>
+                <p className="text-slate-400 mt-1">
+                  Zayuno is the open, capability-based action infrastructure connecting AI agents (ChatGPT, Claude, autonomous workers) to real-world services.
+                </p>
+              </div>
+              {onOpenAiKit && (
+                <button
+                  onClick={onOpenAiKit}
+                  className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 flex items-center gap-2 shrink-0 transition-all"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" /> AI bilan integratsiya qilish
+                </button>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -107,8 +118,11 @@ export function DocsViewer({ selectedDoc, onSelectDoc }: DocsViewerProps) {
                 Zayuno acts as a neutral communication and orchestration layer between AI agents and service providers. When an AI user says:
               </p>
               <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-indigo-200 italic font-mono text-xs">
-                &ldquo;EVOS menusini ko&lsquo;rsat, Chilonzorga 2 ta lavash buyurtma qil&rdquo;
+                &ldquo;Demo Cafe menusini ko&lsquo;rsat, Chilonzorga 2 ta kofe buyurtma qil&rdquo;
               </div>
+              <p className="text-[11px] text-slate-500 italic">
+                * Eslatma: &quot;Demo Cafe&quot; va boshqa barcha misollar Zayuno sandbox simulyatsiyasi uchun keltirilgan.
+              </p>
               <p>The AI agent interacts with Zayuno&apos;s Model Context Protocol (MCP) gateway to:</p>
               <ol className="list-decimal list-inside space-y-2 pl-2 text-slate-300">
                 <li><strong className="text-white">Discover</strong> registered providers matching category and location.</li>
@@ -128,7 +142,7 @@ export function DocsViewer({ selectedDoc, onSelectDoc }: DocsViewerProps) {
               <div className="grid grid-cols-1 gap-3">
                 {[
                   { step: '1', title: 'Register Provider App', desc: 'Visit the Apps & Dashboard tab to obtain your unique provider slug and sandbox keys.' },
-                  { step: '2', title: 'Implement Mandatory Endpoints', desc: 'Implement the 7 core endpoints: /health, /provider-info, /catalog, /quote, /actions, /actions/:id, and webhooks.' },
+                  { step: '2', title: 'Implement Profile Endpoints', desc: 'Implement endpoints for your profile: Discovery (3 endpoints) or Transactional (7 endpoints).' },
                   { step: '3', title: 'Run Automated Certification', desc: 'Execute the automated compliance runner in the Certification tab to verify payload structure.' },
                   { step: '4', title: 'Submit for Live Discovery', desc: 'Once 100% passed, submit for platform operations review to be published across AI agents.' }
                 ].map(s => (
@@ -226,8 +240,13 @@ export function DocsViewer({ selectedDoc, onSelectDoc }: DocsViewerProps) {
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-200 text-xs">
-              <strong>Mandatory Certification Requirement:</strong> To achieve production status, a provider must implement all <strong>7 mandatory capabilities</strong>. Undeclared optional capabilities will be skipped by AI agents.
+            <div className="p-4 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-200 text-xs space-y-2">
+              <p className="font-semibold text-white">Universal Capability Profiles (Har bir provider o‘z profiliga ko‘ra integratsiya qiladi):</p>
+              <ul className="list-disc list-inside space-y-1 text-slate-300">
+                <li><strong className="text-white">A) Discovery / Read-only:</strong> Faqat axborot beruvchi xizmatlar (masalan Telegram recruitment, mahsulot katalogi, vakansiyalar qidiruvi). Majburiy: <code className="text-indigo-300 font-mono">METADATA</code>, <code className="text-indigo-300 font-mono">HEALTH</code>, <code className="text-indigo-300 font-mono">CATALOG</code> (<code className="text-indigo-300 font-mono">SEARCH</code> tavsiya etiladi). Tranzaksion endpointlar talab qilinmaydi.</li>
+                <li><strong className="text-white">B) Transactional:</strong> Buyurtma va to‘lov oqimiga ega providerlar. Majburiy: <code className="text-indigo-300 font-mono">METADATA</code>, <code className="text-indigo-300 font-mono">HEALTH</code>, <code className="text-indigo-300 font-mono">CATALOG</code>, <code className="text-indigo-300 font-mono">QUOTE</code>, <code className="text-indigo-300 font-mono">ACTION_CREATE</code>, <code className="text-indigo-300 font-mono">ACTION_STATUS</code>, <code className="text-indigo-300 font-mono">WEBHOOK</code> (<code className="text-indigo-300 font-mono">PAYMENT_OPTIONS</code> faqat to‘lov bo‘lsa, <code className="text-indigo-300 font-mono">ACTION_CANCEL</code> faqat bekor qilish qo‘llansa).</li>
+                <li><strong className="text-white">C) Physical vs D) Digital / Remote:</strong> Jismoniy manzilga bog‘liq xizmatlarda (yetkazib berish, do‘kon, filial) <code className="text-indigo-300 font-mono">LOCATIONS</code> talab qilinadi. Raqamli va masofaviy xizmatlarda <code className="text-indigo-300 font-mono">LOCATIONS</code> talab qilinmaydi.</li>
+              </ul>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
@@ -235,24 +254,24 @@ export function DocsViewer({ selectedDoc, onSelectDoc }: DocsViewerProps) {
                 <thead>
                   <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 font-mono">
                     <th className="p-3">Capability Flag</th>
-                    <th className="p-3">Type</th>
+                    <th className="p-3">Profile Requirement</th>
                     <th className="p-3">Endpoint / Method</th>
                     <th className="p-3">Description</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-slate-300 font-mono text-[11px]">
                   {[
-                    { flag: 'METADATA', type: 'MANDATORY', endpoint: 'GET /provider-info', desc: 'Provider identity, category, coverage, support contact.' },
-                    { flag: 'HEALTH', type: 'MANDATORY', endpoint: 'GET /health', desc: 'Real-time operational health check and latency probe.' },
-                    { flag: 'CATALOG', type: 'MANDATORY', endpoint: 'GET /catalog, GET /offerings/:id', desc: 'Structured catalog, categories, option groups, and prices.' },
-                    { flag: 'QUOTE', type: 'MANDATORY', endpoint: 'POST /quote', desc: 'Verified itemized pricing computation with expiration.' },
-                    { flag: 'ACTION_CREATE', type: 'MANDATORY', endpoint: 'POST /actions', desc: 'Action creation with idempotency and nextAction handoff.' },
-                    { flag: 'ACTION_STATUS', type: 'MANDATORY', endpoint: 'GET /actions/:id', desc: 'Status lookup, fulfillment stages, and tracking timeline.' },
-                    { flag: 'WEBHOOK', type: 'MANDATORY', endpoint: 'POST /webhooks', desc: 'Asynchronous event push with HMAC-SHA256 signatures.' },
-                    { flag: 'LOCATIONS', type: 'OPTIONAL', endpoint: 'GET /locations', desc: 'Physical store branches, coordinates, service radius.' },
-                    { flag: 'SEARCH', type: 'OPTIONAL', endpoint: 'GET /search', desc: 'Keyword and semantic search indexing across offerings.' },
-                    { flag: 'ACTION_CANCEL', type: 'OPTIONAL', endpoint: 'POST /actions/:id/cancel', desc: 'Customer-initiated cancellation before fulfillment lock.' },
-                    { flag: 'PAYMENT_OPTIONS', type: 'OPTIONAL', endpoint: 'GET /actions/:id/payment-options', desc: 'Discovery of provider-supported checkout options.' }
+                    { flag: 'METADATA', req: 'ALL PROFILES', badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', endpoint: 'GET /provider-info', desc: 'Provider identity, category, coverage, support contact.' },
+                    { flag: 'HEALTH', req: 'ALL PROFILES', badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', endpoint: 'GET /health', desc: 'Real-time operational health check and latency probe.' },
+                    { flag: 'CATALOG', req: 'ALL PROFILES', badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', endpoint: 'GET /catalog, GET /offerings/:id', desc: 'Structured catalog, categories, option groups, and prices.' },
+                    { flag: 'QUOTE', req: 'TRANSACTIONAL', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', endpoint: 'POST /quote', desc: 'Verified itemized pricing computation with expiration.' },
+                    { flag: 'ACTION_CREATE', req: 'TRANSACTIONAL', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', endpoint: 'POST /actions', desc: 'Action creation with idempotency and nextAction handoff.' },
+                    { flag: 'ACTION_STATUS', req: 'TRANSACTIONAL', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', endpoint: 'GET /actions/:id', desc: 'Status lookup, fulfillment stages, and tracking timeline.' },
+                    { flag: 'WEBHOOK', req: 'TRANSACTIONAL', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', endpoint: 'POST /webhooks', desc: 'Asynchronous event push with HMAC-SHA256 signatures.' },
+                    { flag: 'LOCATIONS', req: 'PHYSICAL ONLY', badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30', endpoint: 'GET /locations', desc: 'Physical store branches, coordinates, service radius (digital xizmatlarda shart emas).' },
+                    { flag: 'SEARCH', req: 'OPTIONAL', badge: 'bg-slate-800 text-slate-400 border-slate-700', endpoint: 'GET /search', desc: 'Keyword and semantic search indexing across offerings.' },
+                    { flag: 'ACTION_CANCEL', req: 'OPTIONAL', badge: 'bg-slate-800 text-slate-400 border-slate-700', endpoint: 'POST /actions/:id/cancel', desc: 'Customer-initiated cancellation before fulfillment lock.' },
+                    { flag: 'PAYMENT_OPTIONS', req: 'OPTIONAL', badge: 'bg-slate-800 text-slate-400 border-slate-700', endpoint: 'GET /actions/:id/payment-options', desc: 'Discovery of provider-supported checkout options.' }
                   ].map(row => (
                     <tr key={row.flag} className="hover:bg-slate-900/40 transition-colors">
                       <td className="p-3 font-bold text-white flex items-center gap-1.5">
@@ -260,10 +279,8 @@ export function DocsViewer({ selectedDoc, onSelectDoc }: DocsViewerProps) {
                         {row.flag}
                       </td>
                       <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          row.type === 'MANDATORY' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {row.type}
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${row.badge}`}>
+                          {row.req}
                         </span>
                       </td>
                       <td className="p-3 text-indigo-300">{row.endpoint}</td>
@@ -306,7 +323,7 @@ export function DocsViewer({ selectedDoc, onSelectDoc }: DocsViewerProps) {
                   <pre className="font-mono text-[11px] text-indigo-300 bg-slate-900/90 p-3 rounded-lg overflow-x-auto">
 {`POST /api/actions HTTP/1.1
 Host: api.provider.example
-x-provider-api-key: zy_live_prov_secret_847192
+x-provider-api-key: your_assigned_provider_secret_here
 Content-Type: application/json`}
                   </pre>
                 </div>
@@ -376,7 +393,7 @@ const signature = crypto
 
               <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-indigo-300 overflow-x-auto">
 {`{
-  "providerSlug": "evos-fastfood",
+  "providerSlug": "demo-cafe",
   "locationId": "loc_tashkent_chilonzor",
   "categories": [
     {
@@ -390,7 +407,7 @@ const signature = crypto
   "offerings": [
     {
       "id": "offering_lavash_beef",
-      "providerSlug": "evos-fastfood",
+      "providerSlug": "demo-cafe",
       "categorySlug": "lavash",
       "offeringCode": "LAVASH_BEEF_STANDARD",
       "title": "Classic Beef Lavash",
@@ -459,7 +476,7 @@ const signature = crypto
                 </div>
                 <pre className="font-mono text-[11px] text-slate-300 overflow-x-auto">
 {`{
-  "providerSlug": "evos-fastfood",
+  "providerSlug": "demo-cafe",
   "locationId": "loc_tashkent_chilonzor",
   "fulfillmentType": "DELIVERY",
   "destination": {
@@ -485,7 +502,7 @@ const signature = crypto
                 <pre className="font-mono text-[11px] text-indigo-300 overflow-x-auto">
 {`{
   "id": "quote_894103859",
-  "providerSlug": "evos-fastfood",
+  "providerSlug": "demo-cafe",
   "lines": [
     {
       "offeringId": "offering_lavash_beef",
@@ -551,7 +568,7 @@ const signature = crypto
 {`POST /api/v1/actions
 {
   "idempotencyKey": "d8e379b2-6c9a-4e9b-83bb-92736152a1b9",
-  "providerSlug": "evos-fastfood",
+  "providerSlug": "demo-cafe",
   "quoteId": "quote_894103859",
   "userConfirmed": true,
   "customer": {
@@ -594,7 +611,7 @@ const signature = crypto
   "currency": "UZS",
   "nextAction": {
     "type": "OPEN_URL",
-    "url": "https://evos-sandbox.shopla.uz/mock/pay/ZY-SANDBOX-98421",
+    "url": "https://demo-cafe-sandbox.example.uz/pay/ZY-SANDBOX-98421",
     "label": "Pay with Payme / Card",
     "expiresAt": "2026-08-17T16:15:00Z"
   }
@@ -648,9 +665,9 @@ const signature = crypto
 {`{
   "eventId": "evt_9841029481",
   "eventType": "action.status_updated",
-  "providerSlug": "evos-fastfood",
+  "providerSlug": "demo-cafe",
   "actionId": "ZY-SANDBOX-98421",
-  "externalActionId": "evos_order_8819",
+  "externalActionId": "demo_cafe_order_8819",
   "newStatus": "CONFIRMED",
   "newPaymentStatus": "PAID",
   "timestamp": "2026-08-17T15:35:00.000Z",
