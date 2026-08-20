@@ -69,6 +69,40 @@ export class AdminController {
     return this.adminService.getWebhookLogs(limit ? parseInt(limit, 10) : 50, providerSlug);
   }
 
+  @Get('logs/live-inspector')
+  @ApiOperation({ summary: 'Live unified provider API and webhook payload inspector' })
+  async getLiveInspectorLogs(
+    @Query('provider') providerSlug?: string,
+    @Query('source') source?: string,
+    @Query('status') status?: string,
+    @Query('traceId') traceId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string
+  ) {
+    return this.adminService.getLiveInspectorLogs({
+      providerSlug,
+      source,
+      status,
+      traceId,
+      from,
+      to,
+      limit: limit ? parseInt(limit, 10) : 50,
+      offset: offset ? parseInt(offset, 10) : 0
+    });
+  }
+
+  @Get('analytics/unmet-demand')
+  @ApiOperation({ summary: 'Get aggregated analytics on unfulfilled categories, geographies, and search demand' })
+  async getUnmetDemandAnalytics(
+    @Query('category') category?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string
+  ) {
+    return this.adminService.getUnmetDemandAnalytics({ category, from, to });
+  }
+
   @Get('logs/events')
   @ApiOperation({ summary: 'Get redacted integration, webhook, action, and moderation events' })
   async getOperationalEvents(

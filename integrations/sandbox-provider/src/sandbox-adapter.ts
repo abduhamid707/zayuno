@@ -355,8 +355,8 @@ export class SandboxProviderAdapter extends BaseProviderAdapter {
     const body = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;
     return {
       eventId: body.eventId || `evt_${Date.now()}`,
-      eventType: body.eventType || 'action.status_updated',
-      providerSlug: this.providerSlug,
+      eventType: body.eventType || body.event || 'action.status_updated',
+      providerSlug: body.providerSlug || this.providerSlug || 'sandbox-provider',
       actionId: body.actionId,
       externalActionId: body.externalActionId,
       newStatus: body.newStatus as ActionStatus,

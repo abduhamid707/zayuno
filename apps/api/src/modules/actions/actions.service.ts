@@ -2,7 +2,15 @@ import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/com
 import { ProviderRegistryService } from '../providers/provider-registry.service';
 import { NatsService } from '../../common/services/nats.service';
 import { prisma, ActionStatus as DbActionStatus, PaymentStatus as DbPaymentStatus, UserRole } from '@zayuno/database';
-import { generatePublicActionId, NotFoundError, IdempotencyError, Logger } from '@zayuno/shared';
+import {
+  generatePublicActionId,
+  NotFoundError,
+  IdempotencyError,
+  Logger,
+  isProviderPublished,
+  normalizeSupportContact,
+  sanitizePublicSupportContact
+} from '@zayuno/shared';
 import { ZayunoEventTopic } from '@zayuno/event-schemas';
 import {
   CreateActionInput,
@@ -89,8 +97,7 @@ export class ActionsService {
     if (!provider) {
       throw new NotFoundError('Provider', cleanSlug);
     }
-    const reviewStatus = (provider.metadata as any)?.reviewStatus;
-    if (provider.status !== 'ACTIVE' || reviewStatus === 'REJECTED' || reviewStatus === 'SUSPENDED') {
+    if (!isProviderPublished(provider)) {
       throw new BadRequestException('Provider is not published for public actions.');
     }
 
@@ -341,6 +348,9 @@ export class ActionsService {
 
   private mapDbActionToNormalized(dbAction: any): NormalizedAction {
     const metadata = (dbAction.metadata as any) || {};
+    const rawSupport = dbAction.provider?.config?.supportContact || (dbAction.provider?.metadata as any)?.supportContact;
+    const supportContact = sanitizePublicSupportContact(normalizeSupportContact(rawSupport));
+
     return {
       id: dbAction.id,
       publicId: dbAction.publicId,
@@ -373,6 +383,7 @@ export class ActionsService {
       paymentStatus: dbAction.paymentStatus as PaymentStatus,
       paymentUrl: dbAction.paymentUrl || undefined,
       idempotencyKey: dbAction.idempotencyKey || undefined,
+      supportContact,
       parameters: (dbAction.parameters as any) || {},
       metadata,
       timeline: (dbAction.timeline || []).map((e: any) => ({

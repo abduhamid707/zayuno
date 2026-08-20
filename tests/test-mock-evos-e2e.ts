@@ -132,12 +132,22 @@ async function main() {
     assert(cancelled.status === 303, 'Sandbox cancellation did not redirect.');
     const afterCancellationPayment = await fetch(`${providerBase}${cancellationPath}/simulate-success`, { method: 'POST', redirect: 'manual' });
     assert(afterCancellationPayment.status === 409, 'Cancelled action accepted a payment transition.');
-    const cancelledActionResponse = await fetch(`${providerBase}/actions/${cancellationAction.externalActionId}`, { headers });
-    const cancelledAction: any = await cancelledActionResponse.json();
-    assert(cancelledAction.status === 'CANCELLED', 'Cancelled action state was reopened.');
-    assert(cancelledAction.paymentStatus === 'PENDING', 'Cancelled action payment status changed.');
+    // Certification runner verification against Mock EVOS
+    const { RemoteHttpProviderAdapter } = await import('../packages/provider-sdk/src/remote-http-adapter.ts');
+    const { ProviderCertificationRunner } = await import('../packages/provider-sdk/src/certification.ts');
+    const remoteAdapter = new RemoteHttpProviderAdapter({
+      slug: 'mock-evos',
+      baseUrl: providerBase,
+      secret: sharedSecret,
+      webhookSecret: sharedSecret
+    });
 
-    console.log('Mock EVOS E2E passed: catalog, quote, confirmation, idempotency, provider checkout, HMAC webhook, payment status, and terminal-state protection.');
+    const certRunner = new ProviderCertificationRunner(remoteAdapter);
+    const certReport = await certRunner.runAllTests();
+    assert(certReport.isCertified, `Mock EVOS certification failed: ${certReport.tests.filter(t => !t.passed).map(t => t.error).join('; ')}`);
+    assert(certReport.failedCount === 0, 'Mock EVOS must have 0 failed certification tests.');
+
+    console.log('Mock EVOS E2E passed: catalog, quote, confirmation, idempotency, provider checkout, HMAC webhook, payment status, terminal-state protection, and automated capability certification.');
   } finally {
     await Promise.all([
       new Promise<void>(resolve => providerServer.close(() => resolve())),

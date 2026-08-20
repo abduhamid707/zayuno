@@ -47,8 +47,8 @@ export abstract class BaseProviderAdapter implements ProviderAdapter {
   protected readonly capabilities: Set<ProviderCapability>;
 
   constructor(config: ProviderAdapterConfig, capabilities: ProviderCapability[] = []) {
-    this.providerSlug = config.slug;
-    this.config = config;
+    this.providerSlug = config.slug || (config as any).providerSlug;
+    this.config = { ...config, slug: this.providerSlug };
     this.capabilities = new Set(capabilities);
   }
 

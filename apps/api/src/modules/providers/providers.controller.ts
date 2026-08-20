@@ -133,6 +133,29 @@ export class ProvidersController {
     return this.providersService.getProviderCredentials(slug, request.user);
   }
 
+  @Get(':slug/logs')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROVIDER_OWNER, UserRole.PROVIDER_DEVELOPER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get scoped, redacted integration and webhook logs for the provider' })
+  async getProviderLogs(
+    @Param('slug') slug: string,
+    @Req() request: any,
+    @Query('traceId') traceId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string
+  ) {
+    return this.providersService.getProviderLogsBySlug(slug, request.user, {
+      traceId,
+      from,
+      to,
+      limit: limit ? parseInt(limit, 10) : 50,
+      offset: offset ? parseInt(offset, 10) : 0
+    });
+  }
+
   @Get(':slug/capabilities')
   @UseGuards(ApiKeyGuard)
   @ApiSecurity('api-key')

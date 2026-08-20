@@ -15,6 +15,7 @@
     "dev:apps": "turbo run dev --filter=@zayuno/admin --filter=@zayuno/provider-portal",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:review": "tsx tests/run-all-review-tests.ts",
     "test:mcp-tool-consistency": "tsx tests/test-mcp-tool-consistency.ts",
     "test:action-guardrails": "tsx tests/test-action-guardrails.ts",
     "test:location-and-quote-persistence": "tsx tests/test-location-and-quote-persistence.ts",

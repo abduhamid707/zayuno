@@ -1,13 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, Optional } from '@nestjs/common';
 import { prisma, ProviderStatus, ProviderType, ProviderCapability, ActionStatus, PaymentStatus } from '@zayuno/database';
-import { BadRequestException } from '@nestjs/common';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
+import { UnmetDemandService } from '../analytics/unmet-demand.service';
 import { ProviderCertificationRunner, CertificationReport } from '@zayuno/provider-sdk';
 import { MetricsCollector } from '@zayuno/observability';
+import { redactForLogs, sanitizeHeaders } from '@zayuno/shared';
 
 @Injectable()
 export class AdminService {
-  constructor(private registry: ProviderRegistryService) {}
+  constructor(
+    private registry: ProviderRegistryService,
+    private unmetDemandService?: UnmetDemandService
+  ) {}
 
   async getDashboardKpis() {
     const today = new Date();
@@ -68,60 +72,65 @@ export class AdminService {
     }));
   }
 
-  async getProviders(filters: {
-    query?: string; status?: string; reviewStatus?: string; type?: string; capability?: string;
-    category?: string; geography?: string; certified?: string; ownerEmail?: string;
-    from?: string; to?: string; limit?: string; offset?: string;
-  } = {}) {
-    const status = this.optionalEnum(filters.status, ProviderStatus, 'provider status');
-    const type = this.optionalEnum(filters.type, ProviderType, 'provider type');
-    const capability = this.optionalEnum(filters.capability, ProviderCapability, 'provider capability');
-    const from = this.optionalDate(filters.from, 'from');
-    const to = this.optionalDate(filters.to, 'to', true);
-    if (from && to && from > to) throw new BadRequestException('from cannot be later than to.');
-    const query = filters.query?.trim();
-    const ownerEmail = filters.ownerEmail?.trim();
-    const dbProviders = await prisma.provider.findMany({
-      where: {
-        ...(status ? { status } : {}),
-        ...(type ? { type } : {}),
-        ...(capability ? { capabilities: { has: capability } } : {}),
-        ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
-        ...(query ? { OR: [{ name: { contains: query, mode: 'insensitive' } }, { slug: { contains: query, mode: 'insensitive' } }] } : {}),
-        ...(ownerEmail ? { users: { some: { email: { contains: ownerEmail, mode: 'insensitive' } } } } : {})
-      },
+  async getProviders(filters?: {
+    query?: string;
+    status?: string;
+    reviewStatus?: string;
+    type?: string;
+    capability?: string;
+    category?: string;
+    geography?: string;
+    certified?: string;
+    ownerEmail?: string;
+    from?: string;
+    to?: string;
+    limit?: string;
+    offset?: string;
+  }) {
+    const where: any = {};
+    if (filters?.status && filters.status !== 'ALL') {
+      where.status = filters.status as any;
+    }
+    if (filters?.type && filters.type !== 'ALL') {
+      where.type = filters.type as any;
+    }
+    if (filters?.query) {
+      where.OR = [
+        { name: { contains: filters.query, mode: 'insensitive' } },
+        { slug: { contains: filters.query, mode: 'insensitive' } }
+      ];
+    }
+
+    const providers = await prisma.provider.findMany({
+      where,
       include: {
-        users: { select: { id: true, name: true, email: true, role: true, isActive: true } },
-        _count: { select: { actions: true, integrationLogs: true, webhookLogs: true } }
+        locations: true,
+        _count: {
+          select: { actions: true, quotes: true }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
-    const reviewStatus = filters.reviewStatus?.trim().toUpperCase();
-    const category = filters.category?.trim().toLowerCase();
-    const geography = filters.geography?.trim().toLowerCase();
-    const certified = filters.certified === 'true' ? true : filters.certified === 'false' ? false : undefined;
-    const filtered = dbProviders.filter(provider => {
-      const metadata = (provider.metadata as Record<string, any>) || {};
-      if (reviewStatus && reviewStatus !== 'ALL' && String(metadata.reviewStatus || 'DRAFT').toUpperCase() !== reviewStatus) return false;
-      if (category && !String(metadata.category || '').toLowerCase().includes(category)) return false;
-      if (geography && !((metadata.geography || []) as string[]).some(value => value.toLowerCase().includes(geography))) return false;
-      if (certified !== undefined && Boolean(metadata.isCertified) !== certified) return false;
-      return true;
-    });
-    const limit = Math.min(Math.max(Number.parseInt(filters.limit || '50', 10) || 50, 1), 100);
-    const offset = Math.max(Number.parseInt(filters.offset || '0', 10) || 0, 0);
-    return {
-      data: filtered.slice(offset, offset + limit),
-      total: filtered.length,
-      pagination: { limit, offset, hasMore: offset + limit < filtered.length }
-    };
-  }
 
-  private optionalEnum<T extends Record<string, string>>(value: string | undefined, enumType: T, label: string): T[keyof T] | undefined {
-    if (!value || value === 'ALL') return undefined;
-    const normalized = value.trim().toUpperCase();
-    if (!Object.values(enumType).includes(normalized as T[keyof T])) throw new BadRequestException(`Invalid ${label}: ${value}.`);
-    return normalized as T[keyof T];
+    return providers.map(p => ({
+      id: p.id,
+      slug: p.slug,
+      name: p.name,
+      status: p.status,
+      type: p.type,
+      category: (p.metadata as any)?.category || 'general',
+      geography: (p.metadata as any)?.geography || ['UZ'],
+      capabilities: p.capabilities,
+      adapterType: p.adapterType,
+      baseUrl: p.baseUrl,
+      isCertified: (p.metadata as any)?.isCertified || false,
+      isPublished: p.status === ProviderStatus.ACTIVE,
+      actionsCount: p._count.actions,
+      quotesCount: p._count.quotes,
+      locationsCount: p.locations.length,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt
+    }));
   }
 
   private optionalDate(value: string | undefined, label: string, endOfDay = false): Date | undefined {
@@ -133,21 +142,166 @@ export class AdminService {
   }
 
   async getIntegrationLogs(limit = 50, traceId?: string) {
-    return prisma.integrationLog.findMany({
+    const safeLimit = Math.min(Math.max(limit, 1), 200);
+    const logs = await prisma.integrationLog.findMany({
       where: traceId ? { traceId } : undefined,
-      include: { provider: true },
+      include: { provider: { select: { slug: true, name: true } } },
       orderBy: { createdAt: 'desc' },
-      take: limit
+      take: safeLimit
     });
+
+    return logs.map(log => ({
+      id: log.id,
+      providerSlug: log.provider?.slug,
+      providerName: log.provider?.name,
+      traceId: log.traceId,
+      endpoint: log.endpoint,
+      method: log.method,
+      statusCode: log.statusCode,
+      durationMs: log.durationMs,
+      errorMessage: log.errorMessage,
+      requestBody: redactForLogs(log.requestBody),
+      responseBody: redactForLogs(log.responseBody),
+      createdAt: log.createdAt
+    }));
   }
 
   async getWebhookLogs(limit = 50, providerSlug?: string) {
-    return prisma.webhookLog.findMany({
+    const safeLimit = Math.min(Math.max(limit, 1), 200);
+    const logs = await prisma.webhookLog.findMany({
       where: providerSlug ? { provider: { slug: providerSlug } } : undefined,
-      include: { provider: true },
+      include: { provider: { select: { slug: true, name: true } } },
       orderBy: { createdAt: 'desc' },
-      take: limit
+      take: safeLimit
     });
+
+    return logs.map(log => ({
+      id: log.id,
+      providerSlug: log.provider?.slug,
+      providerName: log.provider?.name,
+      event: log.event,
+      isVerified: log.isVerified,
+      isProcessed: log.isProcessed,
+      errorMessage: log.errorMessage,
+      headers: sanitizeHeaders(log.headers as any),
+      payload: redactForLogs(log.payload),
+      createdAt: log.createdAt
+    }));
+  }
+
+  async getLiveInspectorLogs(filters: {
+    providerSlug?: string;
+    source?: string;
+    status?: string;
+    traceId?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const limit = Math.min(Math.max(filters.limit || 50, 1), 200);
+    const offset = Math.max(filters.offset || 0, 0);
+    const from = this.optionalDate(filters.from, 'from');
+    const to = this.optionalDate(filters.to, 'to', true);
+    const createdAt = from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } : undefined;
+    const providerWhere = filters.providerSlug ? { provider: { slug: filters.providerSlug } } : undefined;
+
+    const [integrationLogs, webhookLogs, totalIntegration, totalWebhooks] = await Promise.all([
+      (!filters.source || filters.source === 'INTEGRATION') ? prisma.integrationLog.findMany({
+        where: {
+          ...providerWhere,
+          ...(filters.traceId ? { traceId: filters.traceId } : {}),
+          ...(createdAt ? { createdAt } : {})
+        },
+        include: { provider: { select: { slug: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset
+      }) : [],
+      (!filters.source || filters.source === 'WEBHOOK') ? prisma.webhookLog.findMany({
+        where: {
+          ...providerWhere,
+          ...(createdAt ? { createdAt } : {})
+        },
+        include: { provider: { select: { slug: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset
+      }) : [],
+      prisma.integrationLog.count({
+        where: {
+          ...providerWhere,
+          ...(filters.traceId ? { traceId: filters.traceId } : {}),
+          ...(createdAt ? { createdAt } : {})
+        }
+      }),
+      prisma.webhookLog.count({
+        where: {
+          ...providerWhere,
+          ...(createdAt ? { createdAt } : {})
+        }
+      })
+    ]);
+
+    const items = [
+      ...integrationLogs.map(log => ({
+        id: `integration:${log.id}`,
+        source: 'INTEGRATION',
+        providerSlug: log.provider?.slug,
+        providerName: log.provider?.name,
+        method: log.method,
+        endpoint: log.endpoint,
+        statusCode: log.statusCode,
+        durationMs: log.durationMs,
+        traceId: log.traceId,
+        isRetryable: log.statusCode >= 500 || log.statusCode === 429,
+        errorMessage: log.errorMessage,
+        requestBody: redactForLogs(log.requestBody),
+        responseBody: redactForLogs(log.responseBody),
+        createdAt: log.createdAt
+      })),
+      ...webhookLogs.map(log => ({
+        id: `webhook:${log.id}`,
+        source: 'WEBHOOK',
+        providerSlug: log.provider?.slug,
+        providerName: log.provider?.name,
+        method: 'POST',
+        endpoint: '/api/v1/webhooks',
+        statusCode: log.isVerified ? (log.isProcessed ? 200 : 202) : 401,
+        durationMs: 0,
+        traceId: null,
+        isRetryable: !log.isProcessed && log.isVerified,
+        errorMessage: log.errorMessage,
+        event: log.event,
+        isVerified: log.isVerified,
+        isProcessed: log.isProcessed,
+        headers: sanitizeHeaders(log.headers as any),
+        payload: redactForLogs(log.payload),
+        createdAt: log.createdAt
+      }))
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return {
+      total: totalIntegration + totalWebhooks,
+      limit,
+      offset,
+      logs: items
+    };
+  }
+
+  async getUnmetDemandAnalytics(filters?: { from?: string; to?: string; category?: string }) {
+    if (!this.unmetDemandService) {
+      return {
+        totalEvents: 0,
+        uniquePatterns: 0,
+        topMissingCategories: [],
+        topMissingGeographies: [],
+        topMissingCapabilities: [],
+        reasonsBreakdown: [],
+        recentUnmetDemand: []
+      };
+    }
+    return await this.unmetDemandService.getAggregatedDemand(filters);
   }
 
   async getOperationalEvents(filters: {
@@ -191,8 +345,8 @@ export class AdminService {
         id: `integration:${log.id}`, source: 'INTEGRATION', eventType: `${log.method} ${log.endpoint}`,
         severity: log.errorMessage || log.statusCode >= 500 ? 'ERROR' : log.statusCode >= 400 ? 'WARN' : 'INFO',
         providerSlug: log.provider.slug, providerName: log.provider.name, actionId: null, traceId: log.traceId,
-        status: String(log.statusCode), durationMs: log.durationMs, message: this.redactForLogs(log.errorMessage || 'Provider integration request completed'),
-        details: this.redactForLogs({ requestBody: log.requestBody, responseBody: log.responseBody }), createdAt: log.createdAt
+        status: String(log.statusCode), durationMs: log.durationMs, message: redactForLogs(log.errorMessage || 'Provider integration request completed'),
+        details: redactForLogs({ requestBody: log.requestBody, responseBody: log.responseBody }), createdAt: log.createdAt
       })),
       ...webhookLogs.map(log => ({
         id: `webhook:${log.id}`, source: 'WEBHOOK', eventType: log.event,
@@ -200,14 +354,14 @@ export class AdminService {
         providerSlug: log.provider.slug, providerName: log.provider.name,
         actionId: this.extractActionId(log.payload), traceId: null,
         status: log.isVerified ? (log.isProcessed ? 'PROCESSED' : 'UNPROCESSED') : 'INVALID_SIGNATURE', durationMs: null,
-        message: this.redactForLogs(log.errorMessage || (log.isVerified ? 'Verified provider webhook' : 'Webhook signature verification failed')),
-        details: this.redactForLogs(log.payload), createdAt: log.createdAt
+        message: redactForLogs(log.errorMessage || (log.isVerified ? 'Verified provider webhook' : 'Webhook signature verification failed')),
+        details: redactForLogs(log.payload), createdAt: log.createdAt
       })),
       ...actionEvents.map(event => ({
         id: `action:${event.id}`, source: 'ACTION', eventType: 'ACTION_STATUS_CHANGED', severity: event.status === 'FAILED' ? 'ERROR' : event.status === 'CANCELLED' ? 'WARN' : 'INFO',
         providerSlug: event.action.provider.slug, providerName: event.action.provider.name, actionId: event.action.publicId,
-        traceId: null, status: event.status, durationMs: null, message: this.redactForLogs(event.description),
-        details: this.redactForLogs(event.payload), createdAt: event.createdAt
+        traceId: null, status: event.status, durationMs: null, message: redactForLogs(event.description),
+        details: redactForLogs(event.payload), createdAt: event.createdAt
       })),
       ...providers.flatMap(provider => {
         const metadata = (provider.metadata as Record<string, any>) || {};
@@ -215,7 +369,7 @@ export class AdminService {
           id: `moderation:${provider.slug}:${entry.reviewedAt || index}`, source: 'MODERATION', eventType: `PROVIDER_${entry.decision}`,
           severity: entry.decision === 'REQUEST_CHANGES' ? 'WARN' : 'ERROR', providerSlug: provider.slug, providerName: provider.name,
           actionId: null, traceId: null, status: entry.reasonCode || entry.decision, durationMs: null,
-          message: this.redactForLogs(entry.reason), details: this.redactForLogs({ requiredChanges: entry.requiredChanges, internalNote: entry.internalNote }),
+          message: redactForLogs(entry.reason), details: redactForLogs({ requiredChanges: entry.requiredChanges, internalNote: entry.internalNote }),
           createdAt: entry.reviewedAt || new Date(0).toISOString()
         }));
       })
@@ -248,26 +402,6 @@ export class AdminService {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
     const value = (payload as Record<string, any>).actionId;
     return typeof value === 'string' ? value : null;
-  }
-
-  private redactForLogs(value: unknown): unknown {
-    const sensitive = /password|secret|token|authorization|cookie|api.?key|card|cvv|otp|passport|document|pin|phone|email|customer|address|destination|latitude|longitude/i;
-    const scrubString = (text: string) => text
-      .replace(/Bearer\s+[A-Za-z0-9._~+\/-]+/gi, 'Bearer [REDACTED]')
-      .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[REDACTED_EMAIL]')
-      .replace(/\+?\d[\d\s()-]{7,}\d/g, '[REDACTED_PHONE]')
-      .replace(/\bzy_(?:live|test|sb)_[A-Za-z0-9_-]+\b/gi, '[REDACTED_CREDENTIAL]');
-    const walk = (current: unknown, depth: number): unknown => {
-      if (depth > 6) return '[TRUNCATED]';
-      if (Array.isArray(current)) return current.slice(0, 50).map(item => walk(item, depth + 1));
-      if (current && typeof current === 'object') return Object.fromEntries(Object.entries(current as Record<string, unknown>).map(([key, child]) => [key, sensitive.test(key) ? '[REDACTED]' : walk(child, depth + 1)]));
-      if (typeof current === 'string') {
-        const scrubbed = scrubString(current);
-        return scrubbed.length > 2000 ? `${scrubbed.slice(0, 2000)}…[TRUNCATED]` : scrubbed;
-      }
-      return current;
-    };
-    return walk(value, 0);
   }
 
   async certifyProvider(slug: string): Promise<CertificationReport> {

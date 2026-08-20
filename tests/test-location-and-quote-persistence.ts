@@ -3,7 +3,16 @@ import { prisma } from '../packages/database/src/client.ts';
 import { QuotesService } from '../apps/api/src/modules/quotes/quotes.service.ts';
 import { ActionsService } from '../apps/api/src/modules/actions/actions.service.ts';
 
-const provider = { id: 'provider-internal-id', slug: 'mock-evos', status: 'ACTIVE' as any };
+const provider = {
+  id: 'provider-internal-id',
+  slug: 'mock-evos',
+  status: 'ACTIVE' as any,
+  metadata: {
+    reviewStatus: 'APPROVED',
+    isPublished: true,
+    isCertified: true
+  }
+};
 const internalLocationId = 'location-internal-id';
 const quoteId = 'quote-persisted-id';
 const providerLocationId = 'mock-evos-chilonzor';

@@ -1,10 +1,13 @@
+import crypto from 'node:crypto';
 import {
   ProviderAdapter,
   ProviderCapability,
   MANDATORY_CAPABILITIES,
   OPTIONAL_CAPABILITIES,
   ActionStatus,
-  PaymentMethodType
+  PaymentMethodType,
+  Offering,
+  SelectedOption
 } from '@zayuno/contracts';
 
 export interface CertificationTestResult {
@@ -84,25 +87,62 @@ export class ProviderCertificationRunner {
         if (!Array.isArray(locations) || locations.length === 0) {
           throw new Error('Provider declared LOCATIONS but returned an empty list.');
         }
-        testLocationId = locations[0].id || locations[0].providerLocationId;
-        if (!locations[0].name || !locations[0].address) {
+        const activeLocation = locations.find(l => l.isActive !== false) || locations[0];
+        testLocationId = activeLocation.id || (activeLocation as any).providerLocationId;
+        if (!activeLocation.name || !activeLocation.address) {
           throw new Error('Location object missing required name or address.');
         }
       });
     }
 
     // 4. Catalog Capability (MANDATORY)
-    let testOfferingId: string | undefined;
+    let selectedTestOffering: Offering | undefined;
+    let selectedTestVariantId: string | undefined;
+    let selectedTestOptions: SelectedOption[] = [];
+
     if (this.adapter.hasCapability(ProviderCapability.CATALOG) && this.adapter.getCatalog) {
       await this.runTest(results, 'Catalog Structure & Offerings', ProviderCapability.CATALOG, true, async () => {
         const catalog = await this.adapter.getCatalog!({ providerSlug: this.adapter.providerSlug, locationId: testLocationId });
         if (!catalog.offerings || catalog.offerings.length === 0) throw new Error('Catalog has no offerings.');
-        testOfferingId = catalog.offerings[0].id || catalog.offerings[0].offeringCode;
 
-        if (this.adapter.getOffering && testOfferingId) {
+        // Select an available offering
+        const availableOfferings = catalog.offerings.filter(o => o.isAvailable !== false);
+        if (availableOfferings.length === 0) {
+          throw new Error('Catalog has no available offerings for testing.');
+        }
+
+        selectedTestOffering = availableOfferings[0];
+        const offeringId = selectedTestOffering.id || selectedTestOffering.offeringCode;
+
+        // If offering has variants, select the default or first available variant
+        if (selectedTestOffering.variants && selectedTestOffering.variants.length > 0) {
+          const availableVariants = selectedTestOffering.variants.filter(v => v.isAvailable !== false);
+          const defaultVariant = availableVariants.find(v => (v as any).isDefault) || availableVariants[0] || selectedTestOffering.variants[0];
+          selectedTestVariantId = defaultVariant.id;
+        }
+
+        // If offering has required option groups, deterministically select valid options
+        selectedTestOptions = [];
+        if (selectedTestOffering.optionGroups && selectedTestOffering.optionGroups.length > 0) {
+          for (const group of selectedTestOffering.optionGroups) {
+            if (group.isRequired || (group.minSelections && group.minSelections > 0)) {
+              const availableOpts = group.options.filter(o => o.isAvailable !== false);
+              const defaultOpt = availableOpts.find(o => (o as any).isDefault) || availableOpts[0] || group.options[0];
+              if (defaultOpt) {
+                selectedTestOptions.push({
+                  groupId: group.id,
+                  optionId: defaultOpt.id,
+                  quantity: 1
+                });
+              }
+            }
+          }
+        }
+
+        if (this.adapter.getOffering && offeringId) {
           const singleOffering = await this.adapter.getOffering({
             providerSlug: this.adapter.providerSlug,
-            offeringId: testOfferingId
+            offeringId
           });
           if (!singleOffering || singleOffering.basePrice < 0) {
             throw new Error('Failed to retrieve single offering by ID or basePrice is invalid.');
@@ -114,9 +154,10 @@ export class ProviderCertificationRunner {
     // 5. Search Capability (OPTIONAL)
     if (this.adapter.hasCapability(ProviderCapability.SEARCH) && this.adapter.searchOfferings) {
       await this.runTest(results, 'Catalog Search Indexing', ProviderCapability.SEARCH, false, async () => {
+        const queryTerm = selectedTestOffering?.title?.split(' ')[0] || 'standard';
         const searchRes = await this.adapter.searchOfferings!({
           providerSlug: this.adapter.providerSlug,
-          query: 'standard',
+          query: queryTerm,
           limit: 5
         });
         if (!Array.isArray(searchRes)) throw new Error('Search result must be an array of offerings.');
@@ -125,15 +166,65 @@ export class ProviderCertificationRunner {
 
     // 6. Quote Capability (MANDATORY)
     let testQuoteId: string | undefined;
-    if (this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote && testOfferingId) {
-      await this.runTest(results, 'Verified Quote Pricing', ProviderCapability.QUOTE, true, async () => {
+    if (this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote) {
+      await this.runTest(results, 'Verified Quote Pricing & Math', ProviderCapability.QUOTE, true, async () => {
+        if (!selectedTestOffering) {
+          throw new Error('Quote test requires an offering discovered from catalog.');
+        }
+
+        const testOfferingId = selectedTestOffering.id || selectedTestOffering.offeringCode;
         const quote = await this.adapter.requestQuote!({
           providerSlug: this.adapter.providerSlug,
           locationId: testLocationId,
-          items: [{ offeringId: testOfferingId!, quantity: 2, selectedOptions: [] }]
+          items: [{
+            offeringId: testOfferingId,
+            variantId: selectedTestVariantId,
+            quantity: 2,
+            selectedOptions: selectedTestOptions
+          }]
         });
+
         if (quote.total <= 0) throw new Error('Quote total must be a positive number.');
         if (!quote.lines || quote.lines.length === 0) throw new Error('Quote must return itemized lines breakdown.');
+
+        // Strict Quote Math Validation: total == subtotal + fees - discount
+        const subtotal = Number(quote.subtotal);
+        const fees = typeof quote.totalFees === 'number'
+          ? quote.totalFees
+          : Array.isArray(quote.fees)
+          ? quote.fees.reduce((acc, f) => acc + Number(f.amount || 0), 0)
+          : Number((quote as any).fees || 0);
+
+        const discount = typeof quote.totalDiscount === 'number'
+          ? quote.totalDiscount
+          : Array.isArray(quote.discounts)
+          ? quote.discounts.reduce((acc, d) => acc + Number(d.amount || 0), 0)
+          : Number((quote as any).discount || 0);
+
+        const total = Number(quote.total);
+
+        if (subtotal < 0 || fees < 0 || discount < 0 || total < 0) {
+          throw new Error('Quote financial amounts must not be negative.');
+        }
+
+        const expectedTotal = subtotal + fees - discount;
+        if (Math.abs(expectedTotal - total) > 0.01) {
+          throw new Error(`Quote math error: expected total ${expectedTotal} (subtotal: ${subtotal} + fees: ${fees} - discount: ${discount}) but received ${total}.`);
+        }
+
+        // Line math validation
+        const calculatedLinesTotal = quote.lines.reduce((sum, line) => sum + Number(line.lineTotal || (line as any).total || 0), 0);
+        if (Math.abs(calculatedLinesTotal - subtotal) > 0.01) {
+          throw new Error(`Quote lines math mismatch: sum of line totals (${calculatedLinesTotal}) does not match subtotal (${subtotal}).`);
+        }
+
+        if (quote.expiresAt) {
+          const exp = new Date(quote.expiresAt).getTime();
+          if (isNaN(exp) || exp <= Date.now()) {
+            throw new Error('Quote expiresAt must be a valid timestamp in the future.');
+          }
+        }
+
         testQuoteId = quote.id;
       });
     }
@@ -141,14 +232,21 @@ export class ProviderCertificationRunner {
     // 7. Action Create & Payment Handoff (MANDATORY)
     let createdActionId: string | undefined;
     const testIdempKey = `cert_idemp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    if (this.adapter.hasCapability(ProviderCapability.ACTION_CREATE) && this.adapter.createAction && testOfferingId) {
+
+    if (this.adapter.hasCapability(ProviderCapability.ACTION_CREATE) && this.adapter.createAction) {
       await this.runTest(results, 'Action Creation & Payment Handoff', ProviderCapability.ACTION_CREATE, true, async () => {
-        const quoteId = testQuoteId;
-        if (!quoteId) throw new Error('Action certification requires a successfully verified quote.');
+        if (!selectedTestOffering) {
+          throw new Error('Action creation requires an offering discovered from catalog.');
+        }
+        if (!testQuoteId) {
+          throw new Error('Action creation requires a successfully verified quote.');
+        }
+
+        const testOfferingId = selectedTestOffering.id || selectedTestOffering.offeringCode;
         const action = await this.adapter.createAction!({
           idempotencyKey: testIdempKey,
           providerSlug: this.adapter.providerSlug,
-          quoteId,
+          quoteId: testQuoteId,
           locationId: testLocationId,
           customer: {
             name: 'Certification Validator',
@@ -157,7 +255,12 @@ export class ProviderCertificationRunner {
           destination: {
             raw: 'Central Validation Zone, District 1'
           },
-          items: [{ offeringId: testOfferingId!, quantity: 2, selectedOptions: [] }],
+          items: [{
+            offeringId: testOfferingId,
+            variantId: selectedTestVariantId,
+            quantity: 2,
+            selectedOptions: selectedTestOptions
+          }],
           userConfirmed: true
         });
 
@@ -181,17 +284,25 @@ export class ProviderCertificationRunner {
 
       // 7b. Idempotency Validation (MANDATORY)
       await this.runTest(results, 'Action Idempotency Protection', ProviderCapability.ACTION_CREATE, true, async () => {
-        const quoteId = testQuoteId;
-        if (!quoteId) throw new Error('Idempotency certification requires a successfully verified quote.');
+        if (!selectedTestOffering || !testQuoteId || !createdActionId) {
+          throw new Error('Idempotency certification requires a successfully created initial action.');
+        }
+
+        const testOfferingId = selectedTestOffering.id || selectedTestOffering.offeringCode;
         const dupAction = await this.adapter.createAction!({
           idempotencyKey: testIdempKey,
           providerSlug: this.adapter.providerSlug,
-          quoteId,
+          quoteId: testQuoteId,
           customer: {
             name: 'Certification Validator',
             phone: '+998901234567'
           },
-          items: [{ offeringId: testOfferingId!, quantity: 2, selectedOptions: [] }],
+          items: [{
+            offeringId: testOfferingId,
+            variantId: selectedTestVariantId,
+            quantity: 2,
+            selectedOptions: selectedTestOptions
+          }],
           userConfirmed: true
         });
 
@@ -204,8 +315,11 @@ export class ProviderCertificationRunner {
     }
 
     // 8. Action Status Capability (MANDATORY)
-    if (this.adapter.hasCapability(ProviderCapability.ACTION_STATUS) && this.adapter.getAction && createdActionId) {
+    if (this.adapter.hasCapability(ProviderCapability.ACTION_STATUS) && this.adapter.getAction) {
       await this.runTest(results, 'Action Status Lookup', ProviderCapability.ACTION_STATUS, true, async () => {
+        if (!createdActionId) {
+          throw new Error('Action status check requires a created action from prior step.');
+        }
         const fetched = await this.adapter.getAction!({
           providerSlug: this.adapter.providerSlug,
           actionId: createdActionId!
@@ -217,8 +331,11 @@ export class ProviderCertificationRunner {
     }
 
     // 9. Payment Options Capability (OPTIONAL)
-    if (this.adapter.hasCapability(ProviderCapability.PAYMENT_OPTIONS) && this.adapter.getPaymentOptions && createdActionId) {
+    if (this.adapter.hasCapability(ProviderCapability.PAYMENT_OPTIONS) && this.adapter.getPaymentOptions) {
       await this.runTest(results, 'Payment Options Discovery', ProviderCapability.PAYMENT_OPTIONS, false, async () => {
+        if (!createdActionId) {
+          throw new Error('Payment options discovery requires a created action.');
+        }
         const options = await this.adapter.getPaymentOptions!({
           providerSlug: this.adapter.providerSlug,
           actionId: createdActionId!
@@ -230,8 +347,11 @@ export class ProviderCertificationRunner {
     }
 
     // 10. Action Cancel Capability (OPTIONAL)
-    if (this.adapter.hasCapability(ProviderCapability.ACTION_CANCEL) && this.adapter.cancelAction && createdActionId) {
+    if (this.adapter.hasCapability(ProviderCapability.ACTION_CANCEL) && this.adapter.cancelAction) {
       await this.runTest(results, 'Action Cancellation Lifecycle', ProviderCapability.ACTION_CANCEL, false, async () => {
+        if (!createdActionId) {
+          throw new Error('Action cancellation requires a created action.');
+        }
         const cancelRes = await this.adapter.cancelAction!({
           providerSlug: this.adapter.providerSlug,
           actionId: createdActionId!,
@@ -256,7 +376,6 @@ export class ProviderCertificationRunner {
 
         if (this.adapter.verifyWebhook) {
           // Valid signature test
-          const crypto = await import('crypto');
           const validSig = crypto.createHmac('sha256', testSecret).update(samplePayload).digest('hex');
           const isValid = await this.adapter.verifyWebhook(
             { 'x-signature': validSig, 'x-provider': this.adapter.providerSlug },
@@ -267,7 +386,7 @@ export class ProviderCertificationRunner {
 
           // Invalid signature rejection test
           const isInvalid = await this.adapter.verifyWebhook(
-            { 'x-signature': 'invalid_hmac_sig', 'x-provider': this.adapter.providerSlug },
+            { 'x-signature': 'invalid_forged_hmac_sig', 'x-provider': this.adapter.providerSlug },
             samplePayload,
             testSecret
           );

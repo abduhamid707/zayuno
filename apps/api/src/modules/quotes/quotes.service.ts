@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
-import { prisma, ProviderStatus } from '@zayuno/database';
+import { prisma } from '@zayuno/database';
+import { isProviderPublished } from '@zayuno/shared';
 import {
   RequestQuoteInput,
   NormalizedQuote,
@@ -26,8 +27,7 @@ export class QuotesService {
 
     const cleanSlug = input.providerSlug.toLowerCase().trim();
     const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
-    const reviewStatus = (provider?.metadata as any)?.reviewStatus;
-    if (!provider || provider.status !== ProviderStatus.ACTIVE || reviewStatus === 'REJECTED' || reviewStatus === 'SUSPENDED') {
+    if (!provider || !isProviderPublished(provider)) {
       throw new BadRequestException('Provider is not published for public quotes.');
     }
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.QUOTE);

@@ -3,10 +3,102 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { prisma, UserRole } from '@zayuno/database';
 import { generateApiKey, hashApiKey } from '@zayuno/shared';
+import { EmailVerificationService } from './email-verification.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private emailVerificationService: EmailVerificationService
+  ) {}
+
+  async registerProviderOwner(input: { email: string; password: string; name: string }) {
+    const cleanEmail = (input.email || '').trim().toLowerCase();
+    const cleanName = (input.name || '').trim();
+    const password = input.password || '';
+
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      throw new BadRequestException('To‘g‘ri email manzilini kiriting.');
+    }
+    if (!cleanName || cleanName.length < 2) {
+      throw new BadRequestException('Ism yoki tashkilot nomini kiriting.');
+    }
+    if (!password || password.length < 12) {
+      throw new BadRequestException('Parol kamida 12 belgidan iborat bo‘lishi kerak.');
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
+    if (existing) {
+      if (existing.isActive) {
+        // Enumeration-safe response
+        return {
+          success: true,
+          message: 'Agar ushbu email ro‘yxatdan o‘tgan bo‘lsa, tasdiqlash xati yuborildi.'
+        };
+      }
+      // If user exists but is not active / unverified, re-send verification
+      await this.emailVerificationService.generateAndSendVerificationToken(cleanEmail);
+      return {
+        success: true,
+        message: 'Tasdiqlash xati yuborildi. Iltimos, emailingizni tekshiring.'
+      };
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.create({
+      data: {
+        email: cleanEmail,
+        name: cleanName,
+        passwordHash,
+        role: UserRole.PROVIDER_OWNER,
+        isActive: false // Activated upon email verification
+      }
+    });
+
+    await this.emailVerificationService.generateAndSendVerificationToken(cleanEmail);
+
+    return {
+      success: true,
+      message: 'Hisob yaratildi. Iltimos, hisobingizni faollashtirish uchun emailingizga yuborilgan havolani tasdiqlang.'
+    };
+  }
+
+  async verifyEmail(token: string) {
+    const { email } = await this.emailVerificationService.verifyToken(token);
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new BadRequestException('Foydalanuvchi topilmadi.');
+    }
+
+    if (!user.isActive) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { isActive: true }
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Email muvaffaqiyatli tasdiqlandi. Endi tizimga kirishingiz mumkin.'
+    };
+  }
+
+  async resendVerification(email: string) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
+    if (user && !user.isActive) {
+      return this.emailVerificationService.generateAndSendVerificationToken(cleanEmail);
+    }
+    // Enumeration-safe response
+    return {
+      success: true,
+      message: 'Agar ushbu email tasdiqlanmagan bo‘lsa, tasdiqlash xati qayta yuborildi.'
+    };
+  }
+
+  getEmailVerificationService(): EmailVerificationService {
+    return this.emailVerificationService;
+  }
 
   async login(email: string, password: string) {
     const user = await prisma.user.findUnique({

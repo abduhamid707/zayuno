@@ -266,3 +266,40 @@ model IntegrationLog {
   @@index([traceId])
   @@index([providerId, createdAt])
 }
+
+model EmailVerificationToken {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  used        Boolean  @default(false)
+  resendCount Int      @default(1)
+  windowStart DateTime @default(now())
+  lastSentAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email])
+  @@index([tokenHash])
+}
+
+model UnmetDemandRecord {
+  id                  String   @id @default(uuid())
+  bucketKey           String   @unique
+  category            String?
+  geography           String?
+  requestedCapability String?
+  queryIntent         String?
+  reasonCode          String
+  source              String   @default("SEARCH")
+  count               Int      @default(1)
+  lastOccurredAt      DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([category])
+  @@index([geography])
+  @@index([reasonCode])
+  @@index([createdAt])
+}
+

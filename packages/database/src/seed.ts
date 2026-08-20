@@ -55,10 +55,34 @@ async function main() {
         ProviderCapability.PAYMENT_OPTIONS,
         ProviderCapability.WEBHOOK
       ],
+      config: {
+        authMethod: 'API_KEY',
+        supportContact: {
+          phone: '+998900000000',
+          telegram: '@sandbox_support',
+          email: 'support@sandbox.zayuno.uz',
+          workingHours: '09:00 - 18:00 (Mon-Fri)',
+          supportUrl: 'https://zayuno.uz/support'
+        }
+      },
       metadata: {
         description: 'Fictional domain-neutral sandbox provider for end-to-end testing of capability discovery, quotes, and actions.',
         tier: 'STANDARD',
-        environment: 'SANDBOX'
+        environment: 'SANDBOX',
+        category: 'general',
+        geography: ['UZ', 'Tashkent'],
+        reviewStatus: 'APPROVED',
+        isCertified: true,
+        isPublished: true,
+        catalogSummary: { totalCount: 2, availableCount: 2 },
+        activeLocationsCount: 3,
+        supportContact: {
+          phone: '+998900000000',
+          telegram: '@sandbox_support',
+          email: 'support@sandbox.zayuno.uz',
+          workingHours: '09:00 - 18:00 (Mon-Fri)',
+          supportUrl: 'https://zayuno.uz/support'
+        }
       }
     },
     create: {
@@ -84,10 +108,34 @@ async function main() {
         ProviderCapability.PAYMENT_OPTIONS,
         ProviderCapability.WEBHOOK
       ],
+      config: {
+        authMethod: 'API_KEY',
+        supportContact: {
+          phone: '+998900000000',
+          telegram: '@sandbox_support',
+          email: 'support@sandbox.zayuno.uz',
+          workingHours: '09:00 - 18:00 (Mon-Fri)',
+          supportUrl: 'https://zayuno.uz/support'
+        }
+      },
       metadata: {
         description: 'Fictional domain-neutral sandbox provider for end-to-end testing of capability discovery, quotes, and actions.',
         tier: 'STANDARD',
-        environment: 'SANDBOX'
+        environment: 'SANDBOX',
+        category: 'general',
+        geography: ['UZ', 'Tashkent'],
+        reviewStatus: 'APPROVED',
+        isCertified: true,
+        isPublished: true,
+        catalogSummary: { totalCount: 2, availableCount: 2 },
+        activeLocationsCount: 3,
+        supportContact: {
+          phone: '+998900000000',
+          telegram: '@sandbox_support',
+          email: 'support@sandbox.zayuno.uz',
+          workingHours: '09:00 - 18:00 (Mon-Fri)',
+          supportUrl: 'https://zayuno.uz/support'
+        }
       }
     }
   });

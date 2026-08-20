@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
 import {
   prisma,
   ProviderStatus as DbProviderStatus,
@@ -8,7 +8,20 @@ import {
   UserRole
 } from '@zayuno/database';
 import { ProviderRegistryService } from './provider-registry.service';
-import { encryptSecret, decryptSecret, generateApiKey, NotFoundError } from '@zayuno/shared';
+import { UnmetDemandService } from '../analytics/unmet-demand.service';
+import {
+  encryptSecret,
+  decryptSecret,
+  generateApiKey,
+  NotFoundError,
+  checkReservedBrand,
+  normalizeSupportContact,
+  sanitizePublicSupportContact,
+  isProviderPublished,
+  isProviderDiscoveryReady,
+  redactForLogs,
+  sanitizeHeaders
+} from '@zayuno/shared';
 import {
   ProviderInfo,
   ProviderStatus,
@@ -40,7 +53,10 @@ const REVIEW_REASON_CODES = new Set([
 
 @Injectable()
 export class ProvidersService {
-  constructor(private registry: ProviderRegistryService) {}
+  constructor(
+    private registry: ProviderRegistryService,
+    private unmetDemandService?: UnmetDemandService
+  ) {}
 
   private getEncryptionKey(): string {
     if (!process.env.ENCRYPTION_KEY) throw new Error('ENCRYPTION_KEY is required.');
@@ -50,10 +66,11 @@ export class ProvidersService {
   async listProviders(status?: ProviderStatus): Promise<ProviderInfo[]> {
     const providers = await prisma.provider.findMany({
       where: status ? { status } : { status: ProviderStatus.ACTIVE },
+      include: { locations: true },
       orderBy: { name: 'asc' }
     });
 
-    return providers.filter(p => this.isPublished(p)).map(p => this.mapToProviderInfo(p));
+    return providers.filter(p => this.isDiscoveryReady(p)).map(p => this.mapToProviderInfo(p));
   }
 
   async findProviders(filter: FindProvidersInput): Promise<FindProvidersResult> {
@@ -72,10 +89,11 @@ export class ProvidersService {
 
     const providers = await prisma.provider.findMany({
       where,
+      include: { locations: true },
       orderBy: { name: 'asc' }
     });
 
-    let results = providers.filter(p => this.isPublished(p)).map(p => this.mapToProviderInfo(p));
+    let results = providers.filter(p => this.isDiscoveryReady(p)).map(p => this.mapToProviderInfo(p));
 
     if (filter.category && filter.category !== 'all') {
       results = results.filter(p => p.category?.toLowerCase() === filter.category?.toLowerCase() || p.type?.toLowerCase() === filter.category?.toLowerCase());
@@ -87,6 +105,27 @@ export class ProvidersService {
 
     const total = results.length;
     const offset = filter.offset || 0;
+
+    if (total === 0 && this.unmetDemandService) {
+      let reasonCode: 'NO_PROVIDER_IN_CATEGORY' | 'NO_PROVIDER_IN_GEOGRAPHY' | 'CAPABILITY_UNSUPPORTED' | 'OUT_OF_COVERAGE' | 'NO_MATCHING_PROVIDERS' = 'NO_MATCHING_PROVIDERS';
+      if (filter.category && filter.category !== 'all') {
+        reasonCode = 'NO_PROVIDER_IN_CATEGORY';
+      } else if (filter.geography) {
+        reasonCode = 'NO_PROVIDER_IN_GEOGRAPHY';
+      } else if (filter.capability) {
+        reasonCode = 'CAPABILITY_UNSUPPORTED';
+      }
+
+      await this.unmetDemandService.recordUnmetDemand({
+        category: filter.category !== 'all' ? filter.category : undefined,
+        geography: filter.geography,
+        capability: filter.capability,
+        queryIntent: filter.query,
+        reasonCode,
+        source: 'FIND_PROVIDERS'
+      });
+    }
+
     return { total, providers: results.slice(offset, offset + (filter.limit || 20)) };
   }
 
@@ -378,11 +417,29 @@ export class ProvidersService {
       }
     }
     const cleanSlug = input.slug.toLowerCase().trim();
+    const isOpsAdmin = owner?.role === UserRole.SUPER_ADMIN || owner?.role === UserRole.ADMIN;
+
+    if (!isOpsAdmin) {
+      const nameCheck = checkReservedBrand(input.name);
+      const slugCheck = checkReservedBrand(cleanSlug);
+      const brandMatch = nameCheck.isReserved ? nameCheck : slugCheck.isReserved ? slugCheck : null;
+
+      if (brandMatch) {
+        // Audit log the attempt without sensitive data
+        console.warn(`[AUDIT] Public self-service registration blocked for reserved brand "${brandMatch.canonicalBrand}". Match reason: ${brandMatch.reason}. User: ${owner?.id}`);
+        throw new BadRequestException({
+          code: 'RESERVED_BRAND_PROTECTED',
+          message: `The brand or slug "${input.name}" / "${cleanSlug}" is reserved for verified enterprise onboarding. Public self-service registration is not permitted. Please contact platform operations at operations@zayuno.uz.`
+        });
+      }
+    }
+
     const existing = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
     if (existing) {
       throw new BadRequestException(`Provider with slug "${cleanSlug}" already exists.`);
     }
 
+    const normalizedSupport = normalizeSupportContact(input.supportContact);
     const sandboxKey = generateApiKey(false);
     const sandboxSecret = `zy_sb_sec_${Math.random().toString(36).substring(2, 12)}`;
     const encryptedSecret = encryptSecret(sandboxSecret, this.getEncryptionKey());
@@ -402,12 +459,13 @@ export class ProvidersService {
           authMethod: input.authMethod,
           authConfig: input.authConfig || {},
           webhookUrl: input.webhookUrl,
-          supportContact: input.supportContact
+          supportContact: normalizedSupport
         },
         metadata: {
           category: input.category || 'general',
           geography: input.geography || ['UZ'],
           description: input.description,
+          supportContact: normalizedSupport,
           isCertified: false,
           isPublished: false,
           reviewStatus: 'DRAFT',
@@ -463,6 +521,14 @@ export class ProvidersService {
     if (existingProvider) throw new BadRequestException(`Provider with slug "${slug}" already exists.`);
     if (existingOwner) throw new BadRequestException('This owner email already has an account. Use a different email or transfer the account through support.');
 
+    const nameCheck = checkReservedBrand(input.name);
+    const slugCheck = checkReservedBrand(slug);
+    const brandMatch = nameCheck.isReserved ? nameCheck : slugCheck.isReserved ? slugCheck : null;
+    if (brandMatch) {
+      console.log(`[AUDIT] Operations onboarded provider for reserved brand "${brandMatch.canonicalBrand}". Slug: "${slug}". Admin user.`);
+    }
+
+    const normalizedSupport = normalizeSupportContact(input.supportContact);
     const sandboxKey = generateApiKey(false);
     const webhookSecret = `zy_sb_sec_${Math.random().toString(36).slice(2, 14)}`;
     const encryptedSecret = encryptSecret(webhookSecret, this.getEncryptionKey());
@@ -472,8 +538,8 @@ export class ProvidersService {
         slug, name: input.name.trim(), type: (input.type as any) || ProviderType.SERVICES,
         status: ProviderStatus.DRAFT, adapterType: input.baseUrl ? 'remote-http' : 'sandbox',
         capabilities: input.capabilities, baseUrl: input.baseUrl, encryptedSecret, webhookSecret,
-        config: { authMethod: input.authMethod, authConfig: input.authConfig || {}, webhookUrl: input.webhookUrl, supportContact: input.supportContact },
-        metadata: { category: input.category || 'general', geography: input.geography || ['UZ'], description: input.description, isCertified: false, isPublished: false, reviewStatus: 'DRAFT', registeredAt: new Date().toISOString() }
+        config: { authMethod: input.authMethod, authConfig: input.authConfig || {}, webhookUrl: input.webhookUrl, supportContact: normalizedSupport },
+        metadata: { category: input.category || 'general', geography: input.geography || ['UZ'], description: input.description, supportContact: normalizedSupport, isCertified: false, isPublished: false, reviewStatus: 'DRAFT', registeredAt: new Date().toISOString() }
       }});
       const owner = await tx.user.create({ data: { id: randomUUID(), email: input.ownerEmail.trim().toLowerCase(), name: input.ownerName.trim(), passwordHash, role: UserRole.PROVIDER_OWNER, providerId: provider.id, isActive: true } });
       await tx.apiKey.create({ data: { name: `Provider sandbox key (${slug})`, keyHash: sandboxKey.keyHash, keyPrefix: sandboxKey.keyPrefix, role: UserRole.PROVIDER_DEVELOPER, userId: owner.id, providerId: provider.id, isActive: true } });
@@ -864,7 +930,10 @@ export class ProvidersService {
     // Review history may contain operations-only notes. Public/provider-facing
     // payloads expose the current partner-visible reason, never internal notes.
     const { reviewHistory: _reviewHistory, ...safeMeta } = meta;
-    const isPublished = p.status === ProviderStatus.ACTIVE;
+    const isPublished = isProviderPublished(p);
+    const rawSupport = p.config?.supportContact || meta.supportContact;
+    const supportContact = sanitizePublicSupportContact(normalizeSupportContact(rawSupport));
+
     return {
       id: p.id,
       slug: p.slug,
@@ -879,7 +948,7 @@ export class ProvidersService {
       authMethod: p.config?.authMethod || 'API_KEY',
       capabilities: p.capabilities as any,
       baseUrl: p.baseUrl || undefined,
-      supportContact: p.config?.supportContact || undefined,
+      supportContact,
       isCertified: meta.isCertified || false,
       isPublished,
       // Prevent stale registration metadata from contradicting the canonical
@@ -888,13 +957,12 @@ export class ProvidersService {
     };
   }
 
-  private isPublished(provider: any): boolean {
-    const metadata = (provider.metadata as Record<string, any>) || {};
-    // Existing providers created before the approval workflow are trusted only
-    // when an operator already set them ACTIVE. New self-service registrations
-    // are always DRAFT, so they cannot bypass review through this compatibility
-    // path.
-    return provider.status === DbProviderStatus.ACTIVE && metadata.reviewStatus !== 'REJECTED' && metadata.reviewStatus !== 'SUSPENDED';
+  isPublished(provider: any): boolean {
+    return isProviderPublished(provider);
+  }
+
+  isDiscoveryReady(provider: any): boolean {
+    return isProviderDiscoveryReady(provider).isReady;
   }
 
   private assertProviderManager(provider: { id: string }, actor?: { role?: UserRole; providerId?: string }): void {
@@ -907,5 +975,126 @@ export class ProvidersService {
   private async getMetadata(slug: string): Promise<Record<string, any>> {
     const p = await prisma.provider.findUnique({ where: { slug } });
     return (p?.metadata as any) || {};
+  }
+
+  async getProviderLogsBySlug(
+    slug: string,
+    currentUser: { id?: string; role?: UserRole; providerId?: string },
+    filters: {
+      traceId?: string;
+      from?: string;
+      to?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ) {
+    const cleanSlug = slug.toLowerCase().trim();
+    const provider = await prisma.provider.findUnique({
+      where: { slug: cleanSlug },
+      include: { users: true }
+    });
+
+    if (!provider) {
+      throw new NotFoundError('Provider', cleanSlug);
+    }
+
+    // Strict Tenant Isolation: only admin or assigned provider owner/developer
+    if (currentUser.role !== UserRole.SUPER_ADMIN && currentUser.role !== UserRole.ADMIN) {
+      const meta = (provider.metadata as any) || {};
+      const isOwner = meta.ownerId && meta.ownerId === currentUser.id;
+      const isAssigned = currentUser.providerId && currentUser.providerId === provider.id;
+      const isUser = provider.users?.some(u => u.id === currentUser.id);
+      if (!isOwner && !isAssigned && !isUser) {
+        throw new ForbiddenException('You do not have permission to view logs for this provider.');
+      }
+    }
+
+    const limit = Math.min(Math.max(filters.limit || 50, 1), 200);
+    const offset = Math.max(filters.offset || 0, 0);
+
+    const fromDate = filters.from ? new Date(filters.from) : undefined;
+    const toDate = filters.to ? new Date(filters.to) : undefined;
+    const createdAt = fromDate || toDate ? {
+      ...(fromDate ? { gte: fromDate } : {}),
+      ...(toDate ? { lte: toDate } : {})
+    } : undefined;
+
+    const [integrationLogs, webhookLogs, totalIntegration, totalWebhooks] = await Promise.all([
+      prisma.integrationLog.findMany({
+        where: {
+          providerId: provider.id,
+          ...(filters.traceId ? { traceId: filters.traceId } : {}),
+          ...(createdAt ? { createdAt } : {})
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset
+      }),
+      prisma.webhookLog.findMany({
+        where: {
+          providerId: provider.id,
+          ...(createdAt ? { createdAt } : {})
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset
+      }),
+      prisma.integrationLog.count({
+        where: {
+          providerId: provider.id,
+          ...(filters.traceId ? { traceId: filters.traceId } : {}),
+          ...(createdAt ? { createdAt } : {})
+        }
+      }),
+      prisma.webhookLog.count({
+        where: {
+          providerId: provider.id,
+          ...(createdAt ? { createdAt } : {})
+        }
+      })
+    ]);
+
+    const items = [
+      ...integrationLogs.map(log => ({
+        id: `integration:${log.id}`,
+        source: 'INTEGRATION',
+        method: log.method,
+        endpoint: log.endpoint,
+        statusCode: log.statusCode,
+        durationMs: log.durationMs,
+        traceId: log.traceId,
+        isRetryable: log.statusCode >= 500 || log.statusCode === 429,
+        errorMessage: log.errorMessage,
+        requestBody: redactForLogs(log.requestBody),
+        responseBody: redactForLogs(log.responseBody),
+        createdAt: log.createdAt
+      })),
+      ...webhookLogs.map(log => ({
+        id: `webhook:${log.id}`,
+        source: 'WEBHOOK',
+        method: 'POST',
+        endpoint: '/api/v1/webhooks',
+        statusCode: log.isVerified ? (log.isProcessed ? 200 : 202) : 401,
+        durationMs: 0,
+        traceId: null,
+        isRetryable: !log.isProcessed && log.isVerified,
+        errorMessage: log.errorMessage,
+        event: log.event,
+        isVerified: log.isVerified,
+        isProcessed: log.isProcessed,
+        headers: sanitizeHeaders(log.headers as any),
+        payload: redactForLogs(log.payload),
+        createdAt: log.createdAt
+      }))
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return {
+      providerSlug: provider.slug,
+      providerName: provider.name,
+      total: totalIntegration + totalWebhooks,
+      limit,
+      offset,
+      logs: items
+    };
   }
 }

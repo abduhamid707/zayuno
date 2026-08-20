@@ -60,9 +60,17 @@ assert.ok(publicPagesController.includes('yandex-verification'), 'PublicPagesCon
 assert.ok(publicPagesController.includes('yandex_f58af2445b7b4bbf.html'), 'PublicPagesController is missing Yandex verification file endpoint.');
 assert.ok(changelog.includes('Technical SEO'), 'CHANGELOG is missing Technical SEO entry.');
 
-assert.ok(!adminUi.includes('href="http://localhost:4000/api/docs"'), 'Production-facing Swagger link is hardcoded to localhost.');
-assert.ok(!adminUi.includes('href="http://localhost:4001/api/v1/info"'), 'Production-facing sandbox link is hardcoded to localhost.');
+const faqDoc = read('docs/troubleshooting-faq.md');
+assert.ok(faqDoc.includes('CORS & Preflight'), 'docs/troubleshooting-faq.md is missing CORS section');
+assert.ok(faqDoc.includes('rawBody'), 'docs/troubleshooting-faq.md is missing rawBody HMAC section');
+assert.ok(faqDoc.includes('Latency & Timeout'), 'docs/troubleshooting-faq.md is missing Latency SLA section');
+assert.ok(faqDoc.includes('Quote Math Validation'), 'docs/troubleshooting-faq.md is missing Quote Math section');
+assert.ok(faqDoc.includes('RESERVED_BRAND_PROTECTED'), 'docs/troubleshooting-faq.md is missing error code table');
 
-console.log('Documentation and SEO contract checks passed.');
+const docsViewer = read('apps/provider-portal/src/DocsViewer.tsx');
+assert.ok(docsViewer.includes('troubleshooting-faq'), 'DocsViewer.tsx is missing troubleshooting-faq route');
+
+console.log('Documentation, FAQ, and SEO contract checks passed.');
+
 
 

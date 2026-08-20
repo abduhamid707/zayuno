@@ -11,6 +11,7 @@ import { ActionsModule } from './modules/actions/actions.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { PublicPagesModule } from './modules/public-pages/public-pages.module';
 import { RedisService } from './common/services/redis.service';
 import { NatsService } from './common/services/nats.service';
@@ -24,6 +25,7 @@ import { CommonModule } from './common/common.module';
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     CommonModule,
+    AnalyticsModule,
     AuthModule,
     ProvidersModule,
     CatalogModule,

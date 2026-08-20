@@ -30,8 +30,9 @@ assert.match(serviceSource, /reviewHistory: _reviewHistory/, 'Provider-facing me
 assert.match(serviceSource, /REJECTED.*SUSPENDED/, 'Rejected and suspended providers must not reset their own moderation state.');
 assert.match(serviceSource, /paymentStatusSource: 'PROVIDER_REPORTED'/, 'Payment state must identify its provider-reported source.');
 
-const adminService = new AdminService({} as any);
-const redacted = (adminService as any).redactForLogs({
+import { redactForLogs } from '../packages/shared/src/redaction';
+
+const redacted: any = redactForLogs({
   authorization: 'Bearer secret',
   nested: { apiKey: 'raw-key', passportNumber: 'AA1234567', safe: 'visible' },
   list: [{ otp: '123456', event: 'payment.received' }]
@@ -42,9 +43,9 @@ assert.equal(redacted.nested.passportNumber, '[REDACTED]');
 assert.equal(redacted.nested.safe, 'visible');
 assert.equal(redacted.list[0].otp, '[REDACTED]');
 assert.equal(redacted.list[0].event, 'payment.received');
-const scrubbed = (adminService as any).redactForLogs('Contact test@example.com or +998 90 123 45 67 with Bearer raw-token');
-assert.equal(scrubbed.includes('test@example.com'), false);
-assert.equal(scrubbed.includes('+998 90 123 45 67'), false);
-assert.equal(scrubbed.includes('raw-token'), false);
+const scrubbed = redactForLogs('Contact test@example.com or +998 90 123 45 67 with Bearer raw-token');
+assert.equal((scrubbed as string).includes('test@example.com'), false);
+assert.equal((scrubbed as string).includes('+998 90 123 45 67'), false);
+assert.equal((scrubbed as string).includes('raw-token'), false);
 
 console.log('Provider operations guardrails passed: tenant isolation, moderation privacy, and structured cancellation are enforced.');

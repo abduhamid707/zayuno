@@ -82,6 +82,22 @@ export enum AuthMethod {
   NONE = 'NONE'
 }
 
+export const StructuredSupportContactSchema = z.object({
+  phone: z.string().optional(),
+  telegram: z.string().optional(),
+  email: z.string().optional(),
+  workingHours: z.string().optional(),
+  supportUrl: z.string().optional(),
+  locale: z.string().optional()
+});
+export type StructuredSupportContact = z.infer<typeof StructuredSupportContactSchema>;
+
+export const SupportContactSchema = z.union([
+  z.string(),
+  StructuredSupportContactSchema
+]);
+export type SupportContact = z.infer<typeof SupportContactSchema>;
+
 export const ProviderInfoSchema = z.object({
   id: z.string(),
   slug: z.string(),
@@ -96,7 +112,7 @@ export const ProviderInfoSchema = z.object({
   authMethod: z.nativeEnum(AuthMethod).default(AuthMethod.API_KEY),
   capabilities: z.array(z.nativeEnum(ProviderCapability)),
   baseUrl: z.string().optional(),
-  supportContact: z.string().optional(),
+  supportContact: z.union([z.string(), StructuredSupportContactSchema]).optional(),
   isCertified: z.boolean().default(false),
   isPublished: z.boolean().default(false),
   metadata: z.record(z.any()).optional().default({})
@@ -147,7 +163,7 @@ export const RegisterProviderInputSchema = z.object({
   authConfig: z.record(z.any()).optional(),
   capabilities: z.array(z.nativeEnum(ProviderCapability)).min(1),
   webhookUrl: z.string().url().optional(),
-  supportContact: z.string().optional()
+  supportContact: z.union([z.string(), StructuredSupportContactSchema]).optional()
 });
 export type RegisterProviderInput = z.infer<typeof RegisterProviderInputSchema>;
 

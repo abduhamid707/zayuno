@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { EmailVerificationService } from './email-verification.service';
 
 function getJwtSecret(): string {
   if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required.');
@@ -19,7 +20,8 @@ function getJwtSecret(): string {
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService, JwtModule, PassportModule],
+  providers: [AuthService, JwtStrategy, EmailVerificationService],
+  exports: [AuthService, JwtModule, PassportModule, EmailVerificationService],
 })
 export class AuthModule {}
+

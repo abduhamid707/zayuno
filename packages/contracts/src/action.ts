@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CurrencySchema, AddressSchema, CustomerContactSchema } from './common';
 import { QuoteLineSchema } from './quote';
+import { StructuredSupportContactSchema } from './provider';
 
 export enum ActionStatus {
   CREATED = 'CREATED',
@@ -93,6 +94,7 @@ export const NormalizedActionSchema = z.object({
   paymentStatus: z.nativeEnum(PaymentStatus).default(PaymentStatus.PENDING),
   paymentUrl: z.string().url().optional().describe('Legacy checkout URL alias (prefer nextAction.url)'),
   idempotencyKey: z.string().optional(),
+  supportContact: StructuredSupportContactSchema.optional().describe('Official support and escalation channels for the provider'),
   parameters: z.record(z.any()).optional().default({}),
   metadata: z.record(z.any()).optional().default({}),
   timeline: z.array(ActionEventSchema).optional().default([]),

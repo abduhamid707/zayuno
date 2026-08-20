@@ -33,15 +33,78 @@ export const OfferingVariantSchema = z.object({
 });
 export type OfferingVariant = z.infer<typeof OfferingVariantSchema>;
 
+const PRIVATE_IP_PATTERNS = [
+  /^localhost$/i,
+  /^127\./,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+  /^0\.0\.0\.0$/,
+  /^::1$/,
+  /^0:0:0:0:0:0:0:1$/,
+  /^fe80:/i,
+  /\.local$/i,
+  /\.internal$/i,
+  /\.lan$/i
+];
+
+export function isSafePublicHttpsUrl(val: string): boolean {
+  if (!val || typeof val !== 'string') return false;
+  if (val.length > 2048) return false;
+  if (/\s/.test(val)) return false;
+
+  try {
+    const u = new URL(val);
+    if (u.protocol !== 'https:') return false;
+    if (u.username || u.password) return false;
+    const rawHost = u.hostname.toLowerCase();
+    if (!rawHost || rawHost.includes('..') || rawHost.startsWith('.') || rawHost.endsWith('.')) return false;
+    const cleanHost = rawHost.replace(/^\[|\]$/g, '');
+    for (const pattern of PRIVATE_IP_PATTERNS) {
+      if (pattern.test(rawHost) || pattern.test(cleanHost)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const SafePublicHttpsUrlSchema = z
+  .string()
+  .max(2048)
+  .refine(isSafePublicHttpsUrl, {
+    message: 'Must be an absolute public HTTPS URL without credentials or local/private addresses'
+  });
+
+export const MediaItemSchema = z.object({
+  url: SafePublicHttpsUrlSchema,
+  altText: z.string().max(255).optional(),
+  order: z.number().int().min(0).max(100).default(0),
+  thumbnailUrl: SafePublicHttpsUrlSchema.optional(),
+  aspectRatio: z.string().regex(/^(\d+:\d+)$/, 'Aspect ratio must be in format W:H e.g. 16:9, 1:1').optional()
+});
+export type MediaItem = z.infer<typeof MediaItemSchema>;
+
+export function sortOfferingMedia(media?: MediaItem[]): MediaItem[] {
+  if (!media || !Array.isArray(media)) return [];
+  return [...media].sort((a, b) => {
+    const orderA = a.order ?? 0;
+    const orderB = b.order ?? 0;
+    if (orderA !== orderB) return orderA - orderB;
+    return (a.url || '').localeCompare(b.url || '');
+  });
+}
+
 export const OfferingSchema = z.object({
   id: z.string(),
   providerId: z.string(),
   offeringCode: z.string().describe('Provider-specific catalog item identifier'),
-  title: z.string().min(1),
-  description: z.string().optional(),
+  title: z.string().min(1).max(255),
+  description: z.string().max(2000).optional(),
   categorySlug: z.string().optional(),
   categoryTitle: z.string().optional(),
-  imageUrl: z.string().url().optional(),
+  imageUrl: SafePublicHttpsUrlSchema.optional(),
+  media: z.array(MediaItemSchema).max(10).optional(),
   basePrice: z.number().nonnegative(),
   currency: CurrencySchema.default('UZS'),
   isAvailable: z.boolean().default(true),
@@ -51,6 +114,15 @@ export const OfferingSchema = z.object({
   metadata: z.record(z.any()).optional().default({})
 });
 export type Offering = z.infer<typeof OfferingSchema>;
+
+/**
+ * Migration boundary schema: allows reading legacy catalog offerings with raw HTTP image URLs,
+ * while newly submitted or updated offerings must conform to SafePublicHttpsUrlSchema.
+ */
+export const LegacyOfferingSchema = OfferingSchema.extend({
+  imageUrl: z.string().url().optional()
+});
+export type LegacyOffering = z.infer<typeof LegacyOfferingSchema>;
 
 export const CatalogCategorySchema = z.object({
   id: z.string(),

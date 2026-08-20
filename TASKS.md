@@ -4,37 +4,58 @@
 
 - [ ] Fix the Mock EVOS sandbox checkout state machine so a cancelled order can
   never transition to `PAID` or `CONFIRMED`.
-  - Reject `simulate-success` after `CANCELLED` (and other terminal states).
-  - Reject cancellation after a terminal state.
-  - Hide or disable checkout controls that are invalid for the current state.
-  - Add regression coverage for `AWAITING_PAYMENT -> CANCELLED` followed by a
+  - [x] Reject `simulate-success` after `CANCELLED` (and other terminal states).
+  - [x] Reject cancellation after a terminal state.
+  - [x] Hide or disable checkout controls that are invalid for the current state.
+  - [x] Add regression coverage for `AWAITING_PAYMENT -> CANCELLED` followed by a
     payment attempt; the payment attempt must fail and the action must remain
     `CANCELLED` with `PENDING` payment status.
-  - Deploy and run the sandbox E2E test after verification.
+  - [x] Run the Mock EVOS E2E regression test locally after verification.
+  - [ ] Deploy and run the sandbox E2E test against the deployed environment.
+
+> Current evidence: the earlier live sandbox exercise reproduced the invalid
+> `CANCELLED -> PAID/CONFIRMED` transition. The local implementation and
+> regression test now reject it, but the task remains open until the same E2E
+> scenario passes against the deployed `evos-sandbox.shopla.uz` service.
 
 > This affects only the Mock EVOS sandbox. No real payment was processed.
 
 ## Before opening provider self-service onboarding publicly
 
-- [ ] Prevent provider impersonation and unreviewed publishing.
-  - Every new provider must start as `DRAFT` or `SANDBOX`; never as
+- [x] Prevent provider impersonation and unreviewed publishing.
+  - [x] Every new self-service provider starts as `DRAFT`; never as
     `ACTIVE`/discoverable.
-  - Require an authenticated provider account and record its ownership of the
+  - [x] Require an authenticated provider account and record its ownership of the
     provider record.
-  - Verify ownership before review: company-domain email, domain/DNS challenge,
-    business documentation, and provider API credential verification as
-    applicable.
-  - Require an internal/manual approval step before `PUBLISHED`; only approved
-    providers may be returned by MCP discovery.
-  - Reserve and protect recognised brand names/slugs (for example `evos`) so
-    a third party cannot create a deceptive `fake-evos` provider.
-  - Add abuse controls: rate limiting, audit trail, report/takedown workflow,
+  - [x] Require certification, review submission, and an internal/manual approval
+    step before a self-service provider becomes `PUBLISHED`.
+  - [x] Tighten MCP discovery so legacy `ACTIVE` records also require canonical
+    `APPROVED + isPublished + isCertified` metadata before being returned.
+  - [x] Reserve and protect recognised brand names/slugs:
+    - Maintain a normalized reserved-brand registry containing canonical names,
+      aliases, transliterations, domains, and protected slug patterns.
+    - Block or hold exact and confusingly similar applications such as `evos`,
+      `e-vos`, `ev0s`, and `official-evos`.
+    - Never auto-reject a legitimate edge case: route brand-like matches to
+      manual review with an audit reason.
+    - Reserved brandni ochish hozircha public self-service orqali mumkin emas;
+      faqat Operations alohida kelishuv asosida keyin qo‘shishi mumkin.
+    - Add unit tests for normalization, homoglyph/lookalike detection and
+      reserved slugs.
+  - [x] Add abuse controls: rate limiting, audit trail, report/takedown workflow,
     and alerts for brand-like names.
-  - Add tests proving an unverified provider cannot be published or discovered
+  - [x] Add tests proving an unverified provider cannot be published or discovered
     through MCP.
 
 > A public registration form alone is not provider verification. This is needed
 > to prevent brand impersonation and spam before external onboarding is opened.
+
+### Later — provider business ownership verification
+
+- [ ] Domain/DNS, business document yoki signed API challenge orqali haqiqiy
+  brand egasini tasdiqlash oqimini keyingi bosqichda loyihalash. Bu hozirgi
+  sprint scope’iga kirmaydi; unga qadar reserved brandlar public registration
+  orqali ochilmaydi.
 
 ## Product initiative: Zayuno Integration Studio
 
@@ -143,11 +164,11 @@
 
 ## Future product idea: visual catalog discovery and rich client UI
 
-- [ ] Extend the normalized catalog contract to support provider-supplied product
+- [x] Extend the normalized catalog contract to support provider-supplied product
   media: HTTPS image URLs, alt text, ordering, thumbnails, optional aspect
-  ratio, and safe fallback imagery.
-- [ ] Validate, proxy or safely render external media as appropriate; prevent
-  unsafe URLs, broken images, excessive payloads, and misleading product media.
+  ratio, and safe fallback imagery (`MediaItemSchema`, `SafePublicHttpsUrlSchema`, `sortOfferingMedia`).
+- [x] Validate, proxy or safely render external media as appropriate; prevent
+  unsafe URLs, broken images, excessive payloads, and misleading product media (`SafePublicHttpsUrlSchema` security rules).
 - [ ] Keep MCP responses universally usable: structured product data plus
   text/table/image-link fallback for clients that do not support custom UI.
 - [ ] Build an optional Zayuno rich shopping/discovery UI for supported clients
@@ -160,3 +181,195 @@
 - [ ] Preserve a clear separation: MCP remains the universal data/action layer;
   the rich client UI is an optional presentation layer and must not be required
   to complete an action safely.
+
+## Strategic review: Baxo stress-test xulosalari (2026-08)
+
+> Tashqi holisona baholash natijalari. Bu yerda faqat actionable fikrlar.
+
+### Supply-side risk — #1 prioritet (10/10)
+
+- [ ] Supply-side riskni 8/10 dan **10/10** ga ko'tarish kerak. Bu texnik risk emas,
+  bu **asosiy biznes riski**. Providerlar ulanmasa, Zayuno bo'sh katalog.
+- [ ] Kodlashdan oldin **kamida 1-2 real providerdan "ha" olish** kerak:
+  - Railway: Oson Pochta API + Sahiy Express hub access → rasmiy partnershipsiz
+    impossible.
+  - Hotel: lokal kichik hotellar (20-30 ta) qo'lda parse qilinishi mumkin,
+    Booking.com API muammoli.
+  - Restaurant: phone call API yoki custom webhook — og'ir.
+  - Shopla/Uzum sellers: API yoki inventory sync kerak.
+- [ ] MVP uchun "bor deb hisoblash" emas, **"qila olamiz deb isboti"** kerak.
+
+### Execution timeline — haqiqiy baho (9/10)
+
+- [ ] Har bir provider integratsiyasi uchun **6-9 oy minimal**, 3 oy emas:
+  - API complexity: har bir provider 2-3 API + fallback logic.
+  - Data sync: real-time availability = polling + caching + TTL strategy.
+  - Error handling: railway delay → rebooked hotel → restaurant notification
+    chain.
+  - Testing: 100+ scenario'ni cover qilish kerak.
+
+### GO / NO-GO validation signallari (tartib bo'yicha)
+
+- [ ] **Signal 1:** 1 provider qo'shilish (railway YA restaurant) — test
+  integratsiya (3-4 oy).
+- [ ] **Signal 2:** 5-10 user "orders" — retention meter (ular yana qayt
+  oladimi?).
+- [ ] **Signal 3:** Provider: "okeyish bizga analytics + inventory kerak" — moat
+  signal (network effect boshlandi).
+- [ ] Faqat uchala signal bo'lgandan keyin **"GO++"** deyish mumkin.
+
+### Shopla vs. Zayuno positioning — strategic decision
+
+- [ ] **Hozir:** Shopla'ni prioritize qilish. Zayuno'ni 6-8 oydan keyin ishga
+  tushirish.
+- [ ] Shopla'dan technical foundation olish: provider schema, form fill,
+  booking logic.
+- [ ] **Tavsiya etilgan model:** Shopla = Zayuno'ning birinchi provideri,
+  keyin multi-provider orchestration qo'shiladi.
+
+### Hybrid distribution strategiya
+
+- [ ] ChatGPT MCP directory birinchi kanal (yaxshi), lekin yagona bo'lmasin:
+  - Plugin approval 1-2 hafta (compliance review).
+  - Distribution = faqat ChatGPT Plus subscribers.
+- [ ] **Parallel kanallar:** Telegram bot + Uzum app mini-program + SMS bot.
+- [ ] Platform dependency'ni kamaytirish uchun Zayuno native mini-app loyihasi.
+
+### Qayta baholangan ratinglar
+
+| Metrika | Ichki baho | Tashqi baho | Delta |
+|---------|-----------|-------------|-------|
+| Texnik feasibility | 9/10 | 8/10 | API integration underestimated |
+| User value | 8/10 | 8/10 | ✓ |
+| Originality (global) | 4/10 | 5/10 | Form + orchestration + Uzbek = 5 |
+| Uzbek opportunity | 8/10 | 9/10 | Monopoly window bor |
+| Moat potential | 8/10 | 7/10 | Network effect 3 yildan keyin |
+| Execution difficulty | 8/10 | 9/10 | Supply pipeline underbayed |
+
+### Kuchli tomonlar (tasdiqlangan)
+
+- **Discover → Decide → Act framework** haqiqiy va to'g'ri abstraktsiya.
+- **Form-filling use case** genuinely defensible: 20-field form → AI dialog =
+  conversion 30-40% ortadi (60-70% checkout drop kamaytirish).
+- **Merchant-side AI moat** imkoniyati bor: analytics + sell + discover →
+  recurring revenue.
+- **Central Asia monopoly window** haqiqiy: local commerce network + Uzbek
+  language + payment bilan birinchi bo'lish ustunligi.
+
+### Nihoyat xulosa
+
+> **GO+, lekin network tasdiqlanguncha "wow" demi.**
+> Supply risk > technical risk. Ish boshlashdan oldin Oson Pochta + 1-2
+> restaurant/clinic'dan "ha" olish kerak.
+
+## Aniqlangan joriy muammolar
+
+### 1. Developer Portal (`developers.zayuno.uz`) kirish va autentifikatsiya muammosi
+- [x] Saytga kirganda barcha ommaviy bo‘limlar (Overview, Docs, Sandbox) public/protected zone ajratilishi orqali ochiq (`apps/provider-portal/src/App.tsx`).
+- [x] Login oynasida yangi dasturchilar yoki mehmonlar uchun ro‘yxatdan o‘tish (Sign Up / Register) formasi mavjud.
+- [x] Ommaviy bo‘lishi kerak bo‘lgan dokumentatsiya va arxitektura ma’lumotlari ro‘yxatdan o‘tmagan tashqi dasturchilar va hamkorlar uchun to‘liq ochiq.
+
+#### Provider registration journey — savolsiz, bosqichma-bosqich oqim
+
+> Provider application form already exists after login. The missing part is a
+> clear public entry path, account creation/verification, and an explicit status
+> journey before and after that form.
+
+- [x] Public sahifada aniq `Provider bo‘lish` CTA va `Qanday ishlaydi?` sahifasi:
+  talablar, kerakli API endpointlar, xavfsizlik talablari, jarayon bosqichlari,
+  taxminiy review vaqti va sandbox/production farqi.
+- [x] `Account yaratish -> emailni tasdiqlash -> provider application`
+  oqimini yaratish; mavjud provider owner loginiga tabiiy ravishda olib kirish (`EmailVerificationService` with persistent DB tokens).
+- [x] Application wizard bosqichlarini aniq ajratish:
+  1. Business profile va support kontaktlari.
+  2. Brand/slug tanlash va reserved-brand tekshiruvi.
+  3. API base URL, auth usuli va capability tanlash.
+  4. Endpoint mapping va credentiallarni bir marta xavfsiz ko‘rsatish.
+  5. Sandbox testlari va certification natijalari.
+  6. Reviewga yuborish va Operations qarorini kuzatish.
+- [x] Har bir status uchun foydalanuvchiga keyingi qadamni ko‘rsatish:
+  `DRAFT`, `CERTIFICATION_FAILED`, `READY_FOR_REVIEW`, `PENDING_APPROVAL`,
+  `CHANGES_REQUESTED`, `APPROVED`, `REJECTED`, `SUSPENDED`.
+- [x] Success va error holatlari uchun aniq matn, field-level validation,
+  credentialni qayta ko‘rib bo‘lmasligi haqida ogohlantirish va downloadable
+  onboarding checklist qo‘shish.
+- [x] Journey E2E testi: yangi tashqi provider account yaratishdan boshlab
+  `DRAFT -> certified -> review -> approved/discoverable` holatigacha; shu bilan
+  birga unverified provider discoveryga chiqmasligini isbotlash (`tests/test-provider-onboarding-journey.ts`, `tests/test-http-boundary-regression.ts`).
+
+### 2. Interactive Sandbox Action Simulator muammosi
+- [x] Simulator bosqichlaridagi barcha API so‘rovlari (`/find`, `/quotes`, `/actions`, `/webhooks`) to‘g‘ri autentifikatsiya va credentiallar bilan muvaffaqiyatli ishlaydi (`tests/test-sandbox-simulator-e2e.ts`).
+- [x] Frontend kodida API javobi muvaffaqiyati (`res.ok`) tekshiriladi va xatoliklar aniq ko‘rsatiladi.
+- [x] Webhook simulyatsiyasi bosqichida backenddagi HMAC-SHA256 tekshiruviga mos keluvchi haqiqiy imzo hisoblanadi.
+
+## Yangi strategik va texnik vazifalar (Prioritet)
+
+### 3. AI Discovery: Bo‘sh yoki yopiq providerlarni AI’dan yashirish (Smart Filtering)
+- [x] `find_providers` va `list_providers` chaqirilganda, katalogi/mahsulotlari bo‘sh (`offerings: []`) bo‘lgan, filialsiz yoki vaqtincha xizmat ko‘rsatmayotgan providerlarni AI agentga qaytarmaslik (`isProviderDiscoveryReady`).
+- [x] AI agent faqat `status === 'ACTIVE' && metadata.reviewStatus === 'APPROVED' && metadata.isPublished === true && metadata.isCertified === true` bo‘lgan providerlarni ko‘rsin; bo‘sh/unready providerlar AI uchun butunlay ko‘rinmas (invisible) bo‘lsin (`isProviderPublished` canonical gate).
+- [x] Readiness qoidalarini capability-aware qilish:
+  - `LOCATIONS` capability e’lon qilgan yoki fizik filialga bog‘liq delivery, pickup, booking provider uchun kamida bitta faol location talab qilinadi.
+  - Digital service, remote consultation, online recruitment yoki faqat discovery provider uchun filial talab qilinmaydi.
+- [x] Centralized Reserved Brand Registry & Protection: `EVOS`, `UZUM`, `YANDEX`, `KORZINKA`, `PAYME`, `CLICK`, `OSON`, `ZAYUNO` va boshqa brendlar uchun homoglyph/lookalike/alias himoyasi (`RESERVED_BRAND_PROTECTED`), internal operations onboarding yo‘li saqlangan.
+
+### 4. Unmet Demand Aggregator: Mijozlar talablarini yig‘uvchi analitika tizimi
+- [x] Foydalanuvchilar AI orqali qidirgan, lekin Zayuno’da hali mavjud bo‘lmagan xizmatlar, mahsulotlar va hududlarni (`unmet_demand`) avtomatik log qilib borish.
+- [x] Admin panelda eng ko‘p so‘ralayotgan yetishmovchiliklar reytingini (Top Missing Services / Categories / Locations) ko‘rsatuvchi analitika bo‘limi yaratish.
+- [x] Yangi providerlar bilan shartnoma tuzishda real foydalanuvchi talablariga tayanish (masalan: 1-o‘rinda poyezd chiptasi, 2-o‘rinda 24/7 dorixona, 3-o‘rinda gul yetkazish).
+
+### 5. Live Provider API & Payload Inspector (Jonli tekshiruv va Debugger)
+- [x] Developer Portal va Admin panelda har bir so‘rov (`GET /actions/:id`, `GET /catalog`, `POST /quotes`, `POST /webhooks`) nima jo‘natayotgani va nima qaytarayotganini bittalab ko‘rish uchun Live Inspector (Payload Debugger) yaratish.
+- [x] Provider dasturchilari o‘z API’larini ulaganda xatoliklarni, field nomuvofiqliklarini va status o‘zgarishlarini jonli JSON ko‘rinishida tekshira olsin.
+- [x] Inspector va operational log xavfsizligini yakunlash:
+  - [x] Admin operational events va export javoblarida password, secret, token,
+    API key, card/CVV/OTP, telefon, email, customer va address maydonlarini
+    `[REDACTED]` bilan almashtiruvchi redaction mavjud.
+  - [x] Eski/raw `/admin/logs/integration` va `/admin/logs/webhooks` endpointlari
+    ham ayni redactor orqali javob qaytarsin; raw Prisma yozuvini to‘g‘ridan-to‘g‘ri
+    clientga bermasin.
+  - [x] Imkon qadar sensitive qiymatlarni bazaga yozishdan oldin redakt qilish yoki
+    faqat allowlist qilingan diagnostika maydonlarini saqlash.
+  - [x] Nested object, array, header, free-text token, telefon/email va eksportlar
+    uchun regression testlar qo‘shish.
+
+### 6. Customer Support & Escalation Channels (Mijozlar uchun Support va Bog‘lanish kanallari)
+- [x] Har bir provider metadata va action javobida mijozlar qo‘llab-quvvatlash xizmati kontaktlarini (`supportContact`: telefon raqami, Telegram username/bot, email, ish vaqti, supportUrl, locale) standartlashtirib qaytarish (`StructuredSupportContactSchema`, `normalizeSupportContact`, `sanitizePublicSupportContact`).
+- [ ] AI agent uchun qo‘llab-quvvatlash mantiqi va ko‘rsatmasi: agar mijoz "buyurtmam kelmadi", "kechikmoqda", "ovqat sovuq", "bekor qilmoqchiman" yoki shikoyat qilsa, AI agent darhol tegishli providerning rasmiy support kontaktlarini (telefon, Telegram, email) taqdim etsin va mijozni to‘g‘ri operatorga yo‘naltirsin.
+- [x] Action status va timeline javoblarida bevosita mijoz qo‘llab-quvvatlash xizmati bilan bog‘lanish maydonlarini (`supportContact`) uzatish.
+
+### 7. Developer FAQ & Troubleshooting Guide (Integratsiyadagi ko‘p uchraydigan muammolar qo‘llanmasi)
+- [x] Dokumentatsiyaga va Developer Portalga `14. Troubleshooting & Developer FAQ` bo‘limini kiritish:
+  - **CORS va Preflight:** Developer Portal / Sandbox simulyatoridan so‘rov yuborilganda `Access-Control-Allow-Origin` va `Access-Control-Allow-Headers` sozlamalari.
+  - **HMAC Signature Mismatch:** Webhook imzosini hisoblashda `rawBody` (asl JSON matni)dan foydalanish va whitespace/formatting xatolarining oldini olish.
+  - **Latency va Timeout cheklovlari:** AI agentlarning 15–30 soniyalik kutish limitiga mos ravishda provider API’lari 1–2 soniya ichida javob qaytarishi zarurligi.
+  - **Kotirovka matematikasi (Quote Math):** `subtotal + fees - discount == total` formulasi bo‘yicha har bir tiyinning qat’iy mos kelishi.
+  - **Idempotency kafolati:** Takroriy `idempotencyKey` kelganda yangi buyurtma ochmasdan avvalgi natijani qaytarish (mijozdan ikki marta pul yechishni oldini olish).
+  - **HTTPS & SSL sertifikati:** Faqat rasmiy CA sertifikatiga ega bo‘lgan xavfsiz `https://` endpointlarni qabul qilish talabi.
+
+### 8. Future Vertical: Job Search & Recruitment Integration (hh.uz / Ish va Xodim qidirish)
+- [ ] Zayuno platformasiga `RECRUITMENT` / `JOB_SEARCH` toifasini kiritish va standartlashtirish:
+  - **`SEARCH`**: Maosh, tajriba, ko‘nikmalar (skills), shahar va masofaviy/gibrid rejimi bo‘yicha vakansiyalarni qidirish.
+  - **`CATALOG` / `OFFERINGS`**: Vakansiya talablari, kompaniya ma’lumotlari, maosh chegaralari.
+  - **`FORM_FILL` / `APPLY`**: Nomzodning rezyumesi va kontaktlarini biriktirib vakansiyaga avtomatik ariza topshirish.
+  - **`ACTION_STATUS`**: Ariza holatini kuzatish (`APPLIED` &rarr; `VIEWED` &rarr; `INVITED` &rarr; `REJECTED`).
+- [ ] AI foydalanuvchilari uchun: *"Menga Toshkentda 10-15 mln oylikli Python dasturchi ishini topib, rezyumemni yuborishga tayyorla"* kabi tabiiy tildagi talablarni orkestratsiya qilish.
+- [ ] Ish beruvchilar (HR / Recruiter AI) uchun: talablar asosida nomzodlar bazasidan eng moslarini saralab berish.
+
+### 9. Future Vertical: AI Co-Founder & Talent Matchmaker (Startapchilar va Hammuassislarni topish)
+- [ ] Dasturchilar, dizaynerlar va startapchilar uchun AI-Native mutaxassis profillarini yaratish va o‘zaro moslashtirish (Matching) tizimi:
+  - **`SEARCH`**: Semantik chuqur qidiruv — texnologik stek (Next.js, Flutter, NestJS, Python/AI), soha tajribasi (Fintech, Medtech, AI, E-commerce), qiziqqan roli (CTO, Lead Dev, Co-founder), ulush (equity) yoki maosh shartlari.
+  - **`CATALOG` / `OFFERINGS`**: Dasturchi/mutaxassis profili, portfolio, GitHub loyihalari, tajriba darajasi va bandlik holati (full-time, part-time).
+  - **`ACTION_CREATE` / `INTRO`**: "Intro Request" (Tanishuv so‘rovi) — asoschi tomonidan startap g‘oyasi va shartlari bilan birga yuboriladigan taklif.
+  - **`NEXTACTION` / `BOOKING`**: Cal.com yoki Google Meet orqali bir zumda tanishuv video-qo‘ng‘irog‘ini (Call) belgilash havolasi.
+- [ ] Asoschilar (Founders) uchun: *"Bizga Medtech sohasida Flutter va NestJS biladigan, Toshkentdagi equityga ishlaydigan CTO / Co-founder topib ber"* kabi tabiiy talablarni tahlil qilib, eng mos 2–3 ta nomzodni tavsiya qilish.
+- [ ] Dasturchilar uchun: spam xabarlarsiz, faqat o‘z shartlariga 100% mos keladigan jiddiy startap loyihalaridan takliflar olish (AI Agent filtri).
+
+### 10. Future Vertical: Freight & Cargo Logistics Integration (Yuk tashish va Logistika platformalari)
+- [ ] Zayuno platformasiga `FREIGHT_LOGISTICS` / `CARGO` toifasini kiritish va standartlashtirish:
+  - **`LOCATIONS` / `ROUTING`**: Yuk ortish manzili &rarr; Yetkazish manzili (koordinatalar, shahar/viloyatlararo masofa hisobi).
+  - **`QUOTE`**: Yuk vazni (kg/tonna), hajmi ($m^3$), transport turi (Labo, Porter, Gazel, Isuzu, Fura/TIR), yuk ortuvchi (gruzchik) xizmati va sug‘urta bo‘yicha aniq kotirovka hisoblash.
+  - **`ACTION_CREATE`**: Haydovchiga buyurtma yuborish, yuk ortish vaqtini belgilash va dispetcher tizimi orqali transportni band qilish.
+  - **`ACTION_STATUS` / `LIVE_TRACKING`**: Real-vaqtda status kuzatuvi (`TRUCK_ASSIGNED` &rarr; `LOADED` &rarr; `IN_TRANSIT` [Live GPS havola] &rarr; `DELIVERED`).
+  - **`PAYMENT`**: Payme/Click yoki yuridik shaxslar uchun hisob-faktura (Invoys) orqali to‘lov handoff.
+- [ ] AI foydalanuvchilari uchun: *"Toshkentdan Farg‘onaga 800 kg tovarim bor, ertaga soat 10:00 da olib ketadigan Porter yoki Labo top va narxini ayt"* kabi logistika ehtiyojlarini orkestratsiya qilish.
+- [ ] Logistika hamkorlari integratsiyasi: BTS Express, Oson Pochta, Fargo Express, EMU, Starex, shahar ichi yuk agregatorlari (Yandex Cargo/Labo) va viloyatlararo yuk terminallari API/Webhooklari bilan bog‘lanish.
