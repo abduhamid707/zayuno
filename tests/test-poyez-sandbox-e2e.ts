@@ -57,7 +57,10 @@ async function form(path: string, csrfToken: string, expectedStatus: number): Pr
 }
 
 async function checkoutToken(action: any): Promise<string> {
-  const response = await fetch(action.paymentUrl);
+  const path = action.paymentUrl.startsWith('http')
+    ? new URL(action.paymentUrl).pathname
+    : action.paymentUrl;
+  const response = await fetch(`${base}${path}`);
   assert.equal(response.status, 200);
   const page = await response.text();
   assert.match(page, /SANDBOX DEMO/);
@@ -80,18 +83,57 @@ function actionBody(quote: any, idempotencyKey: string) {
 }
 
 try {
-  const allowedPreflight = await fetch(`${base}/search`, {
+  // 1. API Preflight Tests
+  const allowedPartnersPreflight = await fetch(`${base}/search`, {
     method: 'OPTIONS',
     headers: { origin: 'https://partners.zayuno.uz', 'access-control-request-method': 'GET', 'access-control-request-headers': 'x-provider-api-key' }
   });
-  assert.equal(allowedPreflight.status, 204);
-  assert.equal(allowedPreflight.headers.get('access-control-allow-origin'), 'https://partners.zayuno.uz');
+  assert.equal(allowedPartnersPreflight.status, 204);
+  assert.equal(allowedPartnersPreflight.headers.get('access-control-allow-origin'), 'https://partners.zayuno.uz');
+
+  const allowedMcpPreflight = await fetch(`${base}/search`, {
+    method: 'OPTIONS',
+    headers: { origin: 'https://mcp.zayuno.uz', 'access-control-request-method': 'GET', 'access-control-request-headers': 'x-provider-api-key' }
+  });
+  assert.equal(allowedMcpPreflight.status, 204);
+  assert.equal(allowedMcpPreflight.headers.get('access-control-allow-origin'), 'https://mcp.zayuno.uz');
+
+  const allowedDevsPreflight = await fetch(`${base}/search`, {
+    method: 'OPTIONS',
+    headers: { origin: 'https://developers.zayuno.uz', 'access-control-request-method': 'GET', 'access-control-request-headers': 'x-provider-api-key' }
+  });
+  assert.equal(allowedDevsPreflight.status, 204);
+  assert.equal(allowedDevsPreflight.headers.get('access-control-allow-origin'), 'https://developers.zayuno.uz');
 
   const blockedPreflight = await fetch(`${base}/search`, {
     method: 'OPTIONS', headers: { origin: 'https://attacker.invalid', 'access-control-request-method': 'GET' }
   });
   assert.equal(blockedPreflight.status, 403);
   assert.equal(blockedPreflight.headers.get('access-control-allow-origin'), null);
+
+  // 2. Production Mode HTTP Origin Rejection Test
+  {
+    const prevNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    process.env.PROVIDER_API_KEY = 'long-enough-provider-key-for-prod-test';
+    process.env.ZAYUNO_WEBHOOK_SECRET = 'long-enough-webhook-secret-for-prod-test';
+    const prodApp = createPoyezSandboxApp();
+    const prodServer = prodApp.listen(0, '127.0.0.1');
+    await new Promise<void>(resolve => prodServer.once('listening', resolve));
+    const prodAddr = prodServer.address() as any;
+    const prodBase = `http://127.0.0.1:${prodAddr.port}`;
+
+    const httpDevPreflight = await fetch(`${prodBase}/search`, {
+      method: 'OPTIONS',
+      headers: { origin: 'http://developers.zayuno.uz', 'access-control-request-method': 'GET' }
+    });
+    assert.equal(httpDevPreflight.status, 403, 'http:// origin must be rejected in production mode');
+
+    await new Promise<void>(resolve => prodServer.close(() => resolve()));
+    process.env.NODE_ENV = prevNodeEnv;
+    process.env.PROVIDER_API_KEY = providerKey;
+    process.env.ZAYUNO_WEBHOOK_SECRET = webhookSecret;
+  }
 
   assert.equal((await fetch(`${base}/catalog`)).status, 401);
   const health = await (await fetch(`${base}/health`)).json();
@@ -162,6 +204,32 @@ try {
   assert.match(collision.message, /no longer available/);
 
   const csrfA = await checkoutToken(actionA);
+
+  // 3. GET /pay/* redirect UX tests (details, success, cancel -> 303)
+  const getDetailsRedirect = await fetch(`${base}/pay/${actionA.externalActionId}/details`, { redirect: 'manual' });
+  assert.equal(getDetailsRedirect.status, 303);
+  assert.equal(getDetailsRedirect.headers.get('location'), `/pay/${actionA.externalActionId}`);
+
+  const getSuccessRedirect = await fetch(`${base}/pay/${actionA.externalActionId}/success`, { redirect: 'manual' });
+  assert.equal(getSuccessRedirect.status, 303);
+  assert.equal(getSuccessRedirect.headers.get('location'), `/pay/${actionA.externalActionId}`);
+
+  const getCancelRedirect = await fetch(`${base}/pay/${actionA.externalActionId}/cancel`, { redirect: 'manual' });
+  assert.equal(getCancelRedirect.status, 303);
+  assert.equal(getCancelRedirect.headers.get('location'), `/pay/${actionA.externalActionId}`);
+
+  // 4. /pay/* flow with Origin: https://mcp.zayuno.uz (must NOT be blocked by 403 CORS)
+  const mcpGetCheckout = await fetch(`${base}/pay/${actionA.externalActionId}`, {
+    headers: { origin: 'https://mcp.zayuno.uz' }
+  });
+  assert.equal(mcpGetCheckout.status, 200, '/pay/:id must not be blocked by CORS');
+
+  const mcpGetDetails = await fetch(`${base}/pay/${actionA.externalActionId}/details`, {
+    redirect: 'manual',
+    headers: { origin: 'https://mcp.zayuno.uz' }
+  });
+  assert.equal(mcpGetDetails.status, 303, 'GET /pay/:id/details with MCP origin must return 303 redirect');
+
   await form(`/pay/${actionA.externalActionId}/details`, 'forged-token', 403);
   await form(`/pay/${actionA.externalActionId}/details`, csrfA, 303);
   const awaitingPayment = await json(`/actions/${actionA.publicId}`);

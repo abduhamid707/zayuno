@@ -31,7 +31,8 @@ const testSuites = [
   'tests/test-location-and-quote-persistence.ts',
   'tests/test-sensitive-dynamic-parameters.ts',
   'tests/test-docs-contract.ts',
-  'tests/test-provider-operations-guardrails.ts'
+  'tests/test-provider-operations-guardrails.ts',
+  'tests/test-poyez-sandbox-e2e.ts'
 ];
 
 async function main() {

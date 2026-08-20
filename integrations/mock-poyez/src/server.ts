@@ -106,27 +106,58 @@ export function createPoyezSandboxApp(): Express {
     if (!publicBase.startsWith('https://')) throw new Error('PROVIDER_PUBLIC_BASE_URL must use HTTPS in production.');
   }
 
-  const allowedOrigins = new Set((process.env.CORS_ALLOWED_ORIGINS || [
+  const defaultOrigins = [
     'https://zayuno.uz',
     'https://admin.zayuno.uz',
     'https://partners.zayuno.uz',
     'https://developers.zayuno.uz',
+    'https://mcp.zayuno.uz',
     'https://poyez-sandbox.shopla.uz'
-  ].join(',')).split(',').map(value => value.trim()).filter(Boolean));
-  const corsOptions: CorsOptions = {
+  ];
+  try {
+    if (publicBase) {
+      const parsed = new URL(publicBase);
+      if (parsed.protocol === 'https:' || (process.env.NODE_ENV !== 'production' && parsed.protocol === 'http:')) {
+        if (!defaultOrigins.includes(parsed.origin)) {
+          defaultOrigins.push(parsed.origin);
+        }
+      }
+    }
+  } catch {}
+
+  const configuredOrigins = process.env.CORS_ALLOWED_ORIGINS
+    ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(value => value.trim()).filter(Boolean)
+    : [];
+  const allowedOrigins = new Set([...defaultOrigins, ...configuredOrigins]);
+
+  const apiCors = cors({
     origin(origin, callback) {
-      const local = process.env.NODE_ENV !== 'production' && !!origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-      return !origin || allowedOrigins.has(origin) || local ? callback(null, true) : callback(new Error('Origin is not allowed by CORS.'));
+      if (!origin) return callback(null, true);
+      const isLocalDev = process.env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      if (allowedOrigins.has(origin) || isLocalDev) {
+        return callback(null, true);
+      }
+      return callback(new Error('Origin is not allowed by CORS.'));
     },
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'x-provider-api-key', 'idempotency-key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-provider-api-key', 'idempotency-key', 'X-Requested-With'],
     credentials: false,
     maxAge: 86400,
     optionsSuccessStatus: 204
-  };
-  app.use(cors(corsOptions));
+  });
+
+  // Apply strict API CORS only to provider/API endpoints, bypassing /pay/* browser checkout/handoff routes
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/pay')) {
+      return next();
+    }
+    return apiCors(req, res, next);
+  });
+
   app.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
-    if (error instanceof Error && error.message === 'Origin is not allowed by CORS.') return res.status(403).json({ message: error.message });
+    if (error instanceof Error && error.message === 'Origin is not allowed by CORS.') {
+      return res.status(403).json({ message: error.message });
+    }
     return next(error);
   });
   app.use((_req, res, next) => {
@@ -574,6 +605,9 @@ export function createPoyezSandboxApp(): Express {
     const action = findAction(req.params.id);
     return action ? res.type('html').send(checkoutPage(action)) : res.status(404).send('Sandbox booking not found.');
   });
+  app.get('/pay/:id/details', (req, res) => {
+    return res.redirect(303, `/pay/${encodeURIComponent(req.params.id)}`);
+  });
   app.post('/pay/:id/details', async (req, res) => {
     expireHolds();
     const action = findAction(req.params.id);
@@ -586,6 +620,9 @@ export function createPoyezSandboxApp(): Express {
     action.timeline?.push({ id: makeId('ps_timeline'), status: ActionStatus.AWAITING_PAYMENT, description: 'Synthetic sandbox passenger details accepted. No identity data stored.', source: 'USER', createdAt: action.updatedAt });
     await sendWebhook(action, 'action.awaiting_payment');
     return res.redirect(303, `/pay/${encodeURIComponent(action.externalActionId || action.id)}`);
+  });
+  app.get('/pay/:id/success', (req, res) => {
+    return res.redirect(303, `/pay/${encodeURIComponent(req.params.id)}`);
   });
   app.post('/pay/:id/success', async (req, res) => {
     expireHolds();
@@ -604,6 +641,9 @@ export function createPoyezSandboxApp(): Express {
     action.timeline?.push({ id: makeId('ps_timeline'), status: ActionStatus.CONFIRMED, description: 'Sandbox payment simulated and test ticket confirmed.', source: 'PROVIDER_WEBHOOK', createdAt: action.updatedAt });
     await sendWebhook(action, 'payment.received');
     return res.redirect(303, `/pay/${encodeURIComponent(action.externalActionId || action.id)}`);
+  });
+  app.get('/pay/:id/cancel', (req, res) => {
+    return res.redirect(303, `/pay/${encodeURIComponent(req.params.id)}`);
   });
   app.post('/pay/:id/cancel', async (req, res) => {
     const action = findAction(req.params.id);
