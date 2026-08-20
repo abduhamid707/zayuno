@@ -1,5 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/zayuno?schema=public';
+}
+
 declare global {
   // eslint-disable-next-line no-var
   var __prisma: PrismaClient | undefined;

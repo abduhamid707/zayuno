@@ -24,6 +24,7 @@ async function main() {
     quoteCreate: prisma.quote.create,
     quoteFindUnique: prisma.quote.findUnique,
     actionFindUnique: prisma.action.findUnique,
+    actionFindFirst: prisma.action.findFirst,
     actionCreate: prisma.action.create,
     actionEventCreate: prisma.actionEvent.create
   };
@@ -56,6 +57,7 @@ async function main() {
     };
     (prisma.quote as any).findUnique = async () => dbQuote;
     (prisma.action as any).findUnique = async () => null;
+    (prisma.action as any).findFirst = async () => null;
     (prisma.action as any).create = async ({ data }: any) => {
       persistedActions.push(data);
       return {
@@ -104,6 +106,7 @@ async function main() {
     (prisma.quote as any).create = original.quoteCreate;
     (prisma.quote as any).findUnique = original.quoteFindUnique;
     (prisma.action as any).findUnique = original.actionFindUnique;
+    (prisma.action as any).findFirst = original.actionFindFirst;
     (prisma.action as any).create = original.actionCreate;
     (prisma.actionEvent as any).create = original.actionEventCreate;
   }
