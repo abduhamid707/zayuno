@@ -68,7 +68,7 @@ jobs:
         run: |
           INPUT_SERVICES="${{ github.event.inputs.services }}"
           if [ "$INPUT_SERVICES" = "all" ]; then
-            RESOLVED="mock-evos mock-coffee-time mock-poyez telegram-recruitment api mcp admin provider-portal worker"
+            RESOLVED="mock-evos mock-coffee-time mock-poyez api mcp admin provider-portal worker"
           elif [ -n "$INPUT_SERVICES" ] && [ "$INPUT_SERVICES" != "auto" ]; then
             RESOLVED="$INPUT_SERVICES"
           else
@@ -81,7 +81,6 @@ jobs:
 
             while IFS= read -r file; do
               case "$file" in
-                integrations/telegram-recruitment/*) add_service telegram-recruitment ;;
                 integrations/mock-evos/*) add_service mock-evos ;;
                 integrations/mock-coffee-time/*) add_service mock-coffee-time ;;
                 integrations/mock-poyez/*) add_service mock-poyez ;;
@@ -89,9 +88,9 @@ jobs:
                 apps/mcp/*) add_service mcp ;;
                 apps/admin/*) add_service admin ;;
                 apps/provider-portal/*) add_service provider-portal ;;
-                packages/contracts/*|packages/shared/*|packages/provider-sdk/*) add_service mock-evos; add_service mock-coffee-time; add_service mock-poyez; add_service telegram-recruitment; add_service api; add_service mcp; add_service worker ;;
+                packages/contracts/*|packages/shared/*|packages/provider-sdk/*) add_service mock-evos; add_service mock-coffee-time; add_service mock-poyez; add_service api; add_service mcp; add_service worker ;;
                 packages/database/*) add_service api; add_service worker ;;
-                docker-compose.prod.yml|infra/docker/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|tsconfig.base.json) RESOLVED="mock-evos mock-coffee-time mock-poyez telegram-recruitment api mcp admin provider-portal worker" ;;
+                docker-compose.prod.yml|infra/docker/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|tsconfig.base.json) RESOLVED="mock-evos mock-coffee-time mock-poyez api mcp admin provider-portal worker" ;;
               esac
             done <<< "$CHANGED_FILES"
 

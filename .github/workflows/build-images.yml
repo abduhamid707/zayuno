@@ -32,7 +32,6 @@ on:
           - mock-evos
           - mock-coffee-time
           - mock-poyez
-          - telegram-recruitment
       force_build_all:
         description: 'Force build all services regardless of changed files'
         required: false
@@ -99,8 +98,6 @@ jobs:
               - 'integrations/mock-coffee-time/**'
             mock_poyez:
               - 'integrations/mock-poyez/**'
-            telegram_recruitment:
-              - 'integrations/telegram-recruitment/**'
 
       - name: Calculate service matrix
         id: set-matrix
@@ -120,7 +117,6 @@ jobs:
             SERVICES["mock-evos"]=1
             SERVICES["mock-coffee-time"]=1
             SERVICES["mock-poyez"]=1
-            SERVICES["telegram-recruitment"]=1
           elif [ -n "$SELECTED" ] && [ "$SELECTED" != "all" ]; then
             SERVICES["$SELECTED"]=1
           else
@@ -172,11 +168,6 @@ jobs:
                [ "${{ steps.filter.outputs.contracts }}" = "true" ]; then
               SERVICES["mock-poyez"]=1
             fi
-
-            if [ "${{ steps.filter.outputs.telegram_recruitment }}" = "true" ] || \
-               [ "${{ steps.filter.outputs.contracts }}" = "true" ]; then
-              SERVICES["telegram-recruitment"]=1
-            fi
           fi
 
           # Define metadata map for services: name, dockerfile, build_args
@@ -206,9 +197,6 @@ jobs:
                 ;;
               mock-poyez)
                 JSON_ITEMS+=('{"service":"mock-poyez","dockerfile":"infra/docker/Dockerfile.mock-poyez","build_args":""}')
-                ;;
-              telegram-recruitment)
-                JSON_ITEMS+=('{"service":"telegram-recruitment","dockerfile":"infra/docker/Dockerfile.telegram-recruitment","build_args":""}')
                 ;;
             esac
           done

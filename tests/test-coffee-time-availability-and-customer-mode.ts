@@ -208,9 +208,7 @@ async function main() {
       createAction: async () => ({ id: 'act_1', publicId: 'ZY-TEST-1', paymentUrl: 'https://zayuno.uz/pay/1', status: 'AWAITING_PAYMENT', metadata: { sandbox: true } }),
       getAction: async () => ({ id: 'act_1', publicId: 'ZY-TEST-1', status: 'CONFIRMED', paymentStatus: 'PAID' }),
       cancelAction: async () => ({ success: true, actionId: 'ZY-TEST-1', previousStatus: 'AWAITING_PAYMENT', newStatus: 'CANCELLED' }),
-      getPaymentOptions: async () => [{ checkoutUrl: 'https://zayuno.uz/pay/1' }],
-      searchCandidates: async () => [{ title: 'Python Dev', basePrice: 10000000, metadata: { role: 'Python Developer', skills: ['Python'], location: 'Toshkent', telegramPostUrl: 'https://t.me/UstozShogird/1' } }],
-      searchJobs: async () => [{ title: 'React Dev', basePrice: 15000000, metadata: { role: 'React Developer', skills: ['React'], location: 'Toshkent', telegramPostUrl: 'https://t.me/UstozShogird/2' } }]
+      getPaymentOptions: async () => [{ checkoutUrl: 'https://zayuno.uz/pay/1' }]
     } as any;
 
     const mockArgs: Record<string, any> = {

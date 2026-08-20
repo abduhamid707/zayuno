@@ -16,8 +16,6 @@ const sampleArguments: Record<string, Record<string, unknown>> = {
   get_locations: { providerSlug: 'mock-evos', activeOnly: true },
   get_catalog: { providerSlug: 'mock-evos', locationId: 'demo-location', category: 'demo', parameters: { date: '2026-08-19' } },
   search_catalog: { providerSlug: 'mock-evos', query: 'drink', limit: 1, parameters: { date: '2026-08-19' } },
-  search_candidates: { query: 'NestJS', skills: ['Node.js'], location: 'Toshkent' },
-  search_jobs: { query: 'React developer', location: 'Toshkent' },
   get_offering: { providerSlug: 'mock-evos', offeringId: 'demo-offering', parameters: { date: '2026-08-19' } },
   check_availability: { providerSlug: 'mock-evos', items: [{ offeringId: 'demo-offering', quantity: 1 }], parameters: { date: '2026-08-19' } },
   request_quote: { providerSlug: 'mock-evos', items: [{ offeringId: 'demo-offering', quantity: 1 }] },
