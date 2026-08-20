@@ -113,6 +113,27 @@ services:
     networks:
       - zayuno_net
 
+  # Telegram Recruitment Provider (Stateless Real-time Feed)
+  telegram-recruitment:
+    image: ${IMAGE_PREFIX:-ghcr.io/zayuno}/telegram-recruitment:${DEPLOY_SHA:-latest}
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.telegram-recruitment
+    container_name: zayuno-telegram-recruitment
+    restart: always
+    ports:
+      - "127.0.0.1:4107:4007"
+    environment:
+      - NODE_ENV=production
+      - PORT=4007
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID:-}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH:-}
+      - TELEGRAM_SESSION=${TELEGRAM_SESSION:-}
+      - TELEGRAM_ALLOW_WEB_FALLBACK=${TELEGRAM_ALLOW_WEB_FALLBACK:-true}
+      - TELEGRAM_REQUIRE_MTPROTO=${TELEGRAM_REQUIRE_MTPROTO:-false}
+    networks:
+      - zayuno_net
+
   # 5. Zayuno Core Public API
   api:
     image: ${IMAGE_PREFIX:-ghcr.io/zayuno}/api:${DEPLOY_SHA:-latest}

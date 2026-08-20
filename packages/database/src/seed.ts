@@ -149,7 +149,7 @@ async function main() {
       status: ProviderStatus.ACTIVE,
       type: ProviderType.SERVICES,
       adapterType: 'http',
-      baseUrl: process.env.TELEGRAM_RECRUITMENT_BASE_URL || 'http://localhost:4005',
+      baseUrl: process.env.TELEGRAM_RECRUITMENT_BASE_URL || 'http://telegram-recruitment:4007',
       encryptedSecret: encryptedSandboxSecret,
       webhookSecret: WEBHOOK_SECRET,
       capabilities: [
@@ -188,7 +188,7 @@ async function main() {
       status: ProviderStatus.ACTIVE,
       type: ProviderType.SERVICES,
       adapterType: 'http',
-      baseUrl: process.env.TELEGRAM_RECRUITMENT_BASE_URL || 'http://localhost:4005',
+      baseUrl: process.env.TELEGRAM_RECRUITMENT_BASE_URL || 'http://telegram-recruitment:4007',
       encryptedSecret: encryptedSandboxSecret,
       webhookSecret: WEBHOOK_SECRET,
       capabilities: [

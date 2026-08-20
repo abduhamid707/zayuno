@@ -7,7 +7,7 @@ set -euo pipefail
 # ==============================================================================
 
 DEPLOY_SHA="${1:?Deploy commit SHA is required}"
-SERVICES="${2:-mock-evos mock-coffee-time mock-poyez api mcp admin provider-portal worker}"
+SERVICES="${2:-mock-evos mock-coffee-time mock-poyez telegram-recruitment api mcp admin provider-portal worker}"
 IMAGE_PREFIX="${3:-ghcr.io/zayuno}"
 RUN_MIGRATIONS="${4:-true}"
 

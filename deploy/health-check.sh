@@ -31,6 +31,7 @@ INTERNAL_TARGETS=(
   "provider-portal|http://127.0.0.1:4104"
   "mock-coffee-time|http://127.0.0.1:4105/health"
   "mock-poyez|http://127.0.0.1:4106/health"
+  "telegram-recruitment|http://127.0.0.1:4107/health"
 )
 
 PUBLIC_TARGETS=(

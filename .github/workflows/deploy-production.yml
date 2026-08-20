@@ -64,7 +64,7 @@ jobs:
         run: |
           INPUT_SERVICES="${{ github.event.inputs.services }}"
           if [ -z "$INPUT_SERVICES" ] || [ "$INPUT_SERVICES" = "all" ]; then
-            RESOLVED="mock-evos mock-coffee-time mock-poyez api mcp admin provider-portal worker"
+            RESOLVED="mock-evos mock-coffee-time mock-poyez telegram-recruitment api mcp admin provider-portal worker"
           else
             RESOLVED="$INPUT_SERVICES"
           fi
