@@ -187,7 +187,7 @@ export class EmailVerificationService {
       this.lastDevTokens.set(cleanEmail, rawToken);
     }
 
-    const portalBase = process.env.PROVIDER_PORTAL_URL || 'http://localhost:3000';
+    const portalBase = process.env.PROVIDER_PORTAL_URL || process.env.PROVIDER_PORTAL_BASE_URL || 'http://localhost:3000';
     const verificationUrl = `${portalBase}?verifyToken=${encodeURIComponent(rawToken)}&email=${encodeURIComponent(cleanEmail)}`;
 
     try {
