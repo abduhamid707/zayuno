@@ -11,7 +11,7 @@
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy || (prisma migrate resolve --applied 20260816000000_init && prisma migrate deploy)",
     "push": "prisma db push",
-    "seed": "ts-node src/seed.ts",
+    "seed": "tsx src/seed.ts",
     "studio": "prisma studio",
     "lint": "echo 'No lint specified for database'"
   },

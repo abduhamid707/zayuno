@@ -15,9 +15,35 @@ jobs:
   validate:
     name: Lint, Test & Monorepo Build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zayuno
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       NODE_ENV: test
       DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/zayuno?schema=public'
+      REDIS_URL: 'redis://localhost:6379'
       JWT_SECRET: 'ci-secret-jwt-key-32-chars-long-test'
       ENCRYPTION_KEY: '01234567890123456789012345678901'
       WEBHOOK_SECRET: 'ci-secret-webhook-key'
@@ -42,6 +68,9 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
+
+      - name: Push DB Schema to CI Test Database
+        run: pnpm db:push
 
       - name: Build All Monorepo Packages and Applications
         run: pnpm build
