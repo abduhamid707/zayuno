@@ -1,10 +1,20 @@
 import { z, ZodTypeAny } from 'zod';
+import { randomUUID } from 'crypto';
 import { ZayunoApiClient } from './client.js';
 import {
   formatCustomerQuote,
   formatCustomerActionConfirmation,
   formatCustomerActionStatus,
   formatCustomerActionCancellation,
+  formatCustomerAvailability,
+  formatCustomerProviders,
+  formatCustomerProvider,
+  formatCustomerCapabilities,
+  formatCustomerLocations,
+  formatCustomerOfferings,
+  formatCustomerOffering,
+  formatCustomerPaymentOptions,
+  formatCustomerError,
   getWelcomeMessage,
   getDynamicServiceMessage
 } from '@zayuno/shared';
@@ -23,6 +33,15 @@ export interface McpToolDefinition {
     required?: string[];
   };
   handler: (args: any, client: ZayunoApiClient) => Promise<any>;
+}
+
+const quoteIdToIdempotencyKey = new Map<string, string>();
+function getOrCreateActionIdempotencyKey(quoteId?: string): string {
+  if (!quoteId) return randomUUID();
+  if (!quoteIdToIdempotencyKey.has(quoteId)) {
+    quoteIdToIdempotencyKey.set(quoteId, randomUUID());
+  }
+  return quoteIdToIdempotencyKey.get(quoteId)!;
 }
 
 export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
@@ -96,7 +115,13 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       }
     },
     handler: async (args, client) => {
-      return client.findProviders(args);
+      const result = await client.findProviders(args);
+      const list = Array.isArray(result) ? result : result?.providers || [];
+      const customerMessage = formatCustomerProviders(list);
+      return {
+        customerMessage,
+        ...(Array.isArray(result) ? { providers: result, total: result.length } : result)
+      };
     }
   },
 
@@ -120,11 +145,17 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       }
     },
     handler: async (args, client) => {
-      return client.listProviders(args.status);
+      const result = await client.listProviders(args.status);
+      const list = Array.isArray(result) ? result : result?.providers || [];
+      const customerMessage = formatCustomerProviders(list);
+      return {
+        customerMessage,
+        ...(Array.isArray(result) ? { providers: result, total: result.length } : result)
+      };
     }
   },
 
-  // 2. get_provider
+  // 3. get_provider
   {
     name: 'get_provider',
     description: 'Get comprehensive metadata, supported capabilities, operational status, and details for a specific capability provider by slug.',
@@ -144,11 +175,16 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['providerSlug']
     },
     handler: async (args, client) => {
-      return client.getProvider(args.providerSlug);
+      const provider = await client.getProvider(args.providerSlug);
+      const customerMessage = formatCustomerProvider(provider);
+      return {
+        customerMessage,
+        ...provider
+      };
     }
   },
 
-  // 3. get_provider_capabilities
+  // 4. get_provider_capabilities
   {
     name: 'get_provider_capabilities',
     description: 'Retrieve the explicit capability matrix for a provider (e.g. CATALOG, QUOTE, ACTION_CREATE, LOCATIONS, PAYMENT_OPTIONS). Use this to determine which tools can be invoked against the provider.',
@@ -168,11 +204,17 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['providerSlug']
     },
     handler: async (args, client) => {
-      return client.getProviderCapabilities(args.providerSlug);
+      const result = await client.getProviderCapabilities(args.providerSlug);
+      const caps = Array.isArray(result) ? result : result?.capabilities || [];
+      const customerMessage = formatCustomerCapabilities(caps, args.providerSlug);
+      return {
+        customerMessage,
+        ...(Array.isArray(result) ? { capabilities: result, providerSlug: args.providerSlug } : result)
+      };
     }
   },
 
-  // 4. get_locations
+  // 5. get_locations
   {
     name: 'get_locations',
     description: 'Retrieve physical operational locations, fulfillment centers, or branches for a specific provider, including addresses, operating hours, and service radii.',
@@ -196,11 +238,17 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['providerSlug']
     },
     handler: async (args, client) => {
-      return client.getLocations(args.providerSlug, args.activeOnly);
+      const locations = await client.getLocations(args.providerSlug, args.activeOnly);
+      const list = Array.isArray(locations) ? locations : locations?.locations || [];
+      const customerMessage = formatCustomerLocations(list);
+      return {
+        customerMessage,
+        ...(Array.isArray(locations) ? { locations } : locations)
+      };
     }
   },
 
-  // 5. get_catalog
+  // 6. get_catalog
   {
     name: 'get_catalog',
     description: 'Retrieve the full structured catalog, categories, offerings, base pricing, and option groups from a provider. Can be filtered by category or location.',
@@ -232,11 +280,17 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['providerSlug']
     },
     handler: async (args, client) => {
-      return client.getCatalog(args.providerSlug, args.locationId, args.category, args.parameters);
+      const catalog = await client.getCatalog(args.providerSlug, args.locationId, args.category, args.parameters);
+      const offerings = catalog?.offerings || (Array.isArray(catalog) ? catalog : []);
+      const customerMessage = formatCustomerOfferings(offerings, args.providerSlug);
+      return {
+        customerMessage,
+        ...(Array.isArray(catalog) ? { offerings: catalog } : catalog)
+      };
     }
   },
 
-  // 6. search_catalog
+  // 7. search_catalog
   {
     name: 'search_catalog',
     description: 'Search static or real-time provider offerings. For dynamic domains such as tickets, appointments, hotels, and transport, pass structured parameters (dates, origin/destination, passengers, capacity, or preferences).',
@@ -276,11 +330,17 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['providerSlug']
     },
     handler: async (args, client) => {
-      return client.searchCatalog(args.providerSlug, args.query || '', args.category, args.locationId, args.limit, args.parameters);
+      const result = await client.searchCatalog(args.providerSlug, args.query || '', args.category, args.locationId, args.limit, args.parameters);
+      const offerings = Array.isArray(result) ? result : result?.offerings || [];
+      const customerMessage = formatCustomerOfferings(offerings, args.providerSlug);
+      return {
+        customerMessage,
+        ...(Array.isArray(result) ? { offerings: result, total: result.length } : result)
+      };
     }
   },
 
-  // 7. get_offering
+  // 8. get_offering
   {
     name: 'get_offering',
     description: 'Get deep item details for an offering including variants, modifiers, option groups, required selections, and availability.',
@@ -312,11 +372,16 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['providerSlug', 'offeringId']
     },
     handler: async (args, client) => {
-      return client.getOffering(args.providerSlug, args.offeringId, args.locationId, args.parameters);
+      const offering = await client.getOffering(args.providerSlug, args.offeringId, args.locationId, args.parameters);
+      const customerMessage = formatCustomerOffering(offering);
+      return {
+        customerMessage,
+        ...offering
+      };
     }
   },
 
-  // 8. check_availability
+  // 9. check_availability
   {
     name: 'check_availability',
     description: 'Read-only real-time inventory check before requesting a quote. Use for seats, appointment slots, rooms, tickets, limited stock, or any capacity that can change. This does not reserve or hold inventory.',
@@ -362,10 +427,17 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       },
       required: ['providerSlug', 'items']
     },
-    handler: async (args, client) => client.checkAvailability(args)
+    handler: async (args, client) => {
+      const result = await client.checkAvailability(args);
+      const customerMessage = formatCustomerAvailability(result);
+      return {
+        customerMessage,
+        ...result
+      };
+    }
   },
 
-  // 9. request_quote
+  // 10. request_quote
   {
     name: 'request_quote',
     description: 'Mandatory pre-requisite before creating an action. Calculates verified real-time pricing and returns pre-formatted customerMessage. The AI assistant must present customerMessage directly to the customer without exposing internal quote IDs.',
@@ -444,7 +516,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     }
   },
 
-  // 9. create_action
+  // 11. create_action
   {
     name: 'create_action',
     description: 'Execute an action with the external provider. MUST only be called after request_quote and AFTER the user has explicitly reviewed and confirmed the quote. Returns pre-formatted customerMessage with secure checkout link. The AI assistant must present customerMessage directly to the customer and keep actionId/tokens internal.',
@@ -458,7 +530,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       properties: {
         idempotencyKey: {
           type: 'string',
-          description: 'Unique client-generated key (e.g. UUID) preventing duplicate action submission.'
+          description: 'Optional client-generated key (e.g. UUID) preventing duplicate action submission. If not supplied, server generates and reuses a secure key automatically.'
         },
         providerSlug: {
           type: 'string',
@@ -532,10 +604,14 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           description: 'Explicit confirmation flag acknowledging pricing review by user (must be true).'
         }
       },
-      required: ['idempotencyKey', 'providerSlug', 'quoteId', 'items', 'customer', 'userConfirmed']
+      required: ['providerSlug', 'quoteId', 'items', 'customer', 'userConfirmed']
     },
     handler: async (args, client) => {
-      const action = await client.createAction(args);
+      const idempotencyKey = args.idempotencyKey || getOrCreateActionIdempotencyKey(args.quoteId);
+      const action = await client.createAction({
+        ...args,
+        idempotencyKey
+      });
       const customerMessage = formatCustomerActionConfirmation(action);
       return {
         customerMessage,
@@ -544,7 +620,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     }
   },
 
-  // 10. get_action
+  // 12. get_action
   {
     name: 'get_action',
     description: 'Retrieve live status for an active or completed action. Returns pre-formatted customerMessage in natural Uzbek. The AI assistant must present customerMessage directly to the customer and never expose raw status enums or action IDs.',
@@ -573,7 +649,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     }
   },
 
-  // 11. cancel_action
+  // 13. cancel_action
   {
     name: 'cancel_action',
     description: 'Cancel an eligible active action before fulfillment lock or completion. Returns pre-formatted customerMessage. The AI assistant must use customerMessage directly.',
@@ -611,7 +687,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     }
   },
 
-  // 12. get_payment_options
+  // 14. get_payment_options
   {
     name: 'get_payment_options',
     description: 'Retrieve provider-supplied checkout URLs and available payment options for an action. Sensitive card data is never handled in chat; payment occurs via secure HTTPS redirection.',
@@ -631,7 +707,12 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['actionId']
     },
     handler: async (args, client) => {
-      return client.getPaymentOptions(args.actionId);
+      const options = await client.getPaymentOptions(args.actionId);
+      const customerMessage = formatCustomerPaymentOptions(Array.isArray(options) ? options : options?.paymentOptions);
+      return {
+        customerMessage,
+        ...(Array.isArray(options) ? { paymentOptions: options } : options)
+      };
     }
   }
 ];
@@ -686,12 +767,17 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
             ]
           };
         } catch (err: any) {
+          const friendlyMessage = formatCustomerError(err);
           return {
             isError: true,
             content: [
               {
                 type: 'text',
-                text: `Tool execution error [${tool.name}]: ${err.message || String(err)}`
+                text: JSON.stringify({
+                  isError: true,
+                  customerMessage: friendlyMessage,
+                  message: friendlyMessage
+                }, null, 2)
               }
             ]
           };
@@ -700,3 +786,4 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
     );
   }
 }
+

@@ -23,17 +23,22 @@ export class ZayunoApiClient {
     };
 
     const res = await fetch(url, { ...options, headers });
-    if (!res.ok) {
-      let errBody: any;
-      try {
-        errBody = await res.json();
-      } catch {
-        errBody = await res.text();
-      }
-      throw new Error(`Zayuno API [${res.status}]: ${typeof errBody === 'object' ? errBody.message || JSON.stringify(errBody) : errBody}`);
+    const rawText = await res.text();
+    let parsedBody: any;
+    try {
+      parsedBody = JSON.parse(rawText);
+    } catch {
+      parsedBody = rawText;
     }
 
-    return (await res.json()) as T;
+    if (!res.ok) {
+      const message = typeof parsedBody === 'object' && parsedBody !== null
+        ? parsedBody.message || JSON.stringify(parsedBody)
+        : String(parsedBody || `HTTP ${res.status}`);
+      throw new Error(`Zayuno API [${res.status}]: ${message}`);
+    }
+
+    return parsedBody as T;
   }
 
   // 1. Providers & Discovery

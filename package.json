@@ -22,6 +22,8 @@
     "test:webhook-guardrails": "tsx tests/test-webhook-guardrails.ts",
     "test:action-state-machine": "tsx tests/test-action-state-machine.ts",
     "test:poyez-sandbox": "tsx tests/test-poyez-sandbox-e2e.ts",
+    "test:coffee-time-availability": "tsx tests/test-coffee-time-availability-and-customer-mode.ts",
+    "test:action-tenant-isolation": "tsx tests/test-action-quote-deduplication-tenant-isolation.ts",
     "test:dynamic-provider-context": "tsx tests/test-dynamic-provider-context.ts",
     "test:sensitive-dynamic-parameters": "tsx tests/test-sensitive-dynamic-parameters.ts",
     "test:docs-contract": "tsx tests/test-docs-contract.ts",

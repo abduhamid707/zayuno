@@ -30,7 +30,11 @@ export class ActionsController {
   @Post()
   @ApiOperation({ summary: 'Execute an explicitly confirmed action with idempotency' })
   async createAction(@Body() body: CreateActionInput, @Req() request: any) {
-    return this.actionsService.createAction(body, request.user?.id);
+    const headerKey = request.headers['idempotency-key'] as string | undefined;
+    return this.actionsService.createAction({
+      ...body,
+      idempotencyKey: body.idempotencyKey || headerKey
+    }, request.user?.id);
   }
 
   @Get(':actionId')

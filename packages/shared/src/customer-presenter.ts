@@ -238,7 +238,9 @@ export function formatCustomerQuote(quote: any, providerInfo?: any): string {
 
   if (Array.isArray(quote.lines) && quote.lines.length > 0) {
     for (const line of quote.lines) {
-      const name = line.title || line.name || line.offeringName || 'Xizmat';
+      const baseName = line.offeringTitle || line.title || line.name || line.offeringName || 'Xizmat';
+      const variant = line.variantTitle || line.variantName ? `${line.variantTitle || line.variantName} ` : '';
+      const name = `${variant}${baseName}`.trim();
       const qty = line.quantity || 1;
       const lineTotal = formatUzbekCurrency(line.lineTotal || line.total || (line.unitPrice * qty) || 0, quote.currency);
       lines.push(`• ${name} × ${qty} — ${lineTotal}`);
@@ -251,6 +253,11 @@ export function formatCustomerQuote(quote: any, providerInfo?: any): string {
 
   const grandTotal = formatUzbekCurrency(quote.total || quote.subtotal || 0, quote.currency);
   lines.push(`Jami: ${grandTotal}`);
+
+  if (quote.estimatedDurationMinutes) {
+    lines.push(`Yetkazish: taxminan ${quote.estimatedDurationMinutes} daqiqa`);
+  }
+
   lines.push('');
   lines.push('Buyurtmani tasdiqlaysizmi?');
 
@@ -261,7 +268,7 @@ export function formatCustomerQuote(quote: any, providerInfo?: any): string {
  * Formats action confirmation and payment handoff into customer-facing copy.
  */
 export function formatCustomerActionConfirmation(action: any, providerInfo?: any): string {
-  if (!action) return 'Buyurtma qabul qilindi.';
+  if (!action) return 'Buyurtmangiz yaratildi. To‘lov kutilmoqda.';
 
   const isTicket =
     providerInfo?.type === 'TICKETING' ||
@@ -271,13 +278,17 @@ export function formatCustomerActionConfirmation(action: any, providerInfo?: any
   const isDemo = isDemoOrSandboxProvider(providerInfo) || isDemoOrSandboxProvider(action);
   const checkoutUrl = action.nextAction?.url || action.paymentUrl || 'https://zayuno.uz/pay';
 
-  const demoDisclaimer = isDemo ? 'Bu demo buyurtma, haqiqiy to‘lov olinmaydi.\n' : '';
+  const demoDisclaimer = isTicket && isDemo
+    ? 'Bu demo buyurtma, haqiqiy to‘lov olinmaydi.\n'
+    : isDemo
+      ? 'Bu sandbox buyurtmasi, haqiqiy to‘lov qilinmaydi.\n'
+      : '';
 
   if (isTicket) {
     return `Chipta band qilindi. Endi to‘lovni yakunlang:\n\n${demoDisclaimer}[To‘lov sahifasini ochish](${checkoutUrl})`;
   }
 
-  return `Buyurtma yaratildi. Endi to‘lovni yakunlang:\n\n${demoDisclaimer}[To‘lov sahifasini ochish](${checkoutUrl})`;
+  return `Buyurtmangiz yaratildi. To‘lov kutilmoqda.\n\n${demoDisclaimer}[To‘lov sahifasini ochish](${checkoutUrl})`;
 }
 
 /**
@@ -338,6 +349,117 @@ export function formatCustomerActionCancellation(result: any, providerInfo?: any
     return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga yangi chipta topib beraman.';
   }
   return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga boshqa taklif topib beraman.';
+}
+
+/**
+ * Formats availability result into natural customer-facing copy.
+ */
+export function formatCustomerAvailability(result: any, providerInfo?: any): string {
+  if (!result) return 'Mavjudlik tekshirildi.';
+  if (result.isAvailable) {
+    if (Array.isArray(result.availableItems) && result.availableItems.length > 0) {
+      const isTicket = providerInfo?.type === 'TICKETING';
+      if (isTicket && result.availableItems[0]?.metadata?.recommendedSeats?.length) {
+        const seats = result.availableItems[0].metadata.recommendedSeats.map((s: any) => `${s.number}-joy`).join(', ');
+        return `Joylar mavjud (${seats}). Kotirovka hisoblashga tayyormisiz?`;
+      }
+      return 'Tanlangan mahsulotlar mavjud va buyurtma qilish uchun tayyor.';
+    }
+    return 'Tanlangan mahsulotlar mavjud va buyurtma qilish uchun tayyor.';
+  }
+
+  if (Array.isArray(result.unavailableItems) && result.unavailableItems.length > 0) {
+    return 'Kechirasiz, tanlangan ayrim mahsulotlar hozirda mavjud emas.';
+  }
+
+  return 'Kechirasiz, tanlangan mahsulotlar hozirda mavjud emas.';
+}
+
+/**
+ * Formats provider discovery list into natural customer-facing copy.
+ */
+export function formatCustomerProviders(providers: any[]): string {
+  if (!Array.isArray(providers) || providers.length === 0) {
+    return 'Kechirasiz, so‘rovingiz bo‘yicha xizmatlar topilmadi.';
+  }
+  const names = providers.map(p => p.name || p.slug).filter(Boolean);
+  if (names.length === 1) {
+    return `"${names[0]}" xizmati topildi. Menyu yoki takliflarni ko‘rishni xohlaysizmi?`;
+  }
+  return `Topilgan xizmatlar: ${names.slice(0, 5).join(', ')}. Qaysi birining menyusini ko‘rishni xohlaysiz?`;
+}
+
+/**
+ * Formats single provider metadata for customer.
+ */
+export function formatCustomerProvider(provider: any): string {
+  if (!provider) return 'Xizmat ma’lumoti topilmadi.';
+  const name = provider.name || provider.slug || 'Xizmat';
+  const desc = provider.description ? ` (${provider.description})` : '';
+  return `"${name}"${desc}. Menyu va takliflarni ko‘rishni xohlaysizmi?`;
+}
+
+/**
+ * Formats provider capability summary for customer.
+ */
+export function formatCustomerCapabilities(capabilities: string[], providerName?: string): string {
+  const name = providerName ? `"${providerName}"` : 'Ushbu xizmat';
+  return `${name} orqali buyurtma berish va xizmatlardan foydalanish mumkin.`;
+}
+
+/**
+ * Formats locations list for customer.
+ */
+export function formatCustomerLocations(locations: any[]): string {
+  if (!Array.isArray(locations) || locations.length === 0) {
+    return 'Hozircha faol filiallar mavjud emas.';
+  }
+  const branchList = locations.map(l => l.name || l.address).filter(Boolean);
+  return `Mavjud filiallar: ${branchList.join(', ')}.`;
+}
+
+/**
+ * Formats catalog or search results for customer.
+ */
+export function formatCustomerOfferings(offerings: any[], providerName?: string): string {
+  if (!Array.isArray(offerings) || offerings.length === 0) {
+    return 'Kechirasiz, hech qanday taklif yoki mahsulot topilmadi.';
+  }
+  const items = offerings.slice(0, 8).map(o => {
+    const title = o.title || o.name || 'Mahsulot';
+    const price = o.basePrice ? ` — ${formatUzbekCurrency(o.basePrice, o.currency || 'UZS')}` : '';
+    return `• ${title}${price}`;
+  });
+  return `Mavjud takliflar:\n${items.join('\n')}\n\nQaysi birini tanlaysiz?`;
+}
+
+/**
+ * Formats single offering details for customer.
+ */
+export function formatCustomerOffering(offering: any): string {
+  if (!offering) return 'Mahsulot ma’lumoti topilmadi.';
+  const title = offering.title || offering.name || 'Mahsulot';
+  const desc = offering.description ? `\n${offering.description}` : '';
+  const price = offering.basePrice ? `\nNarxi: ${formatUzbekCurrency(offering.basePrice, offering.currency || 'UZS')}` : '';
+  return `${title}${desc}${price}\n\nBuyurtma kotirovkasini hisoblaymi?`;
+}
+
+/**
+ * Formats payment options for customer.
+ */
+export function formatCustomerPaymentOptions(options: any[], action?: any): string {
+  const url = action?.paymentUrl || action?.nextAction?.url || options?.[0]?.checkoutUrl;
+  if (url) {
+    return `To‘lov sahifasi tayyor:\n\n[To‘lov sahifasini ochish](${url})`;
+  }
+  return 'To‘lov usullari checkout sahifasida taqdim etiladi.';
+}
+
+/**
+ * Formats a friendly customer-facing error message, strictly without technical jargon.
+ */
+export function formatCustomerError(error?: unknown): string {
+  return 'Hozir buyurtmani yakunlay olmadim. Qayta urinib ko‘raymi?';
 }
 
 /**

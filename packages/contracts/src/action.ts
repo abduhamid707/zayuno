@@ -47,7 +47,7 @@ export const ActionItemInputSchema = z.object({
 export type ActionItemInput = z.infer<typeof ActionItemInputSchema>;
 
 export const CreateActionInputSchema = z.object({
-  idempotencyKey: z.string().min(1).describe('Unique client-generated idempotency key (UUID or cryptographically random string)'),
+  idempotencyKey: z.string().min(1).optional().describe('Unique client-generated idempotency key (UUID or cryptographically random string). Server auto-generates if omitted.'),
   providerSlug: z.string().min(1).describe('Target provider slug'),
   quoteId: z.string().min(1).describe('Verified quote ID reviewed and confirmed by the user before submission'),
   locationId: z.string().optional(),

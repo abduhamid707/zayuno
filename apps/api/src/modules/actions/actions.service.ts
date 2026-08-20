@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
 import { NatsService } from '../../common/services/nats.service';
 import { prisma, ActionStatus as DbActionStatus, PaymentStatus as DbPaymentStatus, UserRole } from '@zayuno/database';
@@ -47,9 +48,11 @@ export class ActionsService {
     if (!input.providerSlug) {
       throw new BadRequestException('providerSlug is required.');
     }
-    if (!input.idempotencyKey) {
-      throw new BadRequestException('idempotencyKey is required to prevent duplicate action execution.');
-    }
+    const cleanSlug = input.providerSlug.toLowerCase().trim();
+
+    // Idempotency key: use client-provided key or generate a unique random UUID
+    const idempotencyKey = input.idempotencyKey || randomUUID();
+    input.idempotencyKey = idempotencyKey;
 
     // Explicit confirmation guardrail check
     if (input.userConfirmed !== true) {
@@ -62,8 +65,6 @@ export class ActionsService {
     if (forbiddenKey) {
       throw new BadRequestException(`Sensitive identity or payment field "${forbiddenKey}" is not allowed in action parameters. Use the provider-owned secure handoff.`);
     }
-
-    const cleanSlug = input.providerSlug.toLowerCase().trim();
 
     // A client-supplied idempotency key is only meaningful inside that
     // client's account. Without this namespace, another API consumer who
@@ -91,6 +92,45 @@ export class ActionsService {
     if (existingAction) {
       this.logger.info(`Idempotent hit: returning existing action ${existingAction.publicId} for key ${input.idempotencyKey}`);
       return this.mapDbActionToNormalized(existingAction);
+    }
+
+    if (input.quoteId) {
+      const existingQuoteAction = await prisma.action.findFirst({
+        where: { quoteId: input.quoteId, provider: { slug: cleanSlug } },
+        include: { provider: true, location: true, timeline: { orderBy: { createdAt: 'asc' } } }
+      });
+      if (existingQuoteAction) {
+        if (userId) {
+          if (existingQuoteAction.userId === userId) {
+            this.logger.info(`Quote action hit: returning existing action ${existingQuoteAction.publicId} for user ${userId} on quote ${input.quoteId}`);
+            return this.mapDbActionToNormalized(existingQuoteAction);
+          } else {
+            this.logger.warn(`Security violation: user ${userId} attempted to access quote ${input.quoteId} owned by ${existingQuoteAction.userId || 'anonymous'}`);
+            throw new ForbiddenException('This quote has already been utilized by another account. Request a fresh quote.');
+          }
+        } else {
+          // Anonymous caller
+          if (existingQuoteAction.userId) {
+            this.logger.warn(`Security violation: anonymous caller attempted to access quote ${input.quoteId} owned by user ${existingQuoteAction.userId}`);
+            throw new ForbiddenException('This quote has already been utilized by an account. Request a fresh quote.');
+          }
+
+          // Customer phone/name must NEVER be trusted for authentication.
+          // Anonymous callers must supply the original secret idempotencyKey / continuation credential.
+          const hasValidCredential = Boolean(
+            input.idempotencyKey &&
+            existingQuoteAction.idempotencyKey === scopedIdempotencyKey
+          );
+
+          if (hasValidCredential) {
+            this.logger.info(`Quote action hit: returning existing action ${existingQuoteAction.publicId} for verified anonymous idempotencyKey on quote ${input.quoteId}`);
+            return this.mapDbActionToNormalized(existingQuoteAction);
+          } else {
+            this.logger.warn(`Security violation: anonymous caller without matching idempotency key attempted to reuse quote ${input.quoteId}`);
+            throw new ConflictException('This quote has already been utilized. To retry an existing action, provide the original idempotency key, or request a fresh quote.');
+          }
+        }
+      }
     }
 
     const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });

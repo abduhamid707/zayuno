@@ -104,17 +104,22 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
       redirect: 'error'
     });
 
-    if (!res.ok) {
-      let errBody: any;
-      try {
-        errBody = await res.json();
-      } catch {
-        errBody = await res.text();
-      }
-      throw new Error(`Remote Provider HTTP [${res.status}]: ${typeof errBody === 'object' ? errBody.message || JSON.stringify(errBody) : errBody}`);
+    const rawText = await res.text();
+    let parsedBody: any;
+    try {
+      parsedBody = JSON.parse(rawText);
+    } catch {
+      parsedBody = rawText;
     }
 
-    return (await res.json()) as T;
+    if (!res.ok) {
+      const message = typeof parsedBody === 'object' && parsedBody !== null
+        ? parsedBody.message || JSON.stringify(parsedBody)
+        : String(parsedBody || `HTTP ${res.status}`);
+      throw new Error(`Remote Provider HTTP [${res.status}]: ${message}`);
+    }
+
+    return parsedBody as T;
   }
 
   async getProviderInfo(): Promise<ProviderInfo> {
@@ -194,9 +199,9 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
   async createAction(input: CreateActionInput): Promise<NormalizedAction> {
     return this.callRemote<NormalizedAction>('/actions', {
       method: 'POST',
-      headers: {
+      headers: input.idempotencyKey ? {
         'idempotency-key': input.idempotencyKey
-      },
+      } : undefined,
       body: JSON.stringify(input)
     });
   }

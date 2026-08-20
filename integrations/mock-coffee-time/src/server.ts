@@ -3,7 +3,8 @@ import cors, { type CorsOptions } from 'cors';
 import crypto from 'crypto';
 import {
   ActionStatus, PaymentMethodType, PaymentStatus, ProviderCapability, ProviderStatus, ProviderType,
-  type CreateActionInput, type NormalizedAction, type NormalizedQuote, type QuoteLine, type RequestQuoteInput
+  type CreateActionInput, type NormalizedAction, type NormalizedQuote, type QuoteLine, type RequestQuoteInput,
+  type CheckAvailabilityInput, type AvailabilityResult
 } from '@zayuno/contracts';
 import { COFFEE_CATEGORIES, COFFEE_LOCATIONS, COFFEE_OFFERINGS } from './data';
 
@@ -85,12 +86,67 @@ export function createCoffeeTimeSandboxApp(): Express {
   }
 
   app.get('/health', (_req, res) => res.json({ status: 'HEALTHY', latencyMs: 1, message: DISCLAIMER, timestamp: new Date().toISOString() }));
-  app.use(['/provider-info','/locations','/catalog','/offerings','/search','/quote','/actions'], auth);
+  app.use(['/provider-info','/locations','/catalog','/offerings','/search','/availability','/quote','/actions'], auth);
   app.get('/provider-info', (_req, res) => res.json({ id: SLUG, slug: SLUG, name: 'Coffee Time', description: DISCLAIMER, status: ProviderStatus.SANDBOX, type: ProviderType.DELIVERY, category: 'food_delivery', geography: ['UZ','Tashkent'], adapterType: 'remote-http', authMethod: 'API_KEY', capabilities: Object.values(ProviderCapability), baseUrl: publicBase, isCertified: false, isPublished: false, metadata: { sandbox: true } }));
   app.get('/locations', (req, res) => res.json(req.query.activeOnly === 'false' ? COFFEE_LOCATIONS : COFFEE_LOCATIONS.filter(value => value.isActive)));
   app.get('/catalog', (req, res) => { const category = String(req.query.category || ''); res.json({ providerSlug: SLUG, locationId: req.query.locationId || undefined, categories: COFFEE_CATEGORIES, offerings: category ? COFFEE_OFFERINGS.filter(value => value.categorySlug === category) : COFFEE_OFFERINGS, version: '1.0.0', updatedAt: new Date().toISOString() }); });
   app.get('/offerings/:id', (req, res) => { const item = COFFEE_OFFERINGS.find(value => value.id === req.params.id || value.offeringCode === req.params.id); return item ? res.json(item) : res.status(404).json({ message: 'Offering not found.' }); });
   app.get('/search', (req, res) => { const q = String(req.query.q || '').toLowerCase(); res.json(COFFEE_OFFERINGS.filter(value => value.title.toLowerCase().includes(q) || value.description?.toLowerCase().includes(q) || value.tags?.some(tag => tag.includes(q))).slice(0, Number(req.query.limit || 20))); });
+
+  app.post('/availability', (req, res) => {
+    try {
+      const input = req.body as CheckAvailabilityInput;
+      if (!Array.isArray(input.items) || input.items.length === 0) {
+        return res.status(400).json({ message: 'At least one item is required.' });
+      }
+      const result: AvailabilityResult = {
+        isAvailable: true,
+        unavailableItems: [],
+        availableItems: [],
+        checkedAt: new Date().toISOString(),
+        validUntil: new Date(Date.now() + 60_000).toISOString(),
+        parameters: { sandbox: true }
+      };
+      for (const item of input.items) {
+        const offering = COFFEE_OFFERINGS.find(value => value.id === item.offeringId || value.offeringCode === item.offeringId);
+        if (!offering || !offering.isAvailable) {
+          result.isAvailable = false;
+          result.unavailableItems.push({ offeringId: item.offeringId, reason: 'Offering is not available.' });
+          continue;
+        }
+        if (item.variantId) {
+          const variant = offering.variants?.find(v => v.id === item.variantId);
+          if (!variant || variant.isAvailable === false) {
+            result.isAvailable = false;
+            result.unavailableItems.push({ offeringId: item.offeringId, reason: `Variant "${item.variantId}" is not available.` });
+            continue;
+          }
+        }
+        for (const selected of item.selectedOptions || []) {
+          const group = offering.optionGroups?.find(g => g.id === selected.groupId);
+          const option = group?.options.find(o => o.id === selected.optionId);
+          if (!group || !option || option.isAvailable === false) {
+            result.isAvailable = false;
+            result.unavailableItems.push({ offeringId: item.offeringId, reason: `Option "${selected.optionId}" is not available.` });
+            continue;
+          }
+        }
+        const unitPrice = (item.variantId ? offering.variants?.find(v => v.id === item.variantId)?.basePrice : undefined) ?? offering.basePrice;
+        result.availableItems?.push({
+          offeringId: offering.id,
+          variantId: item.variantId,
+          requestedQuantity: item.quantity,
+          remainingCapacity: 50,
+          unitPrice,
+          currency: 'UZS',
+          metadata: { sandbox: true }
+        });
+      }
+      return res.json(result);
+    } catch (error: any) {
+      return res.status(400).json({ message: error instanceof Error ? error.message : String(error) });
+    }
+  });
 
   app.post('/quote', (req, res) => {
     try { const input = req.body as RequestQuoteInput; const lines = linesFor(input); const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0); const fee = input.fulfillmentType === 'PICKUP' ? 0 : 10000; const quote: NormalizedQuote = { id: makeId('ct_quote'), providerSlug: SLUG, locationId: input.locationId, lines, subtotal, fees: fee ? [{ name: 'Test yetkazib berish', amount: fee }] : [], totalFees: fee, discounts: [], totalDiscount: 0, total: subtotal + fee, currency: 'UZS', expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), estimatedDurationMinutes: 25, parameters: { sandbox: true } }; quotes.set(quote.id, quote); return res.json(quote); }
