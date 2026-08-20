@@ -371,6 +371,10 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           type: 'number',
           description: 'Minimum expected salary in UZS.'
         },
+        minExperienceYears: {
+          type: 'number',
+          description: 'Minimum verified work experience in years, e.g. 2.'
+        },
         providerSlug: {
           type: 'string',
           description: 'Recruitment provider slug (default: "ustoz-shogird").'
@@ -387,6 +391,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         skills: args.skills,
         location: args.location,
         minSalary: args.minSalary,
+        minExperienceYears: args.minExperienceYears,
         limit: args.limit || 10
       });
       const candidates = Array.isArray(result) ? result : result?.offerings || [];
@@ -428,6 +433,10 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           type: 'number',
           description: 'Minimum offered salary in UZS.'
         },
+        minExperienceYears: {
+          type: 'number',
+          description: 'Minimum required experience in years, e.g. 2.'
+        },
         providerSlug: {
           type: 'string',
           description: 'Recruitment provider slug (default: "ustoz-shogird").'
@@ -444,6 +453,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         skills: args.skills,
         location: args.location,
         minSalary: args.minSalary,
+        minExperienceYears: args.minExperienceYears,
         limit: args.limit || 10
       });
       const jobs = Array.isArray(result) ? result : result?.offerings || [];
@@ -902,4 +912,3 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
     );
   }
 }
-

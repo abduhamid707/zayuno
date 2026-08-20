@@ -34,6 +34,20 @@ INTERNAL_TARGETS=(
   "telegram-recruitment|http://127.0.0.1:4107/health"
 )
 
+target_for_service() {
+  case "$1" in
+    api) echo "api|http://127.0.0.1:4100/health" ;;
+    mock-evos) echo "mock-evos|http://127.0.0.1:4101/health" ;;
+    mcp) echo "mcp|http://127.0.0.1:4102/health" ;;
+    admin) echo "admin|http://127.0.0.1:4103" ;;
+    provider-portal) echo "provider-portal|http://127.0.0.1:4104" ;;
+    mock-coffee-time) echo "mock-coffee-time|http://127.0.0.1:4105/health" ;;
+    mock-poyez) echo "mock-poyez|http://127.0.0.1:4106/health" ;;
+    telegram-recruitment) echo "telegram-recruitment|http://127.0.0.1:4107/health" ;;
+    *) return 1 ;;
+  esac
+}
+
 PUBLIC_TARGETS=(
   "api.zayuno.uz|https://api.zayuno.uz/health"
   "mcp.zayuno.uz|https://mcp.zayuno.uz/health"
@@ -110,6 +124,26 @@ main() {
     if ! verify_target_list "INTERNAL" "${INTERNAL_TARGETS[@]}"; then
       exit 1
     fi
+  fi
+
+  if [ "$MODE" = "services" ]; then
+    shift || true
+    local selected_targets=()
+    for service in "$@"; do
+      [ -z "$service" ] && continue
+      local target
+      if ! target=$(target_for_service "$service"); then
+        log_error "Unknown service requested for health check: $service"
+        exit 1
+      fi
+      selected_targets+=("$target")
+    done
+    if [ "${#selected_targets[@]}" -eq 0 ]; then
+      log_success "No services were restarted; no targeted health check required."
+      exit 0
+    fi
+    verify_target_list "TARGETED" "${selected_targets[@]}"
+    exit $?
   fi
 
   if [ "$MODE" = "all" ] || [ "$MODE" = "public" ]; then

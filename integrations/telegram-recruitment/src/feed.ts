@@ -112,6 +112,15 @@ export class TelegramRecruitmentFeedService {
       filtered = filtered.filter(p => p.salaryAmount === 0 || p.salaryAmount >= filter.minSalary!);
     }
 
+    // Do not claim an unspecified experience level meets an HR requirement.
+    if (filter.minExperienceYears && filter.minExperienceYears > 0) {
+      filtered = filtered.filter(p => {
+        const match = p.experience.match(/(\d+(?:[.,]\d+)?)\s*(?:yil|year)/i);
+        if (!match) return false;
+        return Number.parseFloat(match[1].replace(',', '.')) >= filter.minExperienceYears!;
+      });
+    }
+
     // Filter by text query
     if (filter.query && filter.query.trim().length > 0) {
       const qTokens = filter.query.toLowerCase().trim().split(/\s+/);

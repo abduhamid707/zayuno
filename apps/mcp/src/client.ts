@@ -100,7 +100,7 @@ export class ZayunoApiClient {
     return this.request(`/api/v1/search?${params.toString()}`);
   }
 
-  async searchCandidates(query: string, options: { providerSlug?: string; skills?: string[]; location?: string; minSalary?: number; limit?: number } = {}) {
+  async searchCandidates(query: string, options: { providerSlug?: string; skills?: string[]; location?: string; minSalary?: number; minExperienceYears?: number; limit?: number } = {}) {
     const providerSlug = options.providerSlug || 'ustoz-shogird';
     const parameters: Record<string, any> = {
       listingType: 'candidate'
@@ -108,11 +108,12 @@ export class ZayunoApiClient {
     if (options.skills && options.skills.length > 0) parameters.skills = options.skills;
     if (options.location) parameters.location = options.location;
     if (options.minSalary) parameters.minSalary = options.minSalary;
+    if (options.minExperienceYears) parameters.minExperienceYears = options.minExperienceYears;
 
     return this.searchCatalog(providerSlug, query, 'candidate', undefined, options.limit || 20, parameters);
   }
 
-  async searchJobs(query: string, options: { providerSlug?: string; skills?: string[]; location?: string; minSalary?: number; limit?: number } = {}) {
+  async searchJobs(query: string, options: { providerSlug?: string; skills?: string[]; location?: string; minSalary?: number; minExperienceYears?: number; limit?: number } = {}) {
     const providerSlug = options.providerSlug || 'ustoz-shogird';
     const parameters: Record<string, any> = {
       listingType: 'job'
@@ -120,6 +121,7 @@ export class ZayunoApiClient {
     if (options.skills && options.skills.length > 0) parameters.skills = options.skills;
     if (options.location) parameters.location = options.location;
     if (options.minSalary) parameters.minSalary = options.minSalary;
+    if (options.minExperienceYears) parameters.minExperienceYears = options.minExperienceYears;
 
     return this.searchCatalog(providerSlug, query, 'job', undefined, options.limit || 20, parameters);
   }

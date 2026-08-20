@@ -26,7 +26,7 @@ export interface RecruitmentSearchFilter {
   skills?: string[];
   location?: string;
   minSalary?: number;
-  experience?: string;
+  minExperienceYears?: number;
   minConfidence?: number;
   limit?: number;
 }

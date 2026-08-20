@@ -15,15 +15,16 @@ on:
         default: ''
         type: string
       services:
-        description: 'Services to recreate (space-separated or "all")'
+        description: 'Services to recreate ("auto", space-separated, or "all")'
         required: false
-        default: 'all'
+        default: 'auto'
         type: string
       run_migrations:
-        description: 'Run database migrations prior to service restart'
+        description: 'Run database migrations ("auto", "true", or "false")'
         required: false
-        default: true
-        type: boolean
+        default: 'auto'
+        type: choice
+        options: [auto, 'true', 'false']
 
 concurrency:
   group: zayuno-production
@@ -40,6 +41,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
 
       - name: Validate Deploy SHA format
         id: resolve-sha
@@ -63,13 +67,61 @@ jobs:
         shell: bash
         run: |
           INPUT_SERVICES="${{ github.event.inputs.services }}"
-          if [ -z "$INPUT_SERVICES" ] || [ "$INPUT_SERVICES" = "all" ]; then
+          if [ "$INPUT_SERVICES" = "all" ]; then
             RESOLVED="mock-evos mock-coffee-time mock-poyez telegram-recruitment api mcp admin provider-portal worker"
-          else
+          elif [ -n "$INPUT_SERVICES" ] && [ "$INPUT_SERVICES" != "auto" ]; then
             RESOLVED="$INPUT_SERVICES"
+          else
+            CHANGED_FILES=$(git diff --name-only "${TARGET_SHA}^" "$TARGET_SHA" || true)
+            RESOLVED=""
+
+            add_service() {
+              case " $RESOLVED " in *" $1 "*) ;; *) RESOLVED="$RESOLVED $1";; esac
+            }
+
+            while IFS= read -r file; do
+              case "$file" in
+                integrations/telegram-recruitment/*) add_service telegram-recruitment ;;
+                integrations/mock-evos/*) add_service mock-evos ;;
+                integrations/mock-coffee-time/*) add_service mock-coffee-time ;;
+                integrations/mock-poyez/*) add_service mock-poyez ;;
+                apps/api/*) add_service api; add_service worker ;;
+                apps/mcp/*) add_service mcp ;;
+                apps/admin/*) add_service admin ;;
+                apps/provider-portal/*) add_service provider-portal ;;
+                packages/contracts/*|packages/shared/*|packages/provider-sdk/*) add_service mock-evos; add_service mock-coffee-time; add_service mock-poyez; add_service telegram-recruitment; add_service api; add_service mcp; add_service worker ;;
+                packages/database/*) add_service api; add_service worker ;;
+                docker-compose.prod.yml|infra/docker/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|tsconfig.base.json) RESOLVED="mock-evos mock-coffee-time mock-poyez telegram-recruitment api mcp admin provider-portal worker" ;;
+              esac
+            done <<< "$CHANGED_FILES"
+
+            # Documentation-only changes need no container restart.
+            RESOLVED=$(echo "$RESOLVED" | xargs)
+          fi
+
+          if [ -z "$RESOLVED" ]; then
+            echo "No runtime service changed; deployment will only sync manifests."
           fi
           echo "TARGET_SERVICES=$RESOLVED" >> $GITHUB_ENV
           echo "Target Services: $RESOLVED"
+
+      - name: Resolve migration policy
+        id: resolve-migrations
+        shell: bash
+        run: |
+          INPUT_MIGRATIONS="${{ github.event.inputs.run_migrations }}"
+          if [ "$INPUT_MIGRATIONS" = "true" ] || [ "$INPUT_MIGRATIONS" = "false" ]; then
+            RESOLVED_MIGRATIONS="$INPUT_MIGRATIONS"
+          else
+            CHANGED_FILES=$(git diff --name-only "${TARGET_SHA}^" "$TARGET_SHA" || true)
+            if echo "$CHANGED_FILES" | grep -Eq '^packages/database/(prisma/|.*schema\.prisma|.*migrations/)'; then
+              RESOLVED_MIGRATIONS=true
+            else
+              RESOLVED_MIGRATIONS=false
+            fi
+          fi
+          echo "RUN_MIGRATIONS=$RESOLVED_MIGRATIONS" >> $GITHUB_ENV
+          echo "Run migrations: $RESOLVED_MIGRATIONS"
 
       - name: Set lowercased repo prefix for GHCR
         id: repo-prefix
@@ -125,7 +177,7 @@ jobs:
           SSH_CMD="ssh -i ~/.ssh/id_rsa_prod -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
 
           echo "Triggering deployment on remote server..."
-          $SSH_CMD "/root/zayuno/deploy/deploy-server.sh '${{ env.TARGET_SHA }}' '${{ env.TARGET_SERVICES }}' '${{ env.IMAGE_PREFIX }}' '${{ github.event.inputs.run_migrations || 'true' }}'"
+          $SSH_CMD "/root/zayuno/deploy/deploy-server.sh '${{ env.TARGET_SHA }}' '${{ env.TARGET_SERVICES }}' '${{ env.IMAGE_PREFIX }}' '${{ env.RUN_MIGRATIONS }}'"
 
       - name: Cleanup SSH Key
         if: always()
@@ -141,5 +193,5 @@ jobs:
           echo "- **Deployed SHA**: \`${{ env.TARGET_SHA }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Services Recreated**: \`${{ env.TARGET_SERVICES }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Image Prefix**: \`${{ env.IMAGE_PREFIX }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Migrations Executed**: \`${{ github.event.inputs.run_migrations || 'true' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Migrations Executed**: \`${{ env.RUN_MIGRATIONS }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ job.status == 'success' && '✅ SUCCESS' || '❌ FAILED (Check logs & rollback state)' }}" >> $GITHUB_STEP_SUMMARY

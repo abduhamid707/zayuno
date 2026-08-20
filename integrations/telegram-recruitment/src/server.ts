@@ -86,6 +86,7 @@ export function createTelegramRecruitmentApp(): Express {
         skills: contextParams.skills,
         location: contextParams.location,
         minSalary: contextParams.minSalary || contextParams.salaryMin,
+        minExperienceYears: contextParams.minExperienceYears,
         limit: 50
       }, 'ustoz-shogird');
 
@@ -125,6 +126,7 @@ export function createTelegramRecruitmentApp(): Express {
         skills: contextParams.skills || (contextParams.skill ? [contextParams.skill] : undefined),
         location: contextParams.location,
         minSalary: contextParams.minSalary || contextParams.salaryMin,
+        minExperienceYears: contextParams.minExperienceYears,
         limit
       }, 'ustoz-shogird');
 
@@ -136,6 +138,9 @@ export function createTelegramRecruitmentApp(): Express {
 
   app.get('/offerings/search', auth, handleSearch);
   app.post('/offerings/search', auth, handleSearch);
+  // Canonical Provider Contract v1 search route used by RemoteHttpProviderAdapter.
+  app.get('/search', auth, handleSearch);
+  app.post('/search', auth, handleSearch);
 
   // Offering Details
   app.get('/offerings/:id', auth, async (req: Request, res: Response) => {

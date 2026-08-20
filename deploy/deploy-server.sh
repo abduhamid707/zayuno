@@ -36,7 +36,20 @@ if ! flock -n 200; then
 fi
 
 log_info "Starting zero-downtime deployment for SHA: $DEPLOY_SHA"
-log_info "Target services: $SERVICES"
+
+ALL_SERVICES="mock-evos mock-coffee-time mock-poyez telegram-recruitment api mcp admin provider-portal worker"
+if [ "$SERVICES" = "all" ]; then
+  SERVICES="$ALL_SERVICES"
+fi
+
+for svc in $SERVICES; do
+  case " $ALL_SERVICES " in
+    *" $svc "*) ;;
+    *) log_error "Unknown deploy service: $svc"; exit 1 ;;
+  esac
+done
+
+log_info "Target services: ${SERVICES:-none}"
 
 cd "$REMOTE_DIR"
 
@@ -109,15 +122,22 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
 fi
 
 # 7. Recreate containers with new images
-log_info "Recreating target containers..."
-# shellcheck disable=SC2086
-docker compose -f docker-compose.prod.yml up -d --no-deps $SERVICES
+if [ -n "$SERVICES" ]; then
+  log_info "Recreating target containers..."
+  # shellcheck disable=SC2086
+  docker compose -f docker-compose.prod.yml up -d --no-deps $SERVICES
+else
+  log_info "No runtime service changed; skipping container recreation."
+fi
 
 # 8. Run health check
 log_info "Running post-deploy health check..."
 chmod +x "$REMOTE_DIR/deploy/health-check.sh"
 
-if "$REMOTE_DIR/deploy/health-check.sh" all; then
+# SERVICES was validated above, so splitting it into individual service
+# arguments is intentional here.
+# shellcheck disable=SC2086
+if "$REMOTE_DIR/deploy/health-check.sh" services $SERVICES; then
   log_success "Health check passed!"
 
   # 9. Update Nginx configuration if needed
@@ -139,11 +159,14 @@ else
   if [ -n "$PREVIOUS_SHA" ] && [ "$PREVIOUS_SHA" != "$DEPLOY_SHA" ]; then
     log_warn "Initiating automatic rollback to previous working release SHA: $PREVIOUS_SHA..."
     export DEPLOY_SHA="$PREVIOUS_SHA"
-    # shellcheck disable=SC2086
-    docker compose -f docker-compose.prod.yml up -d --no-deps $SERVICES
+    if [ -n "$SERVICES" ]; then
+      # shellcheck disable=SC2086
+      docker compose -f docker-compose.prod.yml up -d --no-deps $SERVICES
+    fi
     
     log_info "Validating health of rolled-back release..."
-    if "$REMOTE_DIR/deploy/health-check.sh" internal; then
+    # shellcheck disable=SC2086
+    if "$REMOTE_DIR/deploy/health-check.sh" services $SERVICES; then
       log_warn "Rollback to $PREVIOUS_SHA succeeded. System is stable on previous release."
       echo "$PREVIOUS_SHA" > "$CURRENT_SHA_FILE"
     else
