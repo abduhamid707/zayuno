@@ -49,6 +49,9 @@ const API_BASE =
     : 'http://localhost:4000');
 const SHOW_LOCAL_SIMULATOR = (import.meta as any).env?.VITE_ENABLE_LOCAL_SIMULATOR === 'true' || true;
 
+const SANDBOX_DEMO_API_KEY = 'zy_live_agent_secret_key_12345';
+const SANDBOX_PROVIDER_SLUG = 'sandbox-provider';
+
 const PROVIDER_CAPABILITIES = [
   'METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE',
   'ACTION_CREATE', 'ACTION_STATUS', 'ACTION_CANCEL', 'PAYMENT_OPTIONS', 'WEBHOOK'
@@ -428,8 +431,15 @@ export default function App() {
     setSandboxLoading(true);
     setSandboxError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/providers/find?category=general_services`);
-      if (!res.ok) throw new Error(`Discovery failed with status ${res.status}`);
+      const res = await fetch(`${API_BASE}/api/v1/providers/find?category=general_services`, {
+        headers: {
+          'x-api-key': SANDBOX_DEMO_API_KEY
+        }
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || `Discovery failed with status ${res.status}`);
+      }
       await res.json();
       setSandboxStep(2);
     } catch (e: any) {
@@ -445,13 +455,19 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/api/v1/quotes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': SANDBOX_DEMO_API_KEY
+        },
         body: JSON.stringify({
-          providerSlug: DEFAULT_PROVIDER_SLUG,
+          providerSlug: SANDBOX_PROVIDER_SLUG,
           items: [{ offeringId: 'offering_standard_pkg', quantity: 2 }]
         })
       });
-      if (!res.ok) throw new Error(`Quote calculation failed with status ${res.status}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || `Quote calculation failed with status ${res.status}`);
+      }
       const data = await res.json();
       setSandboxQuote(data);
       setSandboxStep(3);
@@ -467,22 +483,27 @@ export default function App() {
     setSandboxError(null);
     try {
       const idempKey = `sb_sim_${Date.now()}`;
+      const quoteId = sandboxQuote?.id || sandboxQuote?.quoteId;
       const res = await fetch(`${API_BASE}/api/v1/actions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'idempotency-key': idempKey
+          'idempotency-key': idempKey,
+          'x-api-key': SANDBOX_DEMO_API_KEY
         },
         body: JSON.stringify({
           idempotencyKey: idempKey,
-          providerSlug: DEFAULT_PROVIDER_SLUG,
-          quoteId: sandboxQuote?.id,
+          providerSlug: SANDBOX_PROVIDER_SLUG,
+          quoteId: quoteId,
           customer: { name: 'Demo Customer', phone: '+998901234567' },
           items: [{ offeringId: 'offering_standard_pkg', quantity: 2 }],
           userConfirmed: true
         })
       });
-      if (!res.ok) throw new Error(`Action dispatch failed with status ${res.status}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || `Action dispatch failed with status ${res.status}`);
+      }
       const data = await res.json();
       setSandboxAction(data);
       setSandboxStep(4);
@@ -498,9 +519,16 @@ export default function App() {
     setSandboxLoading(true);
     setSandboxError(null);
     try {
-      // In sandbox simulation, we query status update
-      const res = await fetch(`${API_BASE}/api/v1/actions/${sandboxAction.publicId || sandboxAction.id}`);
-      if (!res.ok) throw new Error(`Status check failed with status ${res.status}`);
+      const actionId = sandboxAction.actionId || sandboxAction.publicId || sandboxAction.id;
+      const res = await fetch(`${API_BASE}/api/v1/actions/${actionId}`, {
+        headers: {
+          'x-api-key': SANDBOX_DEMO_API_KEY
+        }
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || `Status check failed with status ${res.status}`);
+      }
       const updated = await res.json();
       setSandboxAction(updated);
       setSandboxStep(5);
@@ -1430,8 +1458,8 @@ export default function App() {
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-white">Step 3: User Confirms Quote & Creates Action</h3>
                   <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs font-mono text-slate-300 space-y-1">
-                    <div>Quote ID: <span className="text-indigo-400">{sandboxQuote.id}</span></div>
-                    <div>Total Price: <span className="text-emerald-400">{sandboxQuote.total} {sandboxQuote.currency}</span></div>
+                    <div>Quote ID: <span className="text-indigo-400">{sandboxQuote.quoteId || sandboxQuote.id}</span></div>
+                    <div>Total Price: <span className="text-emerald-400">{sandboxQuote.totalAmount || sandboxQuote.total} {sandboxQuote.currency}</span></div>
                   </div>
                   <button
                     onClick={runSandboxCreateAction}
@@ -1447,12 +1475,12 @@ export default function App() {
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-white">Step 4: Payment Handoff via NextAction</h3>
                   <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs font-mono text-slate-300 space-y-1.5">
-                    <div>Action Reference: <span className="text-indigo-400">{sandboxAction.publicId}</span></div>
+                    <div>Action Reference: <span className="text-indigo-400">{sandboxAction.actionId || sandboxAction.publicId || sandboxAction.id}</span></div>
                     <div>Status: <span className="text-amber-400">{sandboxAction.status}</span></div>
                     <div>
                       NextAction Checkout URL: <br />
                       <a
-                        href={sandboxAction.nextAction?.url || sandboxAction.paymentUrl}
+                        href={sandboxAction.nextAction?.url || sandboxAction.paymentUrl || 'https://sandbox.zayuno.uz/checkout'}
                         target="_blank"
                         rel="noreferrer"
                         className="text-sky-400 underline"
