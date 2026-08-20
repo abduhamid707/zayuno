@@ -1,5 +1,13 @@
 import { z, ZodTypeAny } from 'zod';
 import { ZayunoApiClient } from './client.js';
+import {
+  formatCustomerQuote,
+  formatCustomerActionConfirmation,
+  formatCustomerActionStatus,
+  formatCustomerActionCancellation,
+  getWelcomeMessage,
+  getDynamicServiceMessage
+} from '@zayuno/shared';
 
 export interface McpToolDefinition {
   name: string;
@@ -18,6 +26,41 @@ export interface McpToolDefinition {
 }
 
 export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
+  // 0. get_welcome_message
+  {
+    name: 'get_welcome_message',
+    description: 'Get the natural conversational welcome greeting (customerMessage) and dynamic capability metrics for customers. The AI assistant must use customerMessage directly when starting a conversation.',
+    annotations: {
+      readOnly: true,
+      openWorld: false,
+      destructive: false
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    },
+    handler: async (_args, client) => {
+      try {
+        const welcomeInfo = await client.getWelcome();
+        const message = welcomeInfo.customerMessage || welcomeInfo.welcomeMessage || getWelcomeMessage(welcomeInfo.availableServiceCount);
+        return {
+          customerMessage: message,
+          welcomeMessage: message,
+          availableServiceCount: welcomeInfo.availableServiceCount,
+          dynamicServiceMessage: welcomeInfo.dynamicServiceMessage
+        };
+      } catch {
+        const fallback = getWelcomeMessage(null);
+        return {
+          customerMessage: fallback,
+          welcomeMessage: fallback,
+          availableServiceCount: null,
+          dynamicServiceMessage: getDynamicServiceMessage(null)
+        };
+      }
+    }
+  },
+
   // 1. find_providers (Multi-criteria discovery)
   {
     name: 'find_providers',
@@ -325,7 +368,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 9. request_quote
   {
     name: 'request_quote',
-    description: 'Mandatory pre-requisite before creating an action. Calculates verified real-time pricing, subtotal, fees, discounts, and itemized breakdown. Presents an exact total for the user to review and confirm.',
+    description: 'Mandatory pre-requisite before creating an action. Calculates verified real-time pricing and returns pre-formatted customerMessage. The AI assistant must present customerMessage directly to the customer without exposing internal quote IDs.',
     annotations: {
       readOnly: true,
       openWorld: false,
@@ -392,14 +435,19 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['providerSlug', 'items']
     },
     handler: async (args, client) => {
-      return client.requestQuote(args);
+      const quote = await client.requestQuote(args);
+      const customerMessage = formatCustomerQuote(quote);
+      return {
+        customerMessage,
+        ...quote
+      };
     }
   },
 
   // 9. create_action
   {
     name: 'create_action',
-    description: 'Execute an action with the external provider. MUST only be called after request_quote and AFTER the user has explicitly reviewed and confirmed the quote. Requires an idempotencyKey to guarantee exactly-once execution.',
+    description: 'Execute an action with the external provider. MUST only be called after request_quote and AFTER the user has explicitly reviewed and confirmed the quote. Returns pre-formatted customerMessage with secure checkout link. The AI assistant must present customerMessage directly to the customer and keep actionId/tokens internal.',
     annotations: {
       readOnly: false,
       openWorld: true,
@@ -487,14 +535,19 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['idempotencyKey', 'providerSlug', 'quoteId', 'items', 'customer', 'userConfirmed']
     },
     handler: async (args, client) => {
-      return client.createAction(args);
+      const action = await client.createAction(args);
+      const customerMessage = formatCustomerActionConfirmation(action);
+      return {
+        customerMessage,
+        ...action
+      };
     }
   },
 
   // 10. get_action
   {
     name: 'get_action',
-    description: 'Retrieve live status, fulfillment updates, external provider references, and audit timeline for an active or completed action.',
+    description: 'Retrieve live status for an active or completed action. Returns pre-formatted customerMessage in natural Uzbek. The AI assistant must present customerMessage directly to the customer and never expose raw status enums or action IDs.',
     annotations: {
       readOnly: true,
       openWorld: false,
@@ -511,14 +564,19 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['actionId']
     },
     handler: async (args, client) => {
-      return client.getAction(args.actionId);
+      const action = await client.getAction(args.actionId);
+      const customerMessage = formatCustomerActionStatus(action);
+      return {
+        customerMessage,
+        ...action
+      };
     }
   },
 
   // 11. cancel_action
   {
     name: 'cancel_action',
-    description: 'Cancel an eligible active action before fulfillment lock or completion. Releases reservations and initiates settlement adjustments if applicable.',
+    description: 'Cancel an eligible active action before fulfillment lock or completion. Returns pre-formatted customerMessage. The AI assistant must use customerMessage directly.',
     annotations: {
       readOnly: false,
       openWorld: true,
@@ -544,7 +602,12 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['actionId']
     },
     handler: async (args, client) => {
-      return client.cancelAction(args.actionId, args.reason, args.reasonCode);
+      const result = await client.cancelAction(args.actionId, args.reason, args.reasonCode);
+      const customerMessage = formatCustomerActionCancellation(result);
+      return {
+        customerMessage,
+        ...result
+      };
     }
   },
 

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { prisma } from '../packages/database/src/client.ts';
-import { EmailVerificationService, DevEmailTransport } from '../apps/api/src/modules/auth/email-verification.service.ts';
+import {
+  EmailVerificationService,
+  DevEmailTransport,
+  ResendEmailTransport
+} from '../apps/api/src/modules/auth/email-verification.service.ts';
 import {
   SafePublicHttpsUrlSchema,
   isSafePublicHttpsUrl,
@@ -47,6 +51,7 @@ async function testRepairPromptA() {
     // 2. Production Fail-Closed Transport
     console.log('  2. Testing production fail-closed transport...');
     process.env.NODE_ENV = 'production';
+    delete process.env.RESEND_API_KEY;
     const prodService = new EmailVerificationService();
     const prodEmail = `prod_${Date.now()}@company.uz`;
     await assert.rejects(
@@ -54,6 +59,83 @@ async function testRepairPromptA() {
       /Configured mail transport is not available/
     );
     console.log('    ✅ Production fails closed when no real mail transport is configured.');
+
+    // 2b. Resend Transport Dispatch & Mock Execution
+    console.log('  2b. Testing ResendEmailTransport execution, Uzbek copy and error privacy...');
+    let mockSentPayload: any = null;
+    const mockResend = {
+      emails: {
+        send: async (payload: any) => {
+          mockSentPayload = payload;
+          return { data: { id: 'msg_resend_mock_123' }, error: null };
+        }
+      }
+    };
+
+    const resendTransport = new ResendEmailTransport('re_mock_api_key', 'onboarding@resend.dev', mockResend);
+    const resendLogs: string[] = [];
+    (resendTransport as any).logger = {
+      log: (msg: string) => resendLogs.push(msg),
+      error: (msg: string) => resendLogs.push(msg)
+    };
+
+    const targetEmail = 'partner.owner@business.uz';
+    const rawTok = 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210';
+    const targetUrl = `https://portal.zayuno.uz?verifyToken=${rawTok}&email=${encodeURIComponent(targetEmail)}`;
+
+    await resendTransport.sendVerificationEmail(targetEmail, rawTok, targetUrl);
+
+    assert.ok(mockSentPayload, 'Resend send was not called');
+    assert.equal(mockSentPayload.to, targetEmail);
+    assert.equal(mockSentPayload.from, 'onboarding@resend.dev');
+    assert.equal(mockSentPayload.subject, 'Zayuno — emailingizni tasdiqlang');
+    assert.match(mockSentPayload.html, /Emailni tasdiqlash/);
+    assert.match(mockSentPayload.html, /24 soat/);
+    assert.match(mockSentPayload.html, new RegExp(targetUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+
+    // Check log privacy for Resend success log
+    assert.equal(resendLogs.length, 1);
+    assert.ok(!resendLogs[0].includes(rawTok), 'Raw token must not appear in Resend logs');
+    assert.ok(!resendLogs[0].includes('re_mock_api_key'), 'API key must not appear in Resend logs');
+    assert.ok(!resendLogs[0].includes('partner.owner@business.uz'), 'Raw email must be masked in Resend logs');
+
+    // 2c. Resend Transport Error Handling & Privacy
+    const failingResend = {
+      emails: {
+        send: async () => ({
+          data: null,
+          error: { name: 'validation_error', message: 'Domain not verified' }
+        })
+      }
+    };
+    const failingTransport = new ResendEmailTransport('re_mock_api_key', 'onboarding@resend.dev', failingResend);
+    const errorLogs: string[] = [];
+    (failingTransport as any).logger = {
+      log: (msg: string) => errorLogs.push(msg),
+      error: (msg: string) => errorLogs.push(msg)
+    };
+
+    await assert.rejects(
+      async () => failingTransport.sendVerificationEmail(targetEmail, rawTok, targetUrl),
+      /Email yuborishda xatolik yuz berdi/
+    );
+    assert.equal(errorLogs.length, 1);
+    assert.ok(!errorLogs[0].includes(rawTok), 'Raw token leaked in Resend error logs');
+    assert.ok(!errorLogs[0].includes('re_mock_api_key'), 'API key leaked in Resend error logs');
+    assert.ok(!errorLogs[0].includes('partner.owner@business.uz'), 'Raw email leaked in Resend error logs');
+    console.log('    ✅ ResendEmailTransport dispatches Uzbek copy and preserves privacy on errors.');
+
+    // 2d. Production Environment Transport Selection
+    console.log('  2d. Testing production environment transport selection...');
+    process.env.NODE_ENV = 'production';
+    process.env.RESEND_API_KEY = 're_live_production_key_test';
+    const prodResendService = new EmailVerificationService();
+    assert.ok(prodResendService.getTransport() instanceof ResendEmailTransport, 'ResendEmailTransport must be selected in production with key');
+
+    delete process.env.RESEND_API_KEY;
+    const prodNoKeyService = new EmailVerificationService();
+    assert.ok(!(prodNoKeyService.getTransport() instanceof ResendEmailTransport), 'Fail-closed transport must be selected when key is missing');
+    console.log('    ✅ Production environment selects Resend transport when configured.');
 
     // 3. Dev Token Helper Feature Flag Guard
     console.log('  3. Testing dev token helper feature flag guard...');

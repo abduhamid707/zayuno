@@ -1,3 +1,5 @@
+import { WelcomeInfo } from '@zayuno/contracts';
+
 export class ZayunoApiClient {
   private baseUrl: string;
   private apiKey: string;
@@ -35,6 +37,10 @@ export class ZayunoApiClient {
   }
 
   // 1. Providers & Discovery
+  async getWelcome(): Promise<WelcomeInfo> {
+    return this.request<WelcomeInfo>('/api/v1/providers/welcome');
+  }
+
   async listProviders(status?: string) {
     const query = status ? `?status=${encodeURIComponent(status)}` : '';
     return this.request(`/api/v1/providers${query}`);

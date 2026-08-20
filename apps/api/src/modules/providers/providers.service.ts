@@ -19,6 +19,9 @@ import {
   sanitizePublicSupportContact,
   isProviderPublished,
   isProviderDiscoveryReady,
+  computeAvailableServiceCount,
+  getDynamicServiceMessage,
+  getWelcomeMessage,
   redactForLogs,
   sanitizeHeaders
 } from '@zayuno/shared';
@@ -37,7 +40,8 @@ import {
   UpdateProviderIntegrationInput,
   UpdateProviderIntegrationInputSchema,
   ProviderCredentials,
-  MANDATORY_CAPABILITIES
+  MANDATORY_CAPABILITIES,
+  WelcomeInfo
 } from '@zayuno/contracts';
 import { ProviderCertificationRunner, CertificationReport } from '@zayuno/provider-sdk';
 import * as bcrypt from 'bcrypt';
@@ -61,6 +65,59 @@ export class ProvidersService {
   private getEncryptionKey(): string {
     if (!process.env.ENCRYPTION_KEY) throw new Error('ENCRYPTION_KEY is required.');
     return process.env.ENCRYPTION_KEY;
+  }
+
+  private serviceCountCache: {
+    count: number;
+    dynamicMessage: string;
+    welcomeMessage: string;
+    timestamp: number;
+  } | null = null;
+  private readonly SERVICE_COUNT_TTL_MS = 60_000;
+
+  async getWelcomeInfo(): Promise<WelcomeInfo> {
+    const now = Date.now();
+    if (this.serviceCountCache && now - this.serviceCountCache.timestamp < this.SERVICE_COUNT_TTL_MS) {
+      return {
+        customerMessage: this.serviceCountCache.welcomeMessage,
+        welcomeMessage: this.serviceCountCache.welcomeMessage,
+        availableServiceCount: this.serviceCountCache.count,
+        dynamicServiceMessage: this.serviceCountCache.dynamicMessage
+      };
+    }
+
+    try {
+      const providers = await prisma.provider.findMany({
+        where: { status: DbProviderStatus.ACTIVE },
+        include: { locations: true }
+      });
+
+      const count = computeAvailableServiceCount(providers);
+      const dynamicServiceMessage = getDynamicServiceMessage(count);
+      const welcomeMessage = getWelcomeMessage(count);
+
+      this.serviceCountCache = {
+        count,
+        dynamicMessage: dynamicServiceMessage,
+        welcomeMessage,
+        timestamp: now
+      };
+
+      return {
+        customerMessage: welcomeMessage,
+        welcomeMessage,
+        availableServiceCount: count,
+        dynamicServiceMessage
+      };
+    } catch {
+      const fallback = getWelcomeMessage(null);
+      return {
+        customerMessage: fallback,
+        welcomeMessage: fallback,
+        availableServiceCount: null,
+        dynamicServiceMessage: getDynamicServiceMessage(null)
+      };
+    }
   }
 
   async listProviders(status?: ProviderStatus): Promise<ProviderInfo[]> {

@@ -6,4 +6,5 @@ export * from './reserved-brands';
 export * from './support-contact';
 export * from './publishing';
 export * from './redaction';
+export * from './customer-presenter';
 

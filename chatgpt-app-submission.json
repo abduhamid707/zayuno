@@ -1,7 +1,7 @@
 {
   "$schema": "https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json",
   "app_name": "Zayuno",
-  "app_description": "Capability-based action infrastructure enabling conversational AI agents to discover providers, calculate verified quotes, execute confirmed actions, and track fulfillment in real time.",
+  "app_description": "Natural marketplace assistant enabling customers to discover services, calculate verified quotes, order food, book train/flight tickets, and track orders in real time.",
   "developer_name": "Zayuno Platform Operations",
   "website_url": "https://zayuno.uz",
   "privacy_policy_url": "https://zayuno.uz/privacy",
@@ -16,6 +16,11 @@
     }
   },
   "tool_justifications": {
+    "get_welcome_message": {
+      "read_only_justification": "This tool retrieves the conversational welcome greeting and active marketplace capability metrics for customers.",
+      "open_world_justification": "This tool is strictly an internal lookup on active platform offering counts.",
+      "destructive_justification": "This tool is strictly read-only."
+    },
     "find_providers": {
       "read_only_justification": "This tool only searches and filters registered capability providers by category, capability flags, geography, or keyword queries without altering state.",
       "open_world_justification": "This tool is an internal query against platform registry metadata and does not interact with open external networks.",

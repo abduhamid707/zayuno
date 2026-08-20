@@ -8,6 +8,7 @@ import { ZAYUNO_MCP_TOOLS } from '../apps/mcp/src/tools.ts';
  * the tool catalogue.
  */
 const sampleArguments: Record<string, Record<string, unknown>> = {
+  get_welcome_message: {},
   find_providers: { category: 'food_delivery', query: 'demo', limit: 1 },
   list_providers: { status: 'SANDBOX' },
   get_provider: { providerSlug: 'mock-evos' },

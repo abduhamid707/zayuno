@@ -262,3 +262,10 @@ export interface ProviderAdapter {
   verifyWebhook?(headers: Record<string, string | string[] | undefined>, rawBody: string, secret: string): Promise<boolean>;
   parseWebhookEvent?(headers: Record<string, string | string[] | undefined>, rawBody: string | any): Promise<NormalizedWebhookEvent>;
 }
+
+export interface WelcomeInfo {
+  customerMessage: string;
+  welcomeMessage: string;
+  availableServiceCount: number | null;
+  dynamicServiceMessage: string;
+}

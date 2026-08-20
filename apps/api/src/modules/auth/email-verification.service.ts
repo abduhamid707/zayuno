@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { prisma } from '@zayuno/database';
+import { Resend } from 'resend';
 
 export interface EmailTransport {
   sendVerificationEmail(email: string, token: string, verificationUrl: string): Promise<void>;
@@ -17,6 +18,62 @@ export class DevEmailTransport implements EmailTransport {
   }
 }
 
+export class ResendEmailTransport implements EmailTransport {
+  private logger = new Logger('ResendEmailTransport');
+  private resend: Resend;
+  private from: string;
+
+  constructor(apiKey?: string, from?: string, customResendClient?: any) {
+    const key = apiKey || process.env.RESEND_API_KEY;
+    if (!key && !customResendClient) {
+      throw new Error('RESEND_API_KEY is required to initialize ResendEmailTransport.');
+    }
+    this.resend = customResendClient || new Resend(key);
+    this.from = from || process.env.EMAIL_FROM || 'onboarding@resend.dev';
+  }
+
+  async sendVerificationEmail(email: string, _token: string, verificationUrl: string): Promise<void> {
+    const cleanEmail = email.trim().toLowerCase();
+    const [local, domain] = cleanEmail.split('@');
+    const masked = local && local.length > 2 ? `${local[0]}***${local.slice(-1)}@${domain || 'masked'}` : `***@${domain || 'masked'}`;
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: this.from,
+        to: cleanEmail,
+        subject: 'Zayuno — emailingizni tasdiqlang',
+        html: `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; padding: 32px; border: 1px solid #e2e8f0; color: #1e293b;">
+  <h2 style="margin-top: 0; color: #0f172a; font-size: 20px;">Zayunoga xush kelibsiz!</h2>
+  <p style="font-size: 15px; line-height: 1.5; color: #334155; margin-bottom: 24px;">
+    Zayuno platformasida provider profilingizni faollashtirish uchun emailingizni tasdiqlang.
+  </p>
+  <div style="margin: 28px 0;">
+    <a href="${verificationUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; font-size: 15px;">Emailni tasdiqlash</a>
+  </div>
+  <p style="color: #64748b; font-size: 13px; line-height: 1.5; margin-top: 28px; border-top: 1px solid #f1f5f9; padding-top: 16px;">
+    Ushbu havola 24 soat davomida amal qiladi. Agar siz ushbu hisobni yaratmagan bo‘lsangiz, ushbu xatga e’tibor bermang.
+  </p>
+</div>
+        `.trim()
+      });
+
+      if (error) {
+        this.logger.error(`Resend API error sending verification email to ${masked}: ${error.name} - ${error.message}`);
+        throw new InternalServerErrorException('Email yuborishda xatolik yuz berdi.');
+      }
+
+      this.logger.log(`Verification email sent successfully via Resend to ${masked} (id: ${data?.id || 'unknown'})`);
+    } catch (err: any) {
+      if (err instanceof InternalServerErrorException) {
+        throw err;
+      }
+      this.logger.error(`Failed to send verification email via Resend to ${masked}: ${err.message || 'Unknown error'}`);
+      throw new InternalServerErrorException('Email yuborishda xatolik yuz berdi.');
+    }
+  }
+}
+
 @Injectable()
 export class EmailVerificationService {
   private logger = new Logger('EmailVerificationService');
@@ -25,19 +82,39 @@ export class EmailVerificationService {
 
   constructor() {
     if (process.env.NODE_ENV === 'production') {
-      // In production, real transport must be configured. Otherwise fail-closed.
-      this.transport = {
-        async sendVerificationEmail() {
-          throw new InternalServerErrorException('Configured mail transport is not available. Verification emails cannot be dispatched.');
+      if (process.env.RESEND_API_KEY) {
+        try {
+          this.transport = new ResendEmailTransport();
+        } catch {
+          this.transport = {
+            async sendVerificationEmail() {
+              throw new InternalServerErrorException('Configured mail transport is not available. Verification emails cannot be dispatched.');
+            }
+          };
         }
-      };
+      } else {
+        // In production, real transport must be configured. Otherwise fail-closed.
+        this.transport = {
+          async sendVerificationEmail() {
+            throw new InternalServerErrorException('Configured mail transport is not available. Verification emails cannot be dispatched.');
+          }
+        };
+      }
     } else {
-      this.transport = new DevEmailTransport();
+      if (process.env.RESEND_API_KEY && process.env.ENABLE_DEV_RESEND === 'true') {
+        this.transport = new ResendEmailTransport();
+      } else {
+        this.transport = new DevEmailTransport();
+      }
     }
   }
 
   setTransport(customTransport: EmailTransport) {
     this.transport = customTransport;
+  }
+
+  getTransport(): EmailTransport {
+    return this.transport;
   }
 
   private hashToken(rawToken: string): string {

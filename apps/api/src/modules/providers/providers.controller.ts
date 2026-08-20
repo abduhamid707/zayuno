@@ -27,6 +27,14 @@ export class ProvidersController {
     return this.providersService.listProviders(status);
   }
 
+  @Get('welcome')
+  @UseGuards(ApiKeyGuard)
+  @ApiSecurity('api-key')
+  @ApiOperation({ summary: 'Get customer welcome message with dynamic available service count' })
+  async getWelcome() {
+    return this.providersService.getWelcomeInfo();
+  }
+
   @Get('find')
   @UseGuards(ApiKeyGuard)
   @ApiSecurity('api-key')
