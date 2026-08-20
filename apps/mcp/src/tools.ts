@@ -13,6 +13,8 @@ import {
   formatCustomerLocations,
   formatCustomerOfferings,
   formatCustomerOffering,
+  formatCustomerCandidates,
+  formatCustomerJobs,
   formatCustomerPaymentOptions,
   formatCustomerError,
   getWelcomeMessage,
@@ -336,6 +338,120 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       return {
         customerMessage,
         ...(Array.isArray(result) ? { offerings: result, total: result.length } : result)
+      };
+    }
+  },
+
+  // 7b. search_candidates (Recruitment & HR Talent Discovery)
+  {
+    name: 'search_candidates',
+    description: 'Search for active job seekers, developers, and IT specialists from verified recruitment feeds (e.g. UstozShogird). Filter by role, skills, location, or expected salary.',
+    annotations: {
+      readOnly: true,
+      openWorld: false,
+      destructive: false
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search keywords, e.g. "NestJS developer", "React frontend", "Python", "1C".'
+        },
+        skills: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Required technologies or skills, e.g. ["Node.js", "PostgreSQL", "NestJS"].'
+        },
+        location: {
+          type: 'string',
+          description: 'Preferred candidate location or "Remote", e.g. "Toshkent", "Samarqand".'
+        },
+        minSalary: {
+          type: 'number',
+          description: 'Minimum expected salary in UZS.'
+        },
+        providerSlug: {
+          type: 'string',
+          description: 'Recruitment provider slug (default: "ustoz-shogird").'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of candidates to return (default: 10).'
+        }
+      }
+    },
+    handler: async (args, client) => {
+      const result = await client.searchCandidates(args.query || '', {
+        providerSlug: args.providerSlug || 'ustoz-shogird',
+        skills: args.skills,
+        location: args.location,
+        minSalary: args.minSalary,
+        limit: args.limit || 10
+      });
+      const candidates = Array.isArray(result) ? result : result?.offerings || [];
+      const customerMessage = formatCustomerCandidates(candidates);
+      return {
+        customerMessage,
+        candidates,
+        total: candidates.length
+      };
+    }
+  },
+
+  // 7c. search_jobs (Recruitment Vacancy Discovery)
+  {
+    name: 'search_jobs',
+    description: 'Search for open IT vacancies, job positions, and freelance projects from recruitment feeds (e.g. UstozShogird). Filter by role, technologies, location, or offered salary.',
+    annotations: {
+      readOnly: true,
+      openWorld: false,
+      destructive: false
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Job search keywords, e.g. "Frontend React", "Middle Python", "DevOps".'
+        },
+        skills: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Required technologies, e.g. ["Docker", "Kubernetes", "TypeScript"].'
+        },
+        location: {
+          type: 'string',
+          description: 'Office location or "Remote", e.g. "Tashkent", "Yakkasaroy".'
+        },
+        minSalary: {
+          type: 'number',
+          description: 'Minimum offered salary in UZS.'
+        },
+        providerSlug: {
+          type: 'string',
+          description: 'Recruitment provider slug (default: "ustoz-shogird").'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of jobs to return (default: 10).'
+        }
+      }
+    },
+    handler: async (args, client) => {
+      const result = await client.searchJobs(args.query || '', {
+        providerSlug: args.providerSlug || 'ustoz-shogird',
+        skills: args.skills,
+        location: args.location,
+        minSalary: args.minSalary,
+        limit: args.limit || 10
+      });
+      const jobs = Array.isArray(result) ? result : result?.offerings || [];
+      const customerMessage = formatCustomerJobs(jobs);
+      return {
+        customerMessage,
+        jobs,
+        total: jobs.length
       };
     }
   },

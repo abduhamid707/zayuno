@@ -141,6 +141,88 @@ async function main() {
   });
   console.log(`✅ Sandbox Provider: ${sandboxProvider.name} (slug: ${sandboxProvider.slug})`);
 
+  // 2b. Telegram Recruitment Provider (UstozShogird)
+  const recruitmentProvider = await prisma.provider.upsert({
+    where: { slug: 'ustoz-shogird' },
+    update: {
+      name: 'UstozShogird Recruitment Feed',
+      status: ProviderStatus.ACTIVE,
+      type: ProviderType.SERVICES,
+      adapterType: 'http',
+      baseUrl: process.env.TELEGRAM_RECRUITMENT_BASE_URL || 'http://localhost:4005',
+      encryptedSecret: encryptedSandboxSecret,
+      webhookSecret: WEBHOOK_SECRET,
+      capabilities: [
+        ProviderCapability.METADATA,
+        ProviderCapability.HEALTH,
+        ProviderCapability.CATALOG,
+        ProviderCapability.SEARCH
+      ],
+      config: {
+        authMethod: 'NONE',
+        channel: '@UstozShogird',
+        supportContact: {
+          telegram: '@UstozShogird',
+          supportUrl: 'https://t.me/UstozShogird'
+        }
+      },
+      metadata: {
+        description: 'Real-time IT candidates and job vacancies indexed from public Telegram recruitment channels.',
+        tier: 'STANDARD',
+        environment: 'LIVE',
+        category: 'recruitment',
+        geography: ['UZ'],
+        reviewStatus: 'APPROVED',
+        isCertified: true,
+        isPublished: true,
+        supportContact: {
+          telegram: '@UstozShogird',
+          supportUrl: 'https://t.me/UstozShogird'
+        }
+      }
+    },
+    create: {
+      slug: 'ustoz-shogird',
+      name: 'UstozShogird Recruitment Feed',
+      logoUrl: 'https://zayuno.uz/assets/ustoz-shogird-logo.png',
+      status: ProviderStatus.ACTIVE,
+      type: ProviderType.SERVICES,
+      adapterType: 'http',
+      baseUrl: process.env.TELEGRAM_RECRUITMENT_BASE_URL || 'http://localhost:4005',
+      encryptedSecret: encryptedSandboxSecret,
+      webhookSecret: WEBHOOK_SECRET,
+      capabilities: [
+        ProviderCapability.METADATA,
+        ProviderCapability.HEALTH,
+        ProviderCapability.CATALOG,
+        ProviderCapability.SEARCH
+      ],
+      config: {
+        authMethod: 'NONE',
+        channel: '@UstozShogird',
+        supportContact: {
+          telegram: '@UstozShogird',
+          supportUrl: 'https://t.me/UstozShogird'
+        }
+      },
+      metadata: {
+        description: 'Real-time IT candidates and job vacancies indexed from public Telegram recruitment channels.',
+        tier: 'STANDARD',
+        environment: 'LIVE',
+        category: 'recruitment',
+        geography: ['UZ'],
+        reviewStatus: 'APPROVED',
+        isCertified: true,
+        isPublished: true,
+        supportContact: {
+          telegram: '@UstozShogird',
+          supportUrl: 'https://t.me/UstozShogird'
+        }
+      }
+    }
+  });
+  console.log(`✅ Recruitment Provider: ${recruitmentProvider.name} (slug: ${recruitmentProvider.slug})`);
+
   // 3. Provider Owner User
   const ownerPasswordHash = await bcrypt.hash('sandbox12345', 10);
   const ownerUser = await prisma.user.upsert({

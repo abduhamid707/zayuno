@@ -463,8 +463,55 @@ export function formatCustomerError(error?: unknown): string {
 }
 
 /**
+ * Formats candidate search results for customer/HR in natural Uzbek copy.
+ */
+export function formatCustomerCandidates(candidates: any[]): string {
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return 'Kechirasiz, so‘rovingiz bo‘yicha mos nomzodlar topilmadi.';
+  }
+
+  const items = candidates.slice(0, 5).map((c, i) => {
+    const meta = c.metadata || {};
+    const role = meta.role || c.title?.replace(/^\[Nomzod\]\s*/i, '') || 'Mutaxassis';
+    const skills = Array.isArray(meta.skills) && meta.skills.length > 0 ? `\n   • Texnologiyalar: ${meta.skills.slice(0, 6).join(', ')}` : '';
+    const exp = meta.experience && meta.experience !== 'Ko‘rsatilmagan' ? `\n   • Tajriba: ${meta.experience}` : '';
+    const loc = meta.location ? `\n   • Hudud: ${meta.location}` : '';
+    const sal = meta.salary && meta.salary !== 'Kelishuv asosida' ? `\n   • Kutilayotgan maosh: ${meta.salary}` : '';
+    const link = meta.telegramPostUrl ? `\n   • Havola: [Telegram e'lonini ochish](${meta.telegramPostUrl})` : '';
+
+    return `${i + 1}. **${role}**${skills}${exp}${loc}${sal}${link}`;
+  });
+
+  return `Topilgan nomzodlar (${candidates.length} ta):\n\n${items.join('\n\n')}\n\nBatafsil ma'lumot olish yoki aloqaga chiqish uchun tegishli e'lon havolasini ochishingiz mumkin.`;
+}
+
+/**
+ * Formats job vacancy search results for job seekers in natural Uzbek copy.
+ */
+export function formatCustomerJobs(jobs: any[]): string {
+  if (!Array.isArray(jobs) || jobs.length === 0) {
+    return 'Kechirasiz, so‘rovingiz bo‘yicha mos vakansiyalar topilmadi.';
+  }
+
+  const items = jobs.slice(0, 5).map((j, i) => {
+    const meta = j.metadata || {};
+    const role = meta.role || j.title?.replace(/^\[Vakansiya\]\s*/i, '') || 'Vakansiya';
+    const skills = Array.isArray(meta.skills) && meta.skills.length > 0 ? `\n   • Talablar: ${meta.skills.slice(0, 6).join(', ')}` : '';
+    const exp = meta.experience && meta.experience !== 'Ko‘rsatilmagan' ? `\n   • Talab etilgan tajriba: ${meta.experience}` : '';
+    const loc = meta.location ? `\n   • Joylashuv: ${meta.location}` : '';
+    const sal = meta.salary && meta.salary !== 'Kelishuv asosida' ? `\n   • Taklif etilayotgan maosh: ${meta.salary}` : '';
+    const link = meta.telegramPostUrl ? `\n   • Havola: [Telegram e'lonini ochish](${meta.telegramPostUrl})` : '';
+
+    return `${i + 1}. **${role}**${skills}${exp}${loc}${sal}${link}`;
+  });
+
+  return `Topilgan vakansiyalar (${jobs.length} ta):\n\n${items.join('\n\n')}\n\nAriza topshirish yoki bog'lanish uchun tegishli e'lon havolasini ochishingiz mumkin.`;
+}
+
+/**
  * Formats general conversational response when user asks about capabilities.
  */
 export function formatCustomerGeneralHelp(): string {
-  return 'Men ovqat buyurtma qilish, chipta topish, turli xizmatlarni qidirish va buyurtmalarni kuzatishda yordam bera olaman. Nimadan boshlaymiz?';
+  return 'Men ovqat buyurtma qilish, chipta topish, IT mutaxassis va vakansiyalarni qidirish, turli xizmatlardan foydalanish va buyurtmalarni kuzatishda yordam bera olaman. Nimadan boshlaymiz?';
 }
+

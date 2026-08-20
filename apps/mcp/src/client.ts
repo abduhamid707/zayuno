@@ -100,6 +100,30 @@ export class ZayunoApiClient {
     return this.request(`/api/v1/search?${params.toString()}`);
   }
 
+  async searchCandidates(query: string, options: { providerSlug?: string; skills?: string[]; location?: string; minSalary?: number; limit?: number } = {}) {
+    const providerSlug = options.providerSlug || 'ustoz-shogird';
+    const parameters: Record<string, any> = {
+      listingType: 'candidate'
+    };
+    if (options.skills && options.skills.length > 0) parameters.skills = options.skills;
+    if (options.location) parameters.location = options.location;
+    if (options.minSalary) parameters.minSalary = options.minSalary;
+
+    return this.searchCatalog(providerSlug, query, 'candidate', undefined, options.limit || 20, parameters);
+  }
+
+  async searchJobs(query: string, options: { providerSlug?: string; skills?: string[]; location?: string; minSalary?: number; limit?: number } = {}) {
+    const providerSlug = options.providerSlug || 'ustoz-shogird';
+    const parameters: Record<string, any> = {
+      listingType: 'job'
+    };
+    if (options.skills && options.skills.length > 0) parameters.skills = options.skills;
+    if (options.location) parameters.location = options.location;
+    if (options.minSalary) parameters.minSalary = options.minSalary;
+
+    return this.searchCatalog(providerSlug, query, 'job', undefined, options.limit || 20, parameters);
+  }
+
   async getOffering(slug: string, offeringId: string, locationId?: string, parameters?: Record<string, any>) {
     const params = new URLSearchParams();
     if (locationId) params.append('locationId', locationId);
