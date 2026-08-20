@@ -538,53 +538,55 @@ export default function App() {
               </div>
 
               <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-800/60 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="p-3.5">Action ID</th>
-                      <th className="p-3.5">Provider</th>
-                      <th className="p-3.5">Customer</th>
-                      <th className="p-3.5">Offerings</th>
-                      <th className="p-3.5">Total Amount</th>
-                      <th className="p-3.5">Status</th>
-                      <th className="p-3.5">Time</th>
-                      <th className="p-3.5 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/50">
-                    {filteredActions.map((act: any) => (
-                      <tr key={act.id} className="hover:bg-slate-800/40 transition">
-                        <td className="p-3.5 font-mono font-bold text-emerald-400">{act.publicId}</td>
-                        <td className="p-3.5 font-semibold text-slate-200">{act.providerName || act.providerSlug}</td>
-                        <td className="p-3.5">
-                          <div className="font-medium text-slate-200">{act.customer?.name}</div>
-                          <div className="text-[11px] text-slate-400">{act.customer?.phone}</div>
-                        </td>
-                        <td className="p-3.5 text-slate-300 max-w-xs truncate">
-                          {act.lines?.map((it: any) => `${it.quantity}× ${it.offeringTitle || it.offeringId}`).join(', ')}
-                        </td>
-                        <td className="p-3.5 font-bold text-white">
-                          {(act.total).toLocaleString('uz-UZ')} UZS
-                          <span className="block text-[10px] text-slate-400 font-normal uppercase">{act.paymentMethod}</span>
-                        </td>
-                        <td className="p-3.5">
-                          <StatusBadge status={act.status} />
-                        </td>
-                        <td className="p-3.5 text-slate-400 text-[11px]">
-                          {new Date(act.createdAt).toLocaleTimeString()}
-                        </td>
-                        <td className="p-3.5 text-right">
-                          <button
-                            onClick={() => setSelectedAction(act)}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition"
-                          >
-                            Inspect
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs min-w-[850px]">
+                    <thead className="bg-slate-800/60 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                      <tr>
+                        <th className="p-3.5 whitespace-nowrap">Action ID</th>
+                        <th className="p-3.5 whitespace-nowrap">Provider</th>
+                        <th className="p-3.5 whitespace-nowrap">Customer</th>
+                        <th className="p-3.5 whitespace-nowrap">Offerings</th>
+                        <th className="p-3.5 whitespace-nowrap">Total Amount</th>
+                        <th className="p-3.5 whitespace-nowrap">Status</th>
+                        <th className="p-3.5 whitespace-nowrap">Time</th>
+                        <th className="p-3.5 text-right whitespace-nowrap">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {filteredActions.map((act: any) => (
+                        <tr key={act.id} className="hover:bg-slate-800/40 transition">
+                          <td className="p-3.5 font-mono font-bold text-emerald-400 whitespace-nowrap">{act.publicId}</td>
+                          <td className="p-3.5 font-semibold text-slate-200 whitespace-nowrap">{act.providerName || act.providerSlug}</td>
+                          <td className="p-3.5 whitespace-nowrap">
+                            <div className="font-medium text-slate-200">{act.customer?.name}</div>
+                            <div className="text-[11px] text-slate-400">{act.customer?.phone}</div>
+                          </td>
+                          <td className="p-3.5 text-slate-300 max-w-xs truncate">
+                            {act.lines?.map((it: any) => `${it.quantity}× ${it.offeringTitle || it.offeringId}`).join(', ')}
+                          </td>
+                          <td className="p-3.5 font-bold text-white whitespace-nowrap">
+                            {(act.total).toLocaleString('uz-UZ')} UZS
+                            <span className="block text-[10px] text-slate-400 font-normal uppercase">{act.paymentMethod}</span>
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap">
+                            <StatusBadge status={act.status} />
+                          </td>
+                          <td className="p-3.5 text-slate-400 text-[11px] whitespace-nowrap">
+                            {new Date(act.createdAt).toLocaleTimeString()}
+                          </td>
+                          <td className="p-3.5 text-right whitespace-nowrap">
+                            <button
+                              onClick={() => setSelectedAction(act)}
+                              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition"
+                            >
+                              Inspect
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -826,28 +828,30 @@ export default function App() {
               </div>
 
               <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden">
-                <table className="min-w-full text-left text-xs">
-                  <thead className="bg-slate-800/60 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="p-3.5">Manba / Event</th>
-                      <th className="p-3.5">Provider</th>
-                      <th className="p-3.5">Action / Trace</th>
-                      <th className="p-3.5">Status</th>
-                      <th className="p-3.5">Xabar</th>
-                      <th className="p-3.5 text-right">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/50">
-                    {logsLoading ? <tr><td colSpan={6} className="p-8 text-center text-slate-400">Loglar yuklanmoqda…</td></tr> : (operationalLogs?.data || []).length === 0 ? <tr><td colSpan={6} className="p-8 text-center text-slate-400">Tanlangan filtrlar bo‘yicha event topilmadi.</td></tr> : (operationalLogs?.data || []).map((log: any) => <tr key={log.id} className="hover:bg-slate-800/40 transition">
-                      <td className="p-3.5"><div className="font-mono font-bold text-amber-300">{log.eventType}</div><div className="mt-1 text-[10px] text-slate-500">{log.source}{log.durationMs != null ? ` · ${log.durationMs}ms` : ''}</div></td>
-                      <td className="p-3.5"><div className="font-semibold text-slate-200">{log.providerName || 'Platform'}</div><div className="font-mono text-[10px] text-slate-500">{log.providerSlug}</div></td>
-                      <td className="p-3.5 font-mono text-[10px] text-indigo-300"><div>{log.actionId || '—'}</div><div className="mt-1 text-slate-500">{log.traceId || ''}</div></td>
-                      <td className="p-3.5"><span className={`rounded border px-2 py-1 text-[10px] font-bold ${log.severity === 'ERROR' ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : log.severity === 'WARN' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'}`}>{log.status || log.severity}</span></td>
-                      <td className="max-w-md p-3.5 text-slate-300"><div className="line-clamp-2">{log.message}</div></td>
-                      <td className="p-3.5 text-right text-[11px] text-slate-500">{new Date(log.createdAt).toLocaleString('uz-UZ')}</td>
-                    </tr>)}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-xs min-w-[850px]">
+                    <thead className="bg-slate-800/60 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                      <tr>
+                        <th className="p-3.5 whitespace-nowrap">Manba / Event</th>
+                        <th className="p-3.5 whitespace-nowrap">Provider</th>
+                        <th className="p-3.5 whitespace-nowrap">Action / Trace</th>
+                        <th className="p-3.5 whitespace-nowrap">Status</th>
+                        <th className="p-3.5 whitespace-nowrap">Xabar</th>
+                        <th className="p-3.5 text-right whitespace-nowrap">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {logsLoading ? <tr><td colSpan={6} className="p-8 text-center text-slate-400">Loglar yuklanmoqda…</td></tr> : (operationalLogs?.data || []).length === 0 ? <tr><td colSpan={6} className="p-8 text-center text-slate-400">Tanlangan filtrlar bo‘yicha event topilmadi.</td></tr> : (operationalLogs?.data || []).map((log: any) => <tr key={log.id} className="hover:bg-slate-800/40 transition">
+                        <td className="p-3.5 whitespace-nowrap"><div className="font-mono font-bold text-amber-300">{log.eventType}</div><div className="mt-1 text-[10px] text-slate-500">{log.source}{log.durationMs != null ? ` · ${log.durationMs}ms` : ''}</div></td>
+                        <td className="p-3.5 whitespace-nowrap"><div className="font-semibold text-slate-200">{log.providerName || 'Platform'}</div><div className="font-mono text-[10px] text-slate-500">{log.providerSlug}</div></td>
+                        <td className="p-3.5 font-mono text-[10px] text-indigo-300 whitespace-nowrap"><div>{log.actionId || '—'}</div><div className="mt-1 text-slate-500">{log.traceId || ''}</div></td>
+                        <td className="p-3.5 whitespace-nowrap"><span className={`rounded border px-2 py-1 text-[10px] font-bold ${log.severity === 'ERROR' ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : log.severity === 'WARN' ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'}`}>{log.status || log.severity}</span></td>
+                        <td className="max-w-md p-3.5 text-slate-300"><div className="line-clamp-2">{log.message}</div></td>
+                        <td className="p-3.5 text-right text-[11px] text-slate-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString('uz-UZ')}</td>
+                      </tr>)}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
