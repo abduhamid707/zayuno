@@ -140,6 +140,9 @@ services:
       - API_PUBLIC_URL=https://api.zayuno.uz
       - MCP_PUBLIC_URL=https://mcp.zayuno.uz
       - API_BASE_URL=https://api.zayuno.uz
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - EMAIL_FROM=${EMAIL_FROM:-Zayuno <noreply@zayuno.uz>}
+      - PROVIDER_PORTAL_URL=${PROVIDER_PORTAL_URL:-https://developers.zayuno.uz}
     depends_on:
       postgres:
         condition: service_healthy

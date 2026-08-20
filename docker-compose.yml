@@ -105,6 +105,9 @@ services:
       - ZAYUNO_WEBHOOK_SECRET=zayuno_webhook_secret_evos_test_key_123
       - MOCK_EVOS_BASE_URL=http://mock-evos:4001
       - API_BASE_URL=http://localhost:4000
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - EMAIL_FROM=${EMAIL_FROM:-Zayuno <noreply@zayuno.uz>}
+      - PROVIDER_PORTAL_URL=${PROVIDER_PORTAL_URL:-http://localhost:3000}
 
   # 6. Zayuno MCP Server (SSE & Stdio Bridge)
   mcp:
