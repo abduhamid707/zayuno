@@ -42,6 +42,7 @@ target_for_service() {
     provider-portal) echo "provider-portal|http://127.0.0.1:4104" ;;
     mock-coffee-time) echo "mock-coffee-time|http://127.0.0.1:4105/health" ;;
     mock-poyez) echo "mock-poyez|http://127.0.0.1:4106/health" ;;
+    worker) echo "" ;; # Background worker has no HTTP port to health check
     *) return 1 ;;
   esac
 }
@@ -134,7 +135,7 @@ main() {
         log_error "Unknown service requested for health check: $service"
         exit 1
       fi
-      selected_targets+=("$target")
+      [ -n "$target" ] && selected_targets+=("$target")
     done
     if [ "${#selected_targets[@]}" -eq 0 ]; then
       log_success "No services were restarted; no targeted health check required."
