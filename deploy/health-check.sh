@@ -37,6 +37,7 @@ PUBLIC_TARGETS=(
   "api.zayuno.uz|https://api.zayuno.uz/health"
   "mcp.zayuno.uz|https://mcp.zayuno.uz/health"
   "admin.zayuno.uz|https://admin.zayuno.uz"
+  "developers.zayuno.uz|https://developers.zayuno.uz"
   "partners.zayuno.uz|https://partners.zayuno.uz"
   "evos-sandbox.shopla.uz|https://evos-sandbox.shopla.uz/health"
   "coffee-time-sandbox.shopla.uz|https://coffee-time-sandbox.shopla.uz/health"

@@ -228,7 +228,7 @@ services:
     ports:
       - "127.0.0.1:4104:3001"
     environment:
-      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=partners.zayuno.uz
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=partners.zayuno.uz,developers.zayuno.uz
     depends_on:
       - api
     networks:
