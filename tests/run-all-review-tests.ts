@@ -9,6 +9,7 @@ const testSuites = [
   // Prompt 2: Auth, Verification, Onboarding Journey
   'tests/test-auth-and-verification.ts',
   'tests/test-provider-onboarding-journey.ts',
+  'tests/test-onboarding-and-auth-flow.ts',
 
   // Prompt 3: Certification Runner, Local Mock EVOS Terminal Protection
   'tests/test-sandbox-simulator-e2e.ts',

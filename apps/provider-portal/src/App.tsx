@@ -44,6 +44,9 @@ import {
   FileText
 } from 'lucide-react';
 import { DocsViewer } from './DocsViewer';
+import { OnboardingWizard } from './OnboardingWizard';
+import { AuthView } from './AuthView';
+import { ProtectedGate } from './ProtectedGate';
 import {
   generateAiPrompt,
   generateContractJson,
@@ -92,22 +95,54 @@ export default function App() {
   const [authSuccess, setAuthSuccess] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Active Tab & Docs sync
-  const [activeTab, setActiveTab] = useState<'overview' | 'docs' | 'apps' | 'sandbox' | 'certification' | 'inspector'>(() => {
+  // Active Tab & Deep-link sync
+  const [activeTab, setActiveTab] = useState<'overview' | 'docs' | 'apps' | 'sandbox' | 'certification' | 'inspector' | 'onboarding' | 'auth'>(() => {
     if (typeof window === 'undefined') return 'overview';
     const params = new URLSearchParams(window.location.search);
     if (params.has('doc')) return 'docs';
+    if (params.has('token') || params.has('verifyToken')) return 'onboarding';
     const tabParam = params.get('tab');
-    if (tabParam === 'docs' || tabParam === 'apps' || tabParam === 'sandbox' || tabParam === 'certification' || tabParam === 'inspector') {
-      return tabParam as any;
+    if (tabParam === 'docs' || tabParam === 'apps' || tabParam === 'sandbox' || tabParam === 'certification' || tabParam === 'inspector' || tabParam === 'onboarding' || tabParam === 'auth' || tabParam === 'login') {
+      return (tabParam === 'login' ? 'auth' : tabParam) as any;
     }
     return 'overview';
+  });
+
+  const [initialOnboardingStep, setInitialOnboardingStep] = useState<number>(() => {
+    if (typeof window === 'undefined') return 1;
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('token') || params.has('verifyToken')) return 2;
+    if (params.has('step')) return parseInt(params.get('step')!, 10) || 1;
+    return 1;
+  });
+
+  const [initialEmailParam, setInitialEmailParam] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('email') || '';
+  });
+
+  const [initialVerifyTokenParam, setInitialVerifyTokenParam] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('token') || params.get('verifyToken') || '';
   });
 
   const [selectedDoc, setSelectedDoc] = useState<string>(() => {
     if (typeof window === 'undefined') return 'getting-started';
     return new URLSearchParams(window.location.search).get('doc') || 'getting-started';
   });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (activeTab === 'overview') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', activeTab);
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, [activeTab]);
 
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
@@ -659,14 +694,7 @@ export default function App() {
             <BookOpen className="w-3.5 h-3.5" /> Documentation
           </button>
           <button
-            onClick={() => {
-              if (!token) {
-                setAuthModalTab('login');
-                setAuthModalOpen(true);
-              } else {
-                setActiveTab('apps');
-              }
-            }}
+            onClick={() => setActiveTab('apps')}
             className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
               activeTab === 'apps' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -684,14 +712,7 @@ export default function App() {
             </button>
           )}
           <button
-            onClick={() => {
-              if (!token) {
-                setAuthModalTab('login');
-                setAuthModalOpen(true);
-              } else {
-                setActiveTab('certification');
-              }
-            }}
+            onClick={() => setActiveTab('certification')}
             className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
               activeTab === 'certification' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -699,14 +720,7 @@ export default function App() {
             <ShieldCheck className="w-3.5 h-3.5" /> Certification {!token && <Lock className="w-3 h-3 text-slate-500" />}
           </button>
           <button
-            onClick={() => {
-              if (!token) {
-                setAuthModalTab('login');
-                setAuthModalOpen(true);
-              } else {
-                setActiveTab('inspector');
-              }
-            }}
+            onClick={() => setActiveTab('inspector')}
             className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
               activeTab === 'inspector' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
             }`}
@@ -746,13 +760,13 @@ export default function App() {
           ) : (
             <div className="flex items-center gap-2">
               <button
-                onClick={() => { setAuthModalTab('login'); setAuthModalOpen(true); }}
-                className="text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                onClick={() => setActiveTab('auth')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${activeTab === 'auth' ? 'text-white bg-slate-800' : 'text-slate-300 hover:text-white'}`}
               >
                 Kirish
               </button>
               <button
-                onClick={() => { setAuthModalTab('signup'); setAuthModalOpen(true); }}
+                onClick={() => setActiveTab('onboarding')}
                 className="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1"
               >
                 Provider bo‘lish <ArrowRight className="w-3.5 h-3.5" />
@@ -792,17 +806,10 @@ export default function App() {
                     <Sparkles className="w-4 h-4 text-amber-300" /> AI bilan integratsiya qilish
                   </button>
                   <button
-                    onClick={() => {
-                      if (!token) {
-                        setAuthModalTab('signup');
-                        setAuthModalOpen(true);
-                      } else {
-                        setActiveTab('apps');
-                      }
-                    }}
-                    className="bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs px-5 py-2.5 rounded-xl border border-slate-700 transition-all flex items-center gap-2"
+                    onClick={() => setActiveTab('onboarding')}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
                   >
-                    Provider bo‘lish <ArrowRight className="w-4 h-4" />
+                    Provider bo‘lish (5 daqiqada) <ArrowRight className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setActiveTab('docs')}
@@ -811,6 +818,44 @@ export default function App() {
                     <BookOpen className="w-3.5 h-3.5" /> Hujjatlarni o‘qish
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* 6-Step Onboarding Roadmap Card */}
+            <div className="bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-indigo-950/40 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                  <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-semibold">Self-Service Roadmap</span>
+                  <h2 className="text-xl font-bold text-white mt-1">Qanday qilib Zayuno Provider bo‘lish mumkin?</h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Hech qanday murakkab byurokratiyasiz: ro‘yxatdan o‘ting, API ulang va AI qidiruviga chiqing.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('onboarding')}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5 self-start sm:self-auto shrink-0"
+                >
+                  Hoziroq boshlash <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
+                {[
+                  { n: 1, title: 'Hisob ochish', desc: 'Ism, rasmiy email va 12+ belgili parol' },
+                  { n: 2, title: 'Email tasdiqlash', desc: '1 martalik xavfsiz kod orqali faollashtirish' },
+                  { n: 3, title: 'Biznes profil', desc: 'Brend nomi, toifa va support kontaktlar' },
+                  { n: 4, title: 'API & Slug', desc: 'Endpoint, auth formati va capability profili' },
+                  { n: 5, title: 'Sandbox & Test', desc: 'Simulator va compliance runner bilan tekshirish' },
+                  { n: 6, title: 'Review & Nashr', desc: '1-2 ish kunida ko‘rib chiqish va AI agentlarga ochish' }
+                ].map(item => (
+                  <div key={item.n} className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
+                    <div className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center text-xs font-mono">
+                      {item.n}
+                    </div>
+                    <h4 className="font-semibold text-white text-xs">{item.title}</h4>
+                    <p className="text-slate-400 text-[11px] leading-tight">{item.desc}</p>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -824,34 +869,44 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs leading-relaxed">
-                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-5 space-y-3">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold border border-indigo-500/20">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs leading-relaxed">
+                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold border border-indigo-500/20">
                     1
                   </div>
-                  <h3 className="font-semibold text-white text-sm">Kimlar ro‘yxatdan o‘ta oladi?</h3>
-                  <p className="text-slate-400">
-                    O‘zbekistonda xizmat ko‘rsatuvchi yuridik shaxslar, xususiy tadbirkorlar va raqamli servislar (yetkazib berish, do‘kon, transport, xizmatlar, band qilish, Telegram botlar).
+                  <h3 className="font-semibold text-white text-xs">1. Xizmatingizni ulang</h3>
+                  <p className="text-slate-400 text-[11px]">
+                    API va mahsulotlar katalogingizni Zayuno universal adapteriga ulaysiz.
                   </p>
                 </div>
 
-                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-5 space-y-3">
-                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold border border-sky-500/20">
+                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+                  <div className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold border border-sky-500/20">
                     2
                   </div>
-                  <h3 className="font-semibold text-white text-sm">Universal Capability Profillari</h3>
-                  <p className="text-slate-400">
-                    Sizning servisingizga mos profilni tanlang: Discovery / Read-only (3 ta endpoint) yoki To‘liq Tranzaksion (7 ta endpoint), HTTPS va HMAC-SHA256 xavfsizligi.
+                  <h3 className="font-semibold text-white text-xs">2. AI agentlar sizni topadi</h3>
+                  <p className="text-slate-400 text-[11px]">
+                    ChatGPT, Claude va AI assistentlar mijoz so‘roviga ko‘ra xizmatingizni tanlaydi.
                   </p>
                 </div>
 
-                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-5 space-y-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/20">
+                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+                  <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold border border-amber-500/20">
                     3
                   </div>
-                  <h3 className="font-semibold text-white text-sm">Certification va Ko‘rib chiqish</h3>
-                  <p className="text-slate-400">
-                    Avtomatlashtirilgan test sinovlaridan o‘tgach, ariza Zayuno Operations tomonidan 1–2 ish kunida ko‘rib chiqiladi va AI qidiruviga chiqariladi.
+                  <h3 className="font-semibold text-white text-xs">3. Mijoz narxni tasdiqlaydi</h3>
+                  <p className="text-slate-400 text-[11px]">
+                    Kotirovka (Quote) va yetkazib berish shartlari shaffof shakllanadi va tasdiqlanadi.
+                  </p>
+                </div>
+
+                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/20">
+                    4
+                  </div>
+                  <h3 className="font-semibold text-white text-xs">4. Buyurtma tizimingizga keladi</h3>
+                  <p className="text-slate-400 text-[11px]">
+                    Tranzaksiya xavfsiz webhook orqali to‘g‘ridan-to‘g‘ri backend yoki CRM tizimingizga keladi.
                   </p>
                 </div>
               </div>
@@ -865,17 +920,35 @@ export default function App() {
               </div>
             </div>
 
-            {/* Payment Boundary Guarantee Card */}
-            <div className="rounded-xl bg-slate-900/60 border border-amber-500/30 p-6 flex items-start gap-4 shadow-lg">
-              <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
-                <Lock className="w-6 h-6" />
+            {/* Trust & Guarantee Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-white">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Karta ma’lumotlari saqlanmaydi</span>
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Bank kartalari va to‘lov maxfiyligi Zayuno’da saqlanmaydi. Providerlar to‘lovlarni o‘z checkout havolalari orqali qabul qiladi.
+                </p>
               </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
-                  Strict Payment Boundary Guarantee
-                </h3>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  <strong>Zayuno NEVER processes payments or collects card details.</strong> Providers own their checkout flow (Payme, Click, Stripe, POS, invoicing). When an action requires payment, your backend returns an <code className="text-amber-300 font-mono text-[11px] bg-amber-950/60 px-1 py-0.5 rounded">AWAITING_PAYMENT</code> status with a secure <code className="text-amber-300 font-mono text-[11px] bg-amber-950/60 px-1 py-0.5 rounded">nextAction</code> URL.
+
+              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-white">
+                  <Lock className="w-4 h-4 text-sky-400 shrink-0" />
+                  <span>Mijoz tasdig‘i kafolati</span>
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Har qanday buyurtma va to‘lov faqat mijozning bevosita tasdig‘idan keyin rasmiylashtiriladi.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-white">
+                  <Key className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Xavfsiz Credentiallar</span>
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Sizning API kalitlaringiz va webhook secretlaringiz bir marta ko‘rsatiladi va shifrlangan holda saqlanadi.
                 </p>
               </div>
             </div>
@@ -923,6 +996,48 @@ export default function App() {
         )}
 
         {/* ========================================================================= */}
+        {/* ONBOARDING WIZARD VIEW                                                    */}
+        {/* ========================================================================= */}
+        {activeTab === 'onboarding' && (
+          <OnboardingWizard
+            apiBase={API_BASE}
+            token={token}
+            onAuthSuccess={(newToken, user) => {
+              setToken(newToken);
+              setUserProfile(user);
+              refetchProvider();
+            }}
+            onProviderCreated={() => {
+              refetchProvider();
+            }}
+            onNavigateTab={(tab) => setActiveTab(tab)}
+            onOpenAiKit={() => setAiKitOpen(true)}
+            initialStep={initialOnboardingStep}
+            initialEmail={initialEmailParam}
+            initialVerifyToken={initialVerifyTokenParam}
+          />
+        )}
+
+        {/* ========================================================================= */}
+        {/* AUTH / LOGIN VIEW                                                         */}
+        {/* ========================================================================= */}
+        {activeTab === 'auth' && (
+          <AuthView
+            apiBase={API_BASE}
+            onLoginSuccess={(newToken, user) => {
+              setToken(newToken);
+              setUserProfile(user);
+              refetchProvider();
+              setActiveTab('apps');
+            }}
+            onStartOnboarding={() => setActiveTab('onboarding')}
+            onOpenDocs={() => setActiveTab('docs')}
+            initialEmail={initialEmailParam}
+            initialMode={initialVerifyTokenParam ? 'verify' : 'login'}
+          />
+        )}
+
+        {/* ========================================================================= */}
         {/* TAB 2: INTERACTIVE DOCUMENTATION (PUBLIC)                                  */}
         {/* ========================================================================= */}
         {activeTab === 'docs' && (
@@ -939,338 +1054,30 @@ export default function App() {
         {activeTab === 'apps' && (
           <div className="space-y-6 animate-fadeIn">
             {!token ? (
-              <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
-                  <Lock className="w-7 h-7" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Bu bo‘lim uchun avval account yarating</h3>
-                <p className="text-xs text-slate-400">Provider dashboard, API kalitlari va webhook sozlamalarini boshqarish uchun avval tizimga kiring.</p>
-                <button
-                  onClick={() => { setAuthModalTab('signup'); setAuthModalOpen(true); }}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all inline-flex items-center gap-2"
-                >
-                  Ro‘yxatdan o‘tish / Kirish <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <ProtectedGate
+                sectionTitle="Provider Dashboard & API Boshqaruvi"
+                sectionDescription="Provider arizangiz, API credentiallari, webhooklar va tushgan buyurtmalarni monitoring qilish uchun tizimga kiring."
+                onLoginClick={() => setActiveTab('auth')}
+                onSignupClick={() => setActiveTab('onboarding')}
+                onDocsClick={() => setActiveTab('docs')}
+              />
             ) : !provider ? (
-              /* APPLICATION WIZARD FOR NEW PROVIDERS */
-              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 max-w-4xl mx-auto">
-                <div className="border-b border-slate-800 pb-4">
-                  <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-semibold">Onboarding Wizard</span>
-                  <h2 className="text-xl font-bold text-white mt-1">Yangi Provider Arizasini Yaratish</h2>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Quyidagi ma’lumotlarni to‘ldirib, sandbox credentiallarini oling va API integratsiyangizni boshlang.
-                  </p>
-                </div>
-
-                {/* Wizard Stepper */}
-                <div className="grid grid-cols-4 gap-2 text-xs font-mono">
-                  {[
-                    { s: 1, label: '1. Profil & Support' },
-                    { s: 2, label: '2. Brand & Slug' },
-                    { s: 3, label: '3. API & Auth' },
-                    { s: 4, label: '4. Kalitlar (Handoff)' }
-                  ].map(step => (
-                    <div
-                      key={step.s}
-                      className={`p-2.5 rounded-xl border text-center transition-all ${
-                        wizardStep === step.s
-                          ? 'bg-indigo-600 text-white border-indigo-500 shadow'
-                          : wizardStep > step.s
-                          ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30'
-                          : 'bg-slate-900/40 text-slate-500 border-slate-800'
-                      }`}
-                    >
-                      {step.label}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Step 1: Business Profile & Support Contact */}
-                {wizardStep === 1 && (
-                  <div className="space-y-4 text-xs">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-slate-400 mb-1">Kompaniya yoki Servis Nomi *</label>
-                        <input
-                          type="text"
-                          required
-                          value={wizardForm.name}
-                          onChange={e => setWizardForm({ ...wizardForm, name: e.target.value })}
-                          placeholder="Masalan: Express Logistics"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-400 mb-1">Xizmat Toifasi (Category) *</label>
-                        <select
-                          value={wizardForm.category}
-                          onChange={e => setWizardForm({ ...wizardForm, category: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                        >
-                          <option value="general_services">General Services</option>
-                          <option value="logistics">Logistics & Delivery</option>
-                          <option value="retail">Commerce & Retail</option>
-                          <option value="food_delivery">Food & Dining</option>
-                          <option value="railway_tickets">Railway Tickets</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-400 mb-1">Xizmat haqida qisqacha tavsif</label>
-                      <textarea
-                        value={wizardForm.description}
-                        onChange={e => setWizardForm({ ...wizardForm, description: e.target.value })}
-                        placeholder="AI agentlar xizmatlaringizni to‘g‘ri tushunishi uchun qisqa izoh"
-                        rows={2}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                      />
-                    </div>
-
-                    <div className="border-t border-slate-800/80 pt-4 space-y-3">
-                      <h4 className="font-semibold text-white">Mijozlarni qo‘llab-quvvatlash (Support Contacts)</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-slate-400 mb-1">Telefon raqam</label>
-                          <input
-                            type="text"
-                            value={wizardForm.supportContact.phone}
-                            onChange={e => setWizardForm({ ...wizardForm, supportContact: { ...wizardForm.supportContact, phone: e.target.value } })}
-                            placeholder="+998712000000"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-400 mb-1">Telegram username / bot</label>
-                          <input
-                            type="text"
-                            value={wizardForm.supportContact.telegram}
-                            onChange={e => setWizardForm({ ...wizardForm, supportContact: { ...wizardForm.supportContact, telegram: e.target.value } })}
-                            placeholder="@express_support"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-400 mb-1">Support Email</label>
-                          <input
-                            type="email"
-                            value={wizardForm.supportContact.email}
-                            onChange={e => setWizardForm({ ...wizardForm, supportContact: { ...wizardForm.supportContact, email: e.target.value } })}
-                            placeholder="support@express.uz"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-400 mb-1">Ish vaqti</label>
-                          <input
-                            type="text"
-                            value={wizardForm.supportContact.workingHours}
-                            onChange={e => setWizardForm({ ...wizardForm, supportContact: { ...wizardForm.supportContact, workingHours: e.target.value } })}
-                            placeholder="09:00 - 22:00 (Har kuni)"
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end pt-4">
-                      <button
-                        onClick={() => {
-                          if (!wizardForm.name.trim()) return alert('Kompaniya nomini kiriting');
-                          if (!wizardForm.slug) {
-                            setWizardForm({
-                              ...wizardForm,
-                              slug: wizardForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-                            });
-                          }
-                          setWizardStep(2);
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2.5 rounded-xl transition-all flex items-center gap-2"
-                      >
-                        Davom etish <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 2: Slug & Brand Check */}
-                {wizardStep === 2 && (
-                  <div className="space-y-4 text-xs">
-                    <div>
-                      <label className="block text-slate-400 mb-1">Noyob identifikator (Slug) *</label>
-                      <input
-                        type="text"
-                        required
-                        value={wizardForm.slug}
-                        onChange={e => setWizardForm({ ...wizardForm, slug: e.target.value.toLowerCase().trim() })}
-                        placeholder="masalan: express-logistics"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500"
-                      />
-                      <p className="mt-1.5 text-[11px] text-slate-500">
-                        Kichik harflar, sonlar va chiziqcha (<code className="text-indigo-300">-</code>) ishlatiladi. API so‘rovlarida provideringiz aynan shu slug bilan chaqiriladi.
-                      </p>
-                    </div>
-
-                    <div className="flex justify-between pt-4">
-                      <button
-                        onClick={() => setWizardStep(1)}
-                        className="text-slate-400 hover:text-white px-4 py-2"
-                      >
-                        Ortga
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (!wizardForm.slug.trim()) return alert('Slug kiritilmadi');
-                          setWizardStep(3);
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2.5 rounded-xl transition-all flex items-center gap-2"
-                      >
-                        Davom etish <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 3: API & Auth */}
-                {wizardStep === 3 && (
-                  <div className="space-y-4 text-xs">
-                    <div>
-                      <label className="block text-slate-400 mb-1">Backend Base URL (HTTPS) *</label>
-                      <input
-                        type="url"
-                        value={wizardForm.baseUrl}
-                        onChange={e => setWizardForm({ ...wizardForm, baseUrl: e.target.value })}
-                        placeholder="https://api.express.uz"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500"
-                      />
-                      <p className="mt-1 text-[11px] text-slate-500">
-                        Hozircha serveringiz tayyor bo‘lmasa bo‘sh qoldirishingiz mumkin; keyinchalik sozlamalardan kiritiladi.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-400 mb-1">Autentifikatsiya usuli</label>
-                      <select
-                        value={wizardForm.authMethod}
-                        onChange={e => setWizardForm({ ...wizardForm, authMethod: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-                      >
-                        <option value="API_KEY">API Key (x-api-key header)</option>
-                        <option value="BEARER">Bearer Token (Authorization: Bearer)</option>
-                        <option value="NONE">None (Public/Sandbox)</option>
-                      </select>
-                    </div>
-
-                    {registerWizardMutation.isError && (
-                      <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300">
-                        {(registerWizardMutation.error as Error).message}
-                      </div>
-                    )}
-
-                    <div className="flex justify-between pt-4">
-                      <button
-                        onClick={() => setWizardStep(2)}
-                        className="text-slate-400 hover:text-white px-4 py-2"
-                      >
-                        Ortga
-                      </button>
-                      <button
-                        onClick={() => registerWizardMutation.mutate()}
-                        disabled={registerWizardMutation.isPending}
-                        className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-5 py-2.5 rounded-xl transition-all flex items-center gap-2"
-                      >
-                        {registerWizardMutation.isPending ? 'Ro‘yxatdan o‘tkazilmoqda...' : 'Arizani yaratish va Kalitlarni olish'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 4: Credential Handoff (Single-use display) */}
-                {wizardStep === 4 && createdCredentials && (
-                  <div className="space-y-6 text-xs animate-fadeIn">
-                    <div className="p-4 bg-emerald-950/30 border border-emerald-500/30 rounded-2xl space-y-2">
-                      <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
-                        <CheckCircle2 className="w-5 h-5" />
-                        Provider muvaffaqiyatli yaratildi!
-                      </div>
-                      <p className="text-slate-300">
-                        Quyidagi maxfiy kalitlar <strong>faqat bir marta</strong> ko‘rsatiladi. Iltimos, ularni xavfsiz joyga nusxalab yoki yuklab oling.
-                      </p>
-                    </div>
-
-                    <div className="space-y-3 font-mono">
-                      <div>
-                        <span className="text-slate-400 text-[11px]">Sandbox API Key (Zayuno API ga so‘rov yuborish uchun):</span>
-                        <div className="bg-slate-950 p-3 rounded-xl text-emerald-400 border border-slate-800 mt-1 flex justify-between items-center">
-                          <span className="truncate mr-2">{createdCredentials.sandboxApiKey}</span>
-                          <button
-                            onClick={() => copyToClipboard(createdCredentials.sandboxApiKey, 'key')}
-                            className="p-1 hover:text-white"
-                          >
-                            {copiedText === 'key' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-400" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <span className="text-slate-400 text-[11px]">Webhook HMAC Secret (Kelgan voqealarni tekshirish uchun):</span>
-                        <div className="bg-slate-950 p-3 rounded-xl text-emerald-400 border border-slate-800 mt-1 flex justify-between items-center">
-                          <span className="truncate mr-2">{createdCredentials.sandboxWebhookSecret}</span>
-                          <button
-                            onClick={() => copyToClipboard(createdCredentials.sandboxWebhookSecret, 'secret')}
-                            className="p-1 hover:text-white"
-                          >
-                            {copiedText === 'secret' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-400" />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => {
-                          const json = JSON.stringify(createdCredentials, null, 2);
-                          const blob = new Blob([json], { type: 'application/json' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `zayuno-credentials-${createdCredentials.providerSlug}.json`;
-                          a.click();
-                        }}
-                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl border border-slate-700 flex items-center gap-1.5"
-                      >
-                        <Download className="w-3.5 h-3.5" /> JSON formatida yuklab olish
-                      </button>
-                    </div>
-
-                    <label className="flex items-center gap-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={credentialsAcknowledged}
-                        onChange={e => setCredentialsAcknowledged(e.target.checked)}
-                        className="rounded border-slate-700"
-                      />
-                      <span className="text-slate-300">
-                        Men ushbu maxfiy kalitlarni xavfsiz saqlab oldim va keyin ularni qayta ko‘rib bo‘lmasligini tushunaman.
-                      </span>
-                    </label>
-
-                    <div className="flex justify-end pt-2">
-                      <button
-                        disabled={!credentialsAcknowledged}
-                        onClick={() => {
-                          setCreatedCredentials(null);
-                          refetchProvider();
-                        }}
-                        className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-6 py-2.5 rounded-xl transition-all"
-                      >
-                        Boshqaruv paneliga o‘tish
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <OnboardingWizard
+                apiBase={API_BASE}
+                token={token}
+                onAuthSuccess={(newToken, user) => {
+                  setToken(newToken);
+                  setUserProfile(user);
+                  refetchProvider();
+                }}
+                onProviderCreated={() => {
+                  refetchProvider();
+                }}
+                onNavigateTab={(tab) => setActiveTab(tab)}
+                onOpenAiKit={() => setAiKitOpen(true)}
+                initialStep={3}
+                initialEmail={userProfile?.email || ''}
+              />
             ) : (
               /* EXISTING PROVIDER DASHBOARD */
               <div className="space-y-6">
@@ -1677,19 +1484,13 @@ export default function App() {
         {activeTab === 'certification' && (
           <div className="space-y-6 animate-fadeIn">
             {!token ? (
-              <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
-                  <Lock className="w-7 h-7" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Bu bo‘lim uchun avval account yarating</h3>
-                <p className="text-xs text-slate-400">Avtomatlashtirilgan capability certification testlarini o‘tkazish uchun avval tizimga kiring.</p>
-                <button
-                  onClick={() => { setAuthModalTab('login'); setAuthModalOpen(true); }}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all inline-flex items-center gap-2"
-                >
-                  Kirish <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <ProtectedGate
+                sectionTitle="Avtomatlashtirilgan Sertifikatlash"
+                sectionDescription="Provider API integratsiyangizni Zayuno universal protokoli va xavfsizlik talablariga mosligini tekshirish uchun tizimga kiring."
+                onLoginClick={() => setActiveTab('auth')}
+                onSignupClick={() => setActiveTab('onboarding')}
+                onDocsClick={() => setActiveTab('docs')}
+              />
             ) : !provider?.slug ? (
               <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
                 <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
@@ -1825,19 +1626,13 @@ export default function App() {
         {activeTab === 'inspector' && (
           <div className="space-y-6 animate-fadeIn">
             {!token ? (
-              <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
-                  <Lock className="w-7 h-7" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Bu bo‘lim uchun avval account yarating</h3>
-                <p className="text-xs text-slate-400">Jonli API chaqiruvlari va webhook audit loglarini ko‘rish uchun avval tizimga kiring.</p>
-                <button
-                  onClick={() => { setAuthModalTab('login'); setAuthModalOpen(true); }}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all inline-flex items-center gap-2"
-                >
-                  Kirish <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <ProtectedGate
+                sectionTitle="Live Tranzaksiya Inspectori"
+                sectionDescription="AI agentlaridan kelayotgan real-time so‘rovlar, quote hisoblash va webhook tranzaksiyalari loglarini kuzatish uchun tizimga kiring."
+                onLoginClick={() => setActiveTab('auth')}
+                onSignupClick={() => setActiveTab('onboarding')}
+                onDocsClick={() => setActiveTab('docs')}
+              />
             ) : !provider?.slug ? (
               <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
                 <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
