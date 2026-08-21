@@ -16,6 +16,12 @@ export class DeveloperSandboxController {
     return this.sandboxService.createSession(clientIp);
   }
 
+  @Get('discover')
+  @ApiOperation({ summary: 'Discover mock sandbox provider and offerings for developer simulation' })
+  async discover() {
+    return this.sandboxService.discoverSandboxProvider();
+  }
+
   @Post('quote')
   @ApiOperation({ summary: 'Calculate quote inside the developer sandbox simulator' })
   @ApiHeader({ name: 'x-simulator-session', required: true, description: 'Signed simulator session token' })

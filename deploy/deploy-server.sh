@@ -76,6 +76,12 @@ if ! grep -Eq '^POYEZ_SANDBOX_SHARED_SECRET=.{16,}$' "$REMOTE_DIR/.env"; then
   exit 1
 fi
 
+if ! grep -Eq '^SIMULATOR_SESSION_SECRET=.{16,}$' "$REMOTE_DIR/.env"; then
+  log_info "Configuring missing SIMULATOR_SESSION_SECRET in $REMOTE_DIR/.env..."
+  SIM_SEC=$(openssl rand -hex 32)
+  echo "SIMULATOR_SESSION_SECRET=${SIM_SEC}" >> "$REMOTE_DIR/.env"
+fi
+
 if [ ! -f "/etc/letsencrypt/live/poyez-sandbox.shopla.uz/fullchain.pem" ] || [ ! -f "/etc/letsencrypt/live/poyez-sandbox.shopla.uz/privkey.pem" ]; then
   log_error "Poyez SSL certificate files are missing in /etc/letsencrypt/live/poyez-sandbox.shopla.uz/."
   exit 1

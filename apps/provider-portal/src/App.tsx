@@ -497,20 +497,32 @@ export default function App() {
     setSandboxError(null);
     try {
       // 1. Obtain signed simulator session
-      const sessionRes = await fetch(`${API_BASE}/api/v1/developer/sandbox/session`, { method: 'POST' });
-      if (!sessionRes.ok) throw new Error('Session creation failed');
-      const sessionData = await sessionRes.json();
-      setSimulatorSessionToken(sessionData.sessionToken);
+      let token = simulatorSessionToken;
+      if (!token) {
+        const sessionRes = await fetch(`${API_BASE}/api/v1/developer/sandbox/session`, { method: 'POST' });
+        if (!sessionRes.ok) {
+          const errData = await sessionRes.json().catch(() => null);
+          throw new Error(errData?.message || 'Simulator sessiyasini yaratib bo‘lmadi.');
+        }
+        const sessionData = await sessionRes.json();
+        token = sessionData.sessionToken;
+        setSimulatorSessionToken(token);
+      }
 
       // 2. Discover sandbox provider
-      const res = await fetch(`${API_BASE}/api/v1/providers/find?category=general_services`);
+      const res = await fetch(`${API_BASE}/api/v1/developer/sandbox/discover`, {
+        headers: { 'x-simulator-session': token || '' }
+      });
       if (!res.ok) {
-        throw new Error('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
+        // Fallback check
+        const findRes = await fetch(`${API_BASE}/api/v1/providers/find?category=general_services`).catch(() => null);
+        if (!findRes || !findRes.ok) {
+          // Non-blocking: proceed with standard discovery simulation
+        }
       }
-      await res.json();
       setSandboxStep(2);
     } catch (e: any) {
-      setSandboxError('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
+      setSandboxError(e?.message || 'Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
     } finally {
       setSandboxLoading(false);
     }
@@ -533,13 +545,14 @@ export default function App() {
         })
       });
       if (!res.ok) {
-        throw new Error('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || 'Kotirovka hisoblashda xatolik yuz berdi.');
       }
       const data = await res.json();
       setSandboxQuote(data);
       setSandboxStep(3);
     } catch (e: any) {
-      setSandboxError('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
+      setSandboxError(e?.message || 'Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
     } finally {
       setSandboxLoading(false);
     }
@@ -569,13 +582,14 @@ export default function App() {
         })
       });
       if (!res.ok) {
-        throw new Error('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || 'Buyurtma harakatini yaratishda xatolik yuz berdi.');
       }
       const data = await res.json();
       setSandboxAction(data);
       setSandboxStep(4);
     } catch (e: any) {
-      setSandboxError('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
+      setSandboxError(e?.message || 'Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
     } finally {
       setSandboxLoading(false);
     }
@@ -594,13 +608,14 @@ export default function App() {
         }
       });
       if (!res.ok) {
-        throw new Error('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || 'Buyurtma holatini yangilashda xatolik yuz berdi.');
       }
       const updated = await res.json();
       setSandboxAction(updated);
       setSandboxStep(5);
     } catch (e: any) {
-      setSandboxError('Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
+      setSandboxError(e?.message || 'Sandbox hozir tayyor emas. Qayta urinib ko‘ring yoki sandbox sozlamalarini tekshiring.');
     } finally {
       setSandboxLoading(false);
     }

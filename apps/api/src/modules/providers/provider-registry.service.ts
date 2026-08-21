@@ -48,6 +48,32 @@ export class ProviderRegistryService implements OnModuleInit {
     });
 
     if (!provider) {
+      if (slug === 'sandbox-provider') {
+        const sandboxFactory = this.factories.get('sandbox') || ((cfg: any) => new SandboxProviderAdapter(cfg));
+        const sandboxAdapter = sandboxFactory({
+          slug: 'sandbox-provider',
+          secret: 'dev_sandbox_secret',
+          webhookSecret: 'dev_sandbox_webhook_secret',
+          config: {},
+          metadata: {
+            capabilities: [
+              ProviderCapability.METADATA,
+              ProviderCapability.HEALTH,
+              ProviderCapability.LOCATIONS,
+              ProviderCapability.CATALOG,
+              ProviderCapability.SEARCH,
+              ProviderCapability.QUOTE,
+              ProviderCapability.ACTION_CREATE,
+              ProviderCapability.ACTION_STATUS,
+              ProviderCapability.ACTION_CANCEL,
+              ProviderCapability.PAYMENT_OPTIONS,
+              ProviderCapability.WEBHOOK
+            ]
+          }
+        });
+        this.adapterCache.set('sandbox-provider', sandboxAdapter);
+        return sandboxAdapter;
+      }
       throw new NotFoundError('Provider', slug);
     }
 

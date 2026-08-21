@@ -52,6 +52,75 @@ export class DeveloperSandboxService {
     private redisService?: RedisService
   ) {}
 
+  async onModuleInit(): Promise<void> {
+    try {
+      const existing = await prisma.provider.findUnique({ where: { slug: 'sandbox-provider' } });
+      if (!existing) {
+        await prisma.provider.create({
+          data: {
+            slug: 'sandbox-provider',
+            name: 'Zayuno Sandbox Demonstration Provider',
+            status: 'ACTIVE',
+            type: 'SERVICES',
+            adapterType: 'sandbox',
+            capabilities: [
+              'METADATA',
+              'HEALTH',
+              'LOCATIONS',
+              'CATALOG',
+              'SEARCH',
+              'QUOTE',
+              'ACTION_CREATE',
+              'ACTION_STATUS',
+              'ACTION_CANCEL',
+              'PAYMENT_OPTIONS',
+              'WEBHOOK'
+            ],
+            encryptedSecret: 'dev_sandbox_secret',
+            webhookSecret: 'dev_sandbox_webhook_secret',
+            config: {},
+            metadata: {
+              category: 'general_services',
+              description: 'Demonstration provider for developer simulator.'
+            }
+          }
+        });
+      }
+    } catch {
+      // Ignored if DB is unavailable during early tests
+    }
+  }
+
+  async discoverSandboxProvider() {
+    return {
+      providers: [
+        {
+          slug: 'sandbox-provider',
+          name: 'Zayuno Sandbox Demonstration Provider',
+          description: 'Universal sandbox provider simulating discovery, quote, action, and payment handoff.',
+          category: 'general_services',
+          capabilities: [
+            'METADATA',
+            'HEALTH',
+            'CATALOG',
+            'QUOTE',
+            'ACTION_CREATE',
+            'ACTION_STATUS',
+            'WEBHOOK'
+          ],
+          offerings: [
+            {
+              id: 'offering_standard_pkg',
+              name: 'Standard Developer Package',
+              price: 100000,
+              currency: 'UZS'
+            }
+          ]
+        }
+      ]
+    };
+  }
+
   /**
    * Enforces fail-closed production prerequisites:
    * 1. SIMULATOR_SESSION_SECRET must be configured.
