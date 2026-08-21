@@ -20,7 +20,7 @@ import { MOCK_EVOS_CATEGORIES, MOCK_EVOS_LOCATIONS, MOCK_EVOS_OFFERINGS } from '
 type ProviderLifecycle = 'AWAITING_PAYMENT' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
 type StoredAction = NormalizedAction & { providerLifecycle: ProviderLifecycle };
 
-const PROVIDER_SLUG = 'mock-evos';
+const PROVIDER_SLUG = process.env.PROVIDER_SLUG || 'mock-evos';
 const DISCLAIMER = 'Sandbox demo only. Not affiliated with the real EVOS company.';
 
 function id(prefix: string): string {
@@ -53,6 +53,8 @@ export function createMockEvosApp(): Express {
   app.use(cors());
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
+
+  const getProviderSlug = () => process.env.PROVIDER_SLUG || 'evos';
 
   const quotes = new Map<string, NormalizedQuote>();
   const actions = new Map<string, StoredAction>();
@@ -130,11 +132,12 @@ export function createMockEvosApp(): Express {
   }
 
   async function dispatchWebhook(action: StoredAction, eventType: string, description: string): Promise<void> {
-    if (!webhookSecret) throw new Error('ZAYUNO_WEBHOOK_SECRET is required to dispatch mock provider webhooks.');
+    if (!webhookSecret) return;
+    const currentSlug = getProviderSlug();
     const payload = {
       eventId: id('mock_evos_evt'),
       eventType,
-      providerSlug: PROVIDER_SLUG,
+      providerSlug: currentSlug,
       externalActionId: action.externalActionId,
       newStatus: action.status,
       newPaymentStatus: action.paymentStatus,
@@ -144,12 +147,18 @@ export function createMockEvosApp(): Express {
     };
     const rawBody = JSON.stringify(payload);
     const signature = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
-    const response = await fetch(`${zayunoApiUrl}/api/v1/webhooks/${PROVIDER_SLUG}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-provider-signature': signature },
-      body: rawBody
-    });
-    if (!response.ok) throw new Error(`Zayuno webhook failed with HTTP ${response.status}.`);
+    try {
+      const response = await fetch(`${zayunoApiUrl}/api/v1/webhooks/${currentSlug}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-provider-signature': signature },
+        body: rawBody
+      });
+      if (!response.ok) {
+        console.warn(`[mock-evos] Webhook dispatch returned HTTP ${response.status}`);
+      }
+    } catch {
+      // Non-blocking in local testing
+    }
   }
 
   app.get('/health', (_req, res) => res.json({
@@ -158,23 +167,26 @@ export function createMockEvosApp(): Express {
 
   app.use(['/provider-info', '/locations', '/catalog', '/offerings', '/search', '/quote', '/actions'], providerAuth);
 
-  app.get('/provider-info', (_req, res) => res.json({
-    id: PROVIDER_SLUG,
-    slug: PROVIDER_SLUG,
-    name: 'Mock EVOS',
-    description: DISCLAIMER,
-    status: ProviderStatus.SANDBOX,
-    type: ProviderType.DELIVERY,
-    category: 'food_delivery',
-    geography: ['UZ', 'Tashkent'],
-    adapterType: 'remote-http',
-    authMethod: 'API_KEY',
-    capabilities: Object.values(ProviderCapability),
-    baseUrl: process.env.PROVIDER_PUBLIC_BASE_URL,
-    isCertified: false,
-    isPublished: false,
-    metadata: { sandbox: true, affiliation: 'none' }
-  }));
+  app.get('/provider-info', (_req, res) => {
+    const currentSlug = getProviderSlug();
+    return res.json({
+      id: currentSlug,
+      slug: currentSlug,
+      name: 'Mock EVOS',
+      description: DISCLAIMER,
+      status: ProviderStatus.SANDBOX,
+      type: ProviderType.DELIVERY,
+      category: 'food_delivery',
+      geography: ['UZ', 'Tashkent'],
+      adapterType: 'remote-http',
+      authMethod: 'API_KEY',
+      capabilities: Object.values(ProviderCapability),
+      baseUrl: process.env.PROVIDER_PUBLIC_BASE_URL,
+      isCertified: false,
+      isPublished: false,
+      metadata: { sandbox: true, affiliation: 'none' }
+    });
+  });
 
   app.get('/locations', (req, res) => {
     const activeOnly = req.query.activeOnly !== 'false';
@@ -185,7 +197,7 @@ export function createMockEvosApp(): Express {
     const category = String(req.query.category || '');
     const offerings = category ? MOCK_EVOS_OFFERINGS.filter(item => item.categorySlug === category) : MOCK_EVOS_OFFERINGS;
     res.json({
-      providerSlug: PROVIDER_SLUG,
+      providerSlug: getProviderSlug(),
       locationId: req.query.locationId || undefined,
       categories: MOCK_EVOS_CATEGORIES,
       offerings,

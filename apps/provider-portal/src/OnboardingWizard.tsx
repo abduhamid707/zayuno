@@ -34,6 +34,28 @@ import { DocsViewer } from './DocsViewer';
 
 const DRAFT_STORAGE_KEY = 'zayuno_onboarding_draft';
 
+export const SANDBOX_ALLOWLIST_HOSTS = [
+  'coffee-time-sandbox.shopla.uz',
+  'evos-sandbox.shopla.uz',
+  'poyez-sandbox.shopla.uz'
+] as const;
+
+export function isOfficialSandboxUrl(url?: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
+    if (parsed.username || parsed.password) return false;
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === 'coffee-time-sandbox.shopla.uz' ||
+      host === 'evos-sandbox.shopla.uz' ||
+      host === 'poyez-sandbox.shopla.uz'
+    );
+  } catch {
+    return false;
+  }
+}
+
 interface OnboardingWizardProps {
   apiBase: string;
   token: string;
@@ -174,7 +196,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   // Step 4: Integration Details
   const [slug, setSlug] = useState(urlParams.provider || initialProvider?.slug || savedDraft?.slug || '');
   const [baseUrl, setBaseUrl] = useState(initialProvider?.baseUrl || savedDraft?.baseUrl || '');
-  const [apiSecret, setApiSecret] = useState(savedDraft?.apiSecret || '');
+  const [apiSecret, setApiSecret] = useState('');
+  const [showSecret, setShowSecret] = useState(false);
+  const [hasSavedSecret, setHasSavedSecret] = useState(Boolean(savedDraft?.hasSavedSecret || initialProvider?.id));
+  const [showSecretInput, setShowSecretInput] = useState(false);
   const [authMethod, setAuthMethod] = useState<'API_KEY' | 'BEARER_TOKEN' | 'HMAC_SIGNATURE'>(
     initialProvider?.config?.authMethod || savedDraft?.authMethod || 'API_KEY'
   );
@@ -241,7 +266,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     window.history.replaceState({}, '', url.toString());
   }, [currentStep, slug]);
 
-  // Sync draft to localStorage on changes
+  // Sync draft to localStorage on changes (NEVER store raw apiSecret)
   useEffect(() => {
     try {
       const draft = {
@@ -255,10 +280,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         supportEmail,
         slug,
         baseUrl,
-        apiSecret,
         authMethod,
         capabilityProfile,
         currentStep,
+        hasSavedSecret: hasSavedSecret || Boolean(apiSecret.trim()),
         createdCredentials
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
@@ -274,10 +299,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     supportEmail,
     slug,
     baseUrl,
-    apiSecret,
     authMethod,
     capabilityProfile,
     currentStep,
+    hasSavedSecret,
     createdCredentials
   ]);
 
@@ -648,7 +673,7 @@ ${isTrans ? `[1] GET  /health
         throw new Error('Iltimos, avval hisobingizga kiring.');
       }
 
-      const isSandbox = baseUrl.toLowerCase().includes('sandbox') || baseUrl.toLowerCase().includes('shopla.uz');
+      const isSandbox = isOfficialSandboxUrl(baseUrl);
 
       const res = await fetch(`${apiBase}/api/v1/providers/register`, {
         method: 'POST',
@@ -696,6 +721,9 @@ ${isTrans ? `[1] GET  /health
       }
 
       onProviderCreated(data);
+      setHasSavedSecret(true);
+      setApiSecret('');
+      setShowSecretInput(false);
       setSuccessMsg('Provider DRAFT arizasi saqlandi! Endi 5-qadamda sertifikatlash testlarini bajaring.');
       setCurrentStep(5);
     } catch (err: any) {
@@ -1319,13 +1347,13 @@ ${isTrans ? `[1] GET  /health
             </div>
 
             {/* Sandbox Notice Banner */}
-            {(baseUrl.toLowerCase().includes('sandbox') || baseUrl.toLowerCase().includes('shopla.uz')) && (
+            {isOfficialSandboxUrl(baseUrl) && (
               <div className="p-3.5 rounded-2xl bg-sky-950/30 border border-sky-500/40 flex items-start gap-2.5 text-xs text-sky-200 animate-fadeIn">
                 <Sparkles className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-semibold block text-white">Sandbox test provideri tanlandi</span>
                   <p className="text-[11px] text-sky-300 mt-0.5 leading-relaxed">
-                    Sandbox test provideri tanlandi. Test credentiallari Zayuno serveri tomonidan xavfsiz qo‘llanadi; bu yerga API key yoki webhook secret kiritishingiz shart emas.
+                    Sandbox test provideri tanlandi. Test credentiallari Zayuno serveri tomonidan xavfsiz qo‘llanadi; siz hech qanday kalit kiritmaysiz.
                   </p>
                 </div>
               </div>
@@ -1545,40 +1573,166 @@ ${isTrans ? `[1] GET  /health
                 </select>
               </div>
 
-              {/* Credential Inputs for Custom Non-Sandbox APIs */}
-              {!(baseUrl.toLowerCase().includes('sandbox') || baseUrl.toLowerCase().includes('shopla.uz')) && (
+              {/* Credential Inputs for Real External APIs */}
+              {!isOfficialSandboxUrl(baseUrl) && (
                 <div className="space-y-3 pt-1 animate-fadeIn">
-                  {(authMethod === 'API_KEY' || authMethod === 'BEARER_TOKEN') && (
-                    <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-slate-200 font-medium text-xs flex items-center gap-1.5">
-                          <Key className="w-3.5 h-3.5 text-sky-400" />
-                          <span>Provider API key / token *</span>
-                          <InfoTooltip
-                            text="Bu sizning serveringizni Zayuno so‘rovlaridan himoya qiladigan kalit. Uni sizning dasturchingiz backend sozlamalarida yaratadi va Zayuno portalga bir marta kiritadi."
-                            docId="auth"
-                            onOpenDoc={openDocModal}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => openDocModal('auth')}
-                          className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-0.5"
-                        >
-                          Qayerdan olaman? →
-                        </button>
+                  {hasSavedSecret && !showSecretInput && !apiSecret ? (
+                    <div className="p-4 rounded-2xl bg-slate-950/80 border border-emerald-500/30 flex items-center justify-between animate-fadeIn">
+                      <div className="flex items-center gap-2 text-xs text-emerald-300">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Credential saqlangan (Serverda xavfsiz shifrlangan)</span>
                       </div>
-                      <input
-                        type="password"
-                        value={apiSecret}
-                        onChange={e => setApiSecret(e.target.value)}
-                        placeholder="Dasturchingiz yaratgan API key’ni kiriting"
-                        autoComplete="new-password"
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
-                      />
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Zayuno sizning serveringizga so‘rov yuborganda ushbu kalitni <code className="text-sky-300 font-mono">x-provider-api-key</code> (yoki <code className="text-sky-300 font-mono">Bearer</code> token) headerida yuboradi.
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowSecretInput(true)}
+                        className="text-xs text-indigo-400 hover:text-indigo-300 font-medium px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 transition"
+                      >
+                        Yangi kalit kiritish
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5 animate-fadeIn">
+                      {/* API_KEY */}
+                      {authMethod === 'API_KEY' && (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <label className="block text-slate-200 font-medium text-xs flex items-center gap-1.5">
+                              <Key className="w-3.5 h-3.5 text-sky-400" />
+                              <span>Provider API key *</span>
+                              <InfoTooltip
+                                text="Bu sizning serveringizni Zayuno so‘rovlaridan himoya qiladigan kalit. Uni sizning dasturchingiz backend sozlamalarida yaratadi va Zayuno portalga bir marta kiritadi."
+                                docId="auth"
+                                onOpenDoc={openDocModal}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => openDocModal('auth')}
+                              className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-0.5"
+                            >
+                              ? Qayerdan olaman? →
+                            </button>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type={showSecret ? "text" : "password"}
+                              value={apiSecret}
+                              onChange={e => setApiSecret(e.target.value)}
+                              placeholder="Dasturchingiz yaratgan API key’ni kiriting"
+                              autoComplete="new-password"
+                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowSecret(!showSecret)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                              aria-label="Kalitni ko‘rsatish/yashirish"
+                            >
+                              {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-400 leading-relaxed">
+                            Dasturchingiz provider serverida yaratgan maxfiy kalit. Zayuno har so‘rovda shu kalitni <code className="text-sky-300 font-mono bg-sky-950/50 px-1 py-0.5 rounded border border-sky-500/30">x-provider-api-key</code> headerida yuboradi.
+                          </p>
+                        </>
+                      )}
+
+                      {/* BEARER_TOKEN */}
+                      {authMethod === 'BEARER_TOKEN' && (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <label className="block text-slate-200 font-medium text-xs flex items-center gap-1.5">
+                              <Key className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Bearer token *</span>
+                              <InfoTooltip
+                                text="Provider serveringiz kutadigan access token. Zayuno uni Authorization: Bearer ... shaklida yuboradi."
+                                docId="auth"
+                                onOpenDoc={openDocModal}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => openDocModal('auth')}
+                              className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-0.5"
+                            >
+                              ? Qayerdan olaman? →
+                            </button>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type={showSecret ? "text" : "password"}
+                              value={apiSecret}
+                              onChange={e => setApiSecret(e.target.value)}
+                              placeholder="Bearer tokenni kiriting"
+                              autoComplete="new-password"
+                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowSecret(!showSecret)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                              aria-label="Tokenni ko‘rsatish/yashirish"
+                            >
+                              {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-400 leading-relaxed">
+                            Provider serveringiz kutadigan access token. Zayuno uni <code className="text-amber-300 font-mono bg-amber-950/50 px-1 py-0.5 rounded border border-amber-500/30">Authorization: Bearer ...</code> shaklida yuboradi.
+                          </p>
+                        </>
+                      )}
+
+                      {/* HMAC_SIGNATURE */}
+                      {authMethod === 'HMAC_SIGNATURE' && (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <label className="block text-slate-200 font-medium text-xs flex items-center gap-1.5">
+                              <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
+                              <span>Request signing secret *</span>
+                              <InfoTooltip
+                                text="Zayuno har request body’ni shu secret bilan HMAC-SHA256 imzolaydi. Provider serveringiz imzoni tekshiradi."
+                                docId="auth"
+                                onOpenDoc={openDocModal}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => openDocModal('auth')}
+                              className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-0.5"
+                            >
+                              ? Qayerdan olaman? →
+                            </button>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type={showSecret ? "text" : "password"}
+                              value={apiSecret}
+                              onChange={e => setApiSecret(e.target.value)}
+                              placeholder="HMAC request signing secretni kiriting"
+                              autoComplete="new-password"
+                              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowSecret(!showSecret)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                              aria-label="Secretni ko‘rsatish/yashirish"
+                            >
+                              {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-400 leading-relaxed">
+                            Zayuno har request body’ni shu secret bilan HMAC-SHA256 imzolaydi va <code className="text-violet-300 font-mono bg-violet-950/50 px-1 py-0.5 rounded border border-violet-500/30">x-zayuno-signature</code> headerida yuboradi. Provider serveringiz imzoni tekshiradi.
+                          </p>
+                        </>
+                      )}
+
+                      {hasSavedSecret && showSecretInput && (
+                        <p className="text-[10px] text-amber-400 flex items-center gap-1 mt-1">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span>Yangi kalit saqlanganda avvalgi certification bekor qilinadi va qayta test talab etiladi.</span>
+                        </p>
+                      )}
                     </div>
                   )}
 

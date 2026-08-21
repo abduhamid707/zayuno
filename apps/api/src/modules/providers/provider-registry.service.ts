@@ -85,11 +85,17 @@ export class ProviderRegistryService implements OnModuleInit {
     }
 
     // Safely resolve server-side test credential for recognized sandbox hosts
-    // if no specific provider secret has been configured.
-    if (!secret || secret.startsWith('zy_sb_sec_')) {
-      const sandboxCredential = this.resolveSandboxTestCredential(provider.baseUrl, provider.slug);
-      if (sandboxCredential) {
-        secret = sandboxCredential;
+    // if no specific provider secret has been configured or default generated test key was used.
+    let webhookSecret: string | undefined = provider.webhookSecret;
+    if (this.isOfficialSandboxUrl(provider.baseUrl) || provider.slug === 'coffee-time' || provider.slug === 'evos' || provider.slug === 'poyez') {
+      if (!secret || secret.startsWith('zy_sb_sec_') || secret === '') {
+        const sandboxCredential = this.resolveSandboxTestCredential(provider.baseUrl, provider.slug);
+        if (sandboxCredential) {
+          secret = sandboxCredential;
+        }
+      }
+      if (!webhookSecret || webhookSecret === '') {
+        webhookSecret = secret || undefined;
       }
     }
 
@@ -104,7 +110,8 @@ export class ProviderRegistryService implements OnModuleInit {
       slug: provider.slug,
       baseUrl: provider.baseUrl || undefined,
       secret,
-      webhookSecret: provider.webhookSecret,
+      webhookSecret,
+      authMethod: (provider.config as any)?.authMethod || (provider as any).authMethod || 'API_KEY',
       config: (provider.config as Record<string, any>) || {},
       metadata: {
         ...((provider.metadata as Record<string, any>) || {}),
@@ -119,38 +126,70 @@ export class ProviderRegistryService implements OnModuleInit {
     return adapter;
   }
 
-  private resolveSandboxTestCredential(baseUrl?: string | null, slug?: string): string | null {
-    if (!baseUrl && !slug) return null;
-    let hostname = '';
+  isOfficialSandboxUrl(baseUrl?: string | null): boolean {
+    if (!baseUrl) return false;
     try {
-      if (baseUrl) {
-        const parsed = new URL(baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`);
-        hostname = parsed.hostname.toLowerCase();
+      const parsed = new URL(baseUrl);
+      // Userinfo (e.g. user:pass@...) must be strictly rejected
+      if (parsed.username || parsed.password) return false;
+
+      // In production, protocol must strictly be https:
+      if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+        return false;
       }
-    } catch {}
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        return false;
+      }
 
-    const cleanSlug = (slug || '').toLowerCase();
+      const hostname = parsed.hostname.toLowerCase();
+      // Strict exact hostname matching - no subdomains, no suffix tricks, no IP trickery
+      return (
+        hostname === 'coffee-time-sandbox.shopla.uz' ||
+        hostname === 'evos-sandbox.shopla.uz' ||
+        hostname === 'poyez-sandbox.shopla.uz'
+      );
+    } catch {
+      return false;
+    }
+  }
 
-    // 1. Mock Coffee Time Sandbox
-    if (hostname.includes('coffee-time') || cleanSlug.includes('coffee-time')) {
-      return process.env.MOCK_COFFEE_TIME_API_KEY || process.env.PROVIDER_API_KEY || 'zy_test_sandbox_coffee_key';
+  resolveSandboxTestCredential(baseUrl?: string | null, slug?: string): string | null {
+    if (!baseUrl && !slug) return null;
+
+    let hostname = '';
+    if (baseUrl) {
+      try {
+        const parsed = new URL(baseUrl);
+        if (parsed.username || parsed.password) return null;
+        if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') return null;
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+        hostname = parsed.hostname.toLowerCase();
+      } catch {
+        return null;
+      }
     }
 
-    // 2. Mock EVOS Sandbox
-    if (hostname.includes('evos') || cleanSlug.includes('evos')) {
-      return process.env.MOCK_EVOS_API_KEY || process.env.PROVIDER_API_KEY || 'zy_test_sandbox_evos_key';
+    const cleanSlug = (slug || '').toLowerCase().trim();
+
+    // 1. Mock Coffee Time Sandbox -> COFFEE_TIME_SHARED_SECRET (Strict, zero fallbacks)
+    if (hostname === 'coffee-time-sandbox.shopla.uz' || (!baseUrl && (cleanSlug === 'coffee-time' || cleanSlug === 'mock-coffee-time'))) {
+      const secret = process.env.COFFEE_TIME_SHARED_SECRET?.trim();
+      return secret || null;
     }
 
-    // 3. Mock Poyez Tickets Sandbox
-    if (hostname.includes('poyez') || cleanSlug.includes('poyez')) {
-      return process.env.MOCK_POYEZ_API_KEY || process.env.PROVIDER_API_KEY || 'zy_test_sandbox_poyez_key';
+    // 2. Mock EVOS Sandbox -> MOCK_EVOS_SHARED_SECRET (Strict, zero fallbacks)
+    if (hostname === 'evos-sandbox.shopla.uz' || (!baseUrl && (cleanSlug === 'evos' || cleanSlug === 'mock-evos'))) {
+      const secret = process.env.MOCK_EVOS_SHARED_SECRET?.trim();
+      return secret || null;
     }
 
-    // 4. Generic shopla.uz / test sandbox domains
-    if (hostname.endsWith('.shopla.uz') || hostname.includes('sandbox')) {
-      return process.env.SANDBOX_TEST_API_KEY || process.env.PROVIDER_API_KEY || null;
+    // 3. Mock Poyez Tickets Sandbox -> POYEZ_SANDBOX_SHARED_SECRET (Strict, zero fallbacks)
+    if (hostname === 'poyez-sandbox.shopla.uz' || (!baseUrl && (cleanSlug === 'poyez' || cleanSlug === 'poyez-sandbox' || cleanSlug === 'mock-poyez'))) {
+      const secret = process.env.POYEZ_SANDBOX_SHARED_SECRET?.trim();
+      return secret || null;
     }
 
+    // Strict fail-closed: No server-side test credentials for any other URL/domain
     return null;
   }
 

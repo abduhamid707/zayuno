@@ -37,7 +37,11 @@ const testSuites = [
   'tests/test-poyez-sandbox-e2e.ts',
   'tests/test-customer-experience-and-presenter.ts',
   'tests/test-coffee-time-availability-and-customer-mode.ts',
-  'tests/test-action-quote-deduplication-tenant-isolation.ts'
+  'tests/test-action-quote-deduplication-tenant-isolation.ts',
+  'tests/test-credential-ux-and-security.ts',
+  'tests/test-onboarding-wizard-e2e-flow.ts',
+  'tests/test-credential-capture-and-sandbox-flow.ts',
+  'tests/test-sandbox-production-credential-mapping.ts'
 ];
 
 async function main() {

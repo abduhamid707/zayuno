@@ -31,6 +31,7 @@ export interface ProviderAdapterConfig {
   baseUrl?: string;
   secret?: string;
   webhookSecret?: string;
+  authMethod?: string;
   timeoutMs?: number;
   config?: Record<string, any>;
   metadata?: Record<string, any>;

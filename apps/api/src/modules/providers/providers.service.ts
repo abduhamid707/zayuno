@@ -802,6 +802,24 @@ export class ProvidersService {
     const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
     if (!provider) throw new NotFoundError('Provider', cleanSlug);
     this.assertProviderManager(provider, actor);
+
+    // If sandbox URL is selected, ensure server has configured test credentials
+    if (provider.baseUrl && this.registry.isOfficialSandboxUrl(provider.baseUrl)) {
+      const sandboxKey = this.registry.resolveSandboxTestCredential(provider.baseUrl, provider.slug);
+      if (!sandboxKey) {
+        throw new BadRequestException(
+          'Bu sandbox uchun server-side test credential sozlanmagan. Administrator bilan bog‘laning yoki boshqa test URL tanlang.'
+        );
+      }
+    }
+
+    // If custom external URL is selected, ensure owner has saved encrypted credentials
+    if (provider.baseUrl && !this.registry.isOfficialSandboxUrl(provider.baseUrl) && (!provider.encryptedSecret || provider.encryptedSecret === '')) {
+      throw new BadRequestException(
+        'Provider credential kiritilmagan. 4-bosqichga qaytib, API kalitini kiriting.'
+      );
+    }
+
     const adapter = await this.registry.getAdapter(cleanSlug);
     const runner = new ProviderCertificationRunner(adapter);
     const report = await runner.runAllTests();

@@ -17,6 +17,7 @@ async function main() {
   process.env.ZAYUNO_WEBHOOK_SECRET = sharedSecret;
   process.env.ZAYUNO_API_URL = `http://127.0.0.1:${webhookPort}`;
   process.env.MOCK_EVOS_CHECKOUT_BASE_URL = 'https://checkout.mock-provider.example';
+  process.env.PROVIDER_SLUG = 'mock-evos';
 
   const webhookServer = http.createServer((req, res) => {
     let body = '';

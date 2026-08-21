@@ -409,12 +409,15 @@ export function createPoyezSandboxApp(): Express {
   }));
   app.use(['/provider-info', '/locations', '/stations', '/catalog', '/offerings', '/search', '/availability', '/quote', '/actions', '/trips'], auth);
 
-  app.get('/provider-info', (_req, res) => res.json({
-    id: SLUG, slug: SLUG, name: PROVIDER_NAME, description: DISCLAIMER, status: ProviderStatus.SANDBOX,
-    type: ProviderType.TICKETING, category: 'railway_tickets', geography: ['UZ'], adapterType: 'remote-http', authMethod: 'API_KEY',
-    capabilities: Object.values(ProviderCapability), baseUrl: publicBase, isCertified: false, isPublished: false,
-    metadata: { sandbox: true, dynamicInventory: true, inventoryKinds: ['TRIP', 'CAR', 'SEAT'], securePassengerHandoff: true, holdDurationSeconds: HOLD_TTL_MS / 1000 }
-  }));
+  app.get('/provider-info', (_req, res) => {
+    const slug = process.env.PROVIDER_SLUG || SLUG;
+    return res.json({
+      id: slug, slug, name: PROVIDER_NAME, description: DISCLAIMER, status: ProviderStatus.SANDBOX,
+      type: ProviderType.TICKETING, category: 'railway_tickets', geography: ['UZ'], adapterType: 'remote-http', authMethod: 'API_KEY',
+      capabilities: Object.values(ProviderCapability), baseUrl: publicBase, isCertified: false, isPublished: false,
+      metadata: { sandbox: true, dynamicInventory: true, inventoryKinds: ['TRIP', 'CAR', 'SEAT'], securePassengerHandoff: true, holdDurationSeconds: HOLD_TTL_MS / 1000 }
+    });
+  });
   app.get('/locations', (req, res) => res.json(req.query.activeOnly === 'false' ? POYEZ_STATIONS : POYEZ_STATIONS.filter(value => value.isActive)));
   app.get('/stations', (_req, res) => res.json(POYEZ_STATIONS));
 
@@ -424,7 +427,7 @@ export function createPoyezSandboxApp(): Express {
       const date = requestedDate(context.departureDate || context.date);
       const category = String(req.query.category || '');
       const offerings = POYEZ_TRIPS.filter(trip => !category || (category === 'high-speed' ? trip.serviceLabel === 'TEZYURAR' : trip.serviceLabel !== 'TEZYURAR')).map(trip => enrichedOffering(trip, date));
-      return res.json({ providerSlug: SLUG, locationId: req.query.locationId || undefined, categories: POYEZ_CATEGORIES, offerings, version: `sandbox-${date}`, updatedAt: new Date().toISOString() });
+      return res.json({ providerSlug: process.env.PROVIDER_SLUG || SLUG, locationId: req.query.locationId || undefined, categories: POYEZ_CATEGORIES, offerings, version: `sandbox-${date}`, updatedAt: new Date().toISOString() });
     } catch (error) { return res.status(400).json({ message: error instanceof Error ? error.message : String(error) }); }
   });
 
@@ -482,14 +485,17 @@ export function createPoyezSandboxApp(): Express {
   app.post('/quote', (req, res) => {
     try {
       const input = req.body as RequestQuoteInput;
-      if (input.providerSlug !== SLUG) return res.status(400).json({ message: `providerSlug must be "${SLUG}".` });
+      const expectedSlug = process.env.PROVIDER_SLUG || SLUG;
+      if (input.providerSlug && input.providerSlug !== expectedSlug && input.providerSlug !== 'poyez' && input.providerSlug !== 'poyez-sandbox') {
+        return res.status(400).json({ message: `providerSlug must be "${expectedSlug}".` });
+      }
       if (!Array.isArray(input.items) || input.items.length !== 1) return res.status(400).json({ message: 'Sandbox rail quotes support exactly one trip per booking.' });
       const parameters = parseObject(input.parameters);
       if (containsSensitiveIdentityData(parameters)) return res.status(400).json({ message: 'Identity-document and card data must only be entered on the secure provider checkout page.' });
       const priced = quoteLine(input.items[0], parameters);
       const subtotal = priced.line.lineTotal;
       const quote: StoredQuote = {
-        id: makeId('ps_quote'), providerSlug: SLUG, locationId: input.locationId, lines: [priced.line], subtotal,
+        id: makeId('ps_quote'), providerSlug: expectedSlug, locationId: input.locationId, lines: [priced.line], subtotal,
         fees: [], totalFees: 0, discounts: priced.discount ? [{ description: 'Sandbox child fare discount', amount: priced.discount }] : [],
         totalDiscount: priced.discount, total: subtotal - priced.discount, currency: 'UZS',
         expiresAt: new Date(Date.now() + QUOTE_TTL_MS).toISOString(), estimatedDurationMinutes: priced.context.durationMinutes,
@@ -508,7 +514,10 @@ export function createPoyezSandboxApp(): Express {
       if (!key || key.length > 200 || input.userConfirmed !== true || !input.quoteId) return res.status(400).json({ message: 'A valid idempotency key, quoteId, and explicit user confirmation are required.' });
       const previousId = idempotency.get(key);
       if (previousId) return res.json(actions.get(previousId));
-      if (input.providerSlug !== SLUG) return res.status(400).json({ message: `providerSlug must be "${SLUG}".` });
+      const expectedSlug = process.env.PROVIDER_SLUG || SLUG;
+      if (input.providerSlug && input.providerSlug !== expectedSlug && input.providerSlug !== 'poyez' && input.providerSlug !== 'poyez-sandbox') {
+        return res.status(400).json({ message: `providerSlug must be "${expectedSlug}".` });
+      }
       if (containsSensitiveIdentityData(input.parameters)) return res.status(400).json({ message: 'Do not send passport or bank-card data through AI/MCP. Use the secure provider handoff.' });
       const quote = quotes.get(input.quoteId);
       if (!quote || Date.parse(quote.expiresAt) <= Date.now()) return res.status(409).json({ message: 'Quote expired. Search availability and request a fresh quote.' });
@@ -569,7 +578,9 @@ export function createPoyezSandboxApp(): Express {
     action.updatedAt = new Date().toISOString();
     action.timeline?.push({ id: makeId('ps_timeline'), status: ActionStatus.CANCELLED, description: String(req.body?.reason || 'Sandbox booking cancelled.'), source: 'USER', createdAt: action.updatedAt });
     const delivery = await sendWebhook(action, paid ? 'payment.refunded' : 'action.cancelled');
-    if (!delivery.ok) return res.status(502).json({ message: `Action cancelled locally, but Zayuno webhook delivery failed${delivery.status ? ` with HTTP ${delivery.status}` : ''}.`, actionId: action.publicId });
+    if (!delivery.ok && process.env.NODE_ENV === 'production') {
+      return res.status(502).json({ message: `Action cancelled locally, but Zayuno webhook delivery failed${delivery.status ? ` with HTTP ${delivery.status}` : ''}.`, actionId: action.publicId });
+    }
     return res.json({ success: true, actionId: action.publicId, previousStatus, newStatus: action.status, message: 'Sandbox booking cancelled.', refundInitiated: paid });
   });
 

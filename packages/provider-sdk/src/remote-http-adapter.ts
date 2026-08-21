@@ -26,6 +26,7 @@ import {
 import { BaseProviderAdapter, ProviderAdapterConfig } from './base-provider';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
+import crypto from 'node:crypto';
 
 /**
  * Universal Remote HTTP Provider Adapter.
@@ -90,11 +91,31 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
 
     const url = `${this.targetUrl}${endpoint}`;
     await this.assertResolvedAddressIsPublic();
+
+    const authMethod = this.config.authMethod || this.config.config?.authMethod || 'API_KEY';
+    const secret = this.config.secret || '';
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'x-provider-api-key': this.config.secret || '',
       ...(options.headers as any || {})
     };
+
+    if (secret) {
+      if (authMethod === 'BEARER_TOKEN') {
+        headers['Authorization'] = `Bearer ${secret}`;
+      } else if (authMethod === 'HMAC_SIGNATURE') {
+        const bodyString = typeof options.body === 'string'
+          ? options.body
+          : options.body
+            ? JSON.stringify(options.body)
+            : '';
+        const signature = crypto.createHmac('sha256', secret).update(bodyString).digest('hex');
+        headers['x-zayuno-signature'] = signature;
+      } else {
+        // Default API_KEY
+        headers['x-provider-api-key'] = secret;
+      }
+    }
 
     const res = await fetch(url, {
       ...options,
