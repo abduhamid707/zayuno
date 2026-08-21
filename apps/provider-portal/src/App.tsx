@@ -1036,6 +1036,10 @@ export default function App() {
               refetchProvider();
             }}
             onNavigateTab={(tab) => setActiveTab(tab)}
+            onOpenDoc={(docId) => {
+              setSelectedDoc(docId);
+              setActiveTab('docs');
+            }}
             onOpenAiKit={() => setAiKitOpen(true)}
             initialStep={initialOnboardingStep}
             initialEmail={initialEmailParam}
@@ -1105,6 +1109,10 @@ export default function App() {
                   refetchProvider();
                 }}
                 onNavigateTab={(tab) => setActiveTab(tab)}
+                onOpenDoc={(docId) => {
+                  setSelectedDoc(docId);
+                  setActiveTab('docs');
+                }}
                 onOpenAiKit={() => setAiKitOpen(true)}
                 initialStep={3}
                 initialEmail={userProfile?.email || ''}

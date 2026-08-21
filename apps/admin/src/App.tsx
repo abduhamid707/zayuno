@@ -61,6 +61,7 @@ export default function App() {
     query: '', status: 'ALL', reviewStatus: 'ALL', type: 'ALL', capability: 'ALL',
     category: '', geography: '', certified: 'ALL', ownerEmail: '', from: '', to: ''
   });
+  const [providerScope, setProviderScope] = useState<'EXTERNAL' | 'INTERNAL' | 'ALL'>('EXTERNAL');
   const [reviewTarget, setReviewTarget] = useState<{ slug: string; name: string; decision: 'REQUEST_CHANGES' | 'REJECT' | 'SUSPEND' } | null>(null);
   const [reviewForm, setReviewForm] = useState({ reasonCode: 'MORE_INFORMATION_REQUIRED', reason: '', requiredChanges: '', internalNote: '' });
   const [logFilters, setLogFilters] = useState({ source: 'ALL', provider: '', actionId: '', query: '', from: '', to: '' });
@@ -243,6 +244,10 @@ export default function App() {
 
   const actions = Array.isArray(actionsData) ? actionsData : actionsData?.data || [];
   const providers = Array.isArray(providersData) ? providersData : providersData?.data || [];
+
+  const isInternalSandbox = (p: any) => p?.slug === 'sandbox-provider' || p?.adapterType === 'sandbox';
+  const externalProviders = providers.filter((p: any) => !isInternalSandbox(p));
+  const internalProviders = providers.filter((p: any) => isInternalSandbox(p));
 
   const filteredActions = actions.filter((a: any) => {
     if (!searchQuery) return true;
@@ -704,104 +709,266 @@ export default function App() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                {providers.map((p: any) => (
-                  <div key={p.id} className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xl font-black text-emerald-400">
-                          ⚡
-                        </div>
-                        <div>
-                          <h3 className="text-base font-bold text-white">{p.name}</h3>
-                          <span className="text-xs font-mono text-slate-400">slug: {p.slug}</span>
-                        </div>
-                      </div>
-                      <span className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {p.status}
-                      </span>
-                    </div>
-
-                    <div className="text-xs text-slate-300 space-y-1">
-                      <div><span className="text-slate-500">Base URL:</span> <code className="bg-slate-800 px-2 py-0.5 rounded text-amber-300">{p.baseUrl || 'In-Process'}</code></div>
-                      <div><span className="text-slate-500">Adapter Type:</span> <code className="bg-slate-800 px-2 py-0.5 rounded text-emerald-300">{p.adapterType}</code></div>
-                      <div><span className="text-slate-500">Type:</span> {p.type}</div>
-                    </div>
-
-                    <div>
-                      <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold block mb-1.5">Capabilities ({p.capabilities?.length || 0})</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {p.capabilities?.map((cap: string) => (
-                          <span key={cap} className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px] font-mono">
-                            {cap}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => certifyMutation.mutate(p.slug)}
-                          disabled={certifyMutation.isPending}
-                          aria-busy={certifyMutation.isPending && certifyMutation.variables === p.slug}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
-                        >
-                          {certifyMutation.isPending && certifyMutation.variables === p.slug
-                            ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            : <ShieldCheck className="w-3.5 h-3.5" />}
-                          <span>{certifyMutation.isPending && certifyMutation.variables === p.slug ? 'Tekshirilmoqda...' : 'Run Capability Certification'}</span>
-                        </button>
-                        {p.metadata?.isCertified && p.metadata?.reviewStatus === 'PENDING_APPROVAL' && (
-                          <button onClick={() => publishMutation.mutate(p.slug)} disabled={publishMutation.isPending} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold">
-                            {publishMutation.isPending ? 'Tasdiqlanmoqda...' : 'ACTIVE qilish'}
-                          </button>
-                        )}
-                        {p.metadata?.reviewStatus === 'PENDING_APPROVAL' && <button onClick={() => setReviewTarget({ slug: p.slug, name: p.name, decision: 'REQUEST_CHANGES' })} className="px-3 py-1.5 border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 rounded-lg text-xs font-bold">Tuzatish so‘rash</button>}
-                        {p.status !== 'SUSPENDED' && p.slug !== 'mock-evos' && <button onClick={() => setReviewTarget({ slug: p.slug, name: p.name, decision: p.metadata?.reviewStatus === 'PENDING_APPROVAL' ? 'REJECT' : 'SUSPEND' })} disabled={reviewMutation.isPending} className="px-3 py-1.5 border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 rounded-lg text-xs font-bold">{p.metadata?.reviewStatus === 'PENDING_APPROVAL' ? 'Rad etish' : 'Suspend'}</button>}
-                        {p.status === 'SUSPENDED' && ['REJECTED', 'SUSPENDED'].includes(p.metadata?.reviewStatus) && <button onClick={() => reopenMutation.mutate(p.slug)} disabled={reopenMutation.isPending} className="px-3 py-1.5 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 rounded-lg text-xs font-bold">Qayta ochish</button>}
-                      </div>
-
-                      {p.baseUrl && (
-                        <a
-                          href={`${p.baseUrl}/health`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-semibold"
-                        >
-                          <span>Health</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-
-                    {certifyMutation.data && certifyMutation.data.providerSlug === p.slug && (
-                      <div className={`mt-3 p-3 bg-slate-950 border rounded-xl text-xs space-y-1 ${certifyMutation.data.isProductionReady ? 'border-emerald-500/30' : 'border-rose-500/30'}`}>
-                        <div className={`font-bold flex items-center gap-1 ${certifyMutation.data.isProductionReady ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {certifyMutation.data.isProductionReady
-                            ? <CheckCircle2 className="w-3.5 h-3.5" />
-                            : <AlertCircle className="w-3.5 h-3.5" />}
-                          <span>
-                            Certification Result: {certifyMutation.data.passedCount}/{certifyMutation.data.totalTests} tests passed
-                            {typeof certifyMutation.data.durationMs === 'number' ? ` (${certifyMutation.data.durationMs}ms)` : ''}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    {certifyMutation.isError && certifyMutation.variables === p.slug && (
-                      <div className="mt-3 p-3 bg-rose-950/30 border border-rose-500/30 rounded-xl text-xs font-semibold text-rose-300">
-                        Certification ishga tushmadi: {(certifyMutation.error as Error)?.message || 'Noma’lum xatolik'}
-                      </div>
-                    )}
-                    {p.metadata?.reviewReason && (
-                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs">
-                        <div className="font-mono text-[10px] text-amber-300">{p.metadata.reviewStatus} · {p.metadata.reviewReasonCode || 'OTHER'}</div>
-                        <p className="mt-1 text-amber-50">{p.metadata.reviewReason}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
+              {/* Scope Selector: External vs Internal vs All */}
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setProviderScope('EXTERNAL')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                      providerScope === 'EXTERNAL'
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>External Providers</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${providerScope === 'EXTERNAL' ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                      {externalProviders.length}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProviderScope('INTERNAL')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                      providerScope === 'INTERNAL'
+                        ? 'bg-purple-600 text-white shadow-md shadow-purple-950'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Cpu className="w-3.5 h-3.5" />
+                    <span>Internal / Demo Providers</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${providerScope === 'INTERNAL' ? 'bg-purple-700 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                      {internalProviders.length}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProviderScope('ALL')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                      providerScope === 'ALL'
+                        ? 'bg-slate-700 text-white shadow-md shadow-slate-950'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>All Providers</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${providerScope === 'ALL' ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                      {providers.length}
+                    </span>
+                  </button>
+                </div>
               </div>
+
+              {/* 1. EXTERNAL PROVIDERS SECTION */}
+              {(providerScope === 'EXTERNAL' || providerScope === 'ALL') && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">External Providers</h3>
+                      <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-800 text-slate-400">{externalProviders.length}</span>
+                    </div>
+                    <span className="text-xs text-slate-500 hidden sm:inline">Haqiqiy bizneslar va tashqi servis integratsiyalari</span>
+                  </div>
+
+                  {externalProviders.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-xs text-slate-400">
+                      Tashqi providerlar topilmadi.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {externalProviders.map((p: any) => (
+                        <div key={p.id} className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 space-y-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xl font-black text-emerald-400">
+                                ⚡
+                              </div>
+                              <div>
+                                <h3 className="text-base font-bold text-white">{p.name}</h3>
+                                <span className="text-xs font-mono text-slate-400">slug: {p.slug}</span>
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              {p.status}
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-slate-300 space-y-1">
+                            <div><span className="text-slate-500">Base URL:</span> <code className="bg-slate-800 px-2 py-0.5 rounded text-amber-300">{p.baseUrl || 'In-Process'}</code></div>
+                            <div><span className="text-slate-500">Adapter Type:</span> <code className="bg-slate-800 px-2 py-0.5 rounded text-emerald-300">{p.adapterType}</code></div>
+                            <div><span className="text-slate-500">Type:</span> {p.type}</div>
+                          </div>
+
+                          <div>
+                            <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold block mb-1.5">Capabilities ({p.capabilities?.length || 0})</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {p.capabilities?.map((cap: string) => (
+                                <span key={cap} className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px] font-mono">
+                                  {cap}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-800 flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => certifyMutation.mutate(p.slug)}
+                                disabled={certifyMutation.isPending}
+                                aria-busy={certifyMutation.isPending && certifyMutation.variables === p.slug}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
+                              >
+                                {certifyMutation.isPending && certifyMutation.variables === p.slug
+                                  ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  : <ShieldCheck className="w-3.5 h-3.5" />}
+                                <span>{certifyMutation.isPending && certifyMutation.variables === p.slug ? 'Tekshirilmoqda...' : 'Run Capability Certification'}</span>
+                              </button>
+                              {p.metadata?.isCertified && p.metadata?.reviewStatus === 'PENDING_APPROVAL' && (
+                                <button onClick={() => publishMutation.mutate(p.slug)} disabled={publishMutation.isPending} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold">
+                                  {publishMutation.isPending ? 'Tasdiqlanmoqda...' : 'ACTIVE qilish'}
+                                </button>
+                              )}
+                              {p.metadata?.reviewStatus === 'PENDING_APPROVAL' && <button onClick={() => setReviewTarget({ slug: p.slug, name: p.name, decision: 'REQUEST_CHANGES' })} className="px-3 py-1.5 border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 rounded-lg text-xs font-bold">Tuzatish so‘rash</button>}
+                              {p.status !== 'SUSPENDED' && p.slug !== 'mock-evos' && <button onClick={() => setReviewTarget({ slug: p.slug, name: p.name, decision: p.metadata?.reviewStatus === 'PENDING_APPROVAL' ? 'REJECT' : 'SUSPEND' })} disabled={reviewMutation.isPending} className="px-3 py-1.5 border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 rounded-lg text-xs font-bold">{p.metadata?.reviewStatus === 'PENDING_APPROVAL' ? 'Rad etish' : 'Suspend'}</button>}
+                              {p.status === 'SUSPENDED' && ['REJECTED', 'SUSPENDED'].includes(p.metadata?.reviewStatus) && <button onClick={() => reopenMutation.mutate(p.slug)} disabled={reopenMutation.isPending} className="px-3 py-1.5 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 rounded-lg text-xs font-bold">Qayta ochish</button>}
+                            </div>
+
+                            {p.baseUrl && (
+                              <a
+                                href={`${p.baseUrl}/health`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-semibold"
+                              >
+                                <span>Health</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+
+                          {certifyMutation.data && certifyMutation.data.providerSlug === p.slug && (
+                            <div className={`mt-3 p-3 bg-slate-950 border rounded-xl text-xs space-y-1 ${certifyMutation.data.isProductionReady ? 'border-emerald-500/30' : 'border-rose-500/30'}`}>
+                              <div className={`font-bold flex items-center gap-1 ${certifyMutation.data.isProductionReady ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {certifyMutation.data.isProductionReady
+                                  ? <CheckCircle2 className="w-3.5 h-3.5" />
+                                  : <AlertCircle className="w-3.5 h-3.5" />}
+                                <span>
+                                  Certification Result: {certifyMutation.data.passedCount}/{certifyMutation.data.totalTests} tests passed
+                                  {typeof certifyMutation.data.durationMs === 'number' ? ` (${certifyMutation.data.durationMs}ms)` : ''}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          {certifyMutation.isError && certifyMutation.variables === p.slug && (
+                            <div className="mt-3 p-3 bg-rose-950/30 border border-rose-500/30 rounded-xl text-xs font-semibold text-rose-300">
+                              Certification ishga tushmadi: {(certifyMutation.error as Error)?.message || 'Noma’lum xatolik'}
+                            </div>
+                          )}
+                          {p.metadata?.reviewReason && (
+                            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs">
+                              <div className="font-mono text-[10px] text-amber-300">{p.metadata.reviewStatus} · {p.metadata.reviewReasonCode || 'OTHER'}</div>
+                              <p className="mt-1 text-amber-50">{p.metadata.reviewReason}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 2. INTERNAL / DEMO PROVIDERS SECTION */}
+              {(providerScope === 'INTERNAL' || providerScope === 'ALL') && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between border-t border-slate-800/80 pt-4">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded bg-purple-500/20 text-purple-400">
+                        <Cpu className="w-4 h-4" />
+                      </div>
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-purple-300">Internal / Demo Providers</h3>
+                      <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-purple-500/20 text-purple-300">{internalProviders.length}</span>
+                    </div>
+                    <span className="text-xs text-purple-400/80 hidden sm:inline">Developer Sandbox va simulyator uchun ichki test xizmatlari</span>
+                  </div>
+
+                  {internalProviders.length === 0 ? (
+                    <div className="p-8 text-center bg-slate-900/40 border border-purple-500/20 rounded-2xl text-xs text-slate-400">
+                      Ichki sandbox providerlar topilmadi.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {internalProviders.map((p: any) => (
+                        <div key={p.id} className="bg-slate-900/90 border border-purple-500/40 rounded-2xl p-5 space-y-4 shadow-lg shadow-purple-950/20">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-xl font-black text-purple-400">
+                                <Cpu className="w-6 h-6" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="text-base font-bold text-white">{p.name}</h3>
+                                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 uppercase tracking-wide">
+                                    DEMO — public emas
+                                  </span>
+                                </div>
+                                <span className="text-xs font-mono text-slate-400">slug: {p.slug}</span>
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1.5">
+                              <Cpu className="w-3.5 h-3.5" /> INTERNAL SANDBOX
+                            </span>
+                          </div>
+
+                          <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-3 text-xs text-purple-200 flex items-start gap-2.5">
+                            <Cpu className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                            <p className="leading-relaxed">
+                              Developer Sandbox Simulator uchun ichki test provideri. MCP public discovery’da ko‘rinmaydi.
+                            </p>
+                          </div>
+
+                          <div className="text-xs text-slate-300 space-y-1">
+                            <div><span className="text-slate-500">Base URL:</span> <code className="bg-slate-800 px-2 py-0.5 rounded text-amber-300">{p.baseUrl || 'In-Process (Local / Memory)'}</code></div>
+                            <div><span className="text-slate-500">Adapter Type:</span> <code className="bg-purple-950/60 text-purple-300 border border-purple-800/60 px-2 py-0.5 rounded">{p.adapterType}</code></div>
+                            <div><span className="text-slate-500">Type:</span> {p.type}</div>
+                          </div>
+
+                          <div>
+                            <span className="text-[11px] uppercase tracking-wider text-slate-500 font-bold block mb-1.5">Capabilities ({p.capabilities?.length || 0})</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {p.capabilities?.map((cap: string) => (
+                                <span key={cap} className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-[10px] font-mono">
+                                  {cap}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-800 flex items-center justify-between flex-wrap gap-2">
+                            <span
+                              title="Internal sandbox provider boshqarilmaydi."
+                              className="text-xs text-slate-400 italic bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-1.5 cursor-not-allowed select-none"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                              Internal sandbox provider boshqarilmaydi.
+                            </span>
+
+                            {p.baseUrl && (
+                              <a
+                                href={`${p.baseUrl}/health`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-semibold"
+                              >
+                                <span>Health</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

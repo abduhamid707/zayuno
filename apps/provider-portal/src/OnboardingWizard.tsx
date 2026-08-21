@@ -20,7 +20,11 @@ import {
   AlertCircle,
   Clock,
   ExternalLink,
-  Bot
+  Bot,
+  HelpCircle,
+  Info,
+  FileCode,
+  RefreshCw
 } from 'lucide-react';
 
 interface OnboardingWizardProps {
@@ -29,11 +33,44 @@ interface OnboardingWizardProps {
   onAuthSuccess: (token: string, user: any) => void;
   onProviderCreated: (provider: any) => void;
   onNavigateTab: (tab: 'overview' | 'docs' | 'apps' | 'sandbox' | 'certification' | 'inspector') => void;
+  onOpenDoc?: (docId: string) => void;
   onOpenAiKit: () => void;
   initialStep?: number;
   initialEmail?: string;
   initialVerifyToken?: string;
 }
+
+const InfoTooltip: React.FC<{ text: string; docId?: string; onOpenDoc?: (doc: string) => void }> = ({ text, docId, onOpenDoc }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex items-center ml-1.5 align-middle">
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="text-slate-400 hover:text-indigo-400 p-0.5 rounded-full transition-colors focus:outline-none"
+        aria-label="Qo‘shimcha ma’lumot"
+      >
+        <HelpCircle className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-950 border border-slate-700 text-[11px] text-slate-300 rounded-xl shadow-2xl z-50 animate-fadeIn pointer-events-auto leading-relaxed text-left normal-case font-normal block">
+          <span>{text}</span>
+          {docId && onOpenDoc && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); onOpenDoc(docId); }}
+              className="mt-2 text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 text-[10px]"
+            >
+              Batafsil qo‘llanma →
+            </button>
+          )}
+        </span>
+      )}
+    </span>
+  );
+};
 
 const CATEGORIES = [
   { id: 'general_services', label: 'Umumiy xizmatlar (General Services)', desc: 'Konsultatsiya, maishiy va professional xizmatlar' },
@@ -51,6 +88,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onAuthSuccess,
   onProviderCreated,
   onNavigateTab,
+  onOpenDoc,
   onOpenAiKit,
   initialStep = 1,
   initialEmail = '',
@@ -81,6 +119,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [baseUrl, setBaseUrl] = useState('');
   const [authMethod, setAuthMethod] = useState<'API_KEY' | 'BEARER_TOKEN' | 'HMAC_SIGNATURE'>('API_KEY');
   const [capabilityProfile, setCapabilityProfile] = useState<'transactional' | 'readonly'>('transactional');
+
+  // Step 4: URL Testing & Brief Copy States
+  const [testingUrl, setTestingUrl] = useState(false);
+  const [urlCheckResult, setUrlCheckResult] = useState<{
+    status: 'idle' | 'success' | 'https_required' | 'not_found' | 'error';
+    message: string;
+  }>({ status: 'idle', message: '' });
+  const [copiedBrief, setCopiedBrief] = useState(false);
 
   // Step 6: Review & Credentials
   const [createdCredentials, setCreatedCredentials] = useState<{
@@ -252,6 +298,187 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       return;
     }
     setCurrentStep(4);
+  };
+
+  // --------------------------------------------------------------------------
+  // STEP 4 Helpers: Base URL health testing and AI Brief copy
+  // --------------------------------------------------------------------------
+  const handleTestBaseUrl = async () => {
+    const raw = baseUrl.trim();
+    if (!raw) {
+      setUrlCheckResult({
+        status: 'error',
+        message: 'Iltimos, avval API Base URL manzilini kiriting.'
+      });
+      return;
+    }
+
+    try {
+      const u = new URL(raw);
+
+      // SSRF & Protocol Guards
+      if (u.protocol !== 'https:' && !u.hostname.includes('localhost') && u.hostname !== '127.0.0.1') {
+        setUrlCheckResult({
+          status: 'https_required',
+          message: '⚠️ HTTPS talab etiladi (xavfsizlik uchun URL https:// bilan boshlanishi kerak).'
+        });
+        return;
+      }
+
+      // Check for private / cloud metadata / internal hostnames
+      const host = u.hostname.toLowerCase();
+      const isPrivateHost =
+        /^10\./.test(host) ||
+        /^192\.168\./.test(host) ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+        /^169\.254\./.test(host) || // Cloud metadata
+        /^0\.0\.0\.0$/.test(host) ||
+        host === '::1' ||
+        host.endsWith('.internal') ||
+        host.endsWith('.local') ||
+        host.endsWith('.lan');
+
+      const isDevEnv = typeof window !== 'undefined' && (window.location.hostname.includes('localhost') || window.location.hostname === '127.0.0.1');
+
+      if (isPrivateHost && !isDevEnv) {
+        setUrlCheckResult({
+          status: 'error',
+          message: '⚠️ Xavfsizlik: Private IP yoki ichki tarmoq manzillarini tekshirib bo‘lmaydi. Haqiqiy public HTTPS domen kiriting.'
+        });
+        return;
+      }
+    } catch {
+      setUrlCheckResult({
+        status: 'error',
+        message: 'Noto‘g‘ri URL formati kiritildi.'
+      });
+      return;
+    }
+
+    setTestingUrl(true);
+    setUrlCheckResult({ status: 'idle', message: '' });
+
+    try {
+      const cleanUrl = raw.replace(/\/+$/, '');
+      const healthUrl = `${cleanUrl}/health`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const res = await fetch(healthUrl, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal
+      }).catch(err => {
+        if (err.name === 'AbortError') {
+          throw new Error('Server 6 soniya ichida javob bermadi (Timeout).');
+        }
+        throw new Error('Server bilan ulanib bo‘lmadi yoki CORS bloklandi.');
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        setUrlCheckResult({
+          status: 'success',
+          message: '✅ Ulanish muvaffaqiyatli! Server /health endpointida 200 OK qaytardi.'
+        });
+      } else if (res.status === 404) {
+        setUrlCheckResult({
+          status: 'not_found',
+          message: '❌ /health endpointi topilmadi (404 Not Found). Backend yo‘nalishini tekshiring.'
+        });
+      } else {
+        setUrlCheckResult({
+          status: 'error',
+          message: `⚠️ Server xato status qaytardi (HTTP ${res.status}).`
+        });
+      }
+    } catch (err: any) {
+      setUrlCheckResult({
+        status: 'error',
+        message: '❌ Server javob bermadi yoki /health ga ulanish bloklandi.'
+      });
+    } finally {
+      setTestingUrl(false);
+    }
+  };
+
+  const handleCopyIntegrationBrief = () => {
+    const isTrans = capabilityProfile === 'transactional';
+    const brief = `# ZAYUNO PROVIDER INTEGRATSIYA BRIEFI (TEXNIK TOPSHIRIQ)
+
+Biznes nomi: ${businessName.trim() || 'Mening Biznesim'}
+Provider Slug: ${slug.trim() || 'my-provider-slug'}
+Toifa: ${CATEGORIES.find(c => c.id === category)?.label || category}
+Tanlangan rejim: ${isTrans ? 'Variant B — Topish va buyurtma berish (TRANSACTIONAL)' : 'Variant A — Faqat topish va ko‘rish (DISCOVERY)'}
+Autentifikatsiya formati: ${authMethod} (${authMethod === 'API_KEY' ? 'X-API-KEY header' : authMethod === 'BEARER_TOKEN' ? 'Authorization: Bearer token' : 'HMAC-SHA256 imzosi'})
+
+--------------------------------------------------------------------------------
+1. INTEGRATSIYA MAQSADI
+--------------------------------------------------------------------------------
+Zayuno AI agentlar (ChatGPT, Claude, autonomous workerlar) uchun neytral harakat platformasidir.
+AI agentlar foydalanuvchi talabiga asosan sizning xizmatlaringizni topadi, kotirovka oladi va buyurtma yaratadi.
+
+--------------------------------------------------------------------------------
+2. TALAB ETILADIGAN API ENDPOINTLAR (HTTPS)
+--------------------------------------------------------------------------------
+${isTrans ? `[1] GET  /health
+    Vazifasi: Server salomatligini tekshirish.
+    Javob: { "status": "HEALTHY", "provider": "${slug.trim() || 'my-slug'}" }
+
+[2] GET  /catalog
+    Vazifasi: Menyu, xizmatlar yoki mahsulotlar ro'yxati.
+    Javob: { "items": [{ "id": "...", "name": "...", "price": 10000, "currency": "UZS", "available": true }] }
+
+[3] POST /quote
+    Vazifasi: Aniq narx, yetkazib berish haqi va jami summani hisoblash.
+    Input: { "items": [{ "id": "...", "quantity": 1 }], "destination": { "address": "..." } }
+    Javob: { "quoteId": "...", "subtotal": 50000, "fees": 10000, "discount": 0, "total": 60000, "currency": "UZS", "expiresAt": "..." }
+
+[4] POST /actions
+    Vazifasi: Tasdiqlangan kotirovka asosida buyurtma yaratish (Idempotency bilan).
+    Input: { "quoteId": "...", "customer": { "name": "...", "phone": "..." } }
+    Javob: { "actionId": "...", "status": "AWAITING_PAYMENT", "nextAction": { "type": "OPEN_URL", "url": "https://..." } }
+
+[5] GET  /actions/:id
+    Vazifasi: Buyurtma joriy holatini tekshirish.
+    Javob: { "actionId": "...", "status": "CONFIRMED" }
+
+[6] POST /actions/:id/cancel
+    Vazifasi: Buyurtmani bekor qilish.
+
+[7] POST /webhook
+    Vazifasi: Zayuno xabarnomalarini qabul qilish (HMAC-SHA256 imzo tekshiruvi bilan).` : `[1] GET  /health
+    Vazifasi: Server salomatligini tekshirish.
+    Javob: { "status": "HEALTHY", "provider": "${slug.trim() || 'my-slug'}" }
+
+[2] GET  /catalog
+    Vazifasi: Menyu, xizmatlar yoki takliflar katalogi.
+    Javob: { "items": [{ "id": "...", "name": "...", "price": 0, "currency": "UZS", "available": true }] }
+
+[3] GET  /search
+    Vazifasi: Qidiruv va filtr so'rovlariga javob berish.
+
+[4] GET  /locations
+    Vazifasi: Filiallar va xizmat manzillari.`}
+
+--------------------------------------------------------------------------------
+3. XAVFSIZLIK VA TO'LOV QOIDALARI
+--------------------------------------------------------------------------------
+- Zayuno hech qachon to'lov kartalari ma'lumotlarini qabul qilmaydi. To'lov providerning o'z checkout havolasi (NextAction) orqali amalga oshiriladi.
+- Barcha so'rovlar JSON formatida va HTTPS orqali bo'lishi shart.
+- Ishlab chiqishda lokal server uchun ngrok HTTPS tunnelidan foydalaning.
+
+--------------------------------------------------------------------------------
+4. QO'LLANMALAR VA AVTOMATIK TEST
+--------------------------------------------------------------------------------
+- Base URL va Endpointlar qo'llanmasi: https://developers.zayuno.uz/?tab=docs&doc=base-url
+- Avtomatlashtirilgan sertifikatlash testi: https://developers.zayuno.uz/?tab=certification
+`;
+
+    navigator.clipboard.writeText(brief);
+    setCopiedBrief(true);
+    setTimeout(() => setCopiedBrief(false), 3000);
   };
 
   // --------------------------------------------------------------------------
@@ -755,14 +982,22 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-white">4. API Integratsiya va Identifikator</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Zayuno protokoli orqali so‘rovlarni qabul qilish uchun API endpoint va autentifikatsiya usulini tanlang.
+              Zayuno protokoli orqali so‘rovlarni qabul qilish uchun API endpoint va autentifikatsiya usulini sozlang.
             </p>
           </div>
 
-          <div className="space-y-4 text-xs">
+          <div className="space-y-5 text-xs">
+            {/* Slug & Base URL Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-slate-300 mb-1 font-medium">Provider Slug (Noyob ID) *</label>
+                <label className="block text-slate-300 mb-1 font-medium items-center">
+                  <span>Provider Slug (Noyob ID) *</span>
+                  <InfoTooltip
+                    text="AI agentlar va API so‘rovlarida biznesingizni topish uchun ishlatiladigan lotincha qisqa nom (masalan: my-coffee-shop)."
+                    docId="getting-started"
+                    onOpenDoc={onOpenDoc}
+                  />
+                </label>
                 <div className="relative">
                   <input
                     type="text"
@@ -774,64 +1009,125 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                   />
                 </div>
                 <span className="text-[11px] text-slate-500 mt-1 block">
-                  AI so‘rovlarida ishlatiladigan identifikator (masalan: <span className="font-mono text-indigo-400">{slug || 'provider-slug'}</span>)
+                  AI so‘rovlarida identifikator: <span className="font-mono text-indigo-400">{slug || 'provider-slug'}</span>
                 </span>
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1 font-medium">API Base URL (HTTPS) *</label>
-                <input
-                  type="url"
-                  value={baseUrl}
-                  onChange={e => setBaseUrl(e.target.value)}
-                  placeholder="https://api.yourbusiness.uz/zayuno"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
-                />
-                <span className="text-[11px] text-slate-500 mt-1 block">
-                  Serveringizdagi Zayuno adapter endpointi (keyinroq ham o‘zgartirish mumkin).
-                </span>
+                <label className="block text-slate-300 mb-1 font-medium items-center">
+                  <span>API Base URL (HTTPS) *</span>
+                  <InfoTooltip
+                    text="Zayuno so‘rov yuboradigan sizning server manzilingiz. Bu oddiy sayt manzili emas, backend API endpoint bo‘lishi kerak."
+                    docId="base-url"
+                    onOpenDoc={onOpenDoc}
+                  />
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={baseUrl}
+                    onChange={e => {
+                      setBaseUrl(e.target.value);
+                      if (urlCheckResult.status !== 'idle') setUrlCheckResult({ status: 'idle', message: '' });
+                    }}
+                    placeholder="https://api.sizningbiznesingiz.uz/zayuno"
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTestBaseUrl}
+                    disabled={testingUrl || !baseUrl.trim()}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-xs font-semibold shrink-0 transition flex items-center gap-1.5"
+                  >
+                    {testingUrl ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />}
+                    <span>{testingUrl ? 'Tekshirilmoqda...' : 'URLni tekshirish'}</span>
+                  </button>
+                </div>
+                <div className="flex items-center justify-between text-[11px] mt-1 flex-wrap gap-1">
+                  <span className="text-slate-500 font-mono">Masalan: https://api.sizningbiznesingiz.uz/zayuno</span>
+                  {onOpenDoc && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenDoc('base-url')}
+                      className="text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-0.5"
+                    >
+                      API Base URL qanday tayyorlanadi? →
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Capability Profile Selector */}
-            <div className="space-y-2">
-              <label className="block text-slate-300 font-medium">Capability Profilini tanlang *</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div
-                  onClick={() => setCapabilityProfile('transactional')}
-                  className={`p-4 rounded-2xl border cursor-pointer transition-all space-y-2 ${
-                    capabilityProfile === 'transactional'
-                      ? 'bg-indigo-950/40 border-indigo-500/80 shadow-lg shadow-indigo-950/40'
-                      : 'bg-slate-950/40 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      <Zap className="w-4 h-4 text-amber-400" /> Profil B: To‘liq Tranzaksion
-                    </span>
-                    <input
-                      type="radio"
-                      checked={capabilityProfile === 'transactional'}
-                      onChange={() => setCapabilityProfile('transactional')}
-                      className="text-indigo-600 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Yetkazib berish, do‘kon, chipta va buyurtma yaratish xizmatlari uchun. Kotirovka (Quote), Buyurtma (Action), Status va Webhook qo‘llab-quvvatlaydi.
-                  </p>
-                </div>
+            {/* URL Health Check Alert */}
+            {urlCheckResult.status !== 'idle' && (
+              <div
+                className={`p-3 rounded-xl text-xs flex items-start gap-2.5 animate-fadeIn ${
+                  urlCheckResult.status === 'success'
+                    ? 'bg-emerald-950/50 border border-emerald-500/40 text-emerald-300'
+                    : urlCheckResult.status === 'https_required'
+                    ? 'bg-amber-950/50 border border-amber-500/40 text-amber-300'
+                    : 'bg-rose-950/50 border border-rose-500/40 text-rose-300'
+                }`}
+              >
+                {urlCheckResult.status === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 leading-relaxed">{urlCheckResult.message}</div>
+              </div>
+            )}
 
+            {/* Integration Brief Helper for Users without an API */}
+            <div className="p-3.5 rounded-2xl bg-indigo-950/25 border border-indigo-500/30 flex items-center justify-between flex-wrap gap-3">
+              <div className="space-y-0.5">
+                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                  <Bot className="w-4 h-4 text-amber-300" /> Hali API’ingiz yo‘qmi?
+                </span>
+                <p className="text-[11px] text-slate-300">
+                  Dasturchingizga yoki AI vositalariga (Cursor, ChatGPT) tayyor texnik topshiriq yuboring.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyIntegrationBrief}
+                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition shadow-md shadow-indigo-600/30 flex items-center gap-1.5 shrink-0"
+              >
+                {copiedBrief ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedBrief ? 'Brief nusxalandi!' : 'AI uchun integration brief nusxalash'}</span>
+              </button>
+            </div>
+
+            {/* Question: Mijoz Zayuno orqali nima qila olsin? */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-white font-bold text-sm">
+                  Mijoz Zayuno orqali nima qila olsin? *
+                </label>
+                {onOpenDoc && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenDoc('base-url')}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+                  >
+                    Qo‘llanma va kontraktlar →
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* Variant A: Faqat topish va ko'rish */}
                 <div
                   onClick={() => setCapabilityProfile('readonly')}
-                  className={`p-4 rounded-2xl border cursor-pointer transition-all space-y-2 ${
+                  className={`p-4 rounded-2xl border cursor-pointer transition-all space-y-2.5 ${
                     capabilityProfile === 'readonly'
-                      ? 'bg-indigo-950/40 border-indigo-500/80 shadow-lg shadow-indigo-950/40'
+                      ? 'bg-indigo-950/50 border-indigo-500 shadow-lg shadow-indigo-950/50 ring-1 ring-indigo-500/50'
                       : 'bg-slate-950/40 border-slate-800 hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      <Globe className="w-4 h-4 text-sky-400" /> Profil A: Discovery / Katalog
+                    <span className="font-bold text-white flex items-center gap-1.5 text-xs">
+                      <Globe className="w-4 h-4 text-sky-400" /> Variant A — Faqat topish va ko‘rish
                     </span>
                     <input
                       type="radio"
@@ -840,24 +1136,144 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Faqat ma’lumot, mahsulotlar katalogi, menyu yoki filiallar joylashuvini qidirish uchun. Tranzaksiya endpointlari talab etilmaydi.
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    AI xizmatlaringiz, katalogingiz yoki e’lonlaringizni topib ko‘rsatadi. Buyurtma yaratilmaydi.
                   </p>
+                  <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800/80">
+                    <span className="text-slate-500 font-semibold block mb-0.5">Mos misollar:</span>
+                    vakansiyalar, nomzodlar, katalog, konsultatsiya, ma’lumotnoma xizmati.
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] font-mono text-sky-300">Endpointlar: /health, /catalog, /search</span>
+                    {onOpenDoc && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onOpenDoc('base-url'); }}
+                        className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                      >
+                        Batafsil ko‘rish →
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Variant B: Topish va buyurtma berish */}
+                <div
+                  onClick={() => setCapabilityProfile('transactional')}
+                  className={`p-4 rounded-2xl border cursor-pointer transition-all space-y-2.5 ${
+                    capabilityProfile === 'transactional'
+                      ? 'bg-indigo-950/50 border-indigo-500 shadow-lg shadow-indigo-950/50 ring-1 ring-indigo-500/50'
+                      : 'bg-slate-950/40 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white flex items-center gap-1.5 text-xs">
+                      <Zap className="w-4 h-4 text-amber-400" /> Variant B — Topish va buyurtma berish
+                    </span>
+                    <input
+                      type="radio"
+                      checked={capabilityProfile === 'transactional'}
+                      onChange={() => setCapabilityProfile('transactional')}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    AI mahsulot/xizmatni topadi, aniq narx oladi, foydalanuvchi tasdiqlagach buyurtma yaratadi.
+                  </p>
+                  <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800/80">
+                    <span className="text-slate-500 font-semibold block mb-0.5">Mos misollar:</span>
+                    restoran va delivery, chipta, booking, do‘kon, pullik xizmatlar.
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] font-mono text-amber-300">Endpointlar: /health, /catalog, /quote, /actions, /webhook</span>
+                    {onOpenDoc && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onOpenDoc('base-url'); }}
+                        className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                      >
+                        Batafsil ko‘rish →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Endpoint Checklist */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <FileCode className="w-3.5 h-3.5 text-indigo-400" />
+                    Tanlangan rejim uchun talab etiladigan endpointlar ro‘yxati:
+                  </span>
+                  <span className="text-[10px] font-mono text-indigo-400 font-semibold">
+                    {capabilityProfile === 'transactional' ? 'Variant B (To‘liq)' : 'Variant A (Katalog)'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px]">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+                    <span className="font-mono text-slate-200">GET /health</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+                    <span className="font-mono text-slate-200">GET /catalog</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy</span>
+                  </div>
+
+                  {capabilityProfile === 'transactional' ? (
+                    <>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+                        <span className="font-mono text-slate-200">POST /quote</span>
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+                        <span className="font-mono text-slate-200">POST /actions</span>
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+                        <span className="font-mono text-slate-200">GET /actions/:id</span>
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+                        <span className="font-mono text-slate-200">POST /webhook</span>
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy (HMAC)</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+                        <span className="font-mono text-slate-200">GET /search</span>
+                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-semibold text-[10px]">Ixtiyoriy</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+                        <span className="font-mono text-slate-200">GET /locations</span>
+                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-semibold text-[10px]">Ixtiyoriy</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Auth Method */}
             <div>
-              <label className="block text-slate-300 mb-1 font-medium">Autentifikatsiya formati</label>
+              <label className="block text-slate-300 mb-1 font-medium items-center">
+                <span>Autentifikatsiya formati</span>
+                <InfoTooltip
+                  text="Zayuno sizning API serveringizga so‘rov yuborganda o‘zini qanday tasdiqlashini belgilaydi."
+                  docId="auth"
+                  onOpenDoc={onOpenDoc}
+                />
+              </label>
               <select
                 value={authMethod}
                 onChange={e => setAuthMethod(e.target.value as any)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500"
               >
-                <option value="API_KEY">X-API-KEY Header (Tavsiya etiladi)</option>
-                <option value="BEARER_TOKEN">Authorization: Bearer Token</option>
-                <option value="HMAC_SIGNATURE">HMAC-SHA256 Payload Signature</option>
+                <option value="API_KEY">X-API-KEY Header (Tavsiya etiladi — har bir so‘rovda maxfiy API kalit tekshiriladi)</option>
+                <option value="BEARER_TOKEN">Authorization: Bearer Token (Standart Bearer token formati)</option>
+                <option value="HMAC_SIGNATURE">HMAC-SHA256 Payload Signature (Kriptografik imzo orqali eng yuqori xavfsizlik)</option>
               </select>
             </div>
           </div>
@@ -875,7 +1291,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               disabled={loading || !slug.trim()}
               className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
             >
-              {loading ? 'Yaratilmoqda…' : 'Arizani topshirish'} <ArrowRight className="w-4 h-4" />
+              {loading ? 'Saqlanmoqda…' : 'Davom etish (Sertifikatlashga o‘tish)'} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </form>
@@ -900,7 +1316,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               </div>
               <h4 className="font-semibold text-white">Sandbox Simulator</h4>
               <p className="text-slate-400 leading-relaxed">
-                Haqiqiy foydalanuvchi ma’lumotlarisiz kotirovka, buyurtma va status oqimini simulyatsiya qiling.
+                Haqiqiy foydalanuvchi ma’lumotlarisiz kotirovka, buyurtma va status oqimini xavfsiz simulyatsiya qiling.
               </p>
             </div>
 
@@ -925,7 +1341,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 flex items-center justify-between flex-wrap gap-3">
             <div className="space-y-1">
               <span className="text-xs font-semibold text-white flex items-center gap-1.5">
                 <Bot className="w-4 h-4 text-amber-300" /> AI Integratsiya Kit tayyormi?
@@ -956,7 +1372,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               onClick={() => setCurrentStep(6)}
               className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
             >
-              Xulosa va Kalitlarni olish <ArrowRight className="w-4 h-4" />
+              Davom etish (Xulosa va Ko‘rib chiqish) <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -971,7 +1387,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30 shadow-lg shadow-emerald-950/50">
               <CheckCircle2 className="w-7 h-7" />
             </div>
-            <h3 className="text-xl font-bold text-white">Arizangiz muvaffaqiyatli topshirildi!</h3>
+            <h3 className="text-xl font-bold text-white">Arizangiz tayyor va saqlandi!</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
               Provider arizangiz yaratildi. Quyida sizning sandbox integratsiya kalitlaringiz berilgan.
             </p>
@@ -1034,7 +1450,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
             <ul className="space-y-1.5 text-slate-400 list-disc list-inside">
               <li>API adapteringizni Zayuno kontraktiga moslab yozing yoki AI Kit yordamida generatsiya qiling.</li>
               <li>Certification bo‘limida avtomatlashtirilgan testlarni ishga tushiring.</li>
-              <li>Testlar 100% o‘tgach, arizani yakuniy ko‘rib chiqishga topshiring (1-2 ish kuni).</li>
+              <li>Testlar 100% o‘tgach, arizani yakuniy ko‘rib chiqishga (Review) topshiring (1-2 ish kuni).</li>
             </ul>
           </div>
 
@@ -1044,7 +1460,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
               onClick={() => onNavigateTab('apps')}
               className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
             >
-              Dashboardga o‘tish <ArrowRight className="w-4 h-4" />
+              Review’ga yuborish va Dashboardga o‘tish <ArrowRight className="w-4 h-4" />
             </button>
             <button
               type="button"

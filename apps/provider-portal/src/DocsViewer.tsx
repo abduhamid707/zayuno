@@ -23,7 +23,8 @@ import {
   Database,
   ArrowRight,
   Clock,
-  Sparkles
+  Sparkles,
+  Globe
 } from 'lucide-react';
 
 interface DocsViewerProps {
@@ -34,19 +35,20 @@ interface DocsViewerProps {
 
 export const DOCS_MENU = [
   { id: 'getting-started', title: '1. Getting Started', icon: Sparkles },
-  { id: 'spec-v1', title: '2. Provider Integration v1', icon: Layers },
-  { id: 'capabilities', title: '3. Capabilities Matrix', icon: Sliders },
-  { id: 'auth', title: '4. Authentication & Security', icon: ShieldCheck },
-  { id: 'catalog', title: '5. Catalog & Offerings', icon: Database },
-  { id: 'quotes', title: '6. Quotes & Pricing', icon: DollarSign },
-  { id: 'actions', title: '7. Actions & Lifecycle', icon: Zap },
-  { id: 'payment-handoff', title: '8. Payment Handoff (NextAction)', icon: ArrowRight },
-  { id: 'webhooks', title: '9. Webhooks & Events', icon: Webhook },
-  { id: 'errors', title: '10. Errors & Idempotency', icon: AlertTriangle },
-  { id: 'certification', title: '11. Automated Certification', icon: CheckCircle2 },
-  { id: 'api-reference', title: '12. Core API Reference', icon: Terminal },
-  { id: 'provider-operations', title: '13. Dashboard & Moderation', icon: Activity },
-  { id: 'troubleshooting-faq', title: '14. Troubleshooting & FAQ', icon: AlertTriangle }
+  { id: 'base-url', title: '2. API Base URL & Endpoints', icon: Globe },
+  { id: 'spec-v1', title: '3. Provider Integration v1', icon: Layers },
+  { id: 'capabilities', title: '4. Capabilities Matrix', icon: Sliders },
+  { id: 'auth', title: '5. Authentication & Security', icon: ShieldCheck },
+  { id: 'catalog', title: '6. Catalog & Offerings', icon: Database },
+  { id: 'quotes', title: '7. Quotes & Pricing', icon: DollarSign },
+  { id: 'actions', title: '8. Actions & Lifecycle', icon: Zap },
+  { id: 'payment-handoff', title: '9. Payment Handoff (NextAction)', icon: ArrowRight },
+  { id: 'webhooks', title: '10. Webhooks & Events', icon: Webhook },
+  { id: 'errors', title: '11. Errors & Idempotency', icon: AlertTriangle },
+  { id: 'certification', title: '12. Automated Certification', icon: CheckCircle2 },
+  { id: 'api-reference', title: '13. Core API Reference', icon: Terminal },
+  { id: 'provider-operations', title: '14. Dashboard & Moderation', icon: Activity },
+  { id: 'troubleshooting-faq', title: '15. Troubleshooting & FAQ', icon: AlertTriangle }
 ];
 
 export function DocsViewer({ selectedDoc, onSelectDoc, onOpenAiKit }: DocsViewerProps) {
@@ -162,7 +164,409 @@ export function DocsViewer({ selectedDoc, onSelectDoc, onOpenAiKit }: DocsViewer
         )}
 
         {/* ========================================================================= */}
-        {/* 2. SPECIFICATION V1                                                      */}
+        {/* 2. API BASE URL & ENDPOINTS                                              */}
+        {/* ========================================================================= */}
+        {selectedDoc === 'base-url' && (
+          <div className="space-y-6">
+            <div className="border-b border-slate-800 pb-4">
+              <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-semibold">Guide 02</span>
+              <h2 className="text-2xl font-bold text-white mt-1">API Base URL va Endpointlar Bo‘yicha Qo‘llanma</h2>
+              <p className="text-slate-400 mt-1">
+                Zayuno Core API sizning serveringizga qanday so‘rov yuborishi, HTTPS talablari va endpointlar arxitekturasi.
+              </p>
+            </div>
+
+            {/* 1. What is Base URL */}
+            <div className="space-y-3">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                <Globe className="w-4 h-4 text-indigo-400" /> API Base URL nima?
+              </h3>
+              <p>
+                <strong className="text-white">API Base URL</strong> — bu Zayuno serverlari sizning biznesingizga buyurtma, kotirovka yoki menyu so‘rovlarini yuborishi uchun mo‘ljallangan asosiy backend API manzili.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-2">
+                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> API Base URL (To‘g‘ri)
+                  </span>
+                  <code className="text-xs font-mono text-emerald-300 block bg-slate-900 p-2 rounded">
+                    https://api.mybusiness.uz/zayuno
+                  </code>
+                  <p className="text-[11px] text-slate-400">
+                    Backend serveringizdagi Zayuno adapteri. JSON so‘rovlarni qabul qiladi va JSON formatida javob qaytaradi.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-950 border border-rose-500/30 space-y-2">
+                  <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Oddiy Website URL (Noto‘g‘ri)
+                  </span>
+                  <code className="text-xs font-mono text-rose-300 block bg-slate-900 p-2 rounded">
+                    https://mybusiness.uz
+                  </code>
+                  <p className="text-[11px] text-slate-400">
+                    Foydalanuvchilar brauzerda ochadigan HTML/React sayt. U Zayunoning API so‘rovlarini qayta ishlay olmaydi.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. HTTPS Requirement */}
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 space-y-2 text-xs">
+              <div className="flex items-center gap-2 font-bold text-amber-300">
+                <Lock className="w-4 h-4" /> HTTPS TALABI VA XAVFSIZLIK
+              </div>
+              <p className="leading-relaxed">
+                Mijozlar buyurtmasi va API kalitlari xavfsizligini ta’minlash maqsadida Zayuno <strong>faqat HTTPS</strong> protokoli bilan ishlaydi. Oddiy <code className="bg-black/40 px-1 py-0.5 rounded font-mono text-amber-100">http://</code> manzillari qabul qilinmaydi.
+              </p>
+              <p className="text-[11px] text-amber-300/80">
+                💡 <em>Dasturchilar uchun maslahat:</em> Lokal muhitda (Localhost) sinash uchun <strong>ngrok</strong> yoki <strong>cloudflared tunnel</strong> yordamida vaqtinchalik HTTPS havola yaratishingiz mumkin.
+              </p>
+            </div>
+
+            {/* 3. Valid vs Invalid URLs Table */}
+            <div className="space-y-3">
+              <h3 className="text-base font-semibold text-white">To‘g‘ri va Noto‘g‘ri URL Namunalar Jadvali</h3>
+              <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900 text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="p-3">Namuna URL</th>
+                      <th className="p-3">Holat</th>
+                      <th className="p-3">Sabab / Izoh</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 text-slate-300">
+                    <tr>
+                      <td className="p-3 font-mono text-emerald-400">https://api.expressfood.uz/v1/zayuno</td>
+                      <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">TO‘G‘RI</span></td>
+                      <td className="p-3 text-slate-400">HTTPS backend API prefiksi aniq ko‘rsatilgan.</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-mono text-rose-400">http://api.expressfood.uz</td>
+                      <td className="p-3"><span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]">NOTO‘G‘RI</span></td>
+                      <td className="p-3 text-slate-400">HTTP ishlatilgan (HTTPS majburiy).</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-mono text-rose-400">https://expressfood.uz</td>
+                      <td className="p-3"><span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]">NOTO‘G‘RI</span></td>
+                      <td className="p-3 text-slate-400">Oddiy website bosh sahifasi (API endpoint emas).</td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-mono text-emerald-400">https://abc-123.ngrok-free.app/zayuno</td>
+                      <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">TO‘G‘RI (DEV)</span></td>
+                      <td className="p-3 text-slate-400">Lokal sinovlar uchun xavfsiz HTTPS tunnel.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 4. Minimal Required Endpoints */}
+            <div className="space-y-3">
+              <h3 className="text-base font-semibold text-white">Kerakli Minimal Endpointlar</h3>
+              <div className="space-y-2 text-xs">
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-emerald-400 font-bold">GET /health</span>
+                    <p className="text-slate-400 text-[11px] mt-0.5">Server holatini tekshirish. Status: 200 va <code>{JSON.stringify({ status: 'HEALTHY' })}</code> qaytarishi kerak.</p>
+                  </div>
+                  <span className="px-2 py-1 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">Barcha profillar</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-indigo-400 font-bold">GET /catalog</span>
+                    <p className="text-slate-400 text-[11px] mt-0.5">Xizmatlar, mahsulotlar yoki takliflar ro‘yxati.</p>
+                  </div>
+                  <span className="px-2 py-1 rounded bg-slate-800 text-slate-300 text-[10px] font-bold">Barcha profillar</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-emerald-300 font-bold">GET /locations</span>
+                    <p className="text-slate-400 text-[11px] mt-0.5">Filiallar va yetkazish zonalari (Ixtiyoriy — faqat fizik do‘kon/filiallar uchun; raqamli xizmatlarda talab qilinmaydi).</p>
+                  </div>
+                  <span className="px-2 py-1 rounded bg-slate-800 text-slate-400 text-[10px] font-bold">Ixtiyoriy</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-amber-400 font-bold">POST /quote</span>
+                    <p className="text-slate-400 text-[11px] mt-0.5">Aniq narx, yetkazib berish haqi va kotirovka hisoblash.</p>
+                  </div>
+                  <span className="px-2 py-1 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">Variant B (Buyurtma)</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-violet-400 font-bold">POST /actions</span>
+                    <p className="text-slate-400 text-[11px] mt-0.5">Buyurtma yoki bron yaratish va provider checkout havolasini qaytarish.</p>
+                  </div>
+                  <span className="px-2 py-1 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">Variant B (Buyurtma)</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-sky-400 font-bold">GET /actions/:id</span>
+                    <p className="text-slate-400 text-[11px] mt-0.5">Yaratilgan buyurtmaning joriy holati (CREATED, CONFIRMED, COMPLETED).</p>
+                  </div>
+                  <span className="px-2 py-1 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">Variant B (Buyurtma)</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <span className="font-mono text-rose-400 font-bold">POST /webhook</span>
+                    <p className="text-slate-400 text-[11px] mt-0.5">Zayuno sizning serveringizga eventlarni (buyurtma/to‘lov yangilanishi) yuboradigan endpoint (x-zayuno-signature HMAC imzosi bilan).</p>
+                  </div>
+                  <span className="px-2 py-1 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">Variant B (HMAC)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Copyable Code Examples */}
+            <div className="space-y-4 pt-2">
+              <h3 className="text-base font-semibold text-white">Tayyor Ishchi Kod Namunalari (Starter Boilerplate)</h3>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-300 text-xs">Node.js (Express & TypeScript)</span>
+                  <button
+                    onClick={() => copyToClipboard(`import express from 'express';
+import crypto from 'crypto';
+
+const app = express();
+app.use(express.json());
+
+// 1. Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'HEALTHY', provider: 'my-business', uptime: process.uptime() });
+});
+
+// 2. Catalog
+app.get('/catalog', (req, res) => {
+  res.json({
+    items: [
+      { id: 'item_1', name: 'Amerikano Kofe', price: 25000, currency: 'UZS', available: true }
+    ]
+  });
+});
+
+// 3. Quote (Variant B)
+app.post('/quote', (req, res) => {
+  const { items } = req.body;
+  const subtotal = 25000;
+  res.json({
+    quoteId: 'q_' + Date.now(),
+    subtotal,
+    fees: 5000, // Yetkazish
+    discount: 0,
+    total: 30000,
+    currency: 'UZS',
+    expiresAt: new Date(Date.now() + 15 * 60000).toISOString()
+  });
+});
+
+// 4. Action Dispatch (Variant B)
+app.post('/actions', (req, res) => {
+  const actionId = 'act_' + Date.now();
+  res.json({
+    actionId,
+    status: 'AWAITING_PAYMENT',
+    nextAction: {
+      type: 'OPEN_URL',
+      url: 'https://checkout.mybusiness.uz/pay/' + actionId
+    }
+  });
+});
+
+// 5. Webhook receiver (Zayunodan keladigan eventlar)
+app.post('/webhook', (req, res) => {
+  const signature = req.headers['x-zayuno-signature'] as string;
+  const webhookSecret = process.env.ZAYUNO_WEBHOOK_SECRET || 'your_sandbox_webhook_secret';
+  
+  // HMAC-SHA256 tekshiruvi
+  const expectedSignature = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(JSON.stringify(req.body))
+    .digest('hex');
+
+  if (signature && signature !== expectedSignature) {
+    return res.status(401).json({ error: 'Noto‘g‘ri HMAC imzo' });
+  }
+
+  console.log('Event qabul qilindi:', req.body);
+  res.json({ received: true });
+});
+
+app.listen(3000, () => console.log('Zayuno Provider API running on port 3000'));`, 'code-node')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
+                  >
+                    {copiedSection === 'code-node' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedSection === 'code-node' ? 'Nusxalandi!' : 'Kodni nusxalash'}</span>
+                  </button>
+                </div>
+                <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-indigo-200 overflow-x-auto">
+{`import express from 'express';
+import crypto from 'crypto';
+
+const app = express();
+app.use(express.json());
+
+// 1. Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'HEALTHY', provider: 'my-business', uptime: process.uptime() });
+});
+
+// 2. Catalog
+app.get('/catalog', (req, res) => {
+  res.json({
+    items: [
+      { id: 'item_1', name: 'Amerikano Kofe', price: 25000, currency: 'UZS', available: true }
+    ]
+  });
+});
+
+// 3. Quote (Variant B)
+app.post('/quote', (req, res) => {
+  res.json({
+    quoteId: 'q_' + Date.now(),
+    subtotal: 25000,
+    fees: 5000,
+    discount: 0,
+    total: 30000,
+    currency: 'UZS',
+    expiresAt: new Date(Date.now() + 15 * 60000).toISOString()
+  });
+});
+
+// 4. Action Dispatch (Variant B)
+app.post('/actions', (req, res) => {
+  const actionId = 'act_' + Date.now();
+  res.json({
+    actionId,
+    status: 'AWAITING_PAYMENT',
+    nextAction: {
+      type: 'OPEN_URL',
+      url: 'https://checkout.mybusiness.uz/pay/' + actionId
+    }
+  });
+});
+
+// 5. Webhook receiver (Zayunodan keladigan eventlar)
+app.post('/webhook', (req, res) => {
+  const signature = req.headers['x-zayuno-signature'] as string;
+  const webhookSecret = process.env.ZAYUNO_WEBHOOK_SECRET || 'your_sandbox_webhook_secret';
+  
+  // HMAC-SHA256 tekshiruvi
+  const expectedSignature = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(JSON.stringify(req.body))
+    .digest('hex');
+
+  if (signature && signature !== expectedSignature) {
+    return res.status(401).json({ error: 'Noto‘g‘ri HMAC imzo' });
+  }
+
+  console.log('Event qabul qilindi:', req.body);
+  res.json({ received: true });
+});
+
+app.listen(3000, () => console.log('Zayuno Provider API running on port 3000'));`}
+                </pre>
+              </div>
+
+              {/* Python FastAPI */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-300 text-xs">Python (FastAPI)</span>
+                  <button
+                    onClick={() => copyToClipboard(`from fastapi import FastAPI, Header, HTTPException, Request
+from pydantic import BaseModel
+import hmac
+import hashlib
+import json
+import time
+
+app = FastAPI(title="Zayuno Provider Adapter")
+
+@app.get("/health")
+def health():
+    return {"status": "HEALTHY", "provider": "my-business"}
+
+@app.get("/catalog")
+def catalog():
+    return {"items": [{"id": "item_1", "name": "Konsultatsiya xizmati", "price": 100000, "currency": "UZS"}]}
+
+@app.post("/quote")
+def create_quote():
+    return {
+        "quoteId": f"q_{int(time.time())}",
+        "subtotal": 100000,
+        "fees": 0,
+        "discount": 0,
+        "total": 100000,
+        "currency": "UZS"
+    }
+
+@app.post("/actions")
+def create_action():
+    act_id = f"act_{int(time.time())}"
+    return {
+        "actionId": act_id,
+        "status": "CONFIRMED"
+    }
+
+@app.post("/webhook")
+async def receive_webhook(request: Request, x_zayuno_signature: str = Header(None)):
+    body = await request.body()
+    secret = b"your_sandbox_webhook_secret"
+    expected = hmac.new(secret, body, hashlib.sha256).hexdigest()
+    if x_zayuno_signature and not hmac.compare_digest(x_zayuno_signature, expected):
+        raise HTTPException(status_code=401, detail="Noto'g'ri HMAC imzo")
+    return {"received": True}`, 'code-py')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
+                  >
+                    {copiedSection === 'code-py' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedSection === 'code-py' ? 'Nusxalandi!' : 'Kodni nusxalash'}</span>
+                  </button>
+                </div>
+                <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-indigo-200 overflow-x-auto">
+{`from fastapi import FastAPI
+import time
+
+app = FastAPI(title="Zayuno Provider Adapter")
+
+@app.get("/health")
+def health():
+    return {"status": "HEALTHY", "provider": "my-business"}
+
+@app.get("/catalog")
+def catalog():
+    return {"items": [{"id": "item_1", "name": "Konsultatsiya xizmati", "price": 100000, "currency": "UZS"}]}
+
+@app.post("/quote")
+def create_quote():
+    return {
+        "quoteId": f"q_{int(time.time())}",
+        "subtotal": 100000,
+        "fees": 0,
+        "discount": 0,
+        "total": 100000,
+        "currency": "UZS"
+    }
+
+@app.post("/actions")
+def create_action():
+    return {"actionId": f"act_{int(time.time())}", "status": "CONFIRMED"}`}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* 3. SPECIFICATION V1                                                      */}
         {/* ========================================================================= */}
         {selectedDoc === 'spec-v1' && (
           <div className="space-y-6">
