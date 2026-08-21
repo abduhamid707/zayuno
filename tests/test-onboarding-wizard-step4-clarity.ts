@@ -105,11 +105,19 @@ async function main() {
   console.log('    ✓ AI integration briefs cleanly generated with zero secret leakage.');
 
   // 6. Wizard Step Transition Buttons
-  console.log('  [6/6] Testing Step button labels across wizard flow...');
+  console.log('  [6/7] Testing Step button labels across wizard flow...');
   assert.ok(wizardContent.includes('Davom etish (Sertifikatlashga o‘tish)'), 'Step 4 primary button must guide to certification');
   assert.ok(wizardContent.includes('Davom etish (Xulosa va Ko‘rib chiqish)'), 'Step 5 primary button must guide to review/credentials');
   assert.ok(wizardContent.includes('Review’ga yuborish va Dashboardga o‘tish'), 'Step 6 primary button must guide to review & dashboard');
   console.log('    ✓ Step button progression flow (Steps 1–5 "Davom etish", Step 6 "Review") verified.');
+
+  // 7. Draft Persistence & Step Skipping Guardrails
+  console.log('  [7/7] Testing Draft Persistence & Step Progression Guardrails...');
+  assert.ok(wizardContent.includes('DRAFT_STORAGE_KEY'), 'Must use localStorage draft persistence key');
+  assert.ok(wizardContent.includes('isStepAccessible'), 'Must guard step progression with isStepAccessible');
+  assert.ok(wizardContent.includes('activeDocsDrawer'), 'Must support In-Wizard DocsDrawer without unmounting form');
+  assert.ok(wizardContent.includes('Arizangiz hali topshirilmagan'), 'Step 6 must block access if credentials do not exist');
+  console.log('    ✓ Form draft auto-save and step skipping guardrails verified.');
 
   console.log('\n🎉 ALL ONBOARDING WIZARD UX CLARITY & STEP 4 TESTS PASSED CLEANLY!\n');
 }

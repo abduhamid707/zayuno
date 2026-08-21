@@ -24,8 +24,12 @@ import {
   HelpCircle,
   Info,
   FileCode,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
+import { DocsViewer } from './DocsViewer';
+
+const DRAFT_STORAGE_KEY = 'zayuno_onboarding_draft';
 
 interface OnboardingWizardProps {
   apiBase: string;
@@ -40,7 +44,11 @@ interface OnboardingWizardProps {
   initialVerifyToken?: string;
 }
 
-const InfoTooltip: React.FC<{ text: string; docId?: string; onOpenDoc?: (doc: string) => void }> = ({ text, docId, onOpenDoc }) => {
+const InfoTooltip: React.FC<{
+  text: string;
+  docId?: string;
+  onOpenDoc?: (doc: string) => void;
+}> = ({ text, docId, onOpenDoc }) => {
   const [open, setOpen] = useState(false);
   return (
     <span className="relative inline-flex items-center ml-1.5 align-middle">
@@ -94,11 +102,30 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   initialEmail = '',
   initialVerifyToken = ''
 }) => {
-  const [currentStep, setCurrentStep] = useState<number>(initialStep);
+  // Read saved draft from localStorage
+  const loadSavedDraft = () => {
+    try {
+      const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
+  const savedDraft = loadSavedDraft();
+
+  // Current Step determination
+  const [currentStep, setCurrentStep] = useState<number>(() => {
+    if (savedDraft?.currentStep && savedDraft.currentStep >= 1 && savedDraft.currentStep <= 6) {
+      if (token && savedDraft.currentStep < 3) return 3;
+      return savedDraft.currentStep;
+    }
+    if (token) return Math.max(3, initialStep);
+    return initialStep;
+  });
 
   // Step 1: Account Creation
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState(initialEmail);
+  const [fullName, setFullName] = useState(savedDraft?.fullName || '');
+  const [email, setEmail] = useState(initialEmail || savedDraft?.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -107,18 +134,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // Step 3: Business Profile
-  const [businessName, setBusinessName] = useState('');
-  const [category, setCategory] = useState('general_services');
-  const [description, setDescription] = useState('');
-  const [supportPhone, setSupportPhone] = useState('');
-  const [supportTelegram, setSupportTelegram] = useState('');
-  const [supportEmail, setSupportEmail] = useState('');
+  const [businessName, setBusinessName] = useState(savedDraft?.businessName || '');
+  const [category, setCategory] = useState(savedDraft?.category || 'general_services');
+  const [description, setDescription] = useState(savedDraft?.description || '');
+  const [supportPhone, setSupportPhone] = useState(savedDraft?.supportPhone || '');
+  const [supportTelegram, setSupportTelegram] = useState(savedDraft?.supportTelegram || '');
+  const [supportEmail, setSupportEmail] = useState(savedDraft?.supportEmail || '');
 
   // Step 4: Integration Details
-  const [slug, setSlug] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [authMethod, setAuthMethod] = useState<'API_KEY' | 'BEARER_TOKEN' | 'HMAC_SIGNATURE'>('API_KEY');
-  const [capabilityProfile, setCapabilityProfile] = useState<'transactional' | 'readonly'>('transactional');
+  const [slug, setSlug] = useState(savedDraft?.slug || '');
+  const [baseUrl, setBaseUrl] = useState(savedDraft?.baseUrl || '');
+  const [authMethod, setAuthMethod] = useState<'API_KEY' | 'BEARER_TOKEN' | 'HMAC_SIGNATURE'>(savedDraft?.authMethod || 'API_KEY');
+  const [capabilityProfile, setCapabilityProfile] = useState<'transactional' | 'readonly'>(savedDraft?.capabilityProfile || 'transactional');
 
   // Step 4: URL Testing & Brief Copy States
   const [testingUrl, setTestingUrl] = useState(false);
@@ -128,12 +155,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   }>({ status: 'idle', message: '' });
   const [copiedBrief, setCopiedBrief] = useState(false);
 
+  // In-Wizard Docs Modal/Drawer State (Prevents losing wizard context)
+  const [activeDocsDrawer, setActiveDocsDrawer] = useState<string | null>(null);
+
   // Step 6: Review & Credentials
   const [createdCredentials, setCreatedCredentials] = useState<{
     providerSlug: string;
     sandboxApiKey: string;
     sandboxWebhookSecret: string;
-  } | null>(null);
+  } | null>(savedDraft?.createdCredentials || null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Status & Errors
@@ -141,12 +171,49 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Sync draft to localStorage on changes
+  useEffect(() => {
+    try {
+      const draft = {
+        fullName,
+        email,
+        businessName,
+        category,
+        description,
+        supportPhone,
+        supportTelegram,
+        supportEmail,
+        slug,
+        baseUrl,
+        authMethod,
+        capabilityProfile,
+        currentStep,
+        createdCredentials
+      };
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    } catch {}
+  }, [
+    fullName,
+    email,
+    businessName,
+    category,
+    description,
+    supportPhone,
+    supportTelegram,
+    supportEmail,
+    slug,
+    baseUrl,
+    authMethod,
+    capabilityProfile,
+    currentStep,
+    createdCredentials
+  ]);
+
   // Sync initial parameters
   useEffect(() => {
     if (initialEmail) setEmail(initialEmail);
     if (initialVerifyToken) setVerifyToken(initialVerifyToken);
-    if (initialStep) setCurrentStep(initialStep);
-  }, [initialEmail, initialVerifyToken, initialStep]);
+  }, [initialEmail, initialVerifyToken]);
 
   // If user is authenticated, skip Step 1 and Step 2 and navigate directly to Step 3 (Business Profile)
   useEffect(() => {
@@ -557,6 +624,52 @@ ${isTrans ? `[1] GET  /health
     }
   };
 
+  const isStepAccessible = (stepNum: number): boolean => {
+    if (stepNum <= currentStep) return true;
+    if (stepNum === 1 || stepNum === 2) return true;
+    if (stepNum === 3) return Boolean(token);
+    if (stepNum === 4) return Boolean(token) && businessName.trim().length >= 2;
+    if (stepNum === 5 || stepNum === 6) {
+      return Boolean(token) && businessName.trim().length >= 2 && Boolean(createdCredentials);
+    }
+    return false;
+  };
+
+  const handleStepClick = (stepNum: number) => {
+    setError(null);
+    if (stepNum === currentStep) return;
+
+    if (stepNum < currentStep) {
+      setCurrentStep(stepNum);
+      return;
+    }
+
+    if (stepNum >= 3 && !token) {
+      setError('Iltimos, avval hisobingizga kiring yoki emailni tasdiqlang.');
+      return;
+    }
+
+    if (stepNum >= 4 && (!businessName.trim() || businessName.trim().length < 2)) {
+      setError('Iltimos, avval 3-qadamda biznes yoki xizmatingiz nomini kiriting.');
+      setCurrentStep(3);
+      return;
+    }
+
+    if (stepNum >= 5 && !createdCredentials) {
+      setError('Iltimos, avval 4-qadamda API sozlamalarini to‘ldirib, arizani saqlang.');
+      setCurrentStep(4);
+      return;
+    }
+
+    if (isStepAccessible(stepNum)) {
+      setCurrentStep(stepNum);
+    }
+  };
+
+  const openDocModal = (docId: string) => {
+    setActiveDocsDrawer(docId);
+  };
+
   const stepsList = [
     { num: 1, title: 'Hisob', subtitle: 'Account' },
     { num: 2, title: 'Tasdiqlash', subtitle: 'Email' },
@@ -567,10 +680,10 @@ ${isTrans ? `[1] GET  /health
   ];
 
   return (
-    <div className="max-w-4xl mx-auto my-8 bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl animate-fadeIn space-y-8">
+    <div className="max-w-4xl mx-auto my-8 bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl animate-fadeIn space-y-8 relative">
       {/* Stepper Header */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-700 flex items-center justify-center text-xl font-bold text-white shadow-lg shadow-indigo-950/50">
               ⚡
@@ -584,8 +697,11 @@ ${isTrans ? `[1] GET  /health
               </h2>
             </div>
           </div>
-          <div className="hidden sm:block text-right">
-            <span className="text-xs font-mono text-slate-400">
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-emerald-400/90 flex items-center gap-1 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-full font-mono">
+              <Check className="w-3 h-3" /> Qoralama saqlanmoqda
+            </span>
+            <span className="hidden sm:inline text-xs font-mono text-slate-400">
               Qadam {currentStep} / {stepsList.length}
             </span>
           </div>
@@ -594,23 +710,23 @@ ${isTrans ? `[1] GET  /health
         {/* Progress Bar & Steps Tabs */}
         <div className="grid grid-cols-6 gap-2">
           {stepsList.map(s => {
-            const isCompleted = currentStep > s.num || (Boolean(token) && s.num <= 2);
+            const isCompleted = currentStep > s.num || (Boolean(token) && s.num <= 2) || (s.num === 3 && businessName.trim().length >= 2) || (s.num === 4 && Boolean(createdCredentials));
             const isCurrent = currentStep === s.num;
+            const accessible = isStepAccessible(s.num);
             return (
               <button
                 key={s.num}
                 type="button"
-                onClick={() => {
-                  if (Boolean(token) || s.num <= currentStep) {
-                    setCurrentStep(s.num);
-                  }
-                }}
+                onClick={() => handleStepClick(s.num)}
+                title={!accessible ? 'Avval oldingi qadamni to‘ldiring' : ''}
                 className={`p-2.5 rounded-xl border text-center transition-all ${
                   isCurrent
                     ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30 font-semibold'
                     : isCompleted
                     ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40 font-medium hover:border-emerald-400/60'
-                    : 'bg-slate-950/40 text-slate-500 border-slate-800/80 hover:text-slate-400'
+                    : accessible
+                    ? 'bg-slate-950/40 text-slate-400 border-slate-800 hover:text-white'
+                    : 'bg-slate-950/20 text-slate-600 border-slate-800/40 cursor-not-allowed opacity-60'
                 }`}
               >
                 <div className="flex items-center justify-center gap-1 text-[11px] font-mono">
@@ -995,7 +1111,7 @@ ${isTrans ? `[1] GET  /health
                   <InfoTooltip
                     text="AI agentlar va API so‘rovlarida biznesingizni topish uchun ishlatiladigan lotincha qisqa nom (masalan: my-coffee-shop)."
                     docId="getting-started"
-                    onOpenDoc={onOpenDoc}
+                    onOpenDoc={openDocModal}
                   />
                 </label>
                 <div className="relative">
@@ -1019,7 +1135,7 @@ ${isTrans ? `[1] GET  /health
                   <InfoTooltip
                     text="Zayuno so‘rov yuboradigan sizning server manzilingiz. Bu oddiy sayt manzili emas, backend API endpoint bo‘lishi kerak."
                     docId="base-url"
-                    onOpenDoc={onOpenDoc}
+                    onOpenDoc={openDocModal}
                   />
                 </label>
                 <div className="flex gap-2">
@@ -1045,15 +1161,13 @@ ${isTrans ? `[1] GET  /health
                 </div>
                 <div className="flex items-center justify-between text-[11px] mt-1 flex-wrap gap-1">
                   <span className="text-slate-500 font-mono">Masalan: https://api.sizningbiznesingiz.uz/zayuno</span>
-                  {onOpenDoc && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenDoc('base-url')}
-                      className="text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-0.5"
-                    >
-                      API Base URL qanday tayyorlanadi? →
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => openDocModal('base-url')}
+                    className="text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-0.5"
+                  >
+                    API Base URL qanday tayyorlanadi? →
+                  </button>
                 </div>
               </div>
             </div>
@@ -1104,15 +1218,13 @@ ${isTrans ? `[1] GET  /health
                 <label className="block text-white font-bold text-sm">
                   Mijoz Zayuno orqali nima qila olsin? *
                 </label>
-                {onOpenDoc && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenDoc('base-url')}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
-                  >
-                    Qo‘llanma va kontraktlar →
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => openDocModal('base-url')}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+                >
+                  Qo‘llanma va kontraktlar →
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -1145,15 +1257,13 @@ ${isTrans ? `[1] GET  /health
                   </div>
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[10px] font-mono text-sky-300">Endpointlar: /health, /catalog, /search</span>
-                    {onOpenDoc && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onOpenDoc('base-url'); }}
-                        className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
-                      >
-                        Batafsil ko‘rish →
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); openDocModal('base-url'); }}
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                    >
+                      Batafsil ko‘rish →
+                    </button>
                   </div>
                 </div>
 
@@ -1186,15 +1296,13 @@ ${isTrans ? `[1] GET  /health
                   </div>
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[10px] font-mono text-amber-300">Endpointlar: /health, /catalog, /quote, /actions, /webhook</span>
-                    {onOpenDoc && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onOpenDoc('base-url'); }}
-                        className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
-                      >
-                        Batafsil ko‘rish →
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); openDocModal('base-url'); }}
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                    >
+                      Batafsil ko‘rish →
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1263,7 +1371,7 @@ ${isTrans ? `[1] GET  /health
                 <InfoTooltip
                   text="Zayuno sizning API serveringizga so‘rov yuborganda o‘zini qanday tasdiqlashini belgilaydi."
                   docId="auth"
-                  onOpenDoc={onOpenDoc}
+                  onOpenDoc={openDocModal}
                 />
               </label>
               <select
@@ -1369,7 +1477,14 @@ ${isTrans ? `[1] GET  /health
             </button>
             <button
               type="button"
-              onClick={() => setCurrentStep(6)}
+              onClick={() => {
+                if (!createdCredentials) {
+                  setError('Iltimos, avval 4-qadamda API sozlamalarini saqlab, arizani topshiring.');
+                  setCurrentStep(4);
+                  return;
+                }
+                setCurrentStep(6);
+              }}
               className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
             >
               Davom etish (Xulosa va Ko‘rib chiqish) <ArrowRight className="w-4 h-4" />
@@ -1383,92 +1498,162 @@ ${isTrans ? `[1] GET  /health
       {/* --------------------------------------------------------------------- */}
       {currentStep === 6 && (
         <div className="space-y-6 animate-fadeIn">
-          <div className="text-center space-y-2 max-w-lg mx-auto">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30 shadow-lg shadow-emerald-950/50">
-              <CheckCircle2 className="w-7 h-7" />
+          {!createdCredentials ? (
+            <div className="p-8 rounded-3xl bg-amber-950/20 border border-amber-500/30 text-center space-y-4 max-w-lg mx-auto animate-fadeIn">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">Arizangiz hali topshirilmagan</h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Ko‘rib chiqish bosqichiga o‘tish uchun avval 4-qadamda Provider Slug va API Base URL sozlamalarini saqlang.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentStep(4)}
+                className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2 mx-auto"
+              >
+                4-qadamga o‘tish (API sozlamalari) <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-            <h3 className="text-xl font-bold text-white">Arizangiz tayyor va saqlandi!</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Provider arizangiz yaratildi. Quyida sizning sandbox integratsiya kalitlaringiz berilgan.
-            </p>
-          </div>
-
-          {/* Credentials Box */}
-          {createdCredentials && (
-            <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                  <Key className="w-4 h-4 text-amber-400" /> Sandbox Credentiallari
-                </span>
-                <span className="text-[10px] font-mono bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded border border-amber-500/20">
-                  Bir marta ko‘rsatiladi
-                </span>
+          ) : (
+            <>
+              <div className="text-center space-y-2 max-w-lg mx-auto">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30 shadow-lg shadow-emerald-950/50">
+                  <CheckCircle2 className="w-7 h-7" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Arizangiz tayyor va saqlandi!</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Provider arizangiz yaratildi. Quyida sizning sandbox integratsiya kalitlaringiz berilgan.
+                </p>
               </div>
 
-              <div className="space-y-2 text-xs font-mono">
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
-                  <span className="text-slate-400">Provider Slug:</span>
-                  <span className="text-indigo-300 font-bold">{createdCredentials.providerSlug}</span>
+              {/* Credentials Box */}
+              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                    <Key className="w-4 h-4 text-amber-400" /> Sandbox Credentiallari
+                  </span>
+                  <span className="text-[10px] font-mono bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded border border-amber-500/20">
+                    Bir marta ko‘rsatiladi
+                  </span>
                 </div>
 
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
-                  <div className="truncate pr-2">
-                    <span className="text-slate-400 block text-[10px]">Sandbox API Key:</span>
-                    <span className="text-white text-xs">{createdCredentials.sandboxApiKey}</span>
+                <div className="space-y-2 text-xs font-mono">
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                    <span className="text-slate-400">Provider Slug:</span>
+                    <span className="text-indigo-300 font-bold">{createdCredentials.providerSlug}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(createdCredentials.sandboxApiKey, 'key')}
-                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-                  >
-                    {copiedField === 'key' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
 
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
-                  <div className="truncate pr-2">
-                    <span className="text-slate-400 block text-[10px]">Sandbox Webhook Secret:</span>
-                    <span className="text-white text-xs">{createdCredentials.sandboxWebhookSecret}</span>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                    <div className="truncate pr-2">
+                      <span className="text-slate-400 block text-[10px]">Sandbox API Key:</span>
+                      <span className="text-white text-xs">{createdCredentials.sandboxApiKey}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(createdCredentials.sandboxApiKey, 'key')}
+                      className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                    >
+                      {copiedField === 'key' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(createdCredentials.sandboxWebhookSecret, 'sec')}
-                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-                  >
-                    {copiedField === 'sec' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
+
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                    <div className="truncate pr-2">
+                      <span className="text-slate-400 block text-[10px]">Sandbox Webhook Secret:</span>
+                      <span className="text-white text-xs">{createdCredentials.sandboxWebhookSecret}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(createdCredentials.sandboxWebhookSecret, 'sec')}
+                      className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                    >
+                      {copiedField === 'sec' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+
+              {/* Timeline & Next Steps */}
+              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs space-y-2">
+                <h4 className="font-semibold text-white flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-sky-400" /> Keyingi qadamlar va Ko‘rib chiqish muddati
+                </h4>
+                <ul className="space-y-1.5 text-slate-400 list-disc list-inside">
+                  <li>API adapteringizni Zayuno kontraktiga moslab yozing yoki AI Kit yordamida generatsiya qiling.</li>
+                  <li>Certification bo‘limida avtomatlashtirilgan testlarni ishga tushiring.</li>
+                  <li>Testlar 100% o‘tgach, arizani yakuniy ko‘rib chiqishga (Review) topshiring (1-2 ish kuni).</li>
+                </ul>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab('apps')}
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
+                >
+                  Review’ga yuborish va Dashboardga o‘tish <ArrowRight className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab('sandbox')}
+                  className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-slate-200 font-medium text-xs px-5 py-3 rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2"
+                >
+                  Sandbox Simulatorda sinash
+                </button>
+              </div>
+            </>
           )}
+        </div>
+      )}
 
-          {/* Timeline & Next Steps */}
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs space-y-2">
-            <h4 className="font-semibold text-white flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-sky-400" /> Keyingi qadamlar va Ko‘rib chiqish muddati
-            </h4>
-            <ul className="space-y-1.5 text-slate-400 list-disc list-inside">
-              <li>API adapteringizni Zayuno kontraktiga moslab yozing yoki AI Kit yordamida generatsiya qiling.</li>
-              <li>Certification bo‘limida avtomatlashtirilgan testlarni ishga tushiring.</li>
-              <li>Testlar 100% o‘tgach, arizani yakuniy ko‘rib chiqishga (Review) topshiring (1-2 ish kuni).</li>
-            </ul>
-          </div>
+      {/* --------------------------------------------------------------------- */}
+      {/* IN-WIZARD DOCS DRAWER / MODAL (Never lose form context)               */}
+      {/* --------------------------------------------------------------------- */}
+      {activeDocsDrawer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-scaleUp">
+            {/* Drawer Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/70">
+              <div className="flex items-center gap-2.5">
+                <Globe className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-bold text-white text-sm sm:text-base">Zayuno Documentation & Kontraktlar</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                {onOpenDoc && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = activeDocsDrawer;
+                      setActiveDocsDrawer(null);
+                      onOpenDoc(target);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> To‘liq sahifada ochish
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setActiveDocsDrawer(null)}
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                  aria-label="Yopish"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => onNavigateTab('apps')}
-              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
-            >
-              Review’ga yuborish va Dashboardga o‘tish <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateTab('sandbox')}
-              className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-slate-200 font-medium text-xs px-5 py-3 rounded-xl border border-slate-700 transition-all flex items-center justify-center gap-2"
-            >
-              Sandbox Simulatorda sinash
-            </button>
+            {/* Drawer Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 text-xs text-slate-300">
+              <DocsViewer
+                selectedDoc={activeDocsDrawer}
+                onSelectDoc={(id) => setActiveDocsDrawer(id)}
+                onOpenAiKit={onOpenAiKit}
+              />
+            </div>
           </div>
         </div>
       )}
