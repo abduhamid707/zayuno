@@ -198,14 +198,18 @@ export default function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
-    const tokenInUrl = url.searchParams.get('verifyToken');
+    const tokenInUrl = url.searchParams.get('verifyToken') || url.searchParams.get('token');
     const emailInUrl = url.searchParams.get('email');
 
     if (tokenInUrl) {
       setVerifyTokenInput(tokenInUrl);
       if (emailInUrl) setEmail(emailInUrl);
-      setAuthModalTab('verify');
-      setAuthModalOpen(true);
+      // If user is not on onboarding or auth tab, open auth modal
+      const tabParam = url.searchParams.get('tab');
+      if (tabParam !== 'onboarding' && tabParam !== 'auth') {
+        setAuthModalTab('verify');
+        setAuthModalOpen(true);
+      }
     }
   }, []);
 
@@ -1020,6 +1024,12 @@ export default function App() {
             onAuthSuccess={(newToken, user) => {
               setToken(newToken);
               setUserProfile(user);
+              if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('verifyToken');
+                url.searchParams.delete('token');
+                window.history.replaceState({}, '', url.toString());
+              }
               refetchProvider();
             }}
             onProviderCreated={() => {
@@ -1042,6 +1052,12 @@ export default function App() {
             onLoginSuccess={(newToken, user) => {
               setToken(newToken);
               setUserProfile(user);
+              if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('verifyToken');
+                url.searchParams.delete('token');
+                window.history.replaceState({}, '', url.toString());
+              }
               refetchProvider();
               setActiveTab('apps');
             }}
