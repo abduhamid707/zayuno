@@ -106,7 +106,7 @@ async function main() {
 
   // 6. Wizard Step Transition Buttons
   console.log('  [6/7] Testing Step button labels across wizard flow...');
-  assert.ok(wizardContent.includes('Davom etish (Sertifikatlashga o‘tish)'), 'Step 4 primary button must guide to certification');
+  assert.ok(wizardContent.includes("{loading ? 'Saqlanmoqda…' : 'Davom etish'}"), 'Step 4 primary button must be Davom etish');
   assert.ok(wizardContent.includes('Davom etish (Xulosa va Ko‘rib chiqish)'), 'Step 5 primary button must guide to review/credentials');
   assert.ok(wizardContent.includes('Review’ga yuborish va Dashboardga o‘tish'), 'Step 6 primary button must guide to review & dashboard');
   console.log('    ✓ Step button progression flow (Steps 1–5 "Davom etish", Step 6 "Review") verified.');

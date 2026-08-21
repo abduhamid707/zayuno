@@ -1044,6 +1044,7 @@ export default function App() {
             initialStep={initialOnboardingStep}
             initialEmail={initialEmailParam}
             initialVerifyToken={initialVerifyTokenParam}
+            initialProvider={provider}
           />
         )}
 
@@ -1097,26 +1098,24 @@ export default function App() {
                 onDocsClick={() => setActiveTab('docs')}
               />
             ) : !provider ? (
-              <OnboardingWizard
-                apiBase={API_BASE}
-                token={token}
-                onAuthSuccess={(newToken, user) => {
-                  setToken(newToken);
-                  setUserProfile(user);
-                  refetchProvider();
-                }}
-                onProviderCreated={() => {
-                  refetchProvider();
-                }}
-                onNavigateTab={(tab) => setActiveTab(tab)}
-                onOpenDoc={(docId) => {
-                  setSelectedDoc(docId);
-                  setActiveTab('docs');
-                }}
-                onOpenAiKit={() => setAiKitOpen(true)}
-                initialStep={3}
-                initialEmail={userProfile?.email || ''}
-              />
+              <div className="p-8 rounded-3xl bg-slate-950 border border-slate-800 text-center space-y-4 max-w-lg mx-auto animate-fadeIn">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
+                  <Building2 className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-bold text-white">Sizda hali ro‘yxatdan o‘tgan provider yo‘q</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Zayuno tarmog‘iga xizmat yoki biznesingizni ulash uchun bir necha daqiqalik onboarding wizardini yakunlang.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('onboarding')}
+                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2 mx-auto"
+                >
+                  Onboardingni boshlash / davom ettirish <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             ) : (
               /* EXISTING PROVIDER DASHBOARD */
               <div className="space-y-6">

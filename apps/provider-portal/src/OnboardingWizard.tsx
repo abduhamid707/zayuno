@@ -25,7 +25,10 @@ import {
   Info,
   FileCode,
   RefreshCw,
-  X
+  X,
+  Play,
+  XCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { DocsViewer } from './DocsViewer';
 
@@ -42,6 +45,7 @@ interface OnboardingWizardProps {
   initialStep?: number;
   initialEmail?: string;
   initialVerifyToken?: string;
+  initialProvider?: any;
 }
 
 const InfoTooltip: React.FC<{
@@ -100,8 +104,27 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   onOpenAiKit,
   initialStep = 1,
   initialEmail = '',
-  initialVerifyToken = ''
+  initialVerifyToken = '',
+  initialProvider
 }) => {
+  // Read deep-link parameters from URL if present (?tab=onboarding&step=5&provider=my-slug)
+  const getInitialParams = () => {
+    if (typeof window === 'undefined') return { step: null, provider: null };
+    try {
+      const url = new URL(window.location.href);
+      const stepStr = url.searchParams.get('step');
+      const stepVal = stepStr ? parseInt(stepStr, 10) : null;
+      const prov = url.searchParams.get('provider');
+      return {
+        step: stepVal && stepVal >= 1 && stepVal <= 6 ? stepVal : null,
+        provider: prov ? prov.trim().toLowerCase() : null
+      };
+    } catch {
+      return { step: null, provider: null };
+    }
+  };
+  const urlParams = getInitialParams();
+
   // Read saved draft from localStorage
   const loadSavedDraft = () => {
     try {
@@ -115,6 +138,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
   // Current Step determination
   const [currentStep, setCurrentStep] = useState<number>(() => {
+    if (urlParams.step) {
+      if (token && urlParams.step < 3) return 3;
+      return urlParams.step;
+    }
+    if (initialProvider?.slug) {
+      return 5;
+    }
     if (savedDraft?.currentStep && savedDraft.currentStep >= 1 && savedDraft.currentStep <= 6) {
       if (token && savedDraft.currentStep < 3) return 3;
       return savedDraft.currentStep;
@@ -134,18 +164,26 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // Step 3: Business Profile
-  const [businessName, setBusinessName] = useState(savedDraft?.businessName || '');
-  const [category, setCategory] = useState(savedDraft?.category || 'general_services');
-  const [description, setDescription] = useState(savedDraft?.description || '');
-  const [supportPhone, setSupportPhone] = useState(savedDraft?.supportPhone || '');
-  const [supportTelegram, setSupportTelegram] = useState(savedDraft?.supportTelegram || '');
-  const [supportEmail, setSupportEmail] = useState(savedDraft?.supportEmail || '');
+  const [businessName, setBusinessName] = useState(initialProvider?.name || savedDraft?.businessName || '');
+  const [category, setCategory] = useState(initialProvider?.metadata?.category || savedDraft?.category || 'general_services');
+  const [description, setDescription] = useState(initialProvider?.metadata?.description || savedDraft?.description || '');
+  const [supportPhone, setSupportPhone] = useState(initialProvider?.config?.supportContact?.phone || savedDraft?.supportPhone || '');
+  const [supportTelegram, setSupportTelegram] = useState(initialProvider?.config?.supportContact?.telegram || savedDraft?.supportTelegram || '');
+  const [supportEmail, setSupportEmail] = useState(initialProvider?.config?.supportContact?.email || savedDraft?.supportEmail || '');
 
   // Step 4: Integration Details
-  const [slug, setSlug] = useState(savedDraft?.slug || '');
-  const [baseUrl, setBaseUrl] = useState(savedDraft?.baseUrl || '');
-  const [authMethod, setAuthMethod] = useState<'API_KEY' | 'BEARER_TOKEN' | 'HMAC_SIGNATURE'>(savedDraft?.authMethod || 'API_KEY');
-  const [capabilityProfile, setCapabilityProfile] = useState<'transactional' | 'readonly'>(savedDraft?.capabilityProfile || 'transactional');
+  const [slug, setSlug] = useState(urlParams.provider || initialProvider?.slug || savedDraft?.slug || '');
+  const [baseUrl, setBaseUrl] = useState(initialProvider?.baseUrl || savedDraft?.baseUrl || '');
+  const [authMethod, setAuthMethod] = useState<'API_KEY' | 'BEARER_TOKEN' | 'HMAC_SIGNATURE'>(
+    initialProvider?.config?.authMethod || savedDraft?.authMethod || 'API_KEY'
+  );
+  const [capabilityProfile, setCapabilityProfile] = useState<'transactional' | 'readonly'>(() => {
+    if (initialProvider?.capabilities) {
+      const isTrans = initialProvider.capabilities.some((c: string) => c === 'QUOTE' || c === 'ACTION_CREATE');
+      return isTrans ? 'transactional' : 'readonly';
+    }
+    return savedDraft?.capabilityProfile || 'transactional';
+  });
 
   // Step 4: URL Testing & Brief Copy States
   const [testingUrl, setTestingUrl] = useState(false);
@@ -158,18 +196,49 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   // In-Wizard Docs Modal/Drawer State (Prevents losing wizard context)
   const [activeDocsDrawer, setActiveDocsDrawer] = useState<string | null>(null);
 
+  // Step 5: In-Wizard Certification Runner State
+  const [certLoading, setCertLoading] = useState(false);
+  const [certReport, setCertReport] = useState<any | null>(() => {
+    return initialProvider?.metadata?.lastCertificationReport || null;
+  });
+  const [certError, setCertError] = useState<string | null>(null);
+
   // Step 6: Review & Credentials
   const [createdCredentials, setCreatedCredentials] = useState<{
     providerSlug: string;
     sandboxApiKey: string;
     sandboxWebhookSecret: string;
-  } | null>(savedDraft?.createdCredentials || null);
+  } | null>(() => {
+    if (initialProvider?.slug) {
+      return {
+        providerSlug: initialProvider.slug,
+        sandboxApiKey: 'zy_test_sandbox_key',
+        sandboxWebhookSecret: initialProvider.webhookSecret || ''
+      };
+    }
+    return savedDraft?.createdCredentials || null;
+  });
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   // Status & Errors
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Sync deep-link parameters to browser URL: ?tab=onboarding&step=N&provider=slug
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', 'onboarding');
+    url.searchParams.set('step', String(currentStep));
+    if (slug.trim()) {
+      url.searchParams.set('provider', slug.trim());
+    } else {
+      url.searchParams.delete('provider');
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, [currentStep, slug]);
 
   // Sync draft to localStorage on changes
   useEffect(() => {
@@ -447,7 +516,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       if (res.ok) {
         setUrlCheckResult({
           status: 'success',
-          message: '✅ Ulanish muvaffaqiyatli! Server /health endpointida 200 OK qaytardi.'
+          message: '✅ Ulanish muvaffaqiyatli! Server /health endpointida 200 OK qaytardi. (Eslatma: Keyingi amaliy endpointlar uchun API kalit yoki test credential talab qilinishi mumkin.)'
         });
       } else if (res.status === 404) {
         setUrlCheckResult({
@@ -603,24 +672,93 @@ ${isTrans ? `[1] GET  /health
         throw new Error(data?.message || 'Provider arizasini yaratishda xatolik yuz berdi.');
       }
 
-      // Fetch newly created sandbox credentials
-      try {
-        const credsRes = await fetch(`${apiBase}/api/v1/providers/${cleanSlug}/credentials`, {
-          headers: { Authorization: `Bearer ${authToken}` }
-        });
-        if (credsRes.ok) {
-          const credsData = await credsRes.json();
-          setCreatedCredentials(credsData);
-        }
-      } catch {}
+      if (data.credentials) {
+        setCreatedCredentials(data.credentials);
+      } else {
+        // Fetch newly created sandbox credentials
+        try {
+          const credsRes = await fetch(`${apiBase}/api/v1/providers/${cleanSlug}/credentials`, {
+            headers: { Authorization: `Bearer ${authToken}` }
+          });
+          if (credsRes.ok) {
+            const credsData = await credsRes.json();
+            setCreatedCredentials(credsData);
+          }
+        } catch {}
+      }
 
       onProviderCreated(data);
-      setSuccessMsg('Provider muvaffaqiyatli ro‘yxatdan o‘tkazildi!');
+      setSuccessMsg('Provider DRAFT arizasi saqlandi! Endi 5-qadamda sertifikatlash testlarini bajaring.');
       setCurrentStep(5);
     } catch (err: any) {
       setError(err.message || 'Arizani yaratishda xatolik yuz berdi.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // STEP 5: In-Wizard Certification Runner
+  // --------------------------------------------------------------------------
+  const handleRunCertification = async () => {
+    const targetSlug = slug.trim() || createdCredentials?.providerSlug;
+    if (!targetSlug) {
+      setCertError('Provider topilmadi. Iltimos, 4-qadamda arizani saqlang.');
+      return;
+    }
+
+    setCertLoading(true);
+    setCertError(null);
+    setSuccessMsg(null);
+    try {
+      const authToken = token || localStorage.getItem('zayuno_provider_token');
+      const res = await fetch(`${apiBase}/api/v1/providers/${encodeURIComponent(targetSlug)}/certify`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authToken}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || 'Sertifikatlash jarayonida server xatosi yuz berdi.');
+      }
+      setCertReport(data);
+      if (data.isCertified || data.isProductionReady) {
+        setSuccessMsg('Barcha mandatory sertifikatlash testlari muvaffaqiyatli o‘tdi!');
+      }
+    } catch (err: any) {
+      setCertError(err.message || 'Certificationni ishga tushirishda xatolik yuz berdi.');
+    } finally {
+      setCertLoading(false);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // STEP 6: Submit for Review
+  // --------------------------------------------------------------------------
+  const handleSubmitReview = async () => {
+    const targetSlug = slug.trim() || createdCredentials?.providerSlug;
+    if (!targetSlug) return;
+    setSubmittingReview(true);
+    setError(null);
+    try {
+      const authToken = token || localStorage.getItem('zayuno_provider_token');
+      const res = await fetch(`${apiBase}/api/v1/providers/${encodeURIComponent(targetSlug)}/submit-review`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authToken}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || 'Arizani reviewga topshirishda xatolik yuz berdi.');
+      }
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      onNavigateTab('apps');
+    } catch (err: any) {
+      setError(err.message || 'Arizani topshirishda xatolik.');
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -1172,6 +1310,19 @@ ${isTrans ? `[1] GET  /health
               </div>
             </div>
 
+            {/* Sandbox Notice Banner */}
+            {(baseUrl.toLowerCase().includes('sandbox') || baseUrl.toLowerCase().includes('shopla.uz')) && (
+              <div className="p-3.5 rounded-2xl bg-sky-950/30 border border-sky-500/40 flex items-start gap-2.5 text-xs text-sky-200 animate-fadeIn">
+                <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold block text-white">Sandbox test provideri tanlandi</span>
+                  <p className="text-[11px] text-sky-300 mt-0.5 leading-relaxed">
+                    Sandbox test provideri tanlandi. Certification uchun test credential kerak bo‘lishi mumkin. Agar serverda xavfsiz test credential mavjud bo‘lsa, u avtomatik ishlatiladi.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* URL Health Check Alert */}
             {urlCheckResult.status !== 'idle' && (
               <div
@@ -1399,72 +1550,181 @@ ${isTrans ? `[1] GET  /health
               disabled={loading || !slug.trim()}
               className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
             >
-              {loading ? 'Saqlanmoqda…' : 'Davom etish (Sertifikatlashga o‘tish)'} <ArrowRight className="w-4 h-4" />
+              {loading ? 'Saqlanmoqda…' : 'Davom etish'} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </form>
       )}
 
       {/* --------------------------------------------------------------------- */}
-      {/* STEP 5: Sandbox & Certification Guide                                */}
+      {/* STEP 5: In-Wizard Interactive Certification Runner                    */}
       {/* --------------------------------------------------------------------- */}
       {currentStep === 5 && (
         <div className="space-y-6 animate-fadeIn">
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-white">5. Sinov va Avtomatlashtirilgan Sertifikatlash</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Zayuno integratsiyani osonlashtirish uchun avtomatik compliance tekshiruvini taqdim etadi.
+              Zayuno compliance runner barcha talab etiladigan endpointlarni avtomatik tarzda tekshiradi.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-              <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold">
-                1
+          {/* Provider Details Card */}
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="space-y-1">
+              <span className="text-slate-400">Tekshirilayotgan provider:</span>
+              <div className="flex items-center gap-2 font-mono text-white">
+                <span className="text-indigo-400 font-bold">{slug || createdCredentials?.providerSlug || 'provider-slug'}</span>
+                <span className="text-slate-600">•</span>
+                <span className="text-slate-300 text-[11px]">{baseUrl || 'Sandbox Simulator'}</span>
               </div>
-              <h4 className="font-semibold text-white">Sandbox Simulator</h4>
-              <p className="text-slate-400 leading-relaxed">
-                Haqiqiy foydalanuvchi ma’lumotlarisiz kotirovka, buyurtma va status oqimini xavfsiz simulyatsiya qiling.
-              </p>
             </div>
-
-            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-              <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold">
-                2
-              </div>
-              <h4 className="font-semibold text-white">Avtomatik Tekshiruv</h4>
-              <p className="text-slate-400 leading-relaxed">
-                Zayuno compliance runner barcha mandatory endpointlar va HMAC xavfsizligini 1 tugma bilan test qiladi.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
-                3
-              </div>
-              <h4 className="font-semibold text-white">AI Agentlar Qidiruvi</h4>
-              <p className="text-slate-400 leading-relaxed">
-                Sertifikatdan o‘tgach, arizangiz ko‘rib chiqiladi va ChatGPT, Claude qidiruviga nashr qilinadi.
-              </p>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[11px] font-medium">
+                {capabilityProfile === 'transactional' ? 'Variant B (Transactional)' : 'Variant A (Discovery)'}
+              </span>
             </div>
           </div>
 
+          {/* Sandbox Notice Banner */}
+          {(baseUrl.toLowerCase().includes('sandbox') || baseUrl.toLowerCase().includes('shopla.uz')) && (
+            <div className="p-3.5 rounded-2xl bg-sky-950/30 border border-sky-500/40 flex items-start gap-2.5 text-xs text-sky-200 animate-fadeIn">
+              <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold block text-white">Sandbox test provideri</span>
+                <p className="text-[11px] text-sky-300 mt-0.5 leading-relaxed">
+                  Sandbox test provideri tanlandi. Certification uchun test credential kerak bo‘lishi mumkin. Agar serverda xavfsiz test credential mavjud bo‘lsa, u avtomatik ishlatiladi.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Certification Error Alert */}
+          {certError && (
+            <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-500/40 flex items-start gap-2.5 text-xs text-rose-300 animate-fadeIn">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div className="flex-1 leading-relaxed">
+                <span className="font-semibold block text-white">Xatolik yuz berdi</span>
+                <p className="text-[11px] text-rose-200 mt-0.5">{certError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Certification Report Results */}
+          {certReport && (
+            <div className="space-y-4 animate-fadeIn">
+              {/* Summary Card */}
+              <div
+                className={`p-4 rounded-2xl border flex items-center justify-between flex-wrap gap-3 ${
+                  certReport.isCertified || certReport.isProductionReady
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                    : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  {certReport.isCertified || certReport.isProductionReady ? (
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                      <AlertTriangle className="w-6 h-6" />
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-bold text-white text-sm">
+                      {certReport.isCertified || certReport.isProductionReady
+                        ? 'Sertifikatlash muvaffaqiyatli yakunlandi!'
+                        : 'Sertifikatlashda muammolar aniqlandi'}
+                    </h4>
+                    <p className="text-[11px] mt-0.5 opacity-90">
+                      {certReport.isCertified || certReport.isProductionReady
+                        ? 'Barcha talab etiladigan endpointlar tekshiruvdan o‘tdi. Arizani ko‘rib chiqishga yuborishingiz mumkin.'
+                        : 'Ayrim endpointlar yoki kalitlar talablarga javob bermadi. Quyidagi hisobotni tekshiring.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-mono font-bold block text-white">
+                    {certReport.tests ? `${certReport.tests.filter((t: any) => t.passed).length} / ${certReport.tests.length} testlar` : ''}
+                  </span>
+                  <span className="text-[10px] opacity-75">
+                    {certReport.totalDurationMs ? `${certReport.totalDurationMs} ms` : ''}
+                  </span>
+                </div>
+              </div>
+
+              {/* Detailed Test Items */}
+              {certReport.tests && certReport.tests.length > 0 && (
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
+                  <h4 className="text-xs font-semibold text-slate-300 mb-2">Test natijalari tafsilotlari:</h4>
+                  <div className="space-y-2">
+                    {certReport.tests.map((t: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className={`p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs ${
+                          t.passed
+                            ? 'bg-slate-900/80 border-emerald-500/20 text-slate-200'
+                            : 'bg-rose-950/20 border-rose-500/30 text-rose-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          {t.passed ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                          )}
+                          <div>
+                            <span className="font-medium text-white block">{t.name}</span>
+                            {t.error && (
+                              <span className="text-[11px] text-rose-300 block mt-0.5">
+                                Xatolik: {t.error}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 sm:self-center">
+                          <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[10px]">
+                            {t.capability}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              t.passed
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            }`}
+                          >
+                            {t.passed ? 'PASSED' : 'FAILED'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Trigger Card if not yet run or needs rerun */}
           <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 flex items-center justify-between flex-wrap gap-3">
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                <Bot className="w-4 h-4 text-amber-300" /> AI Integratsiya Kit tayyormi?
+                <ShieldCheck className="w-4 h-4 text-emerald-400" /> Avtomatlashtirilgan test tekshiruvi
               </span>
               <p className="text-[11px] text-slate-300">
-                ChatGPT, Cursor yoki Claude uchun tayyor kod prompti va JSON kontraktini bitta tugmada oling.
+                Tugmani bosish orqali barcha endpointlar muvofiqligini tekshiring.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onOpenAiKit}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-4 py-2 rounded-xl transition-all shadow-md shadow-indigo-600/30"
-            >
-              AI Kitni ochish
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRunCertification}
+                disabled={certLoading}
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-600/30 flex items-center gap-1.5"
+              >
+                {certLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                <span>{certLoading ? 'Tekshirilmoqda…' : certReport ? 'Testlarni qayta ishga tushirish' : 'Sertifikatlash testlarini ishga tushirish'}</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-slate-800">
@@ -1473,13 +1733,13 @@ ${isTrans ? `[1] GET  /health
               onClick={() => setCurrentStep(4)}
               className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5"
             >
-              <ArrowLeft className="w-3.5 h-3.5" /> Ortga
+              <ArrowLeft className="w-3.5 h-3.5" /> Ortga (API sozlamalari)
             </button>
             <button
               type="button"
               onClick={() => {
                 if (!createdCredentials) {
-                  setError('Iltimos, avval 4-qadamda API sozlamalarini saqlab, arizani topshiring.');
+                  setError('Iltimos, avval 4-qadamda API sozlamalarini saqlang.');
                   setCurrentStep(4);
                   return;
                 }
@@ -1583,18 +1843,19 @@ ${isTrans ? `[1] GET  /health
                 </h4>
                 <ul className="space-y-1.5 text-slate-400 list-disc list-inside">
                   <li>API adapteringizni Zayuno kontraktiga moslab yozing yoki AI Kit yordamida generatsiya qiling.</li>
-                  <li>Certification bo‘limida avtomatlashtirilgan testlarni ishga tushiring.</li>
-                  <li>Testlar 100% o‘tgach, arizani yakuniy ko‘rib chiqishga (Review) topshiring (1-2 ish kuni).</li>
+                  <li>Sertifikatlash testlaridan muvaffaqiyatli o‘ting.</li>
+                  <li>Arizani ko‘rib chiqishga (Review) topshiring (1-2 ish kuni ichida tasdiqlanadi).</li>
                 </ul>
               </div>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => onNavigateTab('apps')}
-                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
+                  onClick={handleSubmitReview}
+                  disabled={submittingReview}
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
                 >
-                  Review’ga yuborish va Dashboardga o‘tish <ArrowRight className="w-4 h-4" />
+                  {submittingReview ? 'Yuborilmoqda...' : 'Review’ga yuborish va Dashboardga o‘tish'} <ArrowRight className="w-4 h-4" />
                 </button>
                 <button
                   type="button"

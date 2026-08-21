@@ -469,10 +469,18 @@ export class ProvidersService {
     if (!registration.success) throw new BadRequestException(registration.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
     input = registration.data;
     if (!owner?.id) throw new BadRequestException('An authenticated provider owner is required to register a provider.');
+    let existingOwnerDraft: any = null;
     if (owner.role === UserRole.PROVIDER_OWNER) {
       const account = await prisma.user.findUnique({ where: { id: owner.id }, select: { providerId: true } });
       if (account?.providerId) {
-        throw new BadRequestException('This provider-owner account is already assigned to a provider. Ask an administrator to create or transfer another provider account.');
+        const assigned = await prisma.provider.findUnique({ where: { id: account.providerId } });
+        if (assigned) {
+          if (assigned.status === ProviderStatus.DRAFT) {
+            existingOwnerDraft = assigned;
+          } else {
+            throw new BadRequestException('This provider-owner account is already assigned to an active provider. Ask an administrator to create or transfer another provider account.');
+          }
+        }
       }
     }
     const cleanSlug = input.slug.toLowerCase().trim();
@@ -495,10 +503,70 @@ export class ProvidersService {
 
     const existing = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
     if (existing) {
-      throw new BadRequestException(`Provider with slug "${cleanSlug}" already exists.`);
+      if (existing.status === ProviderStatus.DRAFT && (existing.id === existingOwnerDraft?.id || (existing.metadata as any)?.ownerUserId === owner.id)) {
+        existingOwnerDraft = existing;
+      } else {
+        throw new BadRequestException(`Provider with slug "${cleanSlug}" already exists.`);
+      }
     }
 
     const normalizedSupport = normalizeSupportContact(input.supportContact);
+
+    // If updating an existing draft for this owner, persist updates idempotently
+    if (existingOwnerDraft) {
+      const updated = await prisma.provider.update({
+        where: { id: existingOwnerDraft.id },
+        data: {
+          slug: cleanSlug,
+          name: input.name,
+          type: (input.type as any) || ProviderType.SERVICES,
+          adapterType: input.baseUrl ? 'remote-http' : 'sandbox',
+          capabilities: input.capabilities,
+          baseUrl: input.baseUrl,
+          config: {
+            authMethod: input.authMethod,
+            authConfig: input.authConfig || {},
+            webhookUrl: input.webhookUrl,
+            supportContact: normalizedSupport
+          },
+          metadata: {
+            ...((existingOwnerDraft.metadata as Record<string, any>) || {}),
+            category: input.category || 'general',
+            geography: input.geography || ['UZ'],
+            description: input.description,
+            supportContact: normalizedSupport,
+            isCertified: false,
+            isPublished: false,
+            reviewStatus: 'DRAFT',
+            ownerUserId: owner.id,
+            updatedAt: new Date().toISOString()
+          }
+        }
+      });
+      this.registry.invalidateAdapterCache(cleanSlug);
+      if (cleanSlug !== existingOwnerDraft.slug) {
+        this.registry.invalidateAdapterCache(existingOwnerDraft.slug);
+      }
+
+      if (owner.role === UserRole.PROVIDER_OWNER) {
+        await prisma.user.update({ where: { id: owner.id }, data: { providerId: updated.id } });
+      }
+
+      const existingKey = await prisma.apiKey.findFirst({
+        where: { providerId: updated.id, isActive: true }
+      });
+      const sandboxSecret = updated.webhookSecret || `zy_sb_sec_${Math.random().toString(36).substring(2, 12)}`;
+
+      return {
+        provider: this.mapToProviderInfo(updated),
+        credentials: {
+          providerSlug: cleanSlug,
+          sandboxApiKey: existingKey?.keyPrefix ? `${existingKey.keyPrefix}...` : 'zy_test_sandbox_key',
+          sandboxWebhookSecret: sandboxSecret
+        }
+      };
+    }
+
     const sandboxKey = generateApiKey(false);
     const sandboxSecret = `zy_sb_sec_${Math.random().toString(36).substring(2, 12)}`;
     const encryptedSecret = encryptSecret(sandboxSecret, this.getEncryptionKey());

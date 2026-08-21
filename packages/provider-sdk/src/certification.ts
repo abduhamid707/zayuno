@@ -430,6 +430,47 @@ export class ProviderCertificationRunner {
     };
   }
 
+  private formatFriendlyError(raw: string): string {
+    const lower = (raw || '').toLowerCase();
+    if (
+      lower.includes('401') ||
+      lower.includes('unauthorized') ||
+      lower.includes('invalid provider api key') ||
+      lower.includes('api key required') ||
+      lower.includes('invalid api key')
+    ) {
+      return 'API kaliti noto‘g‘ri yoki yo‘q';
+    }
+    if (
+      lower.includes('404') ||
+      lower.includes('not found') ||
+      lower.includes('cannot get') ||
+      lower.includes('cannot post')
+    ) {
+      return 'Server endpointi topilmadi';
+    }
+    if (
+      lower.includes('econnrefused') ||
+      lower.includes('etimedout') ||
+      lower.includes('fetch failed') ||
+      lower.includes('timeout') ||
+      lower.includes('enotfound') ||
+      lower.includes('network') ||
+      lower.includes('server javob bermadi')
+    ) {
+      return 'Server javob bermadi';
+    }
+    if (
+      lower.includes('missing mandatory') ||
+      (lower.includes('capability') && lower.includes('missing')) ||
+      lower.includes('not supported') ||
+      lower.includes('must advertise at least one capability')
+    ) {
+      return 'Majburiy endpoint yo‘q';
+    }
+    return raw;
+  }
+
   private async runTest(
     results: CertificationTestResult[],
     name: string,
@@ -448,15 +489,18 @@ export class ProviderCertificationRunner {
         durationMs: Date.now() - start
       });
     } catch (err: any) {
+      const rawError = err.message || String(err);
+      const friendlyError = this.formatFriendlyError(rawError);
       results.push({
         name,
         capability,
         isMandatory,
         passed: false,
         durationMs: Date.now() - start,
-        error: err.message || String(err),
-        details: err
+        error: friendlyError,
+        details: { rawMessage: rawError }
       });
     }
   }
 }
+

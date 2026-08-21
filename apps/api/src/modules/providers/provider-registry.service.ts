@@ -84,6 +84,15 @@ export class ProviderRegistryService implements OnModuleInit {
       secret = provider.encryptedSecret;
     }
 
+    // Safely resolve server-side test credential for recognized sandbox hosts
+    // if no specific provider secret has been configured.
+    if (!secret || secret.startsWith('zy_sb_sec_')) {
+      const sandboxCredential = this.resolveSandboxTestCredential(provider.baseUrl, provider.slug);
+      if (sandboxCredential) {
+        secret = sandboxCredential;
+      }
+    }
+
     const adapterType = (provider.adapterType || 'sandbox').toLowerCase().trim();
     const factory = this.factories.get(adapterType);
 
@@ -108,6 +117,41 @@ export class ProviderRegistryService implements OnModuleInit {
     this.adapterCache.set(slug, adapter);
     this.logger.info(`Initialized adapter for provider "${slug}" (Type: ${adapterType})`);
     return adapter;
+  }
+
+  private resolveSandboxTestCredential(baseUrl?: string | null, slug?: string): string | null {
+    if (!baseUrl && !slug) return null;
+    let hostname = '';
+    try {
+      if (baseUrl) {
+        const parsed = new URL(baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`);
+        hostname = parsed.hostname.toLowerCase();
+      }
+    } catch {}
+
+    const cleanSlug = (slug || '').toLowerCase();
+
+    // 1. Mock Coffee Time Sandbox
+    if (hostname.includes('coffee-time') || cleanSlug.includes('coffee-time')) {
+      return process.env.MOCK_COFFEE_TIME_API_KEY || process.env.PROVIDER_API_KEY || 'zy_test_sandbox_coffee_key';
+    }
+
+    // 2. Mock EVOS Sandbox
+    if (hostname.includes('evos') || cleanSlug.includes('evos')) {
+      return process.env.MOCK_EVOS_API_KEY || process.env.PROVIDER_API_KEY || 'zy_test_sandbox_evos_key';
+    }
+
+    // 3. Mock Poyez Tickets Sandbox
+    if (hostname.includes('poyez') || cleanSlug.includes('poyez')) {
+      return process.env.MOCK_POYEZ_API_KEY || process.env.PROVIDER_API_KEY || 'zy_test_sandbox_poyez_key';
+    }
+
+    // 4. Generic shopla.uz / test sandbox domains
+    if (hostname.endsWith('.shopla.uz') || hostname.includes('sandbox')) {
+      return process.env.SANDBOX_TEST_API_KEY || process.env.PROVIDER_API_KEY || null;
+    }
+
+    return null;
   }
 
   async assertAndGetCapability(providerSlug: string, capability: ProviderCapability): Promise<ProviderAdapter> {
