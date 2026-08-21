@@ -215,6 +215,15 @@ export class ProvidersController {
     return this.providersService.submitForReview(slug, request.user);
   }
 
+  @Post(':slug/rotate-webhook-secret')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROVIDER_OWNER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Rotate the webhook HMAC secret for the provider and invalidate prior secret' })
+  async rotateWebhookSecret(@Param('slug') slug: string, @Req() request: any) {
+    return this.providersService.rotateWebhookSecret(slug, request.user);
+  }
+
   @Put(':slug/integration')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROVIDER_OWNER, UserRole.PROVIDER_DEVELOPER)

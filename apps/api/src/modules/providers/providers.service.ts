@@ -514,34 +514,40 @@ export class ProvidersService {
 
     // If updating an existing draft for this owner, persist updates idempotently
     if (existingOwnerDraft) {
+      const updateData: any = {
+        slug: cleanSlug,
+        name: input.name,
+        type: (input.type as any) || ProviderType.SERVICES,
+        adapterType: input.baseUrl ? 'remote-http' : 'sandbox',
+        capabilities: input.capabilities,
+        baseUrl: input.baseUrl,
+        config: {
+          authMethod: input.authMethod,
+          authConfig: input.authConfig || {},
+          webhookUrl: input.webhookUrl,
+          supportContact: normalizedSupport
+        },
+        metadata: {
+          ...((existingOwnerDraft.metadata as Record<string, any>) || {}),
+          category: input.category || 'general',
+          geography: input.geography || ['UZ'],
+          description: input.description,
+          supportContact: normalizedSupport,
+          isCertified: false,
+          isPublished: false,
+          reviewStatus: 'DRAFT',
+          ownerUserId: owner.id,
+          updatedAt: new Date().toISOString()
+        }
+      };
+
+      if (input.apiSecret) {
+        updateData.encryptedSecret = encryptSecret(input.apiSecret, this.getEncryptionKey());
+      }
+
       const updated = await prisma.provider.update({
         where: { id: existingOwnerDraft.id },
-        data: {
-          slug: cleanSlug,
-          name: input.name,
-          type: (input.type as any) || ProviderType.SERVICES,
-          adapterType: input.baseUrl ? 'remote-http' : 'sandbox',
-          capabilities: input.capabilities,
-          baseUrl: input.baseUrl,
-          config: {
-            authMethod: input.authMethod,
-            authConfig: input.authConfig || {},
-            webhookUrl: input.webhookUrl,
-            supportContact: normalizedSupport
-          },
-          metadata: {
-            ...((existingOwnerDraft.metadata as Record<string, any>) || {}),
-            category: input.category || 'general',
-            geography: input.geography || ['UZ'],
-            description: input.description,
-            supportContact: normalizedSupport,
-            isCertified: false,
-            isPublished: false,
-            reviewStatus: 'DRAFT',
-            ownerUserId: owner.id,
-            updatedAt: new Date().toISOString()
-          }
-        }
+        data: updateData
       });
       this.registry.invalidateAdapterCache(cleanSlug);
       if (cleanSlug !== existingOwnerDraft.slug) {
@@ -569,7 +575,8 @@ export class ProvidersService {
 
     const sandboxKey = generateApiKey(false);
     const sandboxSecret = `zy_sb_sec_${Math.random().toString(36).substring(2, 12)}`;
-    const encryptedSecret = encryptSecret(sandboxSecret, this.getEncryptionKey());
+    const secretToEncrypt = input.apiSecret || sandboxSecret;
+    const encryptedSecret = encryptSecret(secretToEncrypt, this.getEncryptionKey());
 
     const created = await prisma.provider.create({
       data: {
@@ -686,6 +693,41 @@ export class ProvidersService {
     // silently failed. A replacement key must be issued through the key
     // management flow instead.
     throw new BadRequestException('The sandbox API key is shown only when the provider application is created. Create a replacement API key if it was not saved.');
+  }
+
+  /** Rotates the webhook HMAC secret for the provider securely. */
+  async rotateWebhookSecret(
+    slug: string,
+    actor?: { id?: string; role?: UserRole; providerId?: string }
+  ): Promise<{ providerSlug: string; webhookSecret: string; rotatedAt: string }> {
+    const cleanSlug = slug.toLowerCase().trim();
+    const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
+    if (!provider) throw new NotFoundError('Provider', cleanSlug);
+    this.assertProviderManager(provider, actor);
+
+    const newSecret = `zy_wh_sec_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 10)}`;
+    const currentMetadata = (provider.metadata as Record<string, any>) || {};
+
+    await prisma.provider.update({
+      where: { slug: cleanSlug },
+      data: {
+        webhookSecret: newSecret,
+        metadata: {
+          ...currentMetadata,
+          webhookSecretRotatedAt: new Date().toISOString(),
+          webhookSecretRotatedBy: actor?.id || 'owner'
+        }
+      }
+    });
+
+    this.registry.invalidateAdapterCache(cleanSlug);
+    console.log(`[AUDIT] Webhook secret rotated for provider "${cleanSlug}". Actor: ${actor?.id || 'system'}`);
+
+    return {
+      providerSlug: cleanSlug,
+      webhookSecret: newSecret,
+      rotatedAt: new Date().toISOString()
+    };
   }
 
   async updateIntegrationSettings(

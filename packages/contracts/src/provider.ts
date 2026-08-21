@@ -220,6 +220,7 @@ export const RegisterProviderInputSchema = z.object({
   category: z.string().default('general'),
   geography: z.array(z.string()).default(['UZ']),
   baseUrl: z.string().url().optional(),
+  apiSecret: z.string().optional(),
   authMethod: z.nativeEnum(AuthMethod).default(AuthMethod.API_KEY),
   authConfig: z.record(z.any()).optional(),
   capabilities: z.array(z.nativeEnum(ProviderCapability)).min(1),

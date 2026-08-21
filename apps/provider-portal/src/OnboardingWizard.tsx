@@ -174,6 +174,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   // Step 4: Integration Details
   const [slug, setSlug] = useState(urlParams.provider || initialProvider?.slug || savedDraft?.slug || '');
   const [baseUrl, setBaseUrl] = useState(initialProvider?.baseUrl || savedDraft?.baseUrl || '');
+  const [apiSecret, setApiSecret] = useState(savedDraft?.apiSecret || '');
   const [authMethod, setAuthMethod] = useState<'API_KEY' | 'BEARER_TOKEN' | 'HMAC_SIGNATURE'>(
     initialProvider?.config?.authMethod || savedDraft?.authMethod || 'API_KEY'
   );
@@ -254,6 +255,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         supportEmail,
         slug,
         baseUrl,
+        apiSecret,
         authMethod,
         capabilityProfile,
         currentStep,
@@ -272,6 +274,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     supportEmail,
     slug,
     baseUrl,
+    apiSecret,
     authMethod,
     capabilityProfile,
     currentStep,
@@ -599,16 +602,18 @@ ${isTrans ? `[1] GET  /health
     Vazifasi: Filiallar va xizmat manzillari.`}
 
 --------------------------------------------------------------------------------
-3. XAVFSIZLIK VA TO'LOV QOIDALARI
+3. CREDENTIAL VA MAXFIYLIK QOIDALARI
 --------------------------------------------------------------------------------
-- Zayuno hech qachon to'lov kartalari ma'lumotlarini qabul qilmaydi. To'lov providerning o'z checkout havolasi (NextAction) orqali amalga oshiriladi.
-- Barcha so'rovlar JSON formatida va HTTPS orqali bo'lishi shart.
-- Ishlab chiqishda lokal server uchun ngrok HTTPS tunnelidan foydalaning.
+- Provider API key: Dasturchi o'zi yaratadi va o'z serverining environment variable'iga (.env) qo'yadi hamda Zayuno portalga bir marta kiritadi.
+- Webhook secret: Zayuno handoff orqali taqdim etadi va serverning .env fayliga saqlanadi.
+- Maxfiylik talabi: Ikkala secret ham faqat server-side muhitda (.env) saqlanadi. Git, frontend JS bundle, brauzer, chat yoki public loglarga HECH QACHON yozilmaydi.
+- To'lov chegarasi: Zayuno hech qachon to'lov kartalari ma'lumotlarini qabul qilmaydi. To'lov providerning o'z checkout havolasi (NextAction) orqali amalga oshiriladi.
 
 --------------------------------------------------------------------------------
 4. QO'LLANMALAR VA AVTOMATIK TEST
 --------------------------------------------------------------------------------
 - Base URL va Endpointlar qo'llanmasi: https://developers.zayuno.uz/?tab=docs&doc=base-url
+- Autentifikatsiya va Kalitlar qo'llanmasi: https://developers.zayuno.uz/?tab=docs&doc=auth
 - Avtomatlashtirilgan sertifikatlash testi: https://developers.zayuno.uz/?tab=certification
 `;
 
@@ -643,6 +648,8 @@ ${isTrans ? `[1] GET  /health
         throw new Error('Iltimos, avval hisobingizga kiring.');
       }
 
+      const isSandbox = baseUrl.toLowerCase().includes('sandbox') || baseUrl.toLowerCase().includes('shopla.uz');
+
       const res = await fetch(`${apiBase}/api/v1/providers/register`, {
         method: 'POST',
         headers: {
@@ -657,6 +664,7 @@ ${isTrans ? `[1] GET  /health
           category: category,
           geography: ['UZ'],
           baseUrl: baseUrl.trim() || undefined,
+          apiSecret: (!isSandbox && apiSecret.trim()) ? apiSecret.trim() : undefined,
           authMethod: authMethod,
           capabilities: capabilities,
           supportContact: {
@@ -1313,11 +1321,11 @@ ${isTrans ? `[1] GET  /health
             {/* Sandbox Notice Banner */}
             {(baseUrl.toLowerCase().includes('sandbox') || baseUrl.toLowerCase().includes('shopla.uz')) && (
               <div className="p-3.5 rounded-2xl bg-sky-950/30 border border-sky-500/40 flex items-start gap-2.5 text-xs text-sky-200 animate-fadeIn">
-                <Info className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                <Sparkles className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-semibold block text-white">Sandbox test provideri tanlandi</span>
                   <p className="text-[11px] text-sky-300 mt-0.5 leading-relaxed">
-                    Sandbox test provideri tanlandi. Certification uchun test credential kerak bo‘lishi mumkin. Agar serverda xavfsiz test credential mavjud bo‘lsa, u avtomatik ishlatiladi.
+                    Sandbox test provideri tanlandi. Test credentiallari Zayuno serveri tomonidan xavfsiz qo‘llanadi; bu yerga API key yoki webhook secret kiritishingiz shart emas.
                   </p>
                 </div>
               </div>
@@ -1516,24 +1524,91 @@ ${isTrans ? `[1] GET  /health
             </div>
 
             {/* Auth Method */}
-            <div>
-              <label className="block text-slate-300 mb-1 font-medium items-center">
-                <span>Autentifikatsiya formati</span>
-                <InfoTooltip
-                  text="Zayuno sizning API serveringizga so‘rov yuborganda o‘zini qanday tasdiqlashini belgilaydi."
-                  docId="auth"
-                  onOpenDoc={openDocModal}
-                />
-              </label>
-              <select
-                value={authMethod}
-                onChange={e => setAuthMethod(e.target.value as any)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500"
-              >
-                <option value="API_KEY">X-API-KEY Header (Tavsiya etiladi — har bir so‘rovda maxfiy API kalit tekshiriladi)</option>
-                <option value="BEARER_TOKEN">Authorization: Bearer Token (Standart Bearer token formati)</option>
-                <option value="HMAC_SIGNATURE">HMAC-SHA256 Payload Signature (Kriptografik imzo orqali eng yuqori xavfsizlik)</option>
-              </select>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-slate-300 mb-1 font-medium items-center">
+                  <span>Autentifikatsiya formati</span>
+                  <InfoTooltip
+                    text="Zayuno sizning API serveringizga so‘rov yuborganda o‘zini qanday tasdiqlashini belgilaydi."
+                    docId="auth"
+                    onOpenDoc={openDocModal}
+                  />
+                </label>
+                <select
+                  value={authMethod}
+                  onChange={e => setAuthMethod(e.target.value as any)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="API_KEY">X-API-KEY Header (Tavsiya etiladi — har bir so‘rovda maxfiy API kalit tekshiriladi)</option>
+                  <option value="BEARER_TOKEN">Authorization: Bearer Token (Standart Bearer token formati)</option>
+                  <option value="HMAC_SIGNATURE">HMAC-SHA256 Payload Signature (Kriptografik imzo orqali eng yuqori xavfsizlik)</option>
+                </select>
+              </div>
+
+              {/* Credential Inputs for Custom Non-Sandbox APIs */}
+              {!(baseUrl.toLowerCase().includes('sandbox') || baseUrl.toLowerCase().includes('shopla.uz')) && (
+                <div className="space-y-3 pt-1 animate-fadeIn">
+                  {(authMethod === 'API_KEY' || authMethod === 'BEARER_TOKEN') && (
+                    <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-slate-200 font-medium text-xs flex items-center gap-1.5">
+                          <Key className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Provider API key / token *</span>
+                          <InfoTooltip
+                            text="Bu sizning serveringizni Zayuno so‘rovlaridan himoya qiladigan kalit. Uni sizning dasturchingiz backend sozlamalarida yaratadi va Zayuno portalga bir marta kiritadi."
+                            docId="auth"
+                            onOpenDoc={openDocModal}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => openDocModal('auth')}
+                          className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-0.5"
+                        >
+                          Qayerdan olaman? →
+                        </button>
+                      </div>
+                      <input
+                        type="password"
+                        value={apiSecret}
+                        onChange={e => setApiSecret(e.target.value)}
+                        placeholder="Dasturchingiz yaratgan API key’ni kiriting"
+                        autoComplete="new-password"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
+                      />
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Zayuno sizning serveringizga so‘rov yuborganda ushbu kalitni <code className="text-sky-300 font-mono">x-provider-api-key</code> (yoki <code className="text-sky-300 font-mono">Bearer</code> token) headerida yuboradi.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5 text-xs text-slate-300">
+                    <Webhook className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-white flex items-center gap-1">
+                          Webhook HMAC Secret
+                          <InfoTooltip
+                            text="Bu kalit Zayuno’ga yuboriladigan order/status webhooklar haqiqatan sizning serveringizdan kelganini tasdiqlaydi."
+                            docId="auth"
+                            onOpenDoc={openDocModal}
+                          />
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openDocModal('auth')}
+                          className="text-[10px] text-indigo-400 hover:text-indigo-300"
+                        >
+                          Qo‘llanma →
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Yangi arizada bu secretni o‘ylab topish yoki kiritish shart emas. Zayuno uni avtomatik generatsiya qiladi va 6-bosqichda (Xulosa va Handoff) sizga faqat bir marta xavfsiz taqdim etadi.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1833,6 +1908,18 @@ ${isTrans ? `[1] GET  /health
                       {copiedField === 'sec' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* Credential Usage Guidance */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs space-y-2">
+                <h4 className="font-semibold text-white flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" /> Credentiallardan foydalanish va xavfsizlik:
+                </h4>
+                <div className="space-y-1.5 text-[11px] text-slate-300">
+                  <p><strong>1. Provider API key:</strong> Dasturchi serveringizning <code className="text-sky-300 font-mono">.env</code> muhitiga joylaydi va Zayunodan kelgan <code className="text-sky-300 font-mono">x-provider-api-key</code> headerini tekshiradi.</p>
+                  <p><strong>2. Webhook HMAC secret:</strong> Serveringiz Zayunoga buyurtma holati yangilanishini yuborganda payloadni HMAC-SHA256 bilan imzolash uchun ishlatiladi.</p>
+                  <p className="text-amber-400"><strong>3. Xavfsizlik:</strong> Hech qachon ushbu kalitlarni chat, frontend JS bundle, URL parametri yoki Git repozitoriyaga joylamang.</p>
                 </div>
               </div>
 

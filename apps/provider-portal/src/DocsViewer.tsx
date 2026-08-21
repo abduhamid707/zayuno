@@ -704,66 +704,271 @@ def create_action():
           <div className="space-y-6">
             <div className="border-b border-slate-800 pb-4">
               <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-semibold">Spec 04</span>
-              <h2 className="text-2xl font-bold text-white mt-1">Authentication & Security Protocol</h2>
+              <h2 className="text-2xl font-bold text-white mt-1">Autentifikatsiya va Credentiallar Protokoli</h2>
               <p className="text-slate-400 mt-1">
-                Mutual authentication, AES-256-GCM encryption at rest, and HMAC-SHA256 signature verification.
+                Zayuno va sizning backend serveringiz o‘rtasidagi ikki tomonlama xavfsiz aloqa, kalitlar boshqaruvi va HMAC imzolash tizimi.
               </p>
             </div>
 
-            <div className="space-y-4">
-              <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                <Key className="w-4 h-4 text-indigo-400" /> Outbound Authentication Methods
-              </h3>
-              <p className="text-xs text-slate-400">
-                When Zayuno calls your provider backend, it authenticates using your chosen method:
-              </p>
-
-              <div className="space-y-3">
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-white text-xs">Method A: Header API Key (Standard)</h4>
-                    <span className="text-[10px] font-mono bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded border border-indigo-700/50">Header: x-provider-api-key</span>
-                  </div>
-                  <pre className="font-mono text-[11px] text-indigo-300 bg-slate-900/90 p-3 rounded-lg overflow-x-auto">
-{`POST /api/actions HTTP/1.1
-Host: api.provider.example
-x-provider-api-key: your_assigned_provider_secret_here
-Content-Type: application/json`}
-                  </pre>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-white text-xs">Method B: Webhook HMAC-SHA256 Signature (Inbound)</h4>
-                    <span className="text-[10px] font-mono bg-emerald-900/40 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700/50">Header: x-signature</span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    When pushing events to Zayuno (<code className="text-indigo-300 font-mono">POST /api/v1/webhooks</code>), sign the raw request body with your assigned secret:
+            {/* 1. Quick Summary Card */}
+            <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-2 text-xs">
+              <div className="flex items-center gap-2 font-bold text-indigo-300">
+                <ShieldCheck className="w-4 h-4" /> 10 SONIYALIK XULOSA (KIM NIMA YARATADI?)
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+                  <span className="font-bold text-white flex items-center gap-1.5 text-xs">
+                    <Key className="w-3.5 h-3.5 text-sky-400" /> 1. Provider API key / token
+                  </span>
+                  <p className="text-slate-300 text-[11px] leading-relaxed">
+                    <strong>Kim yaratadi:</strong> Sizning backend dasturchingiz.<br />
+                    <strong>Qayerga qo‘yiladi:</strong> Serveringizning <code className="text-sky-300 font-mono">.env</code> fayliga va Zayuno portalga bir marta kiritiladi.
                   </p>
-                  <pre className="font-mono text-[11px] text-emerald-300 bg-slate-900/90 p-3 rounded-lg overflow-x-auto">
-{`import crypto from 'crypto';
-
-const payloadString = JSON.stringify(webhookPayload);
-const signature = crypto
-  .createHmac('sha256', webhookSecret)
-  .update(payloadString)
-  .digest('hex');
-
-// Outbound HTTP Request Headers:
-// x-provider: <providerSlug>
-// x-signature: <signature>`}
-                  </pre>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+                  <span className="font-bold text-white flex items-center gap-1.5 text-xs">
+                    <Webhook className="w-3.5 h-3.5 text-emerald-400" /> 2. Webhook HMAC secret
+                  </span>
+                  <p className="text-slate-300 text-[11px] leading-relaxed">
+                    <strong>Kim yaratadi:</strong> Zayuno platformasi.<br />
+                    <strong>Qayerga qo‘yiladi:</strong> Zayuno bergan secretni dasturchi o‘z serverining <code className="text-emerald-300 font-mono">.env</code> fayliga qo‘yadi.
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Lock className="w-4 h-4 text-indigo-400" /> Encryption at Rest
+            {/* 2. Provider API Key Deep Dive */}
+            <div className="space-y-3">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                <Key className="w-4 h-4 text-indigo-400" /> 1. Provider API Key — Sizning Serveringizni Himoyalash
               </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                All provider secrets, webhook tokens, and client credentials stored in Zayuno are encrypted with <strong>AES-256-GCM</strong> authenticated encryption. Master keys reside strictly in production environment variables and are never logged or exposed.
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Bu kalit sizning backend serveringizni Zayuno nomidan keladigan so‘rovlarni tekshirish uchun himoyalaydi. Zayuno sizning API endpointlaringizga (<code className="text-indigo-300 font-mono">/catalog</code>, <code className="text-indigo-300 font-mono">/quote</code>, <code className="text-indigo-300 font-mono">/actions</code>) murojaat qilganda har bir so‘rovning headerida ushbu kalitni yuboradi.
               </p>
+
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <h4 className="font-semibold text-white text-xs">Ishlash oqimi (4 qadam):</h4>
+                <ol className="list-decimal list-inside space-y-1 text-xs text-slate-300">
+                  <li>Dasturchi provider backend uchun maxfiy API key yaratadi (masalan: <code className="font-mono text-indigo-300">openssl rand -hex 24</code>).</li>
+                  <li>Uni provider serverining environment variable’iga qo‘yadi (<code className="font-mono text-indigo-300">PROVIDER_API_KEY=...</code>).</li>
+                  <li>Server kelgan <code className="font-mono text-indigo-300">x-provider-api-key</code> yoki <code className="font-mono text-indigo-300">Bearer</code> tokenni tekshiradi.</li>
+                  <li>Owner shu kalitni Zayuno portaliga bir marta kiritadi.</li>
+                </ol>
+              </div>
+            </div>
+
+            {/* 3. Webhook HMAC Secret Deep Dive */}
+            <div className="space-y-3">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                <Webhook className="w-4 h-4 text-emerald-400" /> 2. Webhook HMAC Secret — Zayuno’ga Yuboriladigan Xabarlar
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                <strong>HMAC nima?</strong> HMAC — xabarnoma Zayuno va sizning serveringiz o‘rtasida buzilmasdan, xavfsiz almashilganini tasdiqlovchi raqamli muhrdir.
+              </p>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Yangi provider onboarding jarayonida foydalanuvchidan bu kalitni o‘ylab topish so‘ralmaydi. Zayuno xavfsiz kriptografik secret yaratadi va uni 6-bosqichda (Xulosa va Handoff) faqat bir marta taqdim etadi.
+              </p>
+
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <h4 className="font-semibold text-white text-xs">Ishlash oqimi:</h4>
+                <ol className="list-decimal list-inside space-y-1 text-xs text-slate-300">
+                  <li>Zayuno webhook HMAC secret yaratadi va xavfsiz handoff ekranida ko‘rsatadi.</li>
+                  <li>Dasturchi uni provider serverining environment variable’iga saqlaydi (<code className="font-mono text-emerald-300">ZAYUNO_WEBHOOK_SECRET=...</code>).</li>
+                  <li>Provider Zayuno’ga webhook yuborganda payloadni shu secret bilan HMAC-SHA256 imzolaydi.</li>
+                  <li>Zayuno imzoning to‘g‘riligini tasdiqlab eventni qabul qiladi.</li>
+                </ol>
+              </div>
+            </div>
+
+            {/* 4. Sandbox Testing Rule */}
+            <div className="p-4 rounded-2xl bg-sky-950/30 border border-sky-500/40 space-y-1 text-xs text-sky-200">
+              <div className="flex items-center gap-2 font-bold text-sky-300">
+                <Sparkles className="w-4 h-4" /> SANDBOX TEST QOIDASI
+              </div>
+              <p className="leading-relaxed text-[11px] text-sky-200">
+                Agar siz Zayuno’ning rasmiy sandboxlaridan birini (<code className="font-mono text-sky-300">coffee-time-sandbox.shopla.uz</code>, <code className="font-mono text-sky-300">evos-sandbox.shopla.uz</code>, <code className="font-mono text-sky-300">poyez-sandbox.shopla.uz</code>) tanlasangiz, test credentiallari Zayuno serveri tomonidan avtomatik ta’minlanadi. Foydalanuvchi qo‘lda secret kiritishi shart emas.
+              </p>
+            </div>
+
+            {/* 5. Minimal Secrets-Free Code Examples */}
+            <div className="space-y-4 pt-2">
+              <h3 className="text-base font-semibold text-white">Backend Dasturchilar Uchun Kod Namunasi (Secrets-Free)</h3>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-300 text-xs">Node.js (Express & TypeScript)</span>
+                  <button
+                    onClick={() => copyToClipboard(`import express from 'express';
+import crypto from 'crypto';
+
+const app = express();
+app.use(express.json());
+
+// 1. Zayunodan kelgan so'rovlarni himoyalovchi Middleware
+const verifyZayunoRequest = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const incomingKey = req.headers['x-provider-api-key'];
+  const expectedKey = process.env.PROVIDER_API_KEY; // .env faylidan olinadi
+
+  if (!incomingKey || incomingKey !== expectedKey) {
+    return res.status(401).json({ error: 'API kaliti noto‘g‘ri yoki yo‘q' });
+  }
+  next();
+};
+
+// Health endpoint (ochiq)
+app.get('/health', (req, res) => {
+  res.json({ status: 'HEALTHY', provider: 'my-business', uptime: process.uptime() });
+});
+
+// Himoyalangan endpointlar
+app.get('/catalog', verifyZayunoRequest, (req, res) => {
+  res.json({ items: [{ id: '1', name: 'Amerikano', price: 25000, currency: 'UZS', available: true }] });
+});
+
+// Zayunoga Webhook yuborish (HMAC-SHA256 imzosi bilan)
+async function sendWebhookToZayuno(eventPayload: object) {
+  const webhookSecret = process.env.ZAYUNO_WEBHOOK_SECRET || '';
+  const payloadString = JSON.stringify(eventPayload);
+  const signature = crypto.createHmac('sha256', webhookSecret).update(payloadString).digest('hex');
+
+  await fetch('https://api.zayuno.uz/api/v1/webhooks', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-provider': 'my-business',
+      'x-signature': signature
+    },
+    body: payloadString
+  });
+}`, 'auth-node')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
+                  >
+                    {copiedSection === 'auth-node' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedSection === 'auth-node' ? 'Nusxalandi!' : 'Kodni nusxalash'}</span>
+                  </button>
+                </div>
+                <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-indigo-200 overflow-x-auto">
+{`import express from 'express';
+import crypto from 'crypto';
+
+const app = express();
+app.use(express.json());
+
+// 1. Zayunodan kelgan so'rovlarni himoyalovchi Middleware
+const verifyZayunoRequest = (req, res, next) => {
+  const incomingKey = req.headers['x-provider-api-key'];
+  const expectedKey = process.env.PROVIDER_API_KEY; // .env faylidan olinadi
+
+  if (!incomingKey || incomingKey !== expectedKey) {
+    return res.status(401).json({ error: 'API kaliti noto‘g‘ri yoki yo‘q' });
+  }
+  next();
+};
+
+// Health endpoint (ochiq)
+app.get('/health', (req, res) => {
+  res.json({ status: 'HEALTHY', provider: 'my-business' });
+});
+
+// Himoyalangan endpointlar
+app.get('/catalog', verifyZayunoRequest, (req, res) => {
+  res.json({ items: [{ id: '1', name: 'Amerikano', price: 25000, currency: 'UZS', available: true }] });
+});
+
+// Zayunoga Webhook yuborish (HMAC-SHA256 imzosi bilan)
+async function sendWebhookToZayuno(eventPayload) {
+  const webhookSecret = process.env.ZAYUNO_WEBHOOK_SECRET;
+  const payloadString = JSON.stringify(eventPayload);
+  const signature = crypto.createHmac('sha256', webhookSecret).update(payloadString).digest('hex');
+
+  await fetch('https://api.zayuno.uz/api/v1/webhooks', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-provider': 'my-business',
+      'x-signature': signature
+    },
+    body: payloadString
+  });
+}`}
+                </pre>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-300 text-xs">Python (FastAPI)</span>
+                  <button
+                    onClick={() => copyToClipboard(`import os, hmac, hashlib, json, httpx
+from fastapi import FastAPI, Header, HTTPException, Depends
+
+app = FastAPI()
+
+# 1. Zayuno API kalitini tekshiruvchi Dependency
+def verify_zayuno_api_key(x_provider_api_key: str = Header(None)):
+    expected_key = os.getenv("PROVIDER_API_KEY")
+    if not x_provider_api_key or x_provider_api_key != expected_key:
+        raise HTTPException(status_code=401, detail="API kaliti noto‘g‘ri yoki yo‘q")
+    return True
+
+@app.get("/health")
+def health():
+    return {"status": "HEALTHY", "provider": "my-business"}
+
+@app.get("/catalog", dependencies=[Depends(verify_zayuno_api_key)])
+def get_catalog():
+    return {"items": [{"id": "1", "name": "Amerikano", "price": 25000, "currency": "UZS", "available": True}]}
+
+# Zayunoga Webhook yuborish
+async def send_webhook_to_zayuno(payload: dict):
+    webhook_secret = os.getenv("ZAYUNO_WEBHOOK_SECRET", "").encode()
+    payload_bytes = json.dumps(payload).encode()
+    signature = hmac.new(webhook_secret, payload_bytes, hashlib.sha256).hexdigest()
+
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            "https://api.zayuno.uz/api/v1/webhooks",
+            headers={"x-provider": "my-business", "x-signature": signature},
+            content=payload_bytes
+        )`, 'auth-py')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
+                  >
+                    {copiedSection === 'auth-py' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedSection === 'auth-py' ? 'Nusxalandi!' : 'Kodni nusxalash'}</span>
+                  </button>
+                </div>
+                <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-[11px] text-indigo-200 overflow-x-auto">
+{`import os, hmac, hashlib, json, httpx
+from fastapi import FastAPI, Header, HTTPException, Depends
+
+app = FastAPI()
+
+def verify_zayuno_api_key(x_provider_api_key: str = Header(None)):
+    expected_key = os.getenv("PROVIDER_API_KEY")
+    if not x_provider_api_key or x_provider_api_key != expected_key:
+        raise HTTPException(status_code=401, detail="API kaliti noto‘g‘ri yoki yo‘q")
+    return True
+
+@app.get("/health")
+def health():
+    return {"status": "HEALTHY", "provider": "my-business"}
+
+@app.get("/catalog", dependencies=[Depends(verify_zayuno_api_key)])
+def get_catalog():
+    return {"items": [{"id": "1", "name": "Amerikano", "price": 25000, "currency": "UZS", "available": True}]}`}
+                </pre>
+              </div>
+            </div>
+
+            {/* 6. Security Critical Checklist */}
+            <div className="p-4 rounded-xl bg-slate-950 border border-rose-500/30 space-y-2 text-xs">
+              <h3 className="font-bold text-rose-400 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4" /> Xavfsizlik bo‘yicha muhim talablar:
+              </h3>
+              <ul className="list-disc list-inside space-y-1 text-slate-300 text-[11px]">
+                <li>Hech qachon API key yoki Webhook secretni Git repozitoriyaga yuklamang (<code className="text-rose-300 font-mono">.gitignore</code> ga <code className="font-mono">.env</code> ni qo‘shing).</li>
+                <li>Hech qachon secretlarni brauzer, frontend JS bundle, URL parametri yoki chatlarga yubormang.</li>
+                <li>Barcha kalitlar faqat server-side environment variables orqali saqlanishi shart.</li>
+              </ul>
             </div>
           </div>
         )}
