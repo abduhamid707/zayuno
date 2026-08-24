@@ -35,13 +35,15 @@ import {
   RequestQuoteInputSchema,
   CreateActionInputSchema,
   GetActionInputSchema,
-  CancelActionInputSchema
+  CancelActionInputSchema,
+  findForbiddenParameterKey
 } from '@zayuno/contracts';
 import { BaseProviderAdapter, ProviderAdapterConfig } from './base-provider';
 import {
   normalizeLegacyPaymentOptionsResponse,
   normalizeLegacyQuoteResponse,
-  validateProviderResponse
+  validateProviderResponse,
+  ProviderContractValidationError
 } from './protocol-validation';
 import { z } from 'zod';
 import { lookup } from 'node:dns/promises';
@@ -238,6 +240,18 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
   }
 
   async requestQuote(input: RequestQuoteInput): Promise<NormalizedQuote> {
+    const forbidden = findForbiddenParameterKey(input);
+    if (forbidden) {
+      throw new ProviderContractValidationError({
+        code: 'FORBIDDEN_SENSITIVE_PARAMETER',
+        endpoint: '/quote',
+        path: forbidden,
+        expected: 'Safe non-sensitive dynamic parameter',
+        received: 'sensitive parameter key/value',
+        docsUrl: 'https://developers.zayuno.uz/?doc=provider-integration#contract-parameters',
+        message: `Sensitive identity or payment field "${forbidden}" is not allowed in dynamic parameters. Use the provider-owned secure handoff.`
+      });
+    }
     const canonicalInput = RequestQuoteInputSchema.parse(input);
     const value = await this.callRemote<unknown>('/quote', {
       method: 'POST',
@@ -247,6 +261,18 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
   }
 
   async createAction(input: CreateActionInput): Promise<NormalizedAction> {
+    const forbidden = findForbiddenParameterKey(input);
+    if (forbidden) {
+      throw new ProviderContractValidationError({
+        code: 'FORBIDDEN_SENSITIVE_PARAMETER',
+        endpoint: '/actions',
+        path: forbidden,
+        expected: 'Safe non-sensitive dynamic parameter',
+        received: 'sensitive parameter key/value',
+        docsUrl: 'https://developers.zayuno.uz/?doc=provider-integration#contract-parameters',
+        message: `Sensitive identity or payment field "${forbidden}" is not allowed in dynamic parameters. Use the provider-owned secure handoff.`
+      });
+    }
     const canonicalInput = CreateActionInputSchema.parse(input);
     const value = await this.callRemote<unknown>('/actions', {
       method: 'POST',

@@ -74,6 +74,22 @@ export class ProvidersController {
     return this.providersService.registerProvider(body, request.user);
   }
 
+  @Post('integration/check-url')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Preflight URL and health check validation from secure backend' })
+  async checkIntegrationUrl(@Body() body: any, @Req() request: any) {
+    return this.providersService.checkIntegrationUrl(body, request.user);
+  }
+
+  @Post('check-url')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Preflight URL and health check validation from secure backend (alias)' })
+  async checkUrlAlias(@Body() body: any, @Req() request: any) {
+    return this.providersService.checkIntegrationUrl(body, request.user);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROVIDER_OWNER, UserRole.PROVIDER_DEVELOPER)

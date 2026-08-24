@@ -535,43 +535,55 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
     try {
       const cleanUrl = raw.replace(/\/+$/, '');
-      const healthUrl = `${cleanUrl}/health`;
+      const token = localStorage.getItem('zayuno_provider_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-      const res = await fetch(healthUrl, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-        signal: controller.signal
-      }).catch(err => {
-        if (err.name === 'AbortError') {
-          throw new Error('Server 6 soniya ichida javob bermadi (Timeout).');
-        }
-        throw new Error('Server bilan ulanib bo‘lmadi yoki CORS bloklandi.');
+      const res = await fetch(`${API_BASE}/api/v1/providers/integration/check-url`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          baseUrl: cleanUrl,
+          authMethod,
+          apiSecret: rawSecret || undefined
+        })
       });
-      clearTimeout(timeoutId);
 
-      if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'HEALTHY') {
         setUrlCheckResult({
           status: 'success',
-          message: '✅ Ulanish muvaffaqiyatli! Server /health endpointida 200 OK qaytardi. (Eslatma: Keyingi amaliy endpointlar uchun API kalit yoki test credential talab qilinishi mumkin.)'
+          message: data.message || '✅ Ulanish muvaffaqiyatli! Server /health endpointida 200 OK qaytardi va HealthSchema talablariga to‘liq javob berdi.'
         });
-      } else if (res.status === 404) {
+      } else if (data.status === 'NOT_FOUND') {
         setUrlCheckResult({
           status: 'not_found',
-          message: '❌ /health endpointi topilmadi (404 Not Found). Backend yo‘nalishini tekshiring.'
+          message: data.message || '❌ /health endpointi topilmadi (404 Not Found). Backend yo‘nalishini tekshiring.'
+        });
+      } else if (data.status === 'AUTH_REQUIRED') {
+        setUrlCheckResult({
+          status: 'warning',
+          message: data.message || '⚠️ Serverga ulanish muvaffaqiyatli, ammo /health endpointi autentifikatsiya talab qilmoqda.'
+        });
+      } else if (data.status === 'SCHEMA_MISMATCH') {
+        setUrlCheckResult({
+          status: 'warning',
+          message: data.message || '⚠️ Server /health da 200 OK qaytardi, ammo javob formati Zayuno HealthCheckResultSchema talablariga mos kelmadi.'
         });
       } else {
         setUrlCheckResult({
           status: 'error',
-          message: `⚠️ Server xato status qaytardi (HTTP ${res.status}).`
+          message: data.message || '❌ Server javob bermadi yoki /health ga ulanish bloklandi.'
         });
       }
     } catch (err: any) {
       setUrlCheckResult({
         status: 'error',
-        message: '❌ Server javob bermadi yoki /health ga ulanish bloklandi.'
+        message: '❌ Server javob bermadi yoki tekshirish xizmati bilan ulanishda xatolik yuz berdi.'
       });
     } finally {
       setTestingUrl(false);
@@ -584,12 +596,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     const endpoints = getProviderProtocolEndpoints(profile)
       .filter(endpoint => endpoint.required)
       .map((endpoint, index) => {
+        const reqFields = endpoint.requiredFields && endpoint.requiredFields.length
+          ? `\n    Majburiy maydonlar: ${endpoint.requiredFields.join(', ')}`
+          : '';
         const request = endpoint.requestExample === undefined
           ? ''
-          : `\n    Request: ${JSON.stringify(endpoint.requestExample)}`;
-        return `[${index + 1}] ${endpoint.method} ${endpoint.path}\n    ${endpoint.summary}${request}\n    Response: ${JSON.stringify(endpoint.responseExample)}`;
+          : `\n    Request (${endpoint.requestSchemaName || 'Body'}): ${JSON.stringify(endpoint.requestExample, null, 2).replace(/\n/g, '\n    ')}`;
+        const response = `\n    Response (${endpoint.responseSchemaName}): ${JSON.stringify(endpoint.responseExample, null, 2).replace(/\n/g, '\n    ')}`;
+        return `[${index + 1}] ${endpoint.method} ${endpoint.path}\n    ${endpoint.summary}${reqFields}${request}${response}`;
       })
-      .join('\n\n');
+      .join('\n\n--------------------------------------------------------------------------------\n\n');
     const brief = `# ZAYUNO PROVIDER INTEGRATSIYA BRIEFI (TEXNIK TOPSHIRIQ)
 
 Provider Contract: v${PROVIDER_CONTRACT_VERSION}
@@ -598,7 +614,7 @@ Biznes nomi: ${businessName.trim() || 'Mening Biznesim'}
 Provider Slug: ${slug.trim() || 'my-provider-slug'}
 Toifa: ${CATEGORIES.find(c => c.id === category)?.label || category}
 Tanlangan rejim: ${isTrans ? 'Variant B — Topish va buyurtma berish (TRANSACTIONAL)' : 'Variant A — Faqat topish va ko‘rish (DISCOVERY)'}
-Autentifikatsiya formati: ${authMethod} (${authMethod === 'API_KEY' ? 'X-API-KEY header' : authMethod === 'BEARER_TOKEN' ? 'Authorization: Bearer token' : 'HMAC-SHA256 imzosi'})
+Autentifikatsiya formati: ${authMethod} (${authMethod === 'API_KEY' ? 'X-API-KEY header: x-provider-api-key' : authMethod === 'BEARER_TOKEN' ? 'Authorization: Bearer token' : 'HMAC-SHA256 imzosi: x-zayuno-signature'})
 
 --------------------------------------------------------------------------------
 1. INTEGRATSIYA MAQSADI
@@ -612,7 +628,9 @@ AI agentlar foydalanuvchi talabiga asosan sizning xizmatlaringizni topadi, kotir
 ${endpoints}
 
 MUHIM:
-- Quote javobi "id" va itemized "lines" qaytaradi. "quoteId/items" eski alias hisoblanadi.
+- Katalog offeringlarida "providerId", "offeringCode", "title", "basePrice", "currency" va "isAvailable" maydonlari majburiydir.
+- GET /offerings/:id bitta mahsulot tafsilotini aynan OfferingSchema formatida qaytarishi shart.
+- Quote javobi "id" va itemized "lines" qaytaradi (formula: total == subtotal + totalFees - totalDiscount).
 - Payment options capability ixtiyoriy; yoqilsa javob top-level JSON array bo‘ladi.
 - Provider webhook endpoint ochmaydi. Status eventlarini Zayuno'ga POST ${ZAYUNO_WEBHOOK_INGESTION_PATH} orqali yuboradi.
 
@@ -630,6 +648,7 @@ MUHIM:
 - Base URL va Endpointlar qo'llanmasi: https://developers.zayuno.uz/?tab=docs&doc=base-url
 - Autentifikatsiya va Kalitlar qo'llanmasi: https://developers.zayuno.uz/?tab=docs&doc=auth
 - Avtomatlashtirilgan sertifikatlash testi: https://developers.zayuno.uz/?tab=certification
+- OpenAPI 3.1 va Postman Collection: https://developers.zayuno.uz/?tab=docs&doc=openapi
 `;
 
     navigator.clipboard.writeText(brief);

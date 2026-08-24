@@ -30,7 +30,9 @@ import {
   ProviderStatus,
   ProviderType,
   ProviderCapability,
+  AuthMethod,
   HealthCheckResult,
+  HealthCheckResultSchema,
   Location,
   GetLocationsInput,
   FindProvidersInput,
@@ -50,6 +52,10 @@ import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
+
+import { executeSsrfSafeGet, SsrfSecurityError } from './ssrf-checker';
+
+const preflightRateLimiter = new Map<string, { count: number; resetAt: number }>();
 
 const REVIEW_REASON_CODES = new Set([
   'API_UNREACHABLE', 'CERTIFICATION_FAILED', 'CONTRACT_MISMATCH', 'OWNERSHIP_UNVERIFIED',
@@ -1285,5 +1291,189 @@ export class ProvidersService {
       offset,
       logs: items
     };
+  }
+
+  private checkPreflightRateLimit(identifier: string): boolean {
+    const now = Date.now();
+    const existing = preflightRateLimiter.get(identifier);
+    if (!existing || now > existing.resetAt) {
+      preflightRateLimiter.set(identifier, { count: 1, resetAt: now + 60000 });
+      return true;
+    }
+    if (existing.count >= 20) {
+      return false;
+    }
+    existing.count += 1;
+    return true;
+  }
+
+  async checkIntegrationUrl(input: {
+    baseUrl: string;
+    authMethod?: AuthMethod;
+    apiSecret?: string;
+  }, user?: any): Promise<{
+    reachable: boolean;
+    statusCode?: number;
+    latencyMs?: number;
+    status: 'HEALTHY' | 'UNREACHABLE' | 'AUTH_REQUIRED' | 'NOT_FOUND' | 'SCHEMA_MISMATCH' | 'INVALID_URL' | 'FORBIDDEN_ADDRESS';
+    isSchemaValid: boolean;
+    message: string;
+    health?: HealthCheckResult;
+  }> {
+    const actorId = user?.id || user?.sub || 'anonymous';
+    if (!this.checkPreflightRateLimit(actorId)) {
+      return {
+        reachable: false,
+        status: 'UNREACHABLE',
+        isSchemaValid: false,
+        message: 'Preflight tekshiruvlar limiti oshdi. Iltimos, 1 daqiqadan so‘ng qayta urinib ko‘ring.'
+      };
+    }
+
+    const cleanBase = (input.baseUrl || '').trim().replace(/\/+$/, '');
+    if (!cleanBase) {
+      return {
+        reachable: false,
+        status: 'INVALID_URL',
+        isSchemaValid: false,
+        message: 'Base URL kiritilishi shart.'
+      };
+    }
+
+    const targetHealthUrl = `${cleanBase}/health`;
+    const headers: Record<string, string> = {
+      Accept: 'application/json'
+    };
+
+    if (input.apiSecret) {
+      const method = input.authMethod || AuthMethod.API_KEY;
+      if (method === AuthMethod.BEARER_TOKEN) {
+        headers['Authorization'] = `Bearer ${input.apiSecret}`;
+      } else if (method === AuthMethod.HMAC_SIGNATURE) {
+        const cryptoModule = await import('crypto');
+        const sig = cryptoModule.createHmac('sha256', input.apiSecret).update('').digest('hex');
+        headers['x-zayuno-signature'] = sig;
+      } else {
+        headers['x-provider-api-key'] = input.apiSecret;
+      }
+    }
+
+    try {
+      const res = await executeSsrfSafeGet(targetHealthUrl, headers, {
+        timeoutMs: 5000,
+        maxBytes: 65536,
+        allowLocalDev: true
+      });
+
+      if (res.statusCode === 401 || res.statusCode === 403) {
+        return {
+          reachable: true,
+          statusCode: res.statusCode,
+          latencyMs: res.latencyMs,
+          status: 'AUTH_REQUIRED',
+          isSchemaValid: false,
+          message: 'Serverga ulanish muvaffaqiyatli, ammo /health endpointi autentifikatsiya (API kalit yoki token) talab qilmoqda.'
+        };
+      }
+
+      if (res.statusCode === 404) {
+        return {
+          reachable: true,
+          statusCode: 404,
+          latencyMs: res.latencyMs,
+          status: 'NOT_FOUND',
+          isSchemaValid: false,
+          message: '/health endpointi topilmadi (404 Not Found). API Base URL yo‘nalishini tekshiring.'
+        };
+      }
+
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return {
+          reachable: true,
+          statusCode: res.statusCode,
+          latencyMs: res.latencyMs,
+          status: 'UNREACHABLE',
+          isSchemaValid: false,
+          message: `Server xato status qaytardi (HTTP ${res.statusCode}).`
+        };
+      }
+
+      let body: any;
+      try {
+        body = JSON.parse(res.body);
+      } catch {
+        return {
+          reachable: true,
+          statusCode: res.statusCode,
+          latencyMs: res.latencyMs,
+          status: 'SCHEMA_MISMATCH',
+          isSchemaValid: false,
+          message: 'Server /health endpointi JSON formatida javob qaytarmadi.'
+        };
+      }
+
+      const parsedSchema = HealthCheckResultSchema.safeParse(body);
+      if (!parsedSchema.success) {
+        const missing = parsedSchema.error.issues.map(i => i.path.join('.')).join(', ');
+        return {
+          reachable: true,
+          statusCode: res.statusCode,
+          latencyMs: res.latencyMs,
+          status: 'SCHEMA_MISMATCH',
+          isSchemaValid: false,
+          message: `Server /health da 200 OK qaytardi, ammo javob formati Zayuno HealthCheckResultSchema talablariga mos kelmadi (yetishmayotgan maydonlar: ${missing || 'status/latencyMs'}).`
+        };
+      }
+
+      return {
+        reachable: true,
+        statusCode: res.statusCode,
+        latencyMs: res.latencyMs,
+        status: 'HEALTHY',
+        isSchemaValid: true,
+        message: '✅ Ulanish muvaffaqiyatli! Server /health endpointida 200 OK qaytardi va HealthSchema talablariga to‘liq javob berdi.',
+        health: parsedSchema.data
+      };
+    } catch (err: any) {
+      if (err instanceof SsrfSecurityError) {
+        if (err.code === 'FORBIDDEN_ADDRESS') {
+          return {
+            reachable: false,
+            status: 'FORBIDDEN_ADDRESS',
+            isSchemaValid: false,
+            message: 'Xavfsizlik: Private IP, loopback yoki ichki tarmoq manzillarini tekshirish bloklangan.'
+          };
+        }
+        if (err.code === 'SCHEMA_MISMATCH') {
+          return {
+            reachable: true,
+            status: 'SCHEMA_MISMATCH',
+            isSchemaValid: false,
+            message: 'Server /health javobi juda katta (maksimal 64KB qabul qilinadi).'
+          };
+        }
+        if (err.code === 'TIMEOUT') {
+          return {
+            reachable: false,
+            status: 'UNREACHABLE',
+            isSchemaValid: false,
+            message: 'Server 5 soniya ichida javob bermadi (Timeout).'
+          };
+        }
+        return {
+          reachable: false,
+          status: 'INVALID_URL',
+          isSchemaValid: false,
+          message: err.message
+        };
+      }
+
+      return {
+        reachable: false,
+        status: 'UNREACHABLE',
+        isSchemaValid: false,
+        message: 'Serverga ulanish imkonsiz: tarmoq xatosi yuz berdi.'
+      };
+    }
   }
 }

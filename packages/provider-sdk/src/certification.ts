@@ -16,6 +16,7 @@ import {
 import { ProviderContractValidationError } from './protocol-validation';
 
 export type CertificationTestStatus = 'PASS' | 'FAIL' | 'SKIPPED';
+export type CertificationTestStage = 'CONTRACT_READINESS' | 'LIFECYCLE_E2E';
 
 export interface CertificationIssue {
   code: string;
@@ -30,6 +31,7 @@ export interface CertificationIssue {
 export interface CertificationTestResult {
   testId: string;
   name: string;
+  stage?: CertificationTestStage;
   capability: ProviderCapability;
   isMandatory: boolean;
   passed: boolean;
@@ -39,6 +41,7 @@ export interface CertificationTestResult {
   docsUrl?: string;
   blockedBy?: string[];
   issue?: CertificationIssue;
+  issues?: CertificationIssue[];
   error?: string;
   details?: any;
 }
@@ -69,8 +72,156 @@ export class ProviderCertificationRunner {
     this.adapter = adapter;
   }
 
-  private endpointFor(capability: ProviderCapability) {
-    return PROVIDER_PROTOCOL_ENDPOINTS.find(endpoint => endpoint.capability === capability);
+  private endpointFor(testId?: string, capability?: ProviderCapability) {
+    if (testId) {
+      const byId = PROVIDER_PROTOCOL_ENDPOINTS.find(e => e.id === testId);
+      if (byId) return byId;
+    }
+    if (capability) {
+      return PROVIDER_PROTOCOL_ENDPOINTS.find(e => e.capability === capability);
+    }
+    return undefined;
+  }
+
+  private formatFriendlyError(raw: string): string {
+    const lower = (raw || '').toLowerCase();
+    if (
+      lower.includes('401') ||
+      lower.includes('unauthorized') ||
+      lower.includes('invalid provider api key') ||
+      lower.includes('api key required') ||
+      lower.includes('invalid api key')
+    ) {
+      return 'API kaliti noto‘g‘ri yoki yo‘q';
+    }
+    if (
+      lower.includes('404') ||
+      lower.includes('not found') ||
+      lower.includes('cannot get') ||
+      lower.includes('cannot post')
+    ) {
+      return 'Server endpointi topilmadi';
+    }
+    if (
+      lower.includes('econnrefused') ||
+      lower.includes('etimedout') ||
+      lower.includes('fetch failed') ||
+      lower.includes('timeout') ||
+      lower.includes('enotfound') ||
+      lower.includes('network') ||
+      lower.includes('server javob bermadi')
+    ) {
+      return 'Server javob bermadi';
+    }
+    if (
+      lower.includes('missing mandatory') ||
+      (lower.includes('capability') && lower.includes('missing')) ||
+      lower.includes('not supported') ||
+      lower.includes('must advertise at least one capability')
+    ) {
+      return 'Majburiy endpoint yo‘q';
+    }
+    return raw;
+  }
+
+  private async runTest(
+    results: CertificationTestResult[],
+    testId: string,
+    name: string,
+    capability: ProviderCapability,
+    isMandatory: boolean,
+    testFn: () => Promise<void>,
+    dependsOn: string[] = [],
+    stage: CertificationTestStage = 'LIFECYCLE_E2E'
+  ): Promise<void> {
+    const endpoint = this.endpointFor(testId, capability);
+    const blockedBy = dependsOn.filter(dependency =>
+      results.some(result => result.testId === dependency && result.status !== 'PASS')
+    );
+    if (blockedBy.length > 0) {
+      results.push({
+        testId,
+        name,
+        stage,
+        capability,
+        isMandatory,
+        passed: false,
+        status: 'SKIPPED',
+        durationMs: 0,
+        endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
+        docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+        blockedBy,
+        error: `Oldingi asosiy test muvaffaqiyatsiz: ${blockedBy.join(', ')}`,
+        issue: {
+          code: 'DEPENDENCY_FAILED',
+          endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
+          docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+          rootCause: `Bu test ${blockedBy.join(', ')} natijasiga bog‘liq. Avval asosiy xatoni tuzating.`
+        }
+      });
+      return;
+    }
+
+    const start = Date.now();
+    try {
+      await testFn();
+      results.push({
+        testId,
+        name,
+        stage,
+        capability,
+        isMandatory,
+        passed: true,
+        status: 'PASS',
+        endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
+        docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+        durationMs: Date.now() - start
+      });
+    } catch (err: any) {
+      const rawError = err.message || String(err);
+      const friendlyError = this.formatFriendlyError(rawError);
+      const contractIssues = err instanceof ProviderContractValidationError
+        ? (err.issues && err.issues.length ? err.issues : [err.issue])
+        : undefined;
+
+      const issues: CertificationIssue[] | undefined = contractIssues
+        ? contractIssues.map(ci => ({
+            code: ci.code,
+            endpoint: ci.endpoint || (endpoint ? `${endpoint.method} ${endpoint.path}` : undefined),
+            path: ci.path,
+            expected: ci.expected,
+            received: ci.received,
+            docsUrl: ci.docsUrl || (endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined),
+            rootCause: ci.message
+          }))
+        : undefined;
+
+      const primaryIssue: CertificationIssue = issues && issues.length
+        ? issues[0]
+        : {
+            code: this.inferErrorCode(rawError),
+            endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
+            docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+            rootCause: rawError
+          };
+
+      results.push({
+        testId,
+        name,
+        stage,
+        capability,
+        isMandatory,
+        passed: false,
+        status: 'FAIL',
+        endpoint: primaryIssue.endpoint,
+        docsUrl: primaryIssue.docsUrl,
+        durationMs: Date.now() - start,
+        error: friendlyError,
+        issue: primaryIssue,
+        issues: issues && issues.length ? issues : [primaryIssue],
+        details: { rawMessage: rawError }
+      });
+    }
   }
 
   async runAllTests(): Promise<CertificationReport> {
@@ -94,7 +245,7 @@ export class ProviderCertificationRunner {
         }
         if (!info.capabilities || info.capabilities.length === 0) throw new Error('Provider must advertise at least one capability.');
         if (!info.status) throw new Error('Provider info missing status field.');
-      });
+      }, [], 'CONTRACT_READINESS');
     }
 
     // 2. Health Capability (MANDATORY)
@@ -107,7 +258,7 @@ export class ProviderCertificationRunner {
         if (typeof health.latencyMs !== 'number') {
           throw new Error('Health check must report latencyMs.');
         }
-      });
+      }, [], 'CONTRACT_READINESS');
     }
 
     // 3. Locations Capability (OPTIONAL)
@@ -123,7 +274,7 @@ export class ProviderCertificationRunner {
         if (!activeLocation.name || !activeLocation.address) {
           throw new Error('Location object missing required name or address.');
         }
-      });
+      }, [], 'CONTRACT_READINESS');
     }
 
     // 4. Catalog Capability (MANDATORY)
@@ -143,7 +294,6 @@ export class ProviderCertificationRunner {
         }
 
         selectedTestOffering = availableOfferings[0];
-        const offeringId = selectedTestOffering.id || selectedTestOffering.offeringCode;
 
         // If offering has variants, select the default or first available variant
         if (selectedTestOffering.variants && selectedTestOffering.variants.length > 0) {
@@ -169,17 +319,24 @@ export class ProviderCertificationRunner {
             }
           }
         }
+      }, [], 'CONTRACT_READINESS');
+    }
 
-        if (this.adapter.getOffering && offeringId) {
-          const singleOffering = await this.adapter.getOffering({
-            providerSlug: this.adapter.providerSlug,
-            offeringId
-          });
-          if (!singleOffering || singleOffering.basePrice < 0) {
-            throw new Error('Failed to retrieve single offering by ID or basePrice is invalid.');
-          }
+    // 4b. Single Offering Lookup (MANDATORY with Catalog)
+    if (this.adapter.hasCapability(ProviderCapability.CATALOG) && this.adapter.getOffering) {
+      await this.runTest(results, 'offering', 'Single Offering Lookup', ProviderCapability.CATALOG, true, async () => {
+        const offeringId = selectedTestOffering?.id || selectedTestOffering?.offeringCode;
+        if (!offeringId) {
+          throw new Error('Catalog has no offering ID available for single offering lookup.');
         }
-      });
+        const singleOffering = await this.adapter.getOffering!({
+          providerSlug: this.adapter.providerSlug,
+          offeringId
+        });
+        if (!singleOffering || singleOffering.basePrice < 0) {
+          throw new Error('Failed to retrieve single offering by ID or basePrice is invalid.');
+        }
+      }, ['catalog'], 'CONTRACT_READINESS');
     }
 
     // 5. Search Capability (OPTIONAL)
@@ -192,7 +349,7 @@ export class ProviderCertificationRunner {
           limit: 5
         });
         if (!Array.isArray(searchRes)) throw new Error('Search result must be an array of offerings.');
-      }, ['catalog']);
+      }, ['catalog'], 'LIFECYCLE_E2E');
     }
 
     // 6. Quote Capability (MANDATORY)
@@ -253,7 +410,7 @@ export class ProviderCertificationRunner {
         }
 
         testQuoteId = quote.id;
-      }, ['catalog']);
+      }, ['catalog'], 'LIFECYCLE_E2E');
     }
 
     // 7. Action Create & Payment Handoff (MANDATORY)
@@ -300,7 +457,7 @@ export class ProviderCertificationRunner {
             }
           }
         }
-      }, ['quote']);
+      }, ['quote'], 'LIFECYCLE_E2E');
 
       // 7b. Idempotency Validation (MANDATORY)
       await this.runTest(results, 'action-idempotency', 'Action Idempotency Protection', ProviderCapability.ACTION_CREATE, true, async () => {
@@ -327,7 +484,7 @@ export class ProviderCertificationRunner {
         if (originalId !== dupId) {
           throw new Error(`Idempotency failure: duplicate creation generated new ID (${dupId}) instead of returning original (${originalId}).`);
         }
-      }, ['action-create']);
+      }, ['action-create'], 'LIFECYCLE_E2E');
     }
 
     // 8. Action Status Capability (MANDATORY)
@@ -340,7 +497,7 @@ export class ProviderCertificationRunner {
         if (!fetched || !fetched.status) {
           throw new Error('Failed to retrieve action by ID or status field is missing.');
         }
-      }, ['action-create']);
+      }, ['action-create'], 'LIFECYCLE_E2E');
     }
 
     // 9. Payment Options Capability (OPTIONAL)
@@ -353,7 +510,7 @@ export class ProviderCertificationRunner {
         if (!Array.isArray(options) || options.length === 0) {
           throw new Error('Provider declared PAYMENT_OPTIONS but returned an empty array.');
         }
-      }, ['action-create']);
+      }, ['action-create'], 'LIFECYCLE_E2E');
     }
 
     // 10. Action Cancel Capability (OPTIONAL)
@@ -367,7 +524,7 @@ export class ProviderCertificationRunner {
         if (!cancelRes || typeof cancelRes.success !== 'boolean') {
           throw new Error('Cancel action returned invalid response format.');
         }
-      }, ['action-create']);
+      }, ['action-create'], 'LIFECYCLE_E2E');
     }
 
     // 11. Webhook Capability (MANDATORY)
@@ -409,7 +566,7 @@ export class ProviderCertificationRunner {
             throw new Error('Parsed webhook event missing eventType or providerSlug.');
           }
         }
-      });
+      }, [], 'LIFECYCLE_E2E');
     }
 
     const passedCount = results.filter(r => r.status === 'PASS').length;
@@ -432,132 +589,6 @@ export class ProviderCertificationRunner {
       profile,
       tests: results
     };
-  }
-
-  private formatFriendlyError(raw: string): string {
-    const lower = (raw || '').toLowerCase();
-    if (
-      lower.includes('401') ||
-      lower.includes('unauthorized') ||
-      lower.includes('invalid provider api key') ||
-      lower.includes('api key required') ||
-      lower.includes('invalid api key')
-    ) {
-      return 'API kaliti noto‘g‘ri yoki yo‘q';
-    }
-    if (
-      lower.includes('404') ||
-      lower.includes('not found') ||
-      lower.includes('cannot get') ||
-      lower.includes('cannot post')
-    ) {
-      return 'Server endpointi topilmadi';
-    }
-    if (
-      lower.includes('econnrefused') ||
-      lower.includes('etimedout') ||
-      lower.includes('fetch failed') ||
-      lower.includes('timeout') ||
-      lower.includes('enotfound') ||
-      lower.includes('network') ||
-      lower.includes('server javob bermadi')
-    ) {
-      return 'Server javob bermadi';
-    }
-    if (
-      lower.includes('missing mandatory') ||
-      (lower.includes('capability') && lower.includes('missing')) ||
-      lower.includes('not supported') ||
-      lower.includes('must advertise at least one capability')
-    ) {
-      return 'Majburiy endpoint yo‘q';
-    }
-    return raw;
-  }
-
-  private async runTest(
-    results: CertificationTestResult[],
-    testId: string,
-    name: string,
-    capability: ProviderCapability,
-    isMandatory: boolean,
-    testFn: () => Promise<void>,
-    dependsOn: string[] = []
-  ): Promise<void> {
-    const endpoint = this.endpointFor(capability);
-    const blockedBy = dependsOn.filter(dependency =>
-      results.some(result => result.testId === dependency && result.status !== 'PASS')
-    );
-    if (blockedBy.length > 0) {
-      results.push({
-        testId,
-        name,
-        capability,
-        isMandatory,
-        passed: false,
-        status: 'SKIPPED',
-        durationMs: 0,
-        endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
-        docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
-        blockedBy,
-        error: `Oldingi asosiy test muvaffaqiyatsiz: ${blockedBy.join(', ')}`,
-        issue: {
-          code: 'DEPENDENCY_FAILED',
-          endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
-          docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
-          rootCause: `Bu test ${blockedBy.join(', ')} natijasiga bog‘liq. Avval asosiy xatoni tuzating.`
-        }
-      });
-      return;
-    }
-
-    const start = Date.now();
-    try {
-      await testFn();
-      results.push({
-        testId,
-        name,
-        capability,
-        isMandatory,
-        passed: true,
-        status: 'PASS',
-        endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
-        docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
-        durationMs: Date.now() - start
-      });
-    } catch (err: any) {
-      const rawError = err.message || String(err);
-      const friendlyError = this.formatFriendlyError(rawError);
-      const contractIssue = err instanceof ProviderContractValidationError ? err.issue : undefined;
-      const issue: CertificationIssue = contractIssue ? {
-        code: contractIssue.code,
-        endpoint: contractIssue.endpoint,
-        path: contractIssue.path,
-        expected: contractIssue.expected,
-        received: contractIssue.received,
-        docsUrl: contractIssue.docsUrl,
-        rootCause: contractIssue.message
-      } : {
-        code: this.inferErrorCode(rawError),
-        endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
-        docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
-        rootCause: rawError
-      };
-      results.push({
-        testId,
-        name,
-        capability,
-        isMandatory,
-        passed: false,
-        status: 'FAIL',
-        endpoint: issue.endpoint,
-        docsUrl: issue.docsUrl,
-        durationMs: Date.now() - start,
-        error: friendlyError,
-        issue,
-        details: { rawMessage: rawError }
-      });
-    }
   }
 
   private inferErrorCode(raw: string): string {

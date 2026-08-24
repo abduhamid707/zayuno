@@ -8,20 +8,37 @@ export interface ProviderContractIssue {
   received: string;
   docsUrl: string;
   message: string;
+  fixExample?: string;
 }
 
 export class ProviderContractValidationError extends Error {
   readonly issue: ProviderContractIssue;
+  readonly issues: ProviderContractIssue[];
 
-  constructor(issue: ProviderContractIssue) {
-    super(issue.message);
+  constructor(issues: ProviderContractIssue[] | ProviderContractIssue) {
+    const list = Array.isArray(issues) ? issues : [issues];
+    const primary = list[0] || {
+      code: 'PROVIDER_RESPONSE_SCHEMA_INVALID',
+      endpoint: '',
+      path: 'response',
+      expected: 'Valid schema',
+      received: 'invalid',
+      docsUrl: '',
+      message: 'Schema validation failed.'
+    };
+    const summary = list.length > 1
+      ? `${primary.endpoint} javobida ${list.length} ta schema xatosi aniqlandi: ${list.map(i => `${i.path} (${i.expected})`).join('; ')}`
+      : primary.message;
+    super(summary);
     this.name = 'ProviderContractValidationError';
-    this.issue = issue;
+    this.issue = primary;
+    this.issues = list;
   }
 }
 
 function valueKind(value: unknown): string {
   if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
   if (Array.isArray(value)) return 'array';
   return typeof value;
 }
@@ -44,18 +61,23 @@ export function validateProviderResponse<S extends z.ZodTypeAny>(
   const parsed = schema.safeParse(value);
   if (parsed.success) return parsed.data as z.output<S>;
 
-  const first = parsed.error.issues[0];
-  const path = first.path.length ? `response.${first.path.join('.')}` : 'response';
-  const receivedValue = valueAtPath(value, first.path);
-  throw new ProviderContractValidationError({
-    code: 'PROVIDER_RESPONSE_SCHEMA_INVALID',
-    endpoint,
-    path,
-    expected: first.message,
-    received: valueKind(receivedValue),
-    docsUrl: `https://developers.zayuno.uz/?doc=provider-integration#${docsAnchor}`,
-    message: `${endpoint} javobi Provider Contract v1 ga mos emas: ${path} — ${first.message}.`
+  const docsUrl = `https://developers.zayuno.uz/?doc=provider-integration#${docsAnchor}`;
+  const issues: ProviderContractIssue[] = parsed.error.issues.map(err => {
+    const path = err.path.length ? `response.${err.path.join('.')}` : 'response';
+    const receivedValue = valueAtPath(value, err.path);
+    const expected = err.message;
+    return {
+      code: 'PROVIDER_RESPONSE_SCHEMA_INVALID',
+      endpoint,
+      path,
+      expected,
+      received: valueKind(receivedValue),
+      docsUrl,
+      message: `${endpoint} javobi Provider Contract v1 ga mos emas: ${path} — ${expected}.`
+    };
   });
+
+  throw new ProviderContractValidationError(issues);
 }
 
 /** One-version migration boundary. New providers must emit canonical fields. */

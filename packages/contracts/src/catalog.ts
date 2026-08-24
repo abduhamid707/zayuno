@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CurrencySchema } from './common';
+import { DynamicParameterDeclarationSchema } from './dynamic-parameters';
 
 export const OptionItemSchema = z.object({
   id: z.string(),
@@ -111,6 +112,7 @@ export const OfferingSchema = z.object({
   variants: z.array(OfferingVariantSchema).optional().default([]),
   optionGroups: z.array(OptionGroupSchema).optional().default([]),
   tags: z.array(z.string()).optional().default([]),
+  parametersSchema: DynamicParameterDeclarationSchema.optional(),
   metadata: z.record(z.any()).optional().default({})
 });
 export type Offering = z.infer<typeof OfferingSchema>;
@@ -141,6 +143,7 @@ export const CatalogSchema = z.object({
   locationId: z.string().optional(),
   categories: z.array(CatalogCategorySchema),
   offerings: z.array(OfferingSchema),
+  parametersSchema: DynamicParameterDeclarationSchema.optional(),
   version: z.string().optional(),
   updatedAt: z.string().datetime().optional()
 });

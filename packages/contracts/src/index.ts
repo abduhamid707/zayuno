@@ -7,4 +7,5 @@ export * from './action';
 export * from './webhook';
 export * from './provider';
 export * from './dynamic-service';
+export * from './dynamic-parameters';
 export * from './provider-protocol';
