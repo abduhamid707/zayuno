@@ -1,0 +1,15 @@
+{
+  "name": "@zayuno/cli",
+  "version": "1.0.0",
+  "description": "Local-first developer tools for the Zayuno Provider Contract",
+  "bin": { "zy": "dist/index.js" },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "templates"],
+  "scripts": { "build": "tsc", "clean": "rimraf dist", "lint": "echo 'No lint specified for cli'" },
+  "dependencies": {
+    "@zayuno/contracts": "workspace:*",
+    "@zayuno/provider-sdk": "workspace:*"
+  },
+  "devDependencies": { "@types/node": "^22.10.2", "rimraf": "^6.0.1", "typescript": "^5.7.2" }
+}

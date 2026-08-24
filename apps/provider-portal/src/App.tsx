@@ -450,7 +450,7 @@ export default function App() {
       ...current,
       baseUrl: providerData.baseUrl || '',
       authMethod: providerData.authMethod || 'API_KEY',
-      capabilities: providerData.capabilities?.length ? providerData.capabilities : [...PROVIDER_CAPABILITIES],
+      capabilities: providerData.capabilities?.length ? providerData.capabilities : [...TRANSACTIONAL_MANDATORY_CAPABILITIES],
       apiSecret: '',
       webhookSecret: ''
     }));
@@ -478,10 +478,14 @@ export default function App() {
   const updateIntegrationMutation = useMutation({
     mutationFn: async () => {
       if (!providerData?.slug) throw new Error('Provider arizasi topilmadi.');
+      const isTransactional = integrationForm.capabilities.some(capability =>
+        ['QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK'].includes(capability)
+      );
+      const mandatory = isTransactional ? TRANSACTIONAL_MANDATORY_CAPABILITIES : READONLY_CAPABILITIES;
       const payload: any = {
         baseUrl: integrationForm.baseUrl.trim(),
         authMethod: integrationForm.authMethod,
-        capabilities: [...new Set([...integrationForm.capabilities, ...MANDATORY_PROVIDER_CAPABILITIES])]
+        capabilities: [...new Set([...integrationForm.capabilities, ...mandatory])]
       };
       if (integrationForm.apiSecret.trim()) payload.apiSecret = integrationForm.apiSecret.trim();
       if (integrationForm.webhookSecret.trim()) payload.webhookSecret = integrationForm.webhookSecret.trim();
@@ -1695,7 +1699,7 @@ export default function App() {
                             {certReport.isCertified ? 'Provider Integration Certified' : 'Certification Tests Failed'}
                           </h3>
                           <p className="text-xs text-slate-300">
-                            {certReport.passedCount} of {certReport.totalTests} tests passed. Production ready: {certReport.isProductionReady ? 'YES' : 'NO'}.
+                            {certReport.passedCount} passed, {certReport.failedCount} failed, {certReport.skippedCount || 0} blocked. Production ready: {certReport.isProductionReady ? 'YES' : 'NO'}.
                           </p>
                         </div>
                       </div>
@@ -1730,6 +1734,16 @@ export default function App() {
                                     {t.error}
                                   </div>
                                 )}
+                                {t.issue && (
+                                  <div className="mt-1 text-[10px] text-slate-300 space-y-0.5">
+                                    <div><b>Root cause:</b> {t.issue.rootCause}</div>
+                                    {t.endpoint && <div><b>Endpoint:</b> <code>{t.endpoint}</code></div>}
+                                    {t.issue.path && <div><b>Path:</b> <code>{t.issue.path}</code></div>}
+                                    {t.issue.expected && <div><b>Expected:</b> {t.issue.expected}</div>}
+                                    {t.issue.received && <div><b>Received:</b> {t.issue.received}</div>}
+                                  </div>
+                                )}
+                                {t.blockedBy?.length > 0 && <div className="mt-1 text-[10px] text-amber-300">Blocked by: {t.blockedBy.join(', ')}</div>}
                               </td>
                               <td className="p-3.5">
                                 {t.isMandatory ? (
@@ -1744,9 +1758,13 @@ export default function App() {
                               </td>
                               <td className="p-3.5 font-mono text-slate-400">{t.durationMs}ms</td>
                               <td className="p-3.5 text-right">
-                                {t.passed ? (
+                                {(t.status === 'PASS' || t.passed) ? (
                                   <span className="text-emerald-400 font-semibold flex items-center justify-end gap-1">
                                     <Check className="w-3.5 h-3.5" /> PASS
+                                  </span>
+                                ) : t.status === 'SKIPPED' ? (
+                                  <span className="text-amber-400 font-semibold flex items-center justify-end gap-1">
+                                    <AlertTriangle className="w-3.5 h-3.5" /> BLOCKED
                                   </span>
                                 ) : (
                                   <span className="text-rose-400 font-semibold flex items-center justify-end gap-1">

@@ -32,6 +32,11 @@ import {
   Webhook
 } from 'lucide-react';
 import { DocsViewer } from './DocsViewer';
+import {
+  getProviderProtocolEndpoints,
+  PROVIDER_CONTRACT_VERSION,
+  ZAYUNO_WEBHOOK_INGESTION_PATH
+} from '@zayuno/contracts';
 
 const DRAFT_STORAGE_KEY = 'zayuno_onboarding_draft';
 
@@ -575,7 +580,19 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
   const handleCopyIntegrationBrief = () => {
     const isTrans = capabilityProfile === 'transactional';
+    const profile = isTrans ? 'TRANSACTIONAL' : 'DISCOVERY_READONLY';
+    const endpoints = getProviderProtocolEndpoints(profile)
+      .filter(endpoint => endpoint.required)
+      .map((endpoint, index) => {
+        const request = endpoint.requestExample === undefined
+          ? ''
+          : `\n    Request: ${JSON.stringify(endpoint.requestExample)}`;
+        return `[${index + 1}] ${endpoint.method} ${endpoint.path}\n    ${endpoint.summary}${request}\n    Response: ${JSON.stringify(endpoint.responseExample)}`;
+      })
+      .join('\n\n');
     const brief = `# ZAYUNO PROVIDER INTEGRATSIYA BRIEFI (TEXNIK TOPSHIRIQ)
+
+Provider Contract: v${PROVIDER_CONTRACT_VERSION}
 
 Biznes nomi: ${businessName.trim() || 'Mening Biznesim'}
 Provider Slug: ${slug.trim() || 'my-provider-slug'}
@@ -590,47 +607,14 @@ Zayuno AI agentlar (ChatGPT, Claude, autonomous workerlar) uchun neytral harakat
 AI agentlar foydalanuvchi talabiga asosan sizning xizmatlaringizni topadi, kotirovka oladi va buyurtma yaratadi.
 
 --------------------------------------------------------------------------------
-2. TALAB ETILADIGAN API ENDPOINTLAR (HTTPS)
+2. TALAB ETILADIGAN CANONICAL API ENDPOINTLAR (HTTPS)
 --------------------------------------------------------------------------------
-${isTrans ? `[1] GET  /health
-    Vazifasi: Server salomatligini tekshirish.
-    Javob: { "status": "HEALTHY", "provider": "${slug.trim() || 'my-slug'}" }
+${endpoints}
 
-[2] GET  /catalog
-    Vazifasi: Menyu, xizmatlar yoki mahsulotlar ro'yxati.
-    Javob: { "items": [{ "id": "...", "name": "...", "price": 10000, "currency": "UZS", "available": true }] }
-
-[3] POST /quote
-    Vazifasi: Aniq narx, yetkazib berish haqi va jami summani hisoblash.
-    Input: { "items": [{ "id": "...", "quantity": 1 }], "destination": { "address": "..." } }
-    Javob: { "quoteId": "...", "subtotal": 50000, "fees": 10000, "discount": 0, "total": 60000, "currency": "UZS", "expiresAt": "..." }
-
-[4] POST /actions
-    Vazifasi: Tasdiqlangan kotirovka asosida buyurtma yaratish (Idempotency bilan).
-    Input: { "quoteId": "...", "customer": { "name": "...", "phone": "..." } }
-    Javob: { "actionId": "...", "status": "AWAITING_PAYMENT", "nextAction": { "type": "OPEN_URL", "url": "https://..." } }
-
-[5] GET  /actions/:id
-    Vazifasi: Buyurtma joriy holatini tekshirish.
-    Javob: { "actionId": "...", "status": "CONFIRMED" }
-
-[6] POST /actions/:id/cancel
-    Vazifasi: Buyurtmani bekor qilish.
-
-[7] POST /webhook
-    Vazifasi: Zayuno xabarnomalarini qabul qilish (HMAC-SHA256 imzo tekshiruvi bilan).` : `[1] GET  /health
-    Vazifasi: Server salomatligini tekshirish.
-    Javob: { "status": "HEALTHY", "provider": "${slug.trim() || 'my-slug'}" }
-
-[2] GET  /catalog
-    Vazifasi: Menyu, xizmatlar yoki takliflar katalogi.
-    Javob: { "items": [{ "id": "...", "name": "...", "price": 0, "currency": "UZS", "available": true }] }
-
-[3] GET  /search
-    Vazifasi: Qidiruv va filtr so'rovlariga javob berish.
-
-[4] GET  /locations
-    Vazifasi: Filiallar va xizmat manzillari.`}
+MUHIM:
+- Quote javobi "id" va itemized "lines" qaytaradi. "quoteId/items" eski alias hisoblanadi.
+- Payment options capability ixtiyoriy; yoqilsa javob top-level JSON array bo‘ladi.
+- Provider webhook endpoint ochmaydi. Status eventlarini Zayuno'ga POST ${ZAYUNO_WEBHOOK_INGESTION_PATH} orqali yuboradi.
 
 --------------------------------------------------------------------------------
 3. CREDENTIAL VA MAXFIYLIK QOIDALARI
@@ -669,8 +653,8 @@ ${isTrans ? `[1] GET  /health
 
     const capabilities =
       capabilityProfile === 'transactional'
-        ? ['METADATA', 'HEALTH', 'CATALOG', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK', 'ACTION_CANCEL', 'PAYMENT_OPTIONS']
-        : ['METADATA', 'HEALTH', 'CATALOG', 'SEARCH', 'LOCATIONS'];
+        ? ['METADATA', 'HEALTH', 'CATALOG', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK']
+        : ['METADATA', 'HEALTH', 'CATALOG'];
 
     setLoading(true);
     try {
@@ -1488,7 +1472,7 @@ ${isTrans ? `[1] GET  /health
                     restoran va delivery, chipta, booking, do‘kon, pullik xizmatlar.
                   </div>
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] font-mono text-amber-300">Endpointlar: /health, /catalog, /quote, /actions, /webhook</span>
+                    <span className="text-[10px] font-mono text-amber-300">Provider endpointlari: /provider-info, /health, /catalog, /quote, /actions</span>
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); openDocModal('base-url'); }}
@@ -1537,7 +1521,7 @@ ${isTrans ? `[1] GET  /health
                         <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy</span>
                       </div>
                       <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
-                        <span className="font-mono text-slate-200">POST /webhook</span>
+                        <span className="font-mono text-slate-200">Event → Zayuno webhook URL</span>
                         <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy (HMAC)</span>
                       </div>
                     </>
@@ -1880,7 +1864,7 @@ ${isTrans ? `[1] GET  /health
                 </div>
                 <div className="text-right">
                   <span className="text-xs font-mono font-bold block text-white">
-                    {certReport.tests ? `${certReport.tests.filter((t: any) => t.passed).length} / ${certReport.tests.length} testlar` : ''}
+                    {certReport.tests ? `${certReport.tests.filter((t: any) => t.status === 'PASS' || t.passed).length} o‘tdi · ${certReport.tests.filter((t: any) => t.status === 'FAIL').length} xato · ${certReport.tests.filter((t: any) => t.status === 'SKIPPED').length} bloklandi` : ''}
                   </span>
                   <span className="text-[10px] opacity-75">
                     {certReport.totalDurationMs ? `${certReport.totalDurationMs} ms` : ''}
@@ -1897,14 +1881,16 @@ ${isTrans ? `[1] GET  /health
                       <div
                         key={idx}
                         className={`p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs ${
-                          t.passed
+                          (t.status === 'PASS' || t.passed)
                             ? 'bg-slate-900/80 border-emerald-500/20 text-slate-200'
-                            : 'bg-rose-950/20 border-rose-500/30 text-rose-200'
+                            : t.status === 'SKIPPED' ? 'bg-amber-950/20 border-amber-500/30 text-amber-200' : 'bg-rose-950/20 border-rose-500/30 text-rose-200'
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          {t.passed ? (
+                          {(t.status === 'PASS' || t.passed) ? (
                             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          ) : t.status === 'SKIPPED' ? (
+                            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                           ) : (
                             <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
                           )}
@@ -1915,6 +1901,16 @@ ${isTrans ? `[1] GET  /health
                                 Xatolik: {t.error}
                               </span>
                             )}
+                            {t.issue && (
+                              <div className="text-[10px] mt-1 space-y-0.5 text-slate-300">
+                                <div><b>Root cause:</b> {t.issue.rootCause}</div>
+                                {t.issue.path && <div><b>Path:</b> <code>{t.issue.path}</code></div>}
+                                {t.issue.expected && <div><b>Expected:</b> {t.issue.expected}</div>}
+                                {t.issue.received && <div><b>Received:</b> {t.issue.received}</div>}
+                                {t.issue.docsUrl && <button type="button" onClick={() => openDocModal('spec-v1')} className="text-indigo-400 hover:text-indigo-300">Kontraktni ochish →</button>}
+                              </div>
+                            )}
+                            {t.blockedBy?.length > 0 && <span className="text-[10px] text-amber-300 block mt-1">Avval tuzating: {t.blockedBy.join(', ')}</span>}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 sm:self-center">
@@ -1923,12 +1919,12 @@ ${isTrans ? `[1] GET  /health
                           </span>
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                              t.passed
+                              (t.status === 'PASS' || t.passed)
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                : t.status === 'SKIPPED' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                             }`}
                           >
-                            {t.passed ? 'PASSED' : 'FAILED'}
+                            {t.status || (t.passed ? 'PASS' : 'FAIL')}
                           </span>
                         </div>
                       </div>

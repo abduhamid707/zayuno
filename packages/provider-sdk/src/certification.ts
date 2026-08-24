@@ -10,15 +10,35 @@ import {
   ActionStatus,
   PaymentMethodType,
   Offering,
-  SelectedOption
+  SelectedOption,
+  PROVIDER_PROTOCOL_ENDPOINTS
 } from '@zayuno/contracts';
+import { ProviderContractValidationError } from './protocol-validation';
+
+export type CertificationTestStatus = 'PASS' | 'FAIL' | 'SKIPPED';
+
+export interface CertificationIssue {
+  code: string;
+  endpoint?: string;
+  path?: string;
+  expected?: string;
+  received?: string;
+  docsUrl?: string;
+  rootCause: string;
+}
 
 export interface CertificationTestResult {
+  testId: string;
   name: string;
   capability: ProviderCapability;
   isMandatory: boolean;
   passed: boolean;
+  status: CertificationTestStatus;
   durationMs: number;
+  endpoint?: string;
+  docsUrl?: string;
+  blockedBy?: string[];
+  issue?: CertificationIssue;
   error?: string;
   details?: any;
 }
@@ -28,6 +48,7 @@ export interface CertificationReport {
   totalTests: number;
   passedCount: number;
   failedCount: number;
+  skippedCount: number;
   isCertified: boolean;
   isProductionReady: boolean;
   missingMandatoryCapabilities: ProviderCapability[];
@@ -48,6 +69,10 @@ export class ProviderCertificationRunner {
     this.adapter = adapter;
   }
 
+  private endpointFor(capability: ProviderCapability) {
+    return PROVIDER_PROTOCOL_ENDPOINTS.find(endpoint => endpoint.capability === capability);
+  }
+
   async runAllTests(): Promise<CertificationReport> {
     const results: CertificationTestResult[] = [];
     const declaredCaps = this.adapter.getCapabilities();
@@ -61,7 +86,7 @@ export class ProviderCertificationRunner {
 
     // 1. Metadata Capability (MANDATORY)
     if (this.adapter.hasCapability(ProviderCapability.METADATA) && this.adapter.getProviderInfo) {
-      await this.runTest(results, 'Provider Metadata Verification', ProviderCapability.METADATA, mandatoryForProfile.includes(ProviderCapability.METADATA), async () => {
+      await this.runTest(results, 'metadata', 'Provider Metadata Verification', ProviderCapability.METADATA, mandatoryForProfile.includes(ProviderCapability.METADATA), async () => {
         const info = await this.adapter.getProviderInfo!();
         if (!info.slug || !info.name) throw new Error('Invalid provider info: missing slug or name.');
         if (info.slug.toLowerCase().trim() !== this.adapter.providerSlug.toLowerCase().trim()) {
@@ -74,7 +99,7 @@ export class ProviderCertificationRunner {
 
     // 2. Health Capability (MANDATORY)
     if (this.adapter.hasCapability(ProviderCapability.HEALTH) && this.adapter.checkHealth) {
-      await this.runTest(results, 'Health Check Protocol', ProviderCapability.HEALTH, true, async () => {
+      await this.runTest(results, 'health', 'Health Check Protocol', ProviderCapability.HEALTH, true, async () => {
         const health = await this.adapter.checkHealth!();
         if (!health.status || !['HEALTHY', 'DEGRADED', 'DOWN'].includes(health.status)) {
           throw new Error('Invalid health status response.');
@@ -88,7 +113,7 @@ export class ProviderCertificationRunner {
     // 3. Locations Capability (OPTIONAL)
     let testLocationId: string | undefined;
     if (this.adapter.hasCapability(ProviderCapability.LOCATIONS) && this.adapter.getLocations) {
-      await this.runTest(results, 'Locations & Facilities Query', ProviderCapability.LOCATIONS, false, async () => {
+      await this.runTest(results, 'locations', 'Locations & Facilities Query', ProviderCapability.LOCATIONS, mandatoryForProfile.includes(ProviderCapability.LOCATIONS), async () => {
         const locations = await this.adapter.getLocations!({ providerSlug: this.adapter.providerSlug });
         if (!Array.isArray(locations) || locations.length === 0) {
           throw new Error('Provider declared LOCATIONS but returned an empty list.');
@@ -107,7 +132,7 @@ export class ProviderCertificationRunner {
     let selectedTestOptions: SelectedOption[] = [];
 
     if (this.adapter.hasCapability(ProviderCapability.CATALOG) && this.adapter.getCatalog) {
-      await this.runTest(results, 'Catalog Structure & Offerings', ProviderCapability.CATALOG, true, async () => {
+      await this.runTest(results, 'catalog', 'Catalog Structure & Offerings', ProviderCapability.CATALOG, true, async () => {
         const catalog = await this.adapter.getCatalog!({ providerSlug: this.adapter.providerSlug, locationId: testLocationId });
         if (!catalog.offerings || catalog.offerings.length === 0) throw new Error('Catalog has no offerings.');
 
@@ -159,7 +184,7 @@ export class ProviderCertificationRunner {
 
     // 5. Search Capability (OPTIONAL)
     if (this.adapter.hasCapability(ProviderCapability.SEARCH) && this.adapter.searchOfferings) {
-      await this.runTest(results, 'Catalog Search Indexing', ProviderCapability.SEARCH, false, async () => {
+      await this.runTest(results, 'search', 'Catalog Search Indexing', ProviderCapability.SEARCH, false, async () => {
         const queryTerm = selectedTestOffering?.title?.split(' ')[0] || 'standard';
         const searchRes = await this.adapter.searchOfferings!({
           providerSlug: this.adapter.providerSlug,
@@ -167,18 +192,14 @@ export class ProviderCertificationRunner {
           limit: 5
         });
         if (!Array.isArray(searchRes)) throw new Error('Search result must be an array of offerings.');
-      });
+      }, ['catalog']);
     }
 
     // 6. Quote Capability (MANDATORY)
     let testQuoteId: string | undefined;
     if (this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote) {
-      await this.runTest(results, 'Verified Quote Pricing & Math', ProviderCapability.QUOTE, true, async () => {
-        if (!selectedTestOffering) {
-          throw new Error('Quote test requires an offering discovered from catalog.');
-        }
-
-        const testOfferingId = selectedTestOffering.id || selectedTestOffering.offeringCode;
+      await this.runTest(results, 'quote', 'Verified Quote Pricing & Math', ProviderCapability.QUOTE, true, async () => {
+        const testOfferingId = selectedTestOffering!.id || selectedTestOffering!.offeringCode;
         const quote = await this.adapter.requestQuote!({
           providerSlug: this.adapter.providerSlug,
           locationId: testLocationId,
@@ -232,7 +253,7 @@ export class ProviderCertificationRunner {
         }
 
         testQuoteId = quote.id;
-      });
+      }, ['catalog']);
     }
 
     // 7. Action Create & Payment Handoff (MANDATORY)
@@ -240,19 +261,12 @@ export class ProviderCertificationRunner {
     const testIdempKey = `cert_idemp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
     if (this.adapter.hasCapability(ProviderCapability.ACTION_CREATE) && this.adapter.createAction) {
-      await this.runTest(results, 'Action Creation & Payment Handoff', ProviderCapability.ACTION_CREATE, true, async () => {
-        if (!selectedTestOffering) {
-          throw new Error('Action creation requires an offering discovered from catalog.');
-        }
-        if (!testQuoteId) {
-          throw new Error('Action creation requires a successfully verified quote.');
-        }
-
-        const testOfferingId = selectedTestOffering.id || selectedTestOffering.offeringCode;
+      await this.runTest(results, 'action-create', 'Action Creation & Payment Handoff', ProviderCapability.ACTION_CREATE, true, async () => {
+        const testOfferingId = selectedTestOffering!.id || selectedTestOffering!.offeringCode;
         const action = await this.adapter.createAction!({
           idempotencyKey: testIdempKey,
           providerSlug: this.adapter.providerSlug,
-          quoteId: testQuoteId,
+          quoteId: testQuoteId!,
           locationId: testLocationId,
           customer: {
             name: 'Certification Validator',
@@ -286,19 +300,15 @@ export class ProviderCertificationRunner {
             }
           }
         }
-      });
+      }, ['quote']);
 
       // 7b. Idempotency Validation (MANDATORY)
-      await this.runTest(results, 'Action Idempotency Protection', ProviderCapability.ACTION_CREATE, true, async () => {
-        if (!selectedTestOffering || !testQuoteId || !createdActionId) {
-          throw new Error('Idempotency certification requires a successfully created initial action.');
-        }
-
-        const testOfferingId = selectedTestOffering.id || selectedTestOffering.offeringCode;
+      await this.runTest(results, 'action-idempotency', 'Action Idempotency Protection', ProviderCapability.ACTION_CREATE, true, async () => {
+        const testOfferingId = selectedTestOffering!.id || selectedTestOffering!.offeringCode;
         const dupAction = await this.adapter.createAction!({
           idempotencyKey: testIdempKey,
           providerSlug: this.adapter.providerSlug,
-          quoteId: testQuoteId,
+          quoteId: testQuoteId!,
           customer: {
             name: 'Certification Validator',
             phone: '+998901234567'
@@ -317,15 +327,12 @@ export class ProviderCertificationRunner {
         if (originalId !== dupId) {
           throw new Error(`Idempotency failure: duplicate creation generated new ID (${dupId}) instead of returning original (${originalId}).`);
         }
-      });
+      }, ['action-create']);
     }
 
     // 8. Action Status Capability (MANDATORY)
     if (this.adapter.hasCapability(ProviderCapability.ACTION_STATUS) && this.adapter.getAction) {
-      await this.runTest(results, 'Action Status Lookup', ProviderCapability.ACTION_STATUS, true, async () => {
-        if (!createdActionId) {
-          throw new Error('Action status check requires a created action from prior step.');
-        }
+      await this.runTest(results, 'action-status', 'Action Status Lookup', ProviderCapability.ACTION_STATUS, true, async () => {
         const fetched = await this.adapter.getAction!({
           providerSlug: this.adapter.providerSlug,
           actionId: createdActionId!
@@ -333,15 +340,12 @@ export class ProviderCertificationRunner {
         if (!fetched || !fetched.status) {
           throw new Error('Failed to retrieve action by ID or status field is missing.');
         }
-      });
+      }, ['action-create']);
     }
 
     // 9. Payment Options Capability (OPTIONAL)
     if (this.adapter.hasCapability(ProviderCapability.PAYMENT_OPTIONS) && this.adapter.getPaymentOptions) {
-      await this.runTest(results, 'Payment Options Discovery', ProviderCapability.PAYMENT_OPTIONS, false, async () => {
-        if (!createdActionId) {
-          throw new Error('Payment options discovery requires a created action.');
-        }
+      await this.runTest(results, 'payment-options', 'Payment Options Discovery', ProviderCapability.PAYMENT_OPTIONS, false, async () => {
         const options = await this.adapter.getPaymentOptions!({
           providerSlug: this.adapter.providerSlug,
           actionId: createdActionId!
@@ -349,15 +353,12 @@ export class ProviderCertificationRunner {
         if (!Array.isArray(options) || options.length === 0) {
           throw new Error('Provider declared PAYMENT_OPTIONS but returned an empty array.');
         }
-      });
+      }, ['action-create']);
     }
 
     // 10. Action Cancel Capability (OPTIONAL)
     if (this.adapter.hasCapability(ProviderCapability.ACTION_CANCEL) && this.adapter.cancelAction) {
-      await this.runTest(results, 'Action Cancellation Lifecycle', ProviderCapability.ACTION_CANCEL, false, async () => {
-        if (!createdActionId) {
-          throw new Error('Action cancellation requires a created action.');
-        }
+      await this.runTest(results, 'action-cancel', 'Action Cancellation Lifecycle', ProviderCapability.ACTION_CANCEL, false, async () => {
         const cancelRes = await this.adapter.cancelAction!({
           providerSlug: this.adapter.providerSlug,
           actionId: createdActionId!,
@@ -366,12 +367,12 @@ export class ProviderCertificationRunner {
         if (!cancelRes || typeof cancelRes.success !== 'boolean') {
           throw new Error('Cancel action returned invalid response format.');
         }
-      });
+      }, ['action-create']);
     }
 
     // 11. Webhook Capability (MANDATORY)
     if (this.adapter.hasCapability(ProviderCapability.WEBHOOK)) {
-      await this.runTest(results, 'Webhook HMAC Verification & Event Parsing', ProviderCapability.WEBHOOK, true, async () => {
+      await this.runTest(results, 'webhook', 'Webhook HMAC Verification & Event Parsing', ProviderCapability.WEBHOOK, true, async () => {
         const testSecret = 'zy_test_webhook_secret_cert_123';
         const samplePayload = JSON.stringify({
           event: 'action.status_updated',
@@ -411,9 +412,11 @@ export class ProviderCertificationRunner {
       });
     }
 
-    const passedCount = results.filter(r => r.passed).length;
-    const failedCount = results.filter(r => !r.passed).length;
-    const isCertified = results.length > 0 && failedCount === 0;
+    const passedCount = results.filter(r => r.status === 'PASS').length;
+    const failedCount = results.filter(r => r.status === 'FAIL').length;
+    const skippedCount = results.filter(r => r.status === 'SKIPPED').length;
+    const hasBlockingResult = results.some(r => r.status === 'FAIL' || (r.status === 'SKIPPED' && r.isMandatory));
+    const isCertified = results.length > 0 && !hasBlockingResult;
     const isProductionReady = isCertified && missingMandatoryCapabilities.length === 0;
 
     return {
@@ -421,6 +424,7 @@ export class ProviderCertificationRunner {
       totalTests: results.length,
       passedCount,
       failedCount,
+      skippedCount,
       isCertified,
       isProductionReady,
       missingMandatoryCapabilities,
@@ -473,34 +477,95 @@ export class ProviderCertificationRunner {
 
   private async runTest(
     results: CertificationTestResult[],
+    testId: string,
     name: string,
     capability: ProviderCapability,
     isMandatory: boolean,
-    testFn: () => Promise<void>
+    testFn: () => Promise<void>,
+    dependsOn: string[] = []
   ): Promise<void> {
+    const endpoint = this.endpointFor(capability);
+    const blockedBy = dependsOn.filter(dependency =>
+      results.some(result => result.testId === dependency && result.status !== 'PASS')
+    );
+    if (blockedBy.length > 0) {
+      results.push({
+        testId,
+        name,
+        capability,
+        isMandatory,
+        passed: false,
+        status: 'SKIPPED',
+        durationMs: 0,
+        endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
+        docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+        blockedBy,
+        error: `Oldingi asosiy test muvaffaqiyatsiz: ${blockedBy.join(', ')}`,
+        issue: {
+          code: 'DEPENDENCY_FAILED',
+          endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
+          docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+          rootCause: `Bu test ${blockedBy.join(', ')} natijasiga bog‘liq. Avval asosiy xatoni tuzating.`
+        }
+      });
+      return;
+    }
+
     const start = Date.now();
     try {
       await testFn();
       results.push({
+        testId,
         name,
         capability,
         isMandatory,
         passed: true,
+        status: 'PASS',
+        endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
+        docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
         durationMs: Date.now() - start
       });
     } catch (err: any) {
       const rawError = err.message || String(err);
       const friendlyError = this.formatFriendlyError(rawError);
+      const contractIssue = err instanceof ProviderContractValidationError ? err.issue : undefined;
+      const issue: CertificationIssue = contractIssue ? {
+        code: contractIssue.code,
+        endpoint: contractIssue.endpoint,
+        path: contractIssue.path,
+        expected: contractIssue.expected,
+        received: contractIssue.received,
+        docsUrl: contractIssue.docsUrl,
+        rootCause: contractIssue.message
+      } : {
+        code: this.inferErrorCode(rawError),
+        endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
+        docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+        rootCause: rawError
+      };
       results.push({
+        testId,
         name,
         capability,
         isMandatory,
         passed: false,
+        status: 'FAIL',
+        endpoint: issue.endpoint,
+        docsUrl: issue.docsUrl,
         durationMs: Date.now() - start,
         error: friendlyError,
+        issue,
         details: { rawMessage: rawError }
       });
     }
   }
-}
 
+  private inferErrorCode(raw: string): string {
+    const value = raw.toLowerCase();
+    if (value.includes('401') || value.includes('api key') || value.includes('unauthorized')) return 'PROVIDER_AUTH_FAILED';
+    if (value.includes('404') || value.includes('not found') || value.includes('cannot get') || value.includes('cannot post')) return 'PROVIDER_ENDPOINT_NOT_FOUND';
+    if (value.includes('timeout') || value.includes('fetch failed') || value.includes('econn')) return 'PROVIDER_UNREACHABLE';
+    if (value.includes('math') || value.includes('subtotal') || value.includes('total')) return 'QUOTE_MATH_INVALID';
+    return 'CERTIFICATION_ASSERTION_FAILED';
+  }
+}

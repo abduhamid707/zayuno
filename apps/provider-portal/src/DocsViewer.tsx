@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
 import {
+  createProviderOpenApiDocument,
+  createProviderPostmanCollection,
+  PROVIDER_PROTOCOL_ENDPOINTS
+} from '@zayuno/contracts';
+import {
   BookOpen,
   Code2,
   Terminal,
@@ -60,6 +65,16 @@ export function DocsViewer({ selectedDoc, onSelectDoc, onOpenAiKit }: DocsViewer
     setTimeout(() => setCopiedSection(null), 2000);
   };
 
+  const downloadJson = (filename: string, value: unknown) => {
+    const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-fadeIn">
       {/* Sidebar List */}
@@ -110,6 +125,25 @@ export function DocsViewer({ selectedDoc, onSelectDoc, onOpenAiKit }: DocsViewer
                   <Sparkles className="w-4 h-4 text-amber-300" /> AI bilan integratsiya qilish
                 </button>
               )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={() => downloadJson('zayuno-provider-contract-v1.openapi.json', createProviderOpenApiDocument())}
+                className="p-4 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-left hover:bg-indigo-500/15 transition"
+              >
+                <FileText className="w-4 h-4 text-indigo-400 mb-2" />
+                <span className="font-semibold text-white block">OpenAPI 3.1 JSON yuklab olish</span>
+                <span className="text-[11px] text-slate-400">Canonical endpointlar, misollar va capability metadata.</span>
+              </button>
+              <button
+                onClick={() => downloadJson('zayuno-provider-contract-v1.postman.json', createProviderPostmanCollection())}
+                className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-left hover:bg-emerald-500/15 transition"
+              >
+                <Send className="w-4 h-4 text-emerald-400 mb-2" />
+                <span className="font-semibold text-white block">Postman collection yuklab olish</span>
+                <span className="text-[11px] text-slate-400">Base URL va credentialni qo‘yib endpointlarni darhol sinang.</span>
+              </button>
             </div>
 
             <div className="space-y-3">
@@ -316,8 +350,8 @@ export function DocsViewer({ selectedDoc, onSelectDoc, onOpenAiKit }: DocsViewer
 
                 <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
                   <div>
-                    <span className="font-mono text-rose-400 font-bold">POST /webhook</span>
-                    <p className="text-slate-400 text-[11px] mt-0.5">Zayuno sizning serveringizga eventlarni (buyurtma/to‘lov yangilanishi) yuboradigan endpoint (x-zayuno-signature HMAC imzosi bilan).</p>
+                    <span className="font-mono text-rose-400 font-bold">POST api.zayuno.uz/api/v1/webhooks/:providerSlug</span>
+                    <p className="text-slate-400 text-[11px] mt-0.5">Provider buyurtma/to‘lov eventlarini x-provider-signature HMAC imzosi bilan Zayuno’ga yuboradi. Provider o‘z serverida webhook endpoint ochmaydi.</p>
                   </div>
                   <span className="px-2 py-1 rounded bg-rose-500/20 text-rose-300 text-[10px] font-bold">Variant B (HMAC)</span>
                 </div>
@@ -340,14 +374,14 @@ app.use(express.json());
 
 // 1. Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'HEALTHY', provider: 'my-business', uptime: process.uptime() });
+  res.json({ status: 'HEALTHY', latencyMs: 1, timestamp: new Date().toISOString() });
 });
 
 // 2. Catalog
 app.get('/catalog', (req, res) => {
   res.json({
-    items: [
-      { id: 'item_1', name: 'Amerikano Kofe', price: 25000, currency: 'UZS', available: true }
+    providerSlug: 'my-business', categories: [], offerings: [
+      { id: 'item_1', providerId: 'my-business', offeringCode: 'americano', title: 'Amerikano Kofe', basePrice: 25000, currency: 'UZS', isAvailable: true }
     ]
   });
 });
@@ -357,10 +391,10 @@ app.post('/quote', (req, res) => {
   const { items } = req.body;
   const subtotal = 25000;
   res.json({
-    quoteId: 'q_' + Date.now(),
-    subtotal,
-    fees: 5000, // Yetkazish
-    discount: 0,
+    id: 'q_' + Date.now(), providerSlug: 'my-business',
+    lines: [{ offeringId: items[0].offeringId, offeringTitle: 'Amerikano Kofe', unitPrice: 25000, quantity: 1, optionsTotal: 0, lineTotal: 25000 }],
+    subtotal, fees: [{ name: 'Yetkazish', amount: 5000 }], totalFees: 5000,
+    discounts: [], totalDiscount: 0,
     total: 30000,
     currency: 'UZS',
     expiresAt: new Date(Date.now() + 15 * 60000).toISOString()
@@ -371,33 +405,19 @@ app.post('/quote', (req, res) => {
 app.post('/actions', (req, res) => {
   const actionId = 'act_' + Date.now();
   res.json({
-    actionId,
-    status: 'AWAITING_PAYMENT',
+    id: actionId, publicId: actionId, providerSlug: 'my-business', status: 'AWAITING_PAYMENT',
+    lines: [], subtotal: 30000, fees: 0, discount: 0, total: 30000, currency: 'UZS',
+    customer: req.body.customer, fulfillmentType: 'STANDARD', paymentStatus: 'PENDING',
     nextAction: {
       type: 'OPEN_URL',
       url: 'https://checkout.mybusiness.uz/pay/' + actionId
-    }
+    }, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   });
 });
 
-// 5. Webhook receiver (Zayunodan keladigan eventlar)
-app.post('/webhook', (req, res) => {
-  const signature = req.headers['x-zayuno-signature'] as string;
-  const webhookSecret = process.env.ZAYUNO_WEBHOOK_SECRET || 'your_sandbox_webhook_secret';
-  
-  // HMAC-SHA256 tekshiruvi
-  const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
-    .update(JSON.stringify(req.body))
-    .digest('hex');
-
-  if (signature && signature !== expectedSignature) {
-    return res.status(401).json({ error: 'Noto‘g‘ri HMAC imzo' });
-  }
-
-  console.log('Event qabul qilindi:', req.body);
-  res.json({ received: true });
-});
+// 5. Provider status o‘zgarganda eventni Zayuno'ga yuboradi:
+// POST https://api.zayuno.uz/api/v1/webhooks/my-business
+// Header: x-provider-signature = HMAC-SHA256(rawBody, ZAYUNO_WEBHOOK_SECRET)
 
 app.listen(3000, () => console.log('Zayuno Provider API running on port 3000'));`, 'code-node')}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
@@ -415,14 +435,14 @@ app.use(express.json());
 
 // 1. Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'HEALTHY', provider: 'my-business', uptime: process.uptime() });
+  res.json({ status: 'HEALTHY', latencyMs: 1, timestamp: new Date().toISOString() });
 });
 
 // 2. Catalog
 app.get('/catalog', (req, res) => {
   res.json({
-    items: [
-      { id: 'item_1', name: 'Amerikano Kofe', price: 25000, currency: 'UZS', available: true }
+    providerSlug: 'my-business', categories: [], offerings: [
+      { id: 'item_1', providerId: 'my-business', offeringCode: 'americano', title: 'Amerikano Kofe', basePrice: 25000, currency: 'UZS', isAvailable: true }
     ]
   });
 });
@@ -430,10 +450,10 @@ app.get('/catalog', (req, res) => {
 // 3. Quote (Variant B)
 app.post('/quote', (req, res) => {
   res.json({
-    quoteId: 'q_' + Date.now(),
-    subtotal: 25000,
-    fees: 5000,
-    discount: 0,
+    id: 'q_' + Date.now(), providerSlug: 'my-business',
+    lines: [{ offeringId: 'item_1', offeringTitle: 'Amerikano Kofe', unitPrice: 25000, quantity: 1, optionsTotal: 0, lineTotal: 25000 }],
+    subtotal: 25000, fees: [{ name: 'Yetkazish', amount: 5000 }], totalFees: 5000,
+    discounts: [], totalDiscount: 0,
     total: 30000,
     currency: 'UZS',
     expiresAt: new Date(Date.now() + 15 * 60000).toISOString()
@@ -444,33 +464,18 @@ app.post('/quote', (req, res) => {
 app.post('/actions', (req, res) => {
   const actionId = 'act_' + Date.now();
   res.json({
-    actionId,
-    status: 'AWAITING_PAYMENT',
+    id: actionId, publicId: actionId, providerSlug: 'my-business', status: 'AWAITING_PAYMENT',
+    lines: [], subtotal: 30000, fees: 0, discount: 0, total: 30000, currency: 'UZS',
+    customer: req.body.customer, fulfillmentType: 'STANDARD', paymentStatus: 'PENDING',
     nextAction: {
       type: 'OPEN_URL',
       url: 'https://checkout.mybusiness.uz/pay/' + actionId
-    }
+    }, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   });
 });
 
-// 5. Webhook receiver (Zayunodan keladigan eventlar)
-app.post('/webhook', (req, res) => {
-  const signature = req.headers['x-zayuno-signature'] as string;
-  const webhookSecret = process.env.ZAYUNO_WEBHOOK_SECRET || 'your_sandbox_webhook_secret';
-  
-  // HMAC-SHA256 tekshiruvi
-  const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
-    .update(JSON.stringify(req.body))
-    .digest('hex');
-
-  if (signature && signature !== expectedSignature) {
-    return res.status(401).json({ error: 'Noto‘g‘ri HMAC imzo' });
-  }
-
-  console.log('Event qabul qilindi:', req.body);
-  res.json({ received: true });
-});
+// 5. Provider status o‘zgarganda eventni Zayuno'ga yuboradi:
+// POST https://api.zayuno.uz/api/v1/webhooks/my-business
 
 app.listen(3000, () => console.log('Zayuno Provider API running on port 3000'));`}
                 </pre>
@@ -492,39 +497,35 @@ app = FastAPI(title="Zayuno Provider Adapter")
 
 @app.get("/health")
 def health():
-    return {"status": "HEALTHY", "provider": "my-business"}
+    return {"status": "HEALTHY", "latencyMs": 1, "timestamp": "2026-08-24T10:00:00.000Z"}
 
 @app.get("/catalog")
 def catalog():
-    return {"items": [{"id": "item_1", "name": "Konsultatsiya xizmati", "price": 100000, "currency": "UZS"}]}
+    return {"providerSlug": "my-business", "categories": [], "offerings": [{"id": "item_1", "providerId": "my-business", "offeringCode": "consulting", "title": "Konsultatsiya xizmati", "basePrice": 100000, "currency": "UZS", "isAvailable": True}]}
 
 @app.post("/quote")
 def create_quote():
     return {
-        "quoteId": f"q_{int(time.time())}",
-        "subtotal": 100000,
-        "fees": 0,
-        "discount": 0,
+        "id": f"q_{int(time.time())}", "providerSlug": "my-business",
+        "lines": [{"offeringId": "item_1", "offeringTitle": "Konsultatsiya xizmati", "unitPrice": 100000, "quantity": 1, "optionsTotal": 0, "lineTotal": 100000}],
+        "subtotal": 100000, "fees": [], "totalFees": 0,
+        "discounts": [], "totalDiscount": 0,
         "total": 100000,
-        "currency": "UZS"
+        "currency": "UZS", "expiresAt": "2026-08-24T10:15:00.000Z"
     }
 
 @app.post("/actions")
 def create_action():
     act_id = f"act_{int(time.time())}"
     return {
-        "actionId": act_id,
-        "status": "CONFIRMED"
+        "id": act_id, "publicId": act_id, "providerSlug": "my-business", "status": "CONFIRMED",
+        "lines": [], "subtotal": 100000, "fees": 0, "discount": 0, "total": 100000, "currency": "UZS",
+        "customer": {"name": "Customer", "phone": "+998901234567"}, "fulfillmentType": "STANDARD", "paymentStatus": "PENDING",
+        "createdAt": "2026-08-24T10:00:00.000Z", "updatedAt": "2026-08-24T10:00:00.000Z"
     }
 
-@app.post("/webhook")
-async def receive_webhook(request: Request, x_zayuno_signature: str = Header(None)):
-    body = await request.body()
-    secret = b"your_sandbox_webhook_secret"
-    expected = hmac.new(secret, body, hashlib.sha256).hexdigest()
-    if x_zayuno_signature and not hmac.compare_digest(x_zayuno_signature, expected):
-        raise HTTPException(status_code=401, detail="Noto'g'ri HMAC imzo")
-    return {"received": True}`, 'code-py')}
+# Status eventlarini provider Zayuno'ga yuboradi:
+# POST https://api.zayuno.uz/api/v1/webhooks/my-business`, 'code-py')}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
                   >
                     {copiedSection === 'code-py' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -539,26 +540,25 @@ app = FastAPI(title="Zayuno Provider Adapter")
 
 @app.get("/health")
 def health():
-    return {"status": "HEALTHY", "provider": "my-business"}
+    return {"status": "HEALTHY", "latencyMs": 1, "timestamp": "2026-08-24T10:00:00.000Z"}
 
 @app.get("/catalog")
 def catalog():
-    return {"items": [{"id": "item_1", "name": "Konsultatsiya xizmati", "price": 100000, "currency": "UZS"}]}
+    return {"providerSlug": "my-business", "categories": [], "offerings": [{"id": "item_1", "providerId": "my-business", "offeringCode": "consulting", "title": "Konsultatsiya xizmati", "basePrice": 100000, "currency": "UZS", "isAvailable": True}]}
 
 @app.post("/quote")
 def create_quote():
     return {
-        "quoteId": f"q_{int(time.time())}",
-        "subtotal": 100000,
-        "fees": 0,
-        "discount": 0,
+        "id": f"q_{int(time.time())}", "providerSlug": "my-business",
+        "lines": [{"offeringId": "item_1", "offeringTitle": "Konsultatsiya xizmati", "unitPrice": 100000, "quantity": 1, "optionsTotal": 0, "lineTotal": 100000}],
+        "subtotal": 100000, "fees": [], "totalFees": 0, "discounts": [], "totalDiscount": 0,
         "total": 100000,
-        "currency": "UZS"
+        "currency": "UZS", "expiresAt": "2026-08-24T10:15:00.000Z"
     }
 
 @app.post("/actions")
 def create_action():
-    return {"actionId": f"act_{int(time.time())}", "status": "CONFIRMED"}`}
+    return {"id": f"act_{int(time.time())}", "publicId": "ZY-ACT-1", "providerSlug": "my-business", "status": "CONFIRMED", "lines": [], "subtotal": 100000, "fees": 0, "discount": 0, "total": 100000, "currency": "UZS", "customer": {"name": "Customer", "phone": "+998901234567"}, "fulfillmentType": "STANDARD", "paymentStatus": "PENDING", "createdAt": "2026-08-24T10:00:00.000Z", "updatedAt": "2026-08-24T10:00:00.000Z"}`}
                 </pre>
               </div>
             </div>
@@ -576,6 +576,24 @@ def create_action():
               <p className="text-slate-400 mt-1">
                 Architectural boundaries, payment isolation rules, and integration lifecycle models.
               </p>
+            </div>
+
+            <div className="space-y-3" id="canonical-endpoints">
+              <h3 className="text-base font-semibold text-white">Canonical endpoint kontrakti</h3>
+              <p className="text-xs text-slate-400">Docs, AI Kit va Certification shu ro‘yxatdan foydalanadi. Optional endpoint faqat capability e’lon qilinganda tekshiriladi.</p>
+              <div className="space-y-2">
+                {PROVIDER_PROTOCOL_ENDPOINTS.map(endpoint => (
+                  <div key={endpoint.id} id={endpoint.docsAnchor} className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <code className="text-indigo-300 font-semibold">{endpoint.method} {endpoint.path}</code>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">{endpoint.capability}</span>
+                      <span className={`text-[10px] font-semibold ${endpoint.required ? 'text-emerald-400' : 'text-slate-500'}`}>{endpoint.required ? 'REQUIRED' : 'OPTIONAL'}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">{endpoint.summary}</p>
+                    <pre className="mt-2 p-2 rounded-lg bg-black/30 text-[10px] text-slate-300 overflow-x-auto">{JSON.stringify(endpoint.responseExample, null, 2)}</pre>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -671,7 +689,7 @@ def create_action():
                     { flag: 'QUOTE', req: 'TRANSACTIONAL', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', endpoint: 'POST /quote', desc: 'Verified itemized pricing computation with expiration.' },
                     { flag: 'ACTION_CREATE', req: 'TRANSACTIONAL', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', endpoint: 'POST /actions', desc: 'Action creation with idempotency and nextAction handoff.' },
                     { flag: 'ACTION_STATUS', req: 'TRANSACTIONAL', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', endpoint: 'GET /actions/:id', desc: 'Status lookup, fulfillment stages, and tracking timeline.' },
-                    { flag: 'WEBHOOK', req: 'TRANSACTIONAL', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', endpoint: 'POST /webhooks', desc: 'Asynchronous event push with HMAC-SHA256 signatures.' },
+                    { flag: 'WEBHOOK', req: 'TRANSACTIONAL', badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', endpoint: 'POST → Zayuno webhook intake', desc: 'Provider-to-Zayuno event push with HMAC-SHA256 signatures.' },
                     { flag: 'LOCATIONS', req: 'PHYSICAL ONLY', badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30', endpoint: 'GET /locations', desc: 'Physical store branches, coordinates, service radius (digital xizmatlarda shart emas).' },
                     { flag: 'SEARCH', req: 'OPTIONAL', badge: 'bg-slate-800 text-slate-400 border-slate-700', endpoint: 'GET /search', desc: 'Keyword and semantic search indexing across offerings.' },
                     { flag: 'ACTION_CANCEL', req: 'OPTIONAL', badge: 'bg-slate-800 text-slate-400 border-slate-700', endpoint: 'POST /actions/:id/cancel', desc: 'Customer-initiated cancellation before fulfillment lock.' },
@@ -817,12 +835,12 @@ const verifyZayunoRequest = (req: express.Request, res: express.Response, next: 
 
 // Health endpoint (ochiq)
 app.get('/health', (req, res) => {
-  res.json({ status: 'HEALTHY', provider: 'my-business', uptime: process.uptime() });
+  res.json({ status: 'HEALTHY', latencyMs: 1, timestamp: new Date().toISOString() });
 });
 
 // Himoyalangan endpointlar
 app.get('/catalog', verifyZayunoRequest, (req, res) => {
-  res.json({ items: [{ id: '1', name: 'Amerikano', price: 25000, currency: 'UZS', available: true }] });
+  res.json({ providerSlug: 'my-business', categories: [], offerings: [{ id: '1', providerId: 'my-business', offeringCode: 'americano', title: 'Amerikano', basePrice: 25000, currency: 'UZS', isAvailable: true }] });
 });
 
 // Zayunoga Webhook yuborish (HMAC-SHA256 imzosi bilan)
@@ -831,12 +849,11 @@ async function sendWebhookToZayuno(eventPayload: object) {
   const payloadString = JSON.stringify(eventPayload);
   const signature = crypto.createHmac('sha256', webhookSecret).update(payloadString).digest('hex');
 
-  await fetch('https://api.zayuno.uz/api/v1/webhooks', {
+  await fetch('https://api.zayuno.uz/api/v1/webhooks/my-business', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-provider': 'my-business',
-      'x-signature': signature
+      'x-provider-signature': signature
     },
     body: payloadString
   });
@@ -867,12 +884,12 @@ const verifyZayunoRequest = (req, res, next) => {
 
 // Health endpoint (ochiq)
 app.get('/health', (req, res) => {
-  res.json({ status: 'HEALTHY', provider: 'my-business' });
+  res.json({ status: 'HEALTHY', latencyMs: 1, timestamp: new Date().toISOString() });
 });
 
 // Himoyalangan endpointlar
 app.get('/catalog', verifyZayunoRequest, (req, res) => {
-  res.json({ items: [{ id: '1', name: 'Amerikano', price: 25000, currency: 'UZS', available: true }] });
+  res.json({ providerSlug: 'my-business', categories: [], offerings: [{ id: '1', providerId: 'my-business', offeringCode: 'americano', title: 'Amerikano', basePrice: 25000, currency: 'UZS', isAvailable: true }] });
 });
 
 // Zayunoga Webhook yuborish (HMAC-SHA256 imzosi bilan)
@@ -881,12 +898,11 @@ async function sendWebhookToZayuno(eventPayload) {
   const payloadString = JSON.stringify(eventPayload);
   const signature = crypto.createHmac('sha256', webhookSecret).update(payloadString).digest('hex');
 
-  await fetch('https://api.zayuno.uz/api/v1/webhooks', {
+  await fetch('https://api.zayuno.uz/api/v1/webhooks/my-business', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-provider': 'my-business',
-      'x-signature': signature
+      'x-provider-signature': signature
     },
     body: payloadString
   });
@@ -912,11 +928,11 @@ def verify_zayuno_api_key(x_provider_api_key: str = Header(None)):
 
 @app.get("/health")
 def health():
-    return {"status": "HEALTHY", "provider": "my-business"}
+    return {"status": "HEALTHY", "latencyMs": 1, "timestamp": "2026-08-24T10:00:00.000Z"}
 
 @app.get("/catalog", dependencies=[Depends(verify_zayuno_api_key)])
 def get_catalog():
-    return {"items": [{"id": "1", "name": "Amerikano", "price": 25000, "currency": "UZS", "available": True}]}
+    return {"providerSlug": "my-business", "categories": [], "offerings": [{"id": "1", "providerId": "my-business", "offeringCode": "americano", "title": "Amerikano", "basePrice": 25000, "currency": "UZS", "isAvailable": True}]}
 
 # Zayunoga Webhook yuborish
 async def send_webhook_to_zayuno(payload: dict):
@@ -926,8 +942,8 @@ async def send_webhook_to_zayuno(payload: dict):
 
     async with httpx.AsyncClient() as client:
         await client.post(
-            "https://api.zayuno.uz/api/v1/webhooks",
-            headers={"x-provider": "my-business", "x-signature": signature},
+            "https://api.zayuno.uz/api/v1/webhooks/my-business",
+            headers={"x-provider-signature": signature},
             content=payload_bytes
         )`, 'auth-py')}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-mono"
@@ -950,11 +966,11 @@ def verify_zayuno_api_key(x_provider_api_key: str = Header(None)):
 
 @app.get("/health")
 def health():
-    return {"status": "HEALTHY", "provider": "my-business"}
+    return {"status": "HEALTHY", "latencyMs": 1, "timestamp": "2026-08-24T10:00:00.000Z"}
 
 @app.get("/catalog", dependencies=[Depends(verify_zayuno_api_key)])
 def get_catalog():
-    return {"items": [{"id": "1", "name": "Amerikano", "price": 25000, "currency": "UZS", "available": True}]}`}
+    return {"providerSlug": "my-business", "categories": [], "offerings": [{"id": "1", "providerId": "my-business", "offeringCode": "americano", "title": "Amerikano", "basePrice": 25000, "currency": "UZS", "isAvailable": True}]}`}
                 </pre>
               </div>
             </div>
@@ -1260,7 +1276,7 @@ def get_catalog():
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                 <span className="text-xs font-mono text-indigo-400 font-bold">Webhook Ingestion Endpoint</span>
                 <div className="font-mono text-xs text-emerald-300 bg-slate-900 p-2.5 rounded-lg">
-                  POST https://api.zayuno.uz/api/v1/webhooks
+                  POST https://api.zayuno.uz/api/v1/webhooks/:providerSlug
                 </div>
                 <div className="text-xs text-slate-400 pt-1 space-y-1">
                   <p><strong>Required Header:</strong> <code className="text-indigo-300 font-mono">x-provider: &lt;providerSlug&gt;</code></p>
@@ -1433,7 +1449,7 @@ def get_catalog():
                 { method: 'POST', path: '/actions', desc: 'Create a binding action with idempotencyKey and userConfirmed: true.' },
                 { method: 'GET', path: '/actions/:id', desc: 'Retrieve live action status and fulfillment timeline.' },
                 { method: 'POST', path: '/actions/:id/cancel', desc: 'Cancel an active action with reason code.' },
-                { method: 'POST', path: '/webhooks', desc: 'Ingest provider status transition events with HMAC-SHA256 signature.' }
+                { method: 'POST', path: '/webhooks/:providerSlug', desc: 'Ingest provider status transition events with HMAC-SHA256 signature.' }
               ].map(api => (
                 <div key={api.path} className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
                   <div className="flex items-center gap-2 font-mono text-xs">

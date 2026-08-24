@@ -21,9 +21,29 @@ import {
   CancelActionResult,
   GetPaymentOptionsInput,
   PaymentOption,
-  NormalizedWebhookEvent
+  NormalizedWebhookEvent,
+  ProviderInfoSchema,
+  HealthCheckResultSchema,
+  LocationSchema,
+  CatalogSchema,
+  OfferingSchema,
+  AvailabilityResultSchema,
+  NormalizedQuoteSchema,
+  NormalizedActionSchema,
+  CancelActionResultSchema,
+  PaymentOptionSchema,
+  RequestQuoteInputSchema,
+  CreateActionInputSchema,
+  GetActionInputSchema,
+  CancelActionInputSchema
 } from '@zayuno/contracts';
 import { BaseProviderAdapter, ProviderAdapterConfig } from './base-provider';
+import {
+  normalizeLegacyPaymentOptionsResponse,
+  normalizeLegacyQuoteResponse,
+  validateProviderResponse
+} from './protocol-validation';
+import { z } from 'zod';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import crypto from 'node:crypto';
@@ -144,16 +164,19 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
   }
 
   async getProviderInfo(): Promise<ProviderInfo> {
-    return this.callRemote<ProviderInfo>('/provider-info');
+    const value = await this.callRemote<unknown>('/provider-info');
+    return validateProviderResponse('/provider-info', 'contract-provider-info', ProviderInfoSchema, value);
   }
 
   async checkHealth(): Promise<HealthCheckResult> {
-    return this.callRemote<HealthCheckResult>('/health');
+    const value = await this.callRemote<unknown>('/health');
+    return validateProviderResponse('/health', 'contract-health', HealthCheckResultSchema, value);
   }
 
   async getLocations(input?: GetLocationsInput): Promise<Location[]> {
     const query = input?.activeOnly !== undefined ? `?activeOnly=${input.activeOnly}` : '';
-    return this.callRemote<Location[]>(`/locations${query}`);
+    const value = await this.callRemote<unknown>(`/locations${query}`);
+    return validateProviderResponse('/locations', 'contract-locations', z.array(LocationSchema), value);
   }
 
   async getCatalog(input: GetCatalogInput): Promise<Catalog> {
@@ -162,7 +185,8 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
     if (input.categorySlug) params.append('category', input.categorySlug);
     if (input.parameters) params.append('context', JSON.stringify(input.parameters));
     const query = params.toString() ? `?${params.toString()}` : '';
-    return this.callRemote<Catalog>(`/catalog${query}`);
+    const value = await this.callRemote<unknown>(`/catalog${query}`);
+    return validateProviderResponse('/catalog', 'contract-catalog', CatalogSchema, value);
   }
 
   async getOffering(input: GetOfferingInput): Promise<Offering> {
@@ -170,7 +194,8 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
     if (input.locationId) params.append('locationId', input.locationId);
     if (input.parameters) params.append('context', JSON.stringify(input.parameters));
     const query = params.toString() ? `?${params.toString()}` : '';
-    return this.callRemote<Offering>(`/offerings/${encodeURIComponent(input.offeringId)}${query}`);
+    const value = await this.callRemote<unknown>(`/offerings/${encodeURIComponent(input.offeringId)}${query}`);
+    return validateProviderResponse('/offerings/:id', 'contract-catalog', OfferingSchema, value);
   }
 
   async searchOfferings(input: SearchCatalogInput): Promise<Offering[]> {
@@ -179,15 +204,17 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
     if (input.categorySlug) params.append('category', input.categorySlug);
     if (input.locationId) params.append('locationId', input.locationId);
     if (input.parameters) params.append('context', JSON.stringify(input.parameters));
-    return this.callRemote<Offering[]>(`/search?${params.toString()}`);
+    const value = await this.callRemote<unknown>(`/search?${params.toString()}`);
+    return validateProviderResponse('/search', 'contract-search', z.array(OfferingSchema), value);
   }
 
   async checkAvailability(input: CheckAvailabilityInput): Promise<AvailabilityResult> {
     try {
-      return await this.callRemote<AvailabilityResult>('/availability', {
+      const value = await this.callRemote<unknown>('/availability', {
         method: 'POST',
         body: JSON.stringify(input)
       });
+      return validateProviderResponse('/availability', 'contract-availability', AvailabilityResultSchema, value);
     } catch (error) {
       // `/availability` predates some otherwise valid Provider Contract v1
       // implementations. Preserve their old optimistic behavior only for an
@@ -211,35 +238,49 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
   }
 
   async requestQuote(input: RequestQuoteInput): Promise<NormalizedQuote> {
-    return this.callRemote<NormalizedQuote>('/quote', {
+    const canonicalInput = RequestQuoteInputSchema.parse(input);
+    const value = await this.callRemote<unknown>('/quote', {
       method: 'POST',
-      body: JSON.stringify(input)
+      body: JSON.stringify(canonicalInput)
     });
+    return validateProviderResponse('/quote', 'contract-quote', NormalizedQuoteSchema, normalizeLegacyQuoteResponse(value));
   }
 
   async createAction(input: CreateActionInput): Promise<NormalizedAction> {
-    return this.callRemote<NormalizedAction>('/actions', {
+    const canonicalInput = CreateActionInputSchema.parse(input);
+    const value = await this.callRemote<unknown>('/actions', {
       method: 'POST',
-      headers: input.idempotencyKey ? {
-        'idempotency-key': input.idempotencyKey
+      headers: canonicalInput.idempotencyKey ? {
+        'idempotency-key': canonicalInput.idempotencyKey
       } : undefined,
-      body: JSON.stringify(input)
+      body: JSON.stringify(canonicalInput)
     });
+    return validateProviderResponse('/actions', 'contract-action-create', NormalizedActionSchema, value);
   }
 
   async getAction(input: GetActionInput): Promise<NormalizedAction> {
-    return this.callRemote<NormalizedAction>(`/actions/${input.actionId}`);
+    const canonicalInput = GetActionInputSchema.parse(input);
+    const value = await this.callRemote<unknown>(`/actions/${canonicalInput.actionId}`);
+    return validateProviderResponse('/actions/:id', 'contract-action-status', NormalizedActionSchema, value);
   }
 
   async cancelAction(input: CancelActionInput): Promise<CancelActionResult> {
-    return this.callRemote<CancelActionResult>(`/actions/${input.actionId}/cancel`, {
+    const canonicalInput = CancelActionInputSchema.parse(input);
+    const value = await this.callRemote<unknown>(`/actions/${canonicalInput.actionId}/cancel`, {
       method: 'POST',
-      body: JSON.stringify(input)
+      body: JSON.stringify(canonicalInput)
     });
+    return validateProviderResponse('/actions/:id/cancel', 'contract-action-cancel', CancelActionResultSchema, value);
   }
 
   async getPaymentOptions(input: GetPaymentOptionsInput): Promise<PaymentOption[]> {
-    return this.callRemote<PaymentOption[]>(`/actions/${input.actionId}/payment-options`);
+    const value = await this.callRemote<unknown>(`/actions/${input.actionId}/payment-options`);
+    return validateProviderResponse(
+      '/actions/:id/payment-options',
+      'contract-payment-options',
+      z.array(PaymentOptionSchema),
+      normalizeLegacyPaymentOptionsResponse(value)
+    );
   }
 
   async parseWebhookEvent(

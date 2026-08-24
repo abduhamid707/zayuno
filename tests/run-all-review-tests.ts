@@ -41,7 +41,8 @@ const testSuites = [
   'tests/test-credential-ux-and-security.ts',
   'tests/test-onboarding-wizard-e2e-flow.ts',
   'tests/test-credential-capture-and-sandbox-flow.ts',
-  'tests/test-sandbox-production-credential-mapping.ts'
+  'tests/test-sandbox-production-credential-mapping.ts',
+  'tests/test-provider-contract-dx-parity.ts'
 ];
 
 async function main() {

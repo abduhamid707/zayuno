@@ -2,7 +2,9 @@ import {
   ProviderCapability,
   ProviderCapabilityProfile,
   determineProviderCapabilityProfile,
-  getMandatoryCapabilitiesForProfile
+  getMandatoryCapabilitiesForProfile,
+  getProviderProtocolEndpoints,
+  PROVIDER_CONTRACT_VERSION
 } from '@zayuno/contracts';
 import { redactForLogs, scrubSensitiveString } from '@zayuno/shared';
 
@@ -226,7 +228,7 @@ export function generateAiPrompt(options: GeneratePromptOptions): string {
   // Redacted certification issues if any
   let issueSection = '';
   if (certReport && !certReport.isCertified && Array.isArray(certReport.tests)) {
-    const failed = certReport.tests.filter((t: any) => !t.passed);
+    const failed = certReport.tests.filter((t: any) => (t.status || (t.passed ? 'PASS' : 'FAIL')) === 'FAIL');
     if (failed.length > 0) {
       issueSection = `
 ## 8. Current Certification Failure Context (Redacted)
@@ -235,10 +237,24 @@ ${failed.map((f: any, idx: number) => `
 ### Failure ${idx + 1}: ${f.name} (${f.capability})
 - **Test Type:** ${f.isMandatory ? 'MANDATORY' : 'OPTIONAL'}
 - **Error:** \`${scrubSensitiveString(String(f.error || 'Unknown error'))}\`
+- **Endpoint:** \`${f.endpoint || f.issue?.endpoint || 'unknown'}\`
+- **Field path:** \`${f.issue?.path || 'not provided'}\`
+- **Expected:** \`${f.issue?.expected || 'Provider Contract v1 response'}\`
+- **Received:** \`${f.issue?.received || 'invalid response'}\`
+- **Docs:** ${f.docsUrl || f.issue?.docsUrl || 'https://developers.zayuno.uz/?tab=docs&doc=spec-v1'}
 - **Required Resolution:** Patch the endpoint to return the exact schema and response codes expected by Zayuno contracts.
 `).join('\n')}`;
     }
   }
+
+  const contractSection = getProviderProtocolEndpoints(profile)
+    .filter(endpoint => endpoint.required || declaredCaps.includes(endpoint.capability as ProviderCapability))
+    .map((endpoint, index) => `${index + 1}. **${endpoint.summary}** \`${endpoint.method} ${endpoint.path}\`
+   - Capability: \`${endpoint.capability}\` (${endpoint.required ? 'REQUIRED' : 'OPTIONAL / DECLARED'})
+   ${endpoint.requestExample === undefined ? '' : `- Request: \`${JSON.stringify(endpoint.requestExample)}\``}
+   - Canonical response: \`${JSON.stringify(endpoint.responseExample)}\`
+   - Docs: https://developers.zayuno.uz/?tab=docs&doc=spec-v1#${endpoint.docsAnchor}`)
+    .join('\n');
 
   const rawPrompt = `# Zayuno Provider Integration Task
 
@@ -272,27 +288,11 @@ The universal lifecycle follows four strict stages:
 
 ## 4. Contract Specification
 
-### Mandatory Endpoints for Profile:
-1. **Health Check:** \`GET /health\`
-   - Returns: \`{ "status": "HEALTHY" | "DEGRADED" | "DOWN", "latencyMs": number, "timestamp": string }\`
-2. **Provider Metadata:** \`GET /provider-info\`
-   - Returns: \`{ "id": string, "slug": "${providerSlug}", "name": string, "status": "SANDBOX" | "ACTIVE", "capabilities": string[] }\`
-3. **Catalog & Offerings:** \`GET /catalog\` & \`GET /offerings/:id\`
-   - Returns: \`{ "providerSlug": "${providerSlug}", "categories": [...], "offerings": [...] }\`
+Provider Contract version: \`${PROVIDER_CONTRACT_VERSION}\`
 
-${!isReadOnly ? `4. **Verified Pricing Quote:** \`POST /quote\`
-   - Request: \`{ "providerSlug": "${providerSlug}", "items": [{ "offeringId": string, "quantity": number }] }\`
-   - Strict Math Rule: \`total == subtotal + totalFees - totalDiscount\`
-   - Response: \`{ "id": string, "providerSlug": "${providerSlug}", "lines": [...], "subtotal": number, "totalFees": number, "totalDiscount": number, "total": number, "currency": "UZS", "expiresAt": string }\`
-5. **Action Creation:** \`POST /actions\`
-   - Header: \`idempotency-key: <uuid>\`
-   - Request: \`{ "idempotencyKey": string, "providerSlug": "${providerSlug}", "quoteId": string, "customer": { "name": string, "phone": string }, "userConfirmed": true }\`
-   - Response: \`{ "id": string, "status": "AWAITING_PAYMENT" | "CONFIRMED", "total": number, "currency": "UZS", "nextAction": { "type": "OPEN_URL", "url": "https://..." } }\`
-6. **Action Status:** \`GET /actions/:id\`
-   - Returns: \`{ "id": string, "status": string, "paymentStatus": string, "timeline": [...] }\`
-7. **Webhook Push:** \`POST /webhooks\`
-   - Ingestion: \`POST https://api.zayuno.uz/api/v1/webhooks\`
-   - Signature: \`x-signature: HMAC_SHA256(rawBody, webhookSecret)\`` : ''}
+${contractSection}
+
+Compatibility note: new integrations emit canonical \`id/lines\` quote fields and a top-level payment-options array. Legacy aliases are accepted only at the adapter migration boundary.
 
 ---
 
@@ -345,35 +345,20 @@ export function generateContractJson(provider?: any): string {
   const profile = determineProviderCapabilityProfile(declaredCaps);
   const isReadOnly = profile === ProviderCapabilityProfile.DISCOVERY_READONLY;
 
-  const endpoints: Record<string, { method: string; path: string }> = {
-    health: { method: 'GET', path: '/health' },
-    providerInfo: { method: 'GET', path: '/provider-info' },
-    catalog: { method: 'GET', path: '/catalog' }
-  };
-
-  if (!isReadOnly) {
-    endpoints.quote = { method: 'POST', path: '/quote' };
-    endpoints.actions = { method: 'POST', path: '/actions' };
-    endpoints.actionStatus = { method: 'GET', path: '/actions/:id' };
-    endpoints.webhook = { method: 'POST', path: '/webhooks' };
-
-    if (declaredCaps.includes(ProviderCapability.ACTION_CANCEL)) {
-      endpoints.actionCancel = { method: 'POST', path: '/actions/:id/cancel' };
-    }
-    if (declaredCaps.includes(ProviderCapability.PAYMENT_OPTIONS)) {
-      endpoints.paymentOptions = { method: 'GET', path: '/actions/:id/payment-options' };
-    }
-  }
-
-  if (declaredCaps.includes(ProviderCapability.SEARCH)) {
-    endpoints.search = { method: 'GET', path: '/search' };
-  }
-  if (declaredCaps.includes(ProviderCapability.LOCATIONS)) {
-    endpoints.locations = { method: 'GET', path: '/locations' };
-  }
+  const endpoints = Object.fromEntries(
+    getProviderProtocolEndpoints(profile)
+      .filter(endpoint => endpoint.required || declaredCaps.includes(endpoint.capability as ProviderCapability))
+      .map(endpoint => [endpoint.id, {
+        method: endpoint.method,
+        path: endpoint.path,
+        required: endpoint.required,
+        responseExample: endpoint.responseExample,
+        docsAnchor: endpoint.docsAnchor
+      }])
+  );
 
   const exportData = {
-    contractVersion: '1.0.0',
+    contractVersion: PROVIDER_CONTRACT_VERSION,
     profile,
     generatedAt: new Date().toISOString(),
     provider: {
@@ -387,4 +372,3 @@ export function generateContractJson(provider?: any): string {
 
   return JSON.stringify(exportData, null, 2);
 }
-
