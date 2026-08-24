@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite --port 3001",
-    "build": "vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 3001 --host 0.0.0.0",
     "lint": "echo 'No lint specified for provider portal'"
   },

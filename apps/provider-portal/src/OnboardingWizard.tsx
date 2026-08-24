@@ -28,7 +28,8 @@ import {
   X,
   Play,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  Webhook
 } from 'lucide-react';
 import { DocsViewer } from './DocsViewer';
 

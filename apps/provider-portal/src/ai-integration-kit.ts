@@ -3,8 +3,8 @@ import {
   ProviderCapabilityProfile,
   determineProviderCapabilityProfile,
   getMandatoryCapabilitiesForProfile
-} from '../../../packages/contracts/src/provider.ts';
-import { redactForLogs, scrubSensitiveString } from '../../../packages/shared/src/redaction.ts';
+} from '@zayuno/contracts';
+import { redactForLogs, scrubSensitiveString } from '@zayuno/shared';
 
 export type AiIntegrationGoal =
   | 'create-new'
