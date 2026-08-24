@@ -55,6 +55,11 @@ import {
   AiIntegrationGoal,
   AiFramework
 } from './ai-integration-kit';
+import {
+  ProviderFulfillmentMode,
+  ProviderType,
+  requiresActiveLocations
+} from '@zayuno/contracts';
 
 const API_BASE =
   (import.meta as any).env?.VITE_API_URL ||
@@ -408,6 +413,11 @@ export default function App() {
     enabled: !!token
   });
 
+  const providerRequiresLocations = requiresActiveLocations(
+    providerData?.type as ProviderType | undefined,
+    (providerData?.fulfillmentMode || providerData?.metadata?.fulfillmentMode) as ProviderFulfillmentMode | undefined
+  );
+
   const { data: providerDashboard, isFetching: dashboardFetching, refetch: refetchDashboard } = useQuery({
     queryKey: ['provider-dashboard', token, actionFilters],
     queryFn: async () => {
@@ -446,15 +456,20 @@ export default function App() {
 
   useEffect(() => {
     if (!providerData) return;
+    const savedCapabilities = providerData.capabilities?.length
+      ? providerData.capabilities
+      : [...TRANSACTIONAL_MANDATORY_CAPABILITIES];
     setIntegrationForm(current => ({
       ...current,
       baseUrl: providerData.baseUrl || '',
       authMethod: providerData.authMethod || 'API_KEY',
-      capabilities: providerData.capabilities?.length ? providerData.capabilities : [...TRANSACTIONAL_MANDATORY_CAPABILITIES],
+      capabilities: providerRequiresLocations
+        ? Array.from(new Set([...savedCapabilities, 'LOCATIONS']))
+        : savedCapabilities,
       apiSecret: '',
       webhookSecret: ''
     }));
-  }, [providerData]);
+  }, [providerData, providerRequiresLocations]);
 
   const certifyMutation = useMutation({
     mutationFn: async () => {
@@ -481,7 +496,8 @@ export default function App() {
       const isTransactional = integrationForm.capabilities.some(capability =>
         ['QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK'].includes(capability)
       );
-      const mandatory = isTransactional ? TRANSACTIONAL_MANDATORY_CAPABILITIES : READONLY_CAPABILITIES;
+      const mandatory = isTransactional ? [...TRANSACTIONAL_MANDATORY_CAPABILITIES] : [...READONLY_CAPABILITIES];
+      if (providerRequiresLocations) mandatory.push('LOCATIONS');
       const payload: any = {
         baseUrl: integrationForm.baseUrl.trim(),
         authMethod: integrationForm.authMethod,
@@ -1336,7 +1352,10 @@ export default function App() {
                               type="button"
                               onClick={() => setIntegrationForm(current => ({
                                 ...current,
-                                capabilities: Array.from(new Set([...READONLY_CAPABILITIES]))
+                                capabilities: Array.from(new Set([
+                                  ...READONLY_CAPABILITIES,
+                                  ...(providerRequiresLocations ? ['LOCATIONS'] : [])
+                                ]))
                               }))}
                               className="px-2.5 py-1 rounded-lg text-[10px] font-mono border border-sky-500/30 bg-sky-950/30 text-sky-300 hover:bg-sky-900/40 transition"
                             >
@@ -1346,7 +1365,10 @@ export default function App() {
                               type="button"
                               onClick={() => setIntegrationForm(current => ({
                                 ...current,
-                                capabilities: Array.from(new Set([...TRANSACTIONAL_MANDATORY_CAPABILITIES]))
+                                capabilities: Array.from(new Set([
+                                  ...TRANSACTIONAL_MANDATORY_CAPABILITIES,
+                                  ...(providerRequiresLocations ? ['LOCATIONS'] : [])
+                                ]))
                               }))}
                               className="px-2.5 py-1 rounded-lg text-[10px] font-mono border border-emerald-500/30 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-900/40 transition"
                             >
@@ -1358,14 +1380,15 @@ export default function App() {
                         <div className="flex flex-wrap gap-2">
                           {PROVIDER_CAPABILITIES.map(capability => {
                             const isReadOnlyMandatory = READONLY_CAPABILITIES.includes(capability);
-                            const isTransactionalMandatory = TRANSACTIONAL_MANDATORY_CAPABILITIES.includes(capability);
+                            const isLocationMandatory = capability === 'LOCATIONS' && providerRequiresLocations;
+                            const isTransactionalMandatory = TRANSACTIONAL_MANDATORY_CAPABILITIES.includes(capability) || isLocationMandatory;
                             const checked = integrationForm.capabilities.includes(capability);
                             return (
                               <label key={capability} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] cursor-pointer transition ${checked ? (isTransactionalMandatory ? 'border-indigo-500/40 bg-indigo-950/40 text-indigo-200' : 'border-emerald-500/40 bg-emerald-950/30 text-emerald-300') : 'border-slate-800 bg-slate-950 text-slate-400'}`}>
                                 <input
                                   type="checkbox"
                                   checked={checked}
-                                  disabled={provider.status === 'ACTIVE'}
+                                  disabled={provider.status === 'ACTIVE' || isLocationMandatory}
                                   onChange={event => setIntegrationForm(current => ({
                                     ...current,
                                     capabilities: event.target.checked
@@ -1375,11 +1398,15 @@ export default function App() {
                                 />
                                 {capability}
                                 {isReadOnlyMandatory && <span className="text-[9px] text-sky-400 font-mono">RO</span>}
+                                {isLocationMandatory && <span className="text-[9px] text-amber-300 font-mono">REQUIRED</span>}
                               </label>
                             );
                           })}
                         </div>
-                        <p className="mt-1 text-[11px] text-slate-500">Discovery profili uchun [METADATA, HEALTH, CATALOG] yetarli. Tranzaksion xizmatlar uchun barcha 7 ta capability talab qilinadi.</p>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          Discovery profili uchun [METADATA, HEALTH, CATALOG] yetarli. Tranzaksion xizmatlar uchun barcha 7 ta capability talab qilinadi.
+                          {providerRequiresLocations && ' Bu jismoniy xizmat bo‘lgani uchun LOCATIONS ham majburiy va avtomatik saqlanadi.'}
+                        </p>
                       </div>
 
                       <button

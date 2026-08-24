@@ -76,6 +76,12 @@ async function main() {
     wizardContent.includes('Davom etish (Xulosa va Ko‘rib chiqish)'),
     'Step 5 must allow advancing to Step 6 only when certification and AI discovery readiness both pass'
   );
+  assert.ok(
+    appContent.includes('providerRequiresLocations') &&
+    appContent.includes("mandatory.push('LOCATIONS')") &&
+    appContent.includes("provider.status === 'ACTIVE' || isLocationMandatory"),
+    'Existing physical providers must submit LOCATIONS from Dashboard settings and cannot accidentally uncheck it'
+  );
   console.log('    ✓ In-wizard certification runner correctly implemented with pass/fail gates.');
 
   // --------------------------------------------------------------------------
