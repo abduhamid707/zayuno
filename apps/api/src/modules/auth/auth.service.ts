@@ -65,7 +65,10 @@ export class AuthService {
 
   async verifyEmail(token: string) {
     const { email } = await this.emailVerificationService.verifyToken(token);
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { provider: true }
+    });
     if (!user) {
       throw new BadRequestException('Foydalanuvchi topilmadi.');
     }
@@ -77,9 +80,30 @@ export class AuthService {
       });
     }
 
+    // Auto-login: issue JWT so the user is authenticated immediately after verification
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      providerId: user.providerId,
+      providerSlug: (user as any).provider?.slug
+    };
+
+    const accessToken = this.jwtService.sign(payload);
+
     return {
       success: true,
-      message: 'Email muvaffaqiyatli tasdiqlandi. Endi tizimga kirishingiz mumkin.'
+      message: 'Email muvaffaqiyatli tasdiqlandi.',
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        providerId: user.providerId,
+        providerSlug: (user as any).provider?.slug,
+        providerName: (user as any).provider?.name
+      }
     };
   }
 

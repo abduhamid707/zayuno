@@ -113,8 +113,14 @@ export const AuthView: React.FC<AuthViewProps> = ({
         throw new Error(data?.message || 'Tasdiqlash kodi noto‘g‘ri yoki muddati o‘tgan.');
       }
 
-      setSuccessMsg('Email muvaffaqiyatli tasdiqlandi! Endi parolingiz bilan tizimga kiring.');
-      setMode('login');
+      // Auto-login if verify-email returns accessToken
+      if (data.accessToken && data.user) {
+        setSuccessMsg('Email tasdiqlandi! Tizimga avtomatik kirildi.');
+        onLoginSuccess(data.accessToken, data.user);
+      } else {
+        setSuccessMsg('Email muvaffaqiyatli tasdiqlandi! Endi parolingiz bilan tizimga kiring.');
+        setMode('login');
+      }
     } catch (err: any) {
       setError(err.message || 'Tasdiqlashda xatolik yuz berdi.');
     } finally {

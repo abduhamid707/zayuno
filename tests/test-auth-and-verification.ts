@@ -116,6 +116,9 @@ async function main() {
 
     const verifySuccess = await authService.verifyEmail(token);
     assert.ok(verifySuccess.success);
+    assert.ok(verifySuccess.accessToken, 'verifyEmail must return accessToken for auto-login');
+    assert.ok(verifySuccess.user, 'verifyEmail must return user object');
+    assert.equal(verifySuccess.user.email, flowEmail);
     assert.equal(mockUser.isActive, true, 'User must be activated after verification');
 
     // D. Attempt login after verification -> MUST SUCCEED

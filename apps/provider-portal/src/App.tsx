@@ -342,8 +342,19 @@ export default function App() {
       if (!response.ok) {
         throw new Error(data.message || 'Tasdiqlashda xatolik yuz berdi.');
       }
-      setAuthSuccess('Email muvaffaqiyatli tasdiqlandi! Endi parolingiz bilan tizimga kirishingiz mumkin.');
-      setAuthModalTab('login');
+      // Auto-login if verify-email returns accessToken
+      if (data.accessToken && data.user) {
+        localStorage.setItem('zayuno_provider_token', data.accessToken);
+        localStorage.setItem('zayuno_provider_user', JSON.stringify(data.user));
+        setToken(data.accessToken);
+        setUserProfile(data.user);
+        setAuthModalOpen(false);
+        setAuthSuccess('Email tasdiqlandi va tizimga kirdingiz!');
+        refetchProvider();
+      } else {
+        setAuthSuccess('Email muvaffaqiyatli tasdiqlandi! Endi parolingiz bilan tizimga kirishingiz mumkin.');
+        setAuthModalTab('login');
+      }
     } catch (error: any) {
       setAuthError(error.message || 'Tasdiqlash kodi noto‘g‘ri yoki muddati o‘tgan.');
     } finally {

@@ -411,8 +411,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
       setSuccessMsg('Email muvaffaqiyatli tasdiqlandi!');
 
-      // Attempt automatic login if password is in state
-      if (password) {
+      // Use accessToken from verify-email response (auto-login)
+      if (verifyData.accessToken && verifyData.user) {
+        localStorage.setItem('zayuno_provider_token', verifyData.accessToken);
+        localStorage.setItem('zayuno_provider_user', JSON.stringify(verifyData.user));
+        onAuthSuccess(verifyData.accessToken, verifyData.user);
+      } else if (password) {
+        // Fallback: attempt login with password if verify didn't return token
         const loginRes = await fetch(`${apiBase}/api/v1/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
