@@ -382,7 +382,7 @@ ${schemaScriptTags}
           <span>→</span>
         </a>
 
-        <a href="/mcp" class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono font-medium transition flex items-center gap-1.5" title="Model Context Protocol Endpoint">
+        <a href="https://mcp.zayuno.uz/mcp" class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono font-medium transition flex items-center gap-1.5" title="Model Context Protocol Endpoint">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span class="hidden xs:inline">MCP</span>
           <span class="xs:hidden">/mcp</span>
@@ -523,7 +523,7 @@ ${schemaScriptTags}
               </a>
             </li>
             <li>
-              <a href="/mcp" class="hover:text-emerald-400 transition-colors font-mono">MCP Endpoint (/mcp)</a>
+              <a href="https://mcp.zayuno.uz/mcp" class="hover:text-emerald-400 transition-colors font-mono">MCP Endpoint (/mcp)</a>
             </li>
           </ul>
         </div>
