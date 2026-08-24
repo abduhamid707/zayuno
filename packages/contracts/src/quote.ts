@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CurrencySchema, AddressSchema } from './common';
+import { CurrencySchema, AddressSchema, IsoDateTimeSchema } from './common';
 import { SelectedOptionSchema } from './catalog';
 
 export const QuoteItemInputSchema = z.object({
@@ -59,7 +59,7 @@ export const NormalizedQuoteSchema = z.object({
   totalDiscount: z.number().nonnegative().default(0),
   total: z.number().nonnegative().describe('Final payable amount in quote currency'),
   currency: CurrencySchema.default('UZS'),
-  expiresAt: z.string().datetime().describe('ISO timestamp when quote prices expire'),
+  expiresAt: IsoDateTimeSchema.describe('RFC 3339 timestamp when quote prices expire; Z and numeric offsets are accepted'),
   estimatedDurationMinutes: z.number().int().positive().optional(),
   parameters: z.record(z.any()).optional().default({})
 });

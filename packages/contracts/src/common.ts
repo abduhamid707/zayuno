@@ -3,6 +3,13 @@ import { z } from 'zod';
 export const CurrencySchema = z.enum(['UZS', 'USD', 'EUR']).default('UZS');
 export type Currency = z.infer<typeof CurrencySchema>;
 
+/**
+ * Canonical provider timestamp. RFC 3339 offsets are accepted so providers can
+ * use the native UTC output of Node.js, Python, Go, Java, and .NET without
+ * rewriting a valid `+00:00`/`+05:00` timestamp to the `Z` form first.
+ */
+export const IsoDateTimeSchema = z.string().datetime({ offset: true });
+
 export const CoordinatesSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180)
@@ -22,7 +29,7 @@ export type Address = z.infer<typeof AddressSchema>;
 export const CustomerContactSchema = z.object({
   name: z.string().min(1).describe('Customer full name'),
   phone: z.string().min(6).describe('Customer phone number e.g. +998901234567'),
-  email: z.string().email().optional(),
+  email: z.string().email().nullish().transform(value => value ?? undefined),
   externalId: z.string().optional()
 });
 export type CustomerContact = z.infer<typeof CustomerContactSchema>;

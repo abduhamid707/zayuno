@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ActionStatus, PaymentStatus } from './action';
+import { IsoDateTimeSchema } from './common';
 
 export const WebhookEventTypeSchema = z.enum([
   'action.created',
@@ -22,7 +23,7 @@ export const NormalizedWebhookEventSchema = z.object({
   externalActionId: z.string().optional(),
   newStatus: z.nativeEnum(ActionStatus).optional(),
   newPaymentStatus: z.nativeEnum(PaymentStatus).optional(),
-  timestamp: z.string().datetime(),
+  timestamp: IsoDateTimeSchema,
   description: z.string().optional(),
   payload: z.record(z.any()).default({})
 });

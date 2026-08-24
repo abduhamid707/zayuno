@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { IsoDateTimeSchema } from './common';
 import { Location, GetLocationsInput } from './location';
 import {
   Catalog,
@@ -184,7 +185,7 @@ export const HealthCheckResultSchema = z.object({
   status: z.enum(['HEALTHY', 'DEGRADED', 'DOWN']),
   latencyMs: z.number().nonnegative(),
   message: z.string().optional(),
-  timestamp: z.string().datetime()
+  timestamp: IsoDateTimeSchema
 });
 export type HealthCheckResult = z.infer<typeof HealthCheckResultSchema>;
 

@@ -181,7 +181,7 @@ export const PROVIDER_PROTOCOL_ENDPOINTS: readonly ProviderProtocolEndpoint[] = 
         'ACTION_CANCEL',
         'WEBHOOK'
       ],
-      support: {
+      supportContact: {
         email: 'support@shopla.uz',
         phone: '+998712000000',
         telegram: '@shoplasupport'
@@ -376,32 +376,37 @@ export const PROVIDER_PROTOCOL_ENDPOINTS: readonly ProviderProtocolEndpoint[] = 
     },
     responseExample: {
       id: 'act_12345',
+      publicId: 'ZY-SHOPLA-12345',
       externalActionId: 'ord_provider_999',
       providerSlug: 'shopla',
       quoteId: 'quote_123',
       status: 'AWAITING_PAYMENT',
       paymentStatus: 'PENDING',
       subtotal: 60000,
+      fees: 10000,
+      discount: 0,
       total: 70000,
       currency: 'UZS',
       customer: {
         name: 'Ali Valiyev',
         phone: '+998901234567'
       },
-      items: [
+      lines: [
         {
           offeringId: 'item_coffee_latte',
-          title: 'Latte',
+          offeringTitle: 'Latte',
           quantity: 2,
           unitPrice: 30000,
+          optionsTotal: 0,
           lineTotal: 60000
         }
       ],
       nextAction: {
         type: 'OPEN_URL',
         url: 'https://checkout.shopla.uz/pay/act_12345',
-        description: 'Shopla xavfsiz to‘lov sahifasiga o‘tish'
+        label: 'Shopla xavfsiz to‘lov sahifasiga o‘tish'
       },
+      fulfillmentType: 'STANDARD',
       createdAt: '2026-08-24T10:00:00.000Z',
       updatedAt: '2026-08-24T10:00:00.000Z',
       metadata: {}
@@ -422,27 +427,32 @@ export const PROVIDER_PROTOCOL_ENDPOINTS: readonly ProviderProtocolEndpoint[] = 
     requiredFields: extractRequiredFieldsFromZod(NormalizedActionSchema),
     responseExample: {
       id: 'act_12345',
+      publicId: 'ZY-SHOPLA-12345',
       externalActionId: 'ord_provider_999',
       providerSlug: 'shopla',
       quoteId: 'quote_123',
       status: 'PROCESSING',
       paymentStatus: 'PAID',
       subtotal: 60000,
+      fees: 10000,
+      discount: 0,
       total: 70000,
       currency: 'UZS',
       customer: {
         name: 'Ali Valiyev',
         phone: '+998901234567'
       },
-      items: [
+      lines: [
         {
           offeringId: 'item_coffee_latte',
-          title: 'Latte',
+          offeringTitle: 'Latte',
           quantity: 2,
           unitPrice: 30000,
+          optionsTotal: 0,
           lineTotal: 60000
         }
       ],
+      fulfillmentType: 'STANDARD',
       createdAt: '2026-08-24T10:00:00.000Z',
       updatedAt: '2026-08-24T10:05:00.000Z',
       metadata: {}
@@ -466,14 +476,14 @@ export const PROVIDER_PROTOCOL_ENDPOINTS: readonly ProviderProtocolEndpoint[] = 
         id: 'pay_click',
         name: 'Click',
         type: 'CLICK',
-        providerActionUrl: 'https://checkout.shopla.uz/pay/act_12345?method=click',
+        checkoutUrl: 'https://checkout.shopla.uz/pay/act_12345?method=click',
         isAvailable: true
       },
       {
         id: 'pay_payme',
         name: 'Payme',
         type: 'PAYME',
-        providerActionUrl: 'https://checkout.shopla.uz/pay/act_12345?method=payme',
+        checkoutUrl: 'https://checkout.shopla.uz/pay/act_12345?method=payme',
         isAvailable: true
       }
     ],
@@ -498,9 +508,10 @@ export const PROVIDER_PROTOCOL_ENDPOINTS: readonly ProviderProtocolEndpoint[] = 
     responseExample: {
       success: true,
       actionId: 'act_12345',
-      status: 'CANCELLED',
-      cancellationReason: 'Foydalanuvchi buyurtmani bekor qildi',
-      metadata: {}
+      previousStatus: 'AWAITING_PAYMENT',
+      newStatus: 'CANCELLED',
+      message: 'Foydalanuvchi buyurtmani bekor qildi',
+      refundInitiated: false
     }
   },
   {
@@ -520,7 +531,7 @@ export const PROVIDER_PROTOCOL_ENDPOINTS: readonly ProviderProtocolEndpoint[] = 
       eventType: 'action.status_updated',
       providerSlug: 'shopla',
       actionId: 'act_12345',
-      status: 'COMPLETED',
+      newStatus: 'COMPLETED',
       timestamp: '2026-08-24T10:00:00.000Z'
     },
     responseExample: { success: true },

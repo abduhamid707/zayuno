@@ -113,13 +113,13 @@ const InfoTooltip: React.FC<{
 };
 
 const CATEGORIES = [
-  { id: 'general_services', label: 'Umumiy xizmatlar (General Services)', desc: 'Konsultatsiya, maishiy va professional xizmatlar' },
-  { id: 'food_delivery', label: 'Taom yetkazib berish (Food Delivery)', desc: 'Restoranlar, kafelar va tayyor ovqatlar' },
-  { id: 'logistics', label: 'Kuryer va logistika (Logistics)', desc: 'Yuk tashish, shahar ichida yetkazish va posilka' },
-  { id: 'retail', label: 'Savdo va do‘konlar (Commerce & Retail)', desc: 'Mahsulotlar, kiyim-kechak, elektronika va buyumlar' },
-  { id: 'bookings', label: 'Xizmatlarni bron qilish (Bookings)', desc: 'Salonlar, tibbiyot, sport va band qilish xizmatlari' },
-  { id: 'railway_tickets', label: 'Chiptalar va transport (Ticketing)', desc: 'Poyezd, avtobus va tadbirlar chiptalari' },
-  { id: 'digital', label: 'Raqamli xizmatlar (Digital Services)', desc: 'Obunalar, dasturiy ta’minot va raqamli tovarlar' }
+  { id: 'general_services', providerType: 'SERVICES', label: 'Umumiy xizmatlar (General Services)', desc: 'Konsultatsiya, maishiy va professional xizmatlar' },
+  { id: 'food_delivery', providerType: 'DELIVERY', label: 'Taom yetkazib berish (Food Delivery)', desc: 'Restoranlar, kafelar va tayyor ovqatlar' },
+  { id: 'logistics', providerType: 'DELIVERY', label: 'Kuryer va logistika (Logistics)', desc: 'Yuk tashish, shahar ichida yetkazish va posilka' },
+  { id: 'retail', providerType: 'RETAIL', label: 'Savdo va do‘konlar (Commerce & Retail)', desc: 'Mahsulotlar, kiyim-kechak, elektronika va buyumlar' },
+  { id: 'bookings', providerType: 'BOOKINGS', label: 'Xizmatlarni bron qilish (Bookings)', desc: 'Salonlar, tibbiyot, sport va band qilish xizmatlari' },
+  { id: 'railway_tickets', providerType: 'TICKETING', label: 'Chiptalar va transport (Ticketing)', desc: 'Poyezd, avtobus va tadbirlar chiptalari' },
+  { id: 'digital', providerType: 'DIGITAL', label: 'Raqamli xizmatlar (Digital Services)', desc: 'Obunalar, dasturiy ta’minot va raqamli tovarlar' }
 ];
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
@@ -694,7 +694,9 @@ MUHIM:
           name: businessName.trim(),
           slug: cleanSlug,
           description: description.trim() || undefined,
-          type: 'SERVICES',
+          // Human-readable category labels never become wire enum values.
+          // For example, "Digital Services" maps to the canonical `DIGITAL` value.
+          type: CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES',
           category: category,
           geography: ['UZ'],
           baseUrl: baseUrl.trim() || undefined,

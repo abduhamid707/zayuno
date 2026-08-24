@@ -7,7 +7,9 @@ import { PaymentOptionSchema } from '../packages/contracts/src/payment';
 import { OfferingSchema, CatalogSchema } from '../packages/contracts/src/catalog';
 import { LocationSchema } from '../packages/contracts/src/location';
 import { ProviderInfoSchema, HealthCheckResultSchema } from '../packages/contracts/src/provider';
-import { CreateActionInputSchema, NormalizedActionSchema } from '../packages/contracts/src/action';
+import { CustomerContactSchema, IsoDateTimeSchema } from '../packages/contracts/src/common';
+import { CreateActionInputSchema, NormalizedActionSchema, CancelActionResultSchema } from '../packages/contracts/src/action';
+import { NormalizedWebhookEventSchema } from '../packages/contracts/src/webhook';
 import {
   PROVIDER_PROTOCOL_ENDPOINTS,
   extractRequiredFieldsFromZod,
@@ -42,13 +44,17 @@ const catalogEp = PROVIDER_PROTOCOL_ENDPOINTS.find(e => e.id === 'catalog');
 const metadataEp = PROVIDER_PROTOCOL_ENDPOINTS.find(e => e.id === 'metadata');
 const locationEp = PROVIDER_PROTOCOL_ENDPOINTS.find(e => e.id === 'locations');
 const statusEp = PROVIDER_PROTOCOL_ENDPOINTS.find(e => e.id === 'action-status');
+const actionCreateEp = PROVIDER_PROTOCOL_ENDPOINTS.find(e => e.id === 'action-create');
+const cancelEp = PROVIDER_PROTOCOL_ENDPOINTS.find(e => e.id === 'action-cancel');
+const healthEp = PROVIDER_PROTOCOL_ENDPOINTS.find(e => e.id === 'health');
+const searchEp = PROVIDER_PROTOCOL_ENDPOINTS.find(e => e.id === 'search');
 
 assert.ok(offeringEp, 'GET /offerings/:id endpoint must be present in manifest.');
 assert.equal(offeringEp.method, 'GET');
 assert.equal(offeringEp.path, '/offerings/:id');
 assert.equal(offeringEp.responseSchemaName, 'Offering');
 
-assert.ok(quoteEp && webhookEp && paymentEp && catalogEp && metadataEp && locationEp && statusEp);
+assert.ok(quoteEp && webhookEp && paymentEp && catalogEp && metadataEp && locationEp && statusEp && actionCreateEp && cancelEp && healthEp && searchEp);
 assert.equal((quoteEp.responseExample as any).id, 'quote_123');
 assert.ok(Array.isArray((quoteEp.responseExample as any).lines));
 assert.equal(webhookEp.direction, 'PROVIDER_TO_ZAYUNO');
@@ -68,6 +74,24 @@ assert.doesNotThrow(() => OfferingSchema.parse(offeringEp.responseExample));
 assert.doesNotThrow(() => CatalogSchema.parse(catalogEp.responseExample));
 assert.doesNotThrow(() => NormalizedQuoteSchema.parse(quoteEp.responseExample));
 assert.doesNotThrow(() => PaymentOptionSchema.array().parse(paymentEp.responseExample));
+assert.doesNotThrow(() => ProviderInfoSchema.parse(metadataEp.responseExample));
+assert.doesNotThrow(() => HealthCheckResultSchema.parse(healthEp.responseExample));
+assert.doesNotThrow(() => LocationSchema.array().parse(locationEp.responseExample));
+assert.doesNotThrow(() => OfferingSchema.array().parse(searchEp.responseExample));
+assert.doesNotThrow(() => NormalizedActionSchema.parse(actionCreateEp.responseExample));
+assert.doesNotThrow(() => NormalizedActionSchema.parse(statusEp.responseExample));
+assert.doesNotThrow(() => CancelActionResultSchema.parse(cancelEp.responseExample));
+assert.doesNotThrow(() => NormalizedWebhookEventSchema.parse(webhookEp.requestExample));
+
+// Cross-language RFC 3339 parity: native Python/Java/.NET offsets and JS `Z`
+// timestamps are both canonical provider values.
+assert.equal(IsoDateTimeSchema.safeParse('2026-08-25T00:00:00Z').success, true);
+assert.equal(IsoDateTimeSchema.safeParse('2026-08-25T00:00:00+00:00').success, true);
+assert.equal(IsoDateTimeSchema.safeParse('2026-08-25T05:00:00+05:00').success, true);
+
+// Public provider boundaries accept a missing or explicit null email and
+// normalize both to the same internal representation.
+assert.equal(CustomerContactSchema.parse({ name: 'Ali', phone: '+998901234567', email: null }).email, undefined);
 
 console.log('3. Testing Deep Dynamic Parameter Safety, Types, and Hierarchy Validation...');
 // 3.1 Sensitive keys in nested objects & arrays

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CurrencySchema, AddressSchema, CustomerContactSchema } from './common';
+import { CurrencySchema, AddressSchema, CustomerContactSchema, IsoDateTimeSchema } from './common';
 import { QuoteLineSchema } from './quote';
 import { StructuredSupportContactSchema } from './provider';
 
@@ -30,7 +30,7 @@ export const NextActionSchema = z.object({
   type: z.enum(['OPEN_URL', 'REDIRECT', 'CONFIRMATION_REQUIRED', 'NONE']).default('OPEN_URL'),
   url: z.string().url().describe('Provider-owned checkout or verification URL'),
   label: z.string().default('Pay now'),
-  expiresAt: z.string().datetime().optional()
+  expiresAt: IsoDateTimeSchema.optional()
 });
 export type NextAction = z.infer<typeof NextActionSchema>;
 
@@ -67,7 +67,7 @@ export const ActionEventSchema = z.object({
   description: z.string(),
   source: z.enum(['AI_AGENT', 'PROVIDER_WEBHOOK', 'SYSTEM_WORKER', 'USER', 'ADMIN']),
   payload: z.record(z.any()).optional(),
-  createdAt: z.string().datetime()
+  createdAt: IsoDateTimeSchema
 });
 export type ActionEvent = z.infer<typeof ActionEventSchema>;
 
@@ -98,8 +98,8 @@ export const NormalizedActionSchema = z.object({
   parameters: z.record(z.any()).optional().default({}),
   metadata: z.record(z.any()).optional().default({}),
   timeline: z.array(ActionEventSchema).optional().default([]),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime()
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema
 });
 export type NormalizedAction = z.infer<typeof NormalizedActionSchema>;
 

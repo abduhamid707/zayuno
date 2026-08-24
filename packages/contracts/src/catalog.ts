@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CurrencySchema } from './common';
+import { CurrencySchema, IsoDateTimeSchema } from './common';
 import { DynamicParameterDeclarationSchema } from './dynamic-parameters';
 
 export const OptionItemSchema = z.object({
@@ -145,7 +145,7 @@ export const CatalogSchema = z.object({
   offerings: z.array(OfferingSchema),
   parametersSchema: DynamicParameterDeclarationSchema.optional(),
   version: z.string().optional(),
-  updatedAt: z.string().datetime().optional()
+  updatedAt: IsoDateTimeSchema.optional()
 });
 export type Catalog = z.infer<typeof CatalogSchema>;
 
@@ -210,8 +210,8 @@ export const AvailabilityResultSchema = z.object({
     currency: CurrencySchema.optional(),
     metadata: z.record(z.any()).optional().default({})
   })).optional().default([]),
-  checkedAt: z.string().datetime().optional(),
-  validUntil: z.string().datetime().optional(),
+  checkedAt: IsoDateTimeSchema.optional(),
+  validUntil: IsoDateTimeSchema.optional(),
   parameters: z.record(z.any()).optional().default({})
 });
 export type AvailabilityResult = z.infer<typeof AvailabilityResultSchema>;
