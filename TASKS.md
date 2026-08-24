@@ -86,6 +86,27 @@
 > This is an assisted integration workflow, not permission for Zayuno to
 > autonomously create live provider actions or publish a provider.
 
+## Productize the existing Provider Starter CLI
+
+- [ ] **Starter CLI — aslida mavjud, ammo mahsulot sifatida tugallanmagan.**
+  Mavjud CLI va Express/FastAPI/Go starterlarini yangi boshidan yozmasdan,
+  tashqi developer bemalol topib, o‘rnatib va ishlata oladigan mahsulotga
+  aylantirish.
+  - Public package nomi, versiyalash va release jarayonini yakunlash.
+  - Bir qatorli install/init oqimini berish (`npx ...` yoki ekvivalent).
+  - `readonly` va `transactional` profillar uchun interaktiv generator qo‘shish.
+  - Generatsiyadan keyin local contract validation va certification smoke-test
+    ishga tushirish.
+  - Portal, Documentation, OpenAPI va AI Integration Kit ichidan CLI’ga aniq
+    kirish nuqtalarini qo‘shish.
+  - Toza muhitda install → generate → run → validate oqimini CI’da tekshirish.
+  - Starter ichida real secret, production URL yoki fake provider data
+    bo‘lmasligini release gate bilan tekshirish.
+
+> Bu yangi CLI yaratish vazifasi emas. Repo ichidagi mavjud CLI imkoniyatlarini
+> discoverable, publishable va support qilinadigan developer mahsulotiga
+> aylantirish vazifasi.
+
 ## Future product ideas: AI-native business discovery + action network
 
 ### Product positioning

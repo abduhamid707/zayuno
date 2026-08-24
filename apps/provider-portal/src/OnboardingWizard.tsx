@@ -33,12 +33,25 @@ import {
 } from 'lucide-react';
 import { DocsViewer } from './DocsViewer';
 import {
+  createProviderOpenApiDocument,
   getProviderProtocolEndpoints,
   PROVIDER_CONTRACT_VERSION,
   ZAYUNO_WEBHOOK_INGESTION_PATH
 } from '@zayuno/contracts';
 
 const DRAFT_STORAGE_KEY = 'zayuno_onboarding_draft';
+
+function downloadJsonArtifact(filename: string, value: unknown) {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
+  const href = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = href;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(href);
+}
 
 export const SANDBOX_ALLOWLIST_HOSTS = [
   'coffee-time-sandbox.shopla.uz',
@@ -234,6 +247,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     return initialProvider?.metadata?.lastCertificationReport || null;
   });
   const [certError, setCertError] = useState<string | null>(null);
+  const [showCertificationSettings, setShowCertificationSettings] = useState(false);
+  const [savingCertificationSettings, setSavingCertificationSettings] = useState(false);
+  const [copiedCertificationFix, setCopiedCertificationFix] = useState<number | null>(null);
 
   // Step 6: Review & Credentials
   const [createdCredentials, setCreatedCredentials] = useState<{
@@ -593,6 +609,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const handleCopyIntegrationBrief = () => {
     const isTrans = capabilityProfile === 'transactional';
     const profile = isTrans ? 'TRANSACTIONAL' : 'DISCOVERY_READONLY';
+    const selectedCategory = CATEGORIES.find(c => c.id === category);
+    const canonicalProviderType = selectedCategory?.providerType || 'SERVICES';
     const endpoints = getProviderProtocolEndpoints(profile)
       .filter(endpoint => endpoint.required)
       .map((endpoint, index) => {
@@ -612,7 +630,8 @@ Provider Contract: v${PROVIDER_CONTRACT_VERSION}
 
 Biznes nomi: ${businessName.trim() || 'Mening Biznesim'}
 Provider Slug: ${slug.trim() || 'my-provider-slug'}
-Toifa: ${CATEGORIES.find(c => c.id === category)?.label || category}
+Biznes toifasi (UI): ${selectedCategory?.label || category}
+Provider type (CANONICAL API ENUM): ${canonicalProviderType}
 Tanlangan rejim: ${isTrans ? 'Variant B — Topish va buyurtma berish (TRANSACTIONAL)' : 'Variant A — Faqat topish va ko‘rish (DISCOVERY)'}
 Autentifikatsiya formati: ${authMethod} (${authMethod === 'API_KEY' ? 'X-API-KEY header: x-provider-api-key' : authMethod === 'BEARER_TOKEN' ? 'Authorization: Bearer token' : 'HMAC-SHA256 imzosi: x-zayuno-signature'})
 
@@ -628,6 +647,9 @@ AI agentlar foydalanuvchi talabiga asosan sizning xizmatlaringizni topadi, kotir
 ${endpoints}
 
 MUHIM:
+- UI'dagi biznes toifasi va API'dagi provider type bir xil matn emas. API javobida faqat canonical enum ishlating: RETAIL, DELIVERY, SERVICES, BOOKINGS, TICKETING, DIGITAL, COMMERCE yoki OTHER.
+- Masalan, "Kuryer va logistika (Logistics)" tanlangan bo'lsa JSON ichida "type": "DELIVERY" qaytaring. LOGISTICS canonical enum emas va ishlatilmasin.
+- Ushbu integratsiya uchun to'g'ri qiymat: "type": "${canonicalProviderType}".
 - Katalog offeringlarida "providerId", "offeringCode", "title", "basePrice", "currency" va "isAvailable" maydonlari majburiydir.
 - GET /offerings/:id bitta mahsulot tafsilotini aynan OfferingSchema formatida qaytarishi shart.
 - Quote javobi "id" va itemized "lines" qaytaradi (formula: total == subtotal + totalFees - totalDiscount).
@@ -654,6 +676,100 @@ MUHIM:
     navigator.clipboard.writeText(brief);
     setCopiedBrief(true);
     setTimeout(() => setCopiedBrief(false), 3000);
+  };
+
+  const handleDownloadOpenApi = () => {
+    downloadJsonArtifact('zayuno-provider-contract-v1.openapi.json', createProviderOpenApiDocument());
+  };
+
+  const buildCertificationFixArtifact = (test: any) => {
+    const profile = capabilityProfile === 'transactional' ? 'TRANSACTIONAL' : 'DISCOVERY_READONLY';
+    const selectedCategory = CATEGORIES.find(item => item.id === category);
+    const canonicalType = selectedCategory?.providerType || 'SERVICES';
+    const endpoint = getProviderProtocolEndpoints(profile).find(item =>
+      item.capability === test.capability ||
+      (test.endpoint && item.path === test.endpoint)
+    );
+    const canonicalResponse = endpoint?.responseExample && typeof endpoint.responseExample === 'object'
+      ? JSON.parse(JSON.stringify(endpoint.responseExample))
+      : endpoint?.responseExample;
+
+    if (canonicalResponse && !Array.isArray(canonicalResponse) && test.issue?.path === 'response.type') {
+      canonicalResponse.type = canonicalType;
+    }
+
+    return {
+      contractVersion: PROVIDER_CONTRACT_VERSION,
+      test: test.name,
+      capability: test.capability,
+      endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : test.endpoint,
+      issue: test.issue || { message: test.error },
+      canonicalProviderType: canonicalType,
+      canonicalResponseExample: canonicalResponse,
+      instruction: 'Provider javobini canonicalResponseExample va Expected talabiga moslang. Secret yoki real mijoz ma’lumotini AI chatiga yubormang.'
+    };
+  };
+
+  const handleCopyCertificationFix = async (test: any, index: number) => {
+    await navigator.clipboard.writeText(JSON.stringify(buildCertificationFixArtifact(test), null, 2));
+    setCopiedCertificationFix(index);
+    setTimeout(() => setCopiedCertificationFix(null), 2500);
+  };
+
+  const handleSaveCertificationSettings = async () => {
+    const cleanSlug = slug.trim().toLowerCase();
+    const authToken = token || localStorage.getItem('zayuno_provider_token');
+    if (!authToken || !cleanSlug || !baseUrl.trim()) {
+      setCertError('Provider slug, API Base URL va faol hisob talab qilinadi.');
+      return;
+    }
+    if (!isOfficialSandboxUrl(baseUrl) && !hasSavedSecret && !apiSecret.trim()) {
+      setCertError('Tanlangan autentifikatsiya usuli uchun provider credential kiriting.');
+      return;
+    }
+
+    setSavingCertificationSettings(true);
+    setCertError(null);
+    try {
+      const isSandbox = isOfficialSandboxUrl(baseUrl);
+      const capabilities = capabilityProfile === 'transactional'
+        ? ['METADATA', 'HEALTH', 'CATALOG', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK']
+        : ['METADATA', 'HEALTH', 'CATALOG'];
+      const res = await fetch(`${apiBase}/api/v1/providers/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          name: businessName.trim(),
+          slug: cleanSlug,
+          description: description.trim() || undefined,
+          type: CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES',
+          category,
+          geography: ['UZ'],
+          baseUrl: baseUrl.trim(),
+          apiSecret: (!isSandbox && apiSecret.trim()) ? apiSecret.trim() : undefined,
+          authMethod,
+          capabilities,
+          supportContact: {
+            phone: supportPhone.trim() || undefined,
+            telegram: supportTelegram.trim() || undefined,
+            email: supportEmail.trim() || email.trim() || undefined
+          }
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || 'API sozlamalarini saqlab bo‘lmadi.');
+      onProviderCreated(data);
+      if (apiSecret.trim()) setHasSavedSecret(true);
+      setApiSecret('');
+      setShowSecretInput(false);
+      setCertReport(null);
+      setShowCertificationSettings(false);
+      setSuccessMsg('API sozlamalari saqlandi. Oldingi sertifikat bekor qilindi — testlarni qayta ishga tushiring.');
+    } catch (err: any) {
+      setCertError(err.message || 'API sozlamalarini saqlashda xatolik yuz berdi.');
+    } finally {
+      setSavingCertificationSettings(false);
+    }
   };
 
   // --------------------------------------------------------------------------
@@ -1400,14 +1516,30 @@ MUHIM:
                   Dasturchingizga yoki AI vositalariga (Cursor, ChatGPT) tayyor texnik topshiriq yuboring.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={handleCopyIntegrationBrief}
-                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition shadow-md shadow-indigo-600/30 flex items-center gap-1.5 shrink-0"
-              >
-                {copiedBrief ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedBrief ? 'Brief nusxalandi!' : 'AI uchun integration brief nusxalash'}</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadOpenApi}
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition flex items-center gap-1.5"
+                >
+                  <FileCode className="w-3.5 h-3.5 text-sky-400" /> OpenAPI 3.1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openDocModal('base-url')}
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition flex items-center gap-1.5"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-emerald-400" /> Express · FastAPI · Go
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyIntegrationBrief}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition shadow-md shadow-indigo-600/30 flex items-center gap-1.5 shrink-0"
+                >
+                  {copiedBrief ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedBrief ? 'Brief nusxalandi!' : 'AI uchun brief nusxalash'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Question: Mijoz Zayuno orqali nima qila olsin? */}
@@ -1822,6 +1954,89 @@ MUHIM:
               <span className="px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[11px] font-medium">
                 {capabilityProfile === 'transactional' ? 'Variant B (Transactional)' : 'Variant A (Discovery)'}
               </span>
+              <button
+                type="button"
+                onClick={() => setShowCertificationSettings(value => !value)}
+                className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-[11px] font-semibold transition"
+              >
+                {showCertificationSettings ? 'Sozlamalarni yopish' : 'API sozlamalarini tahrirlash'}
+              </button>
+            </div>
+          </div>
+
+          {showCertificationSettings && (
+            <div className="p-4 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-4 animate-fadeIn">
+              <div>
+                <h4 className="text-sm font-bold text-white">Certification uchun API sozlamalari</h4>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Tunnel yoki backend manzili o‘zgarsa shu yerning o‘zida yangilang. Saqlash oldingi certification natijasini bekor qiladi.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="text-[11px] text-slate-300 space-y-1.5">
+                  <span className="font-semibold">API Base URL (HTTPS)</span>
+                  <input
+                    value={baseUrl}
+                    onChange={event => setBaseUrl(event.target.value)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-indigo-500"
+                    placeholder="https://api.business.uz/zayuno"
+                  />
+                </label>
+                <label className="text-[11px] text-slate-300 space-y-1.5">
+                  <span className="font-semibold">Autentifikatsiya formati</span>
+                  <select
+                    value={authMethod}
+                    onChange={event => setAuthMethod(event.target.value as typeof authMethod)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-indigo-500"
+                  >
+                    <option value="API_KEY">X-API-KEY</option>
+                    <option value="BEARER_TOKEN">Bearer token</option>
+                    <option value="HMAC_SIGNATURE">HMAC-SHA256</option>
+                  </select>
+                </label>
+              </div>
+              {!isOfficialSandboxUrl(baseUrl) && (
+                <label className="text-[11px] text-slate-300 space-y-1.5 block">
+                  <span className="font-semibold">
+                    {authMethod === 'API_KEY' ? 'Provider API key' : authMethod === 'BEARER_TOKEN' ? 'Bearer token' : 'Request signing secret'}
+                    {hasSavedSecret ? ' (faqat almashtirmoqchi bo‘lsangiz kiriting)' : ' *'}
+                  </span>
+                  <div className="relative">
+                    <input
+                      type={showSecret ? 'text' : 'password'}
+                      value={apiSecret}
+                      onChange={event => setApiSecret(event.target.value)}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 pr-10 text-xs text-white outline-none focus:border-indigo-500"
+                      placeholder={hasSavedSecret ? 'Serverda saqlangan credentialni o‘zgartirmaslik uchun bo‘sh qoldiring' : 'Provider serveringiz kutadigan secret'}
+                      autoComplete="new-password"
+                    />
+                    <button type="button" onClick={() => setShowSecret(value => !value)} className="absolute right-3 top-2.5 text-slate-400 hover:text-white">
+                      {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </label>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={handleTestBaseUrl} disabled={testingUrl} className="px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-xs text-slate-200 font-semibold disabled:opacity-50">
+                  {testingUrl ? 'Tekshirilmoqda…' : 'URLni tekshirish'}
+                </button>
+                <button type="button" onClick={handleSaveCertificationSettings} disabled={savingCertificationSettings} className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-semibold disabled:opacity-50">
+                  {savingCertificationSettings ? 'Saqlanmoqda…' : 'Saqlash va certificationni yangilash'}
+                </button>
+              </div>
+              {urlCheckResult.status !== 'idle' && <p className="text-[11px] text-slate-300">{urlCheckResult.message}</p>}
+            </div>
+          )}
+
+          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-semibold text-white">Contract va starter vositalari</span>
+              <p className="text-[11px] text-slate-400 mt-0.5">AI yoki code generator uchun canonical contractdan foydalaning.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={handleDownloadOpenApi} className="px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-[11px] text-slate-200 font-semibold flex items-center gap-1.5"><FileCode className="w-3.5 h-3.5 text-sky-400" /> OpenAPI 3.1</button>
+              <button type="button" onClick={() => openDocModal('base-url')} className="px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-[11px] text-slate-200 font-semibold">Express · FastAPI · Go</button>
+              <button type="button" onClick={handleCopyIntegrationBrief} className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-[11px] text-white font-semibold flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> AI brief</button>
             </div>
           </div>
 
@@ -1932,6 +2147,16 @@ MUHIM:
                               </div>
                             )}
                             {t.blockedBy?.length > 0 && <span className="text-[10px] text-amber-300 block mt-1">Avval tuzating: {t.blockedBy.join(', ')}</span>}
+                            {!(t.status === 'PASS' || t.passed) && t.status !== 'SKIPPED' && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopyCertificationFix(t, idx)}
+                                className="mt-2 px-2.5 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-semibold flex items-center gap-1.5"
+                              >
+                                {copiedCertificationFix === idx ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                {copiedCertificationFix === idx ? 'Tuzatish nusxalandi' : 'AI uchun canonical tuzatish nusxalash'}
+                              </button>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 sm:self-center">

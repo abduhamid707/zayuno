@@ -87,7 +87,7 @@ async function main() {
   assert.ok(wizardContent.includes('Variant A — Faqat topish va ko‘rish'), 'Must have Variant A: "Faqat topish va ko‘rish"');
   assert.ok(wizardContent.includes('Variant B — Topish va buyurtma berish'), 'Must have Variant B: "Topish va buyurtma berish"');
   assert.ok(wizardContent.includes('URLni tekshirish'), 'Must have "URLni tekshirish" button');
-  assert.ok(wizardContent.includes('AI uchun integration brief nusxalash'), 'Must have "AI uchun integration brief nusxalash" button');
+  assert.ok(wizardContent.includes('AI uchun brief nusxalash'), 'Must have AI integration brief copy button');
   console.log('    ✓ Friendly UX terms, clear question, and dynamic endpoint checklists confirmed.');
 
   // 5. AI Integration Brief Generator Security (Zero Leakage)
@@ -118,6 +118,16 @@ async function main() {
   assert.ok(wizardContent.includes('activeDocsDrawer'), 'Must support In-Wizard DocsDrawer without unmounting form');
   assert.ok(wizardContent.includes('Arizangiz hali topshirilmagan'), 'Step 6 must block access if credentials do not exist');
   console.log('    ✓ Form draft auto-save and step skipping guardrails verified.');
+
+  // 8. Canonical enum guidance, downloadable contract and in-place repair UX
+  console.log('  [8/8] Testing canonical enum and certification repair UX...');
+  assert.ok(wizardContent.includes('Provider type (CANONICAL API ENUM)'), 'AI brief must identify the canonical provider type');
+  assert.ok(wizardContent.includes('LOGISTICS canonical enum emas'), 'AI brief must prevent the LOGISTICS vs DELIVERY mismatch');
+  assert.ok(wizardContent.includes('createProviderOpenApiDocument'), 'Wizard must download OpenAPI from the canonical contract generator');
+  assert.ok(wizardContent.includes('API sozlamalarini tahrirlash'), 'Certification must allow in-place API settings editing');
+  assert.ok(wizardContent.includes('AI uchun canonical tuzatish nusxalash'), 'Failed tests must provide a canonical copy-for-AI repair artifact');
+  assert.ok(wizardContent.includes('setCertReport(null)'), 'Saving integration changes must invalidate stale certification results');
+  console.log('    ✓ Canonical enum guidance, OpenAPI and in-place certification repair UX verified.');
 
   console.log('\n🎉 ALL ONBOARDING WIZARD UX CLARITY & STEP 4 TESTS PASSED CLEANLY!\n');
 }
