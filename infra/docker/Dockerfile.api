@@ -17,9 +17,7 @@ COPY packages ./packages
 COPY integrations/sandbox-provider ./integrations/sandbox-provider
 COPY apps/api ./apps/api
 RUN pnpm --filter @zayuno/database run generate
-RUN pnpm --filter "./packages/*" run build
-RUN pnpm --filter @zayuno/sandbox-provider run build
-RUN pnpm --filter @zayuno/api run build
+RUN pnpm --filter @zayuno/api... run build
 
 EXPOSE 4000
 CMD ["node", "apps/api/dist/main.js"]
