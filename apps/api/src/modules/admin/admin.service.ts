@@ -112,25 +112,30 @@ export class AdminService {
       orderBy: { createdAt: 'desc' }
     });
 
-    return providers.map(p => ({
-      id: p.id,
-      slug: p.slug,
-      name: p.name,
-      status: p.status,
-      type: p.type,
-      category: (p.metadata as any)?.category || 'general',
-      geography: (p.metadata as any)?.geography || ['UZ'],
-      capabilities: p.capabilities,
-      adapterType: p.adapterType,
-      baseUrl: p.baseUrl,
-      isCertified: (p.metadata as any)?.isCertified || false,
-      isPublished: p.status === ProviderStatus.ACTIVE,
-      actionsCount: p._count.actions,
-      quotesCount: p._count.quotes,
-      locationsCount: p.locations.length,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt
-    }));
+    return providers.map(p => {
+      const meta = (p.metadata as any) || {};
+      return {
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        status: p.status,
+        type: p.type,
+        category: meta.category || 'general',
+        geography: meta.geography || ['UZ'],
+        capabilities: p.capabilities,
+        adapterType: p.adapterType,
+        baseUrl: p.baseUrl,
+        isCertified: Boolean(meta.isCertified),
+        reviewStatus: meta.reviewStatus || 'DRAFT',
+        metadata: meta,
+        isPublished: p.status === ProviderStatus.ACTIVE,
+        actionsCount: p._count.actions,
+        quotesCount: p._count.quotes,
+        locationsCount: p.locations.length,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt
+      };
+    });
   }
 
   private optionalDate(value: string | undefined, label: string, endOfDay = false): Date | undefined {

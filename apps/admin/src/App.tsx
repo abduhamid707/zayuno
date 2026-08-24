@@ -822,14 +822,14 @@ export default function App() {
                                   : <ShieldCheck className="w-3.5 h-3.5" />}
                                 <span>{certifyMutation.isPending && certifyMutation.variables === p.slug ? 'Tekshirilmoqda...' : 'Run Capability Certification'}</span>
                               </button>
-                              {p.metadata?.isCertified && p.metadata?.reviewStatus === 'PENDING_APPROVAL' && (
-                                <button onClick={() => publishMutation.mutate(p.slug)} disabled={publishMutation.isPending} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold">
+                              {(p.isCertified || p.metadata?.isCertified) && (p.reviewStatus === 'PENDING_APPROVAL' || p.metadata?.reviewStatus === 'PENDING_APPROVAL') && (
+                                <button onClick={() => publishMutation.mutate(p.slug)} disabled={publishMutation.isPending} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold transition">
                                   {publishMutation.isPending ? 'Tasdiqlanmoqda...' : 'ACTIVE qilish'}
                                 </button>
                               )}
-                              {p.metadata?.reviewStatus === 'PENDING_APPROVAL' && <button onClick={() => setReviewTarget({ slug: p.slug, name: p.name, decision: 'REQUEST_CHANGES' })} className="px-3 py-1.5 border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 rounded-lg text-xs font-bold">Tuzatish so‘rash</button>}
-                              {p.status !== 'SUSPENDED' && p.slug !== 'mock-evos' && <button onClick={() => setReviewTarget({ slug: p.slug, name: p.name, decision: p.metadata?.reviewStatus === 'PENDING_APPROVAL' ? 'REJECT' : 'SUSPEND' })} disabled={reviewMutation.isPending} className="px-3 py-1.5 border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 rounded-lg text-xs font-bold">{p.metadata?.reviewStatus === 'PENDING_APPROVAL' ? 'Rad etish' : 'Suspend'}</button>}
-                              {p.status === 'SUSPENDED' && ['REJECTED', 'SUSPENDED'].includes(p.metadata?.reviewStatus) && <button onClick={() => reopenMutation.mutate(p.slug)} disabled={reopenMutation.isPending} className="px-3 py-1.5 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 rounded-lg text-xs font-bold">Qayta ochish</button>}
+                              {(p.reviewStatus === 'PENDING_APPROVAL' || p.metadata?.reviewStatus === 'PENDING_APPROVAL') && <button onClick={() => setReviewTarget({ slug: p.slug, name: p.name, decision: 'REQUEST_CHANGES' })} className="px-3 py-1.5 border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 rounded-lg text-xs font-bold transition">Tuzatish so‘rash</button>}
+                              {p.status !== 'SUSPENDED' && p.slug !== 'mock-evos' && <button onClick={() => setReviewTarget({ slug: p.slug, name: p.name, decision: (p.reviewStatus === 'PENDING_APPROVAL' || p.metadata?.reviewStatus === 'PENDING_APPROVAL') ? 'REJECT' : 'SUSPEND' })} disabled={reviewMutation.isPending} className="px-3 py-1.5 border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 rounded-lg text-xs font-bold transition">{(p.reviewStatus === 'PENDING_APPROVAL' || p.metadata?.reviewStatus === 'PENDING_APPROVAL') ? 'Rad etish' : 'Suspend'}</button>}
+                              {p.status === 'SUSPENDED' && ['REJECTED', 'SUSPENDED'].includes(p.reviewStatus || p.metadata?.reviewStatus) && <button onClick={() => reopenMutation.mutate(p.slug)} disabled={reopenMutation.isPending} className="px-3 py-1.5 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 rounded-lg text-xs font-bold transition">Qayta ochish</button>}
                             </div>
 
                             {p.baseUrl && (
