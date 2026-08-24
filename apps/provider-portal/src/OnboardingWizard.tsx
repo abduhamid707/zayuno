@@ -220,7 +220,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   // Step 4: URL Testing & Brief Copy States
   const [testingUrl, setTestingUrl] = useState(false);
   const [urlCheckResult, setUrlCheckResult] = useState<{
-    status: 'idle' | 'success' | 'https_required' | 'not_found' | 'error';
+    status: 'idle' | 'success' | 'warning' | 'https_required' | 'not_found' | 'error';
     message: string;
   }>({ status: 'idle', message: '' });
   const [copiedBrief, setCopiedBrief] = useState(false);
@@ -543,13 +543,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const res = await fetch(`${API_BASE}/api/v1/providers/integration/check-url`, {
+      const res = await fetch(`${apiBase}/api/v1/providers/integration/check-url`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           baseUrl: cleanUrl,
           authMethod,
-          apiSecret: rawSecret || undefined
+          apiSecret: apiSecret.trim() || undefined
         })
       });
 
@@ -1374,7 +1374,7 @@ MUHIM:
                 className={`p-3 rounded-xl text-xs flex items-start gap-2.5 animate-fadeIn ${
                   urlCheckResult.status === 'success'
                     ? 'bg-emerald-950/50 border border-emerald-500/40 text-emerald-300'
-                    : urlCheckResult.status === 'https_required'
+                    : urlCheckResult.status === 'https_required' || urlCheckResult.status === 'warning'
                     ? 'bg-amber-950/50 border border-amber-500/40 text-amber-300'
                     : 'bg-rose-950/50 border border-rose-500/40 text-rose-300'
                 }`}
