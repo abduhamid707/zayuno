@@ -177,6 +177,31 @@ export class ActionsService {
     const publicId = generatePublicActionId(cleanSlug);
 
     // 5. Persist Action in Database
+    // Normalize lines, totals and pricing: external providers often return a lightweight
+    // confirmation payload (order ID + payment URL) while the canonical verified item lines
+    // and pricing are already locked and persisted in dbQuote.
+    const resolvedLines = (providerAction.lines && Array.isArray(providerAction.lines) && providerAction.lines.length > 0)
+      ? providerAction.lines
+      : (dbQuote.lines as any) || [];
+
+    const resolvedSubtotal = providerAction.subtotal !== undefined && providerAction.subtotal !== null
+      ? providerAction.subtotal
+      : Number(dbQuote.subtotal);
+
+    const resolvedFees = providerAction.fees !== undefined && providerAction.fees !== null
+      ? providerAction.fees
+      : (dbQuote.fees !== undefined && dbQuote.fees !== null ? Number(dbQuote.fees) : 0);
+
+    const resolvedDiscount = providerAction.discount !== undefined && providerAction.discount !== null
+      ? providerAction.discount
+      : (dbQuote.discount !== undefined && dbQuote.discount !== null ? Number(dbQuote.discount) : 0);
+
+    const resolvedTotal = providerAction.total !== undefined && providerAction.total !== null
+      ? providerAction.total
+      : Number(dbQuote.total);
+
+    const resolvedCurrency = providerAction.currency || dbQuote.currency || 'UZS';
+
     const dbAction = await prisma.action.create({
       data: {
         publicId,
@@ -187,13 +212,13 @@ export class ActionsService {
         // writing an external provider ID into this foreign-key column.
         locationId: dbQuote.locationId || undefined,
         quoteId: input.quoteId,
-        status: this.mapContractStatusToDb(providerAction.status),
-        lines: providerAction.lines as any,
-        subtotal: providerAction.subtotal,
-        fees: providerAction.fees || 0,
-        discount: providerAction.discount || 0,
-        total: providerAction.total,
-        currency: providerAction.currency || 'UZS',
+        status: this.mapContractStatusToDb(providerAction.status || ActionStatus.AWAITING_PAYMENT),
+        lines: resolvedLines as any,
+        subtotal: resolvedSubtotal,
+        fees: resolvedFees,
+        discount: resolvedDiscount,
+        total: resolvedTotal,
+        currency: resolvedCurrency,
         customerName: input.customer?.name || 'Customer',
         customerPhone: input.customer?.phone || '+998900000000',
         destination: input.destination?.raw,
