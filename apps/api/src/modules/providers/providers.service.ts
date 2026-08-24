@@ -27,8 +27,10 @@ import {
 } from '@zayuno/shared';
 import {
   ProviderInfo,
+  ProviderAdapter,
   ProviderStatus,
   ProviderType,
+  ProviderFulfillmentMode,
   ProviderCapability,
   AuthMethod,
   HealthCheckResult,
@@ -45,6 +47,8 @@ import {
   MANDATORY_CAPABILITIES,
   getMandatoryCapabilitiesForProfile,
   determineProviderCapabilityProfile,
+  defaultFulfillmentModeForProviderType,
+  requiresActiveLocations,
   WelcomeInfo
 } from '@zayuno/contracts';
 import { ProviderCertificationRunner, CertificationReport } from '@zayuno/provider-sdk';
@@ -517,6 +521,7 @@ export class ProvidersService {
     }
 
     const normalizedSupport = normalizeSupportContact(input.supportContact);
+    const fulfillmentMode = input.fulfillmentMode || defaultFulfillmentModeForProviderType(input.type);
 
     // If updating an existing draft for this owner, persist updates idempotently
     if (existingOwnerDraft) {
@@ -539,6 +544,7 @@ export class ProvidersService {
           geography: input.geography || ['UZ'],
           description: input.description,
           supportContact: normalizedSupport,
+          fulfillmentMode,
           isCertified: false,
           isPublished: false,
           reviewStatus: 'DRAFT',
@@ -606,6 +612,7 @@ export class ProvidersService {
           geography: input.geography || ['UZ'],
           description: input.description,
           supportContact: normalizedSupport,
+          fulfillmentMode,
           isCertified: false,
           isPublished: false,
           reviewStatus: 'DRAFT',
@@ -679,7 +686,7 @@ export class ProvidersService {
         status: ProviderStatus.DRAFT, adapterType: input.baseUrl ? 'remote-http' : 'sandbox',
         capabilities: input.capabilities, baseUrl: input.baseUrl, encryptedSecret, webhookSecret,
         config: { authMethod: input.authMethod, authConfig: input.authConfig || {}, webhookUrl: input.webhookUrl, supportContact: normalizedSupport },
-        metadata: { category: input.category || 'general', geography: input.geography || ['UZ'], description: input.description, supportContact: normalizedSupport, isCertified: false, isPublished: false, reviewStatus: 'DRAFT', registeredAt: new Date().toISOString() }
+        metadata: { category: input.category || 'general', geography: input.geography || ['UZ'], description: input.description, supportContact: normalizedSupport, fulfillmentMode: input.fulfillmentMode || defaultFulfillmentModeForProviderType(input.type), isCertified: false, isPublished: false, reviewStatus: 'DRAFT', registeredAt: new Date().toISOString() }
       }});
       const owner = await tx.user.create({ data: { id: randomUUID(), email: input.ownerEmail.trim().toLowerCase(), name: input.ownerName.trim(), passwordHash, role: UserRole.PROVIDER_OWNER, providerId: provider.id, isActive: true } });
       await tx.apiKey.create({ data: { name: `Provider sandbox key (${slug})`, keyHash: sandboxKey.keyHash, keyPrefix: sandboxKey.keyPrefix, role: UserRole.PROVIDER_DEVELOPER, userId: owner.id, providerId: provider.id, isActive: true } });
@@ -762,7 +769,10 @@ export class ProvidersService {
     if (invalidCapabilities.length > 0) {
       throw new BadRequestException(`Unknown capabilities: ${invalidCapabilities.join(', ')}`);
     }
-    const mandatoryForProfile = getMandatoryCapabilitiesForProfile(capabilities, { type: provider.type as any });
+    const mandatoryForProfile = getMandatoryCapabilitiesForProfile(capabilities, {
+      type: provider.type as any,
+      fulfillmentMode: (currentMetadata.fulfillmentMode || defaultFulfillmentModeForProviderType(provider.type as any)) as ProviderFulfillmentMode
+    });
     const missingMandatory = mandatoryForProfile.filter(capability => !capabilities.includes(capability));
     if (missingMandatory.length > 0) {
       const profile = determineProviderCapabilityProfile(capabilities);
@@ -830,6 +840,10 @@ export class ProvidersService {
     const runner = new ProviderCertificationRunner(adapter);
     const report = await runner.runAllTests();
 
+    if (report.isProductionReady) {
+      await this.syncDiscoveryLocations(provider, adapter);
+    }
+
     // Persist certification outcome in provider record
     await prisma.provider.update({
       where: { slug: cleanSlug },
@@ -891,6 +905,9 @@ export class ProvidersService {
     this.registry.invalidateAdapterCache(cleanSlug);
     const liveAdapter = await this.registry.getAdapter(cleanSlug);
     const liveReport = await new ProviderCertificationRunner(liveAdapter).runAllTests();
+    if (liveReport.isProductionReady) {
+      await this.syncDiscoveryLocations(provider, liveAdapter);
+    }
     await prisma.provider.update({
       where: { slug: cleanSlug },
       data: {
@@ -1137,6 +1154,7 @@ export class ProvidersService {
       logoUrl: p.logoUrl || undefined,
       status: p.status as any,
       type: p.type as any,
+      fulfillmentMode: (meta.fulfillmentMode || defaultFulfillmentModeForProviderType(p.type as any)) as ProviderFulfillmentMode,
       category: meta.category || 'general',
       geography: meta.geography || ['UZ'],
       adapterType: p.adapterType,
@@ -1170,6 +1188,73 @@ export class ProvidersService {
   private async getMetadata(slug: string): Promise<Record<string, any>> {
     const p = await prisma.provider.findUnique({ where: { slug } });
     return (p?.metadata as any) || {};
+  }
+
+  /**
+   * Discovery reads locations from Zayuno's durable index, while certification
+   * reads them from the provider API. Keep both views identical after a
+   * successful certification so a provider cannot pass and then disappear
+   * from AI discovery because its branches were never indexed.
+   */
+  private async syncDiscoveryLocations(provider: any, adapter: ProviderAdapter): Promise<number> {
+    const metadata = (provider.metadata as Record<string, any>) || {};
+    const fulfillmentMode = (metadata.fulfillmentMode || defaultFulfillmentModeForProviderType(provider.type as ProviderType)) as ProviderFulfillmentMode;
+    if (!requiresActiveLocations(provider.type as ProviderType, fulfillmentMode)) return 0;
+
+    const capabilities = (provider.capabilities || []) as ProviderCapability[];
+    if (!capabilities.includes(ProviderCapability.LOCATIONS) || !adapter.getLocations) {
+      throw new BadRequestException('Jismoniy xizmat AI qidiruvida ko‘rinishi uchun LOCATIONS capability va GET /locations endpointi majburiy.');
+    }
+
+    const remoteLocations = await adapter.getLocations({ providerSlug: provider.slug, activeOnly: false });
+    const activeLocations = remoteLocations.filter(location => location.isActive !== false);
+    if (activeLocations.length === 0) {
+      throw new BadRequestException('GET /locations kamida bitta isActive=true filial qaytarishi kerak. Aks holda provider AI qidiruvida ko‘rinmaydi.');
+    }
+
+    const remoteIds = remoteLocations.map(location => location.providerLocationId);
+    await prisma.$transaction(async tx => {
+      if (remoteIds.length > 0) {
+        await tx.location.updateMany({
+          where: { providerId: provider.id, providerLocationId: { notIn: remoteIds } },
+          data: { isActive: false }
+        });
+      }
+      for (const location of remoteLocations) {
+        await tx.location.upsert({
+          where: {
+            providerId_providerLocationId: {
+              providerId: provider.id,
+              providerLocationId: location.providerLocationId
+            }
+          },
+          create: {
+            providerId: provider.id,
+            providerLocationId: location.providerLocationId,
+            name: location.name,
+            address: location.address,
+            latitude: location.coordinates?.latitude,
+            longitude: location.coordinates?.longitude,
+            operatingHours: (location.operatingHours || {}) as any,
+            serviceRadiusKm: location.serviceRadiusKm ?? 10,
+            isActive: location.isActive !== false,
+            metadata: (location.metadata || {}) as any
+          },
+          update: {
+            name: location.name,
+            address: location.address,
+            latitude: location.coordinates?.latitude,
+            longitude: location.coordinates?.longitude,
+            operatingHours: (location.operatingHours || {}) as any,
+            serviceRadiusKm: location.serviceRadiusKm ?? 10,
+            isActive: location.isActive !== false,
+            metadata: (location.metadata || {}) as any
+          }
+        });
+      }
+    });
+
+    return activeLocations.length;
   }
 
   async getProviderLogsBySlug(

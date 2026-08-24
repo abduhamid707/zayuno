@@ -5,8 +5,12 @@ import {
   MANDATORY_CAPABILITIES,
   OPTIONAL_CAPABILITIES,
   ProviderCapabilityProfile,
+  ProviderFulfillmentMode,
+  ProviderInfo,
+  ProviderType,
   determineProviderCapabilityProfile,
   getMandatoryCapabilitiesForProfile,
+  requiresActiveLocations,
   ActionStatus,
   PaymentMethodType,
   Offering,
@@ -26,6 +30,7 @@ export interface CertificationIssue {
   received?: string;
   docsUrl?: string;
   rootCause: string;
+  fixExample?: string;
 }
 
 export interface CertificationTestResult {
@@ -57,6 +62,12 @@ export interface CertificationReport {
   missingMandatoryCapabilities: ProviderCapability[];
   capabilitiesTested: ProviderCapability[];
   profile: ProviderCapabilityProfile;
+  providerType?: ProviderType;
+  fulfillmentMode?: ProviderFulfillmentMode;
+  discoveryReadiness: {
+    isReady: boolean;
+    reasons: string[];
+  };
   tests: CertificationTestResult[];
 }
 
@@ -192,7 +203,8 @@ export class ProviderCertificationRunner {
             expected: ci.expected,
             received: ci.received,
             docsUrl: ci.docsUrl || (endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined),
-            rootCause: ci.message
+            rootCause: ci.message,
+            fixExample: ci.fixExample
           }))
         : undefined;
 
@@ -228,17 +240,14 @@ export class ProviderCertificationRunner {
     const results: CertificationTestResult[] = [];
     const declaredCaps = this.adapter.getCapabilities();
     const profile = determineProviderCapabilityProfile(declaredCaps);
-    const mandatoryForProfile = getMandatoryCapabilitiesForProfile(declaredCaps);
-
-    // Check which mandatory capabilities are missing for this profile
-    const missingMandatoryCapabilities = mandatoryForProfile.filter(
-      cap => !this.adapter.hasCapability(cap)
-    );
+    let providerInfo: ProviderInfo | undefined;
+    let mandatoryForProfile = getMandatoryCapabilitiesForProfile(declaredCaps);
 
     // 1. Metadata Capability (MANDATORY)
     if (this.adapter.hasCapability(ProviderCapability.METADATA) && this.adapter.getProviderInfo) {
       await this.runTest(results, 'metadata', 'Provider Metadata Verification', ProviderCapability.METADATA, mandatoryForProfile.includes(ProviderCapability.METADATA), async () => {
         const info = await this.adapter.getProviderInfo!();
+        providerInfo = info;
         if (!info.slug || !info.name) throw new Error('Invalid provider info: missing slug or name.');
         if (info.slug.toLowerCase().trim() !== this.adapter.providerSlug.toLowerCase().trim()) {
           throw new Error(`Provider slug mismatch: expected "${this.adapter.providerSlug}" but remote API returned "${info.slug}".`);
@@ -246,6 +255,43 @@ export class ProviderCertificationRunner {
         if (!info.capabilities || info.capabilities.length === 0) throw new Error('Provider must advertise at least one capability.');
         if (!info.status) throw new Error('Provider info missing status field.');
       }, [], 'CONTRACT_READINESS');
+    }
+
+    const fulfillmentMode = providerInfo?.fulfillmentMode ||
+      (providerInfo?.metadata?.fulfillmentMode as ProviderFulfillmentMode | undefined);
+    mandatoryForProfile = getMandatoryCapabilitiesForProfile(declaredCaps, {
+      type: providerInfo?.type,
+      fulfillmentMode
+    });
+    const missingMandatoryCapabilities = mandatoryForProfile.filter(
+      cap => !this.adapter.hasCapability(cap)
+    );
+
+    const locationRequired = requiresActiveLocations(providerInfo?.type, fulfillmentMode);
+    if (locationRequired && !this.adapter.hasCapability(ProviderCapability.LOCATIONS)) {
+      results.push({
+        testId: 'discovery-readiness',
+        name: 'AI Discovery Readiness',
+        stage: 'CONTRACT_READINESS',
+        capability: ProviderCapability.LOCATIONS,
+        isMandatory: true,
+        passed: false,
+        status: 'FAIL',
+        durationMs: 0,
+        endpoint: 'GET /locations',
+        docsUrl: 'https://developers.zayuno.uz/?doc=provider-integration#contract-locations',
+        error: 'Jismoniy xizmat uchun LOCATIONS majburiy',
+        issue: {
+          code: 'MISSING_REQUIRED_LOCATIONS',
+          endpoint: 'GET /locations',
+          path: 'capabilities.LOCATIONS',
+          expected: 'LOCATIONS capability and at least one active location',
+          received: 'LOCATIONS capability is not declared',
+          docsUrl: 'https://developers.zayuno.uz/?doc=provider-integration#contract-locations',
+          rootCause: 'Bu xizmat mijozga fizik joyda yoki yetkazib berish orqali ko‘rsatiladi. Faol filial bo‘lmasa AI discovery provider’ni yashiradi.',
+          fixExample: 'GET /locations endpointini qo‘shing, LOCATIONS capabilityni e’lon qiling va kamida bitta isActive=true filial qaytaring.'
+        }
+      });
     }
 
     // 2. Health Capability (MANDATORY)
@@ -261,7 +307,7 @@ export class ProviderCertificationRunner {
       }, [], 'CONTRACT_READINESS');
     }
 
-    // 3. Locations Capability (OPTIONAL)
+    // 3. Locations Capability (mandatory for physical fulfilment, optional otherwise)
     let testLocationId: string | undefined;
     if (this.adapter.hasCapability(ProviderCapability.LOCATIONS) && this.adapter.getLocations) {
       await this.runTest(results, 'locations', 'Locations & Facilities Query', ProviderCapability.LOCATIONS, mandatoryForProfile.includes(ProviderCapability.LOCATIONS), async () => {
@@ -269,7 +315,10 @@ export class ProviderCertificationRunner {
         if (!Array.isArray(locations) || locations.length === 0) {
           throw new Error('Provider declared LOCATIONS but returned an empty list.');
         }
-        const activeLocation = locations.find(l => l.isActive !== false) || locations[0];
+        const activeLocation = locations.find(l => l.isActive !== false);
+        if (!activeLocation) {
+          throw new Error('Provider must return at least one active location (isActive=true) for AI discovery.');
+        }
         testLocationId = activeLocation.id || (activeLocation as any).providerLocationId;
         if (!activeLocation.name || !activeLocation.address) {
           throw new Error('Location object missing required name or address.');
@@ -575,6 +624,14 @@ export class ProviderCertificationRunner {
     const hasBlockingResult = results.some(r => r.status === 'FAIL' || (r.status === 'SKIPPED' && r.isMandatory));
     const isCertified = results.length > 0 && !hasBlockingResult;
     const isProductionReady = isCertified && missingMandatoryCapabilities.length === 0;
+    const discoveryReasons: string[] = [];
+    if (missingMandatoryCapabilities.includes(ProviderCapability.LOCATIONS)) {
+      discoveryReasons.push('MISSING_LOCATIONS_CAPABILITY');
+    }
+    const locationsTest = results.find(result => result.testId === 'locations' || result.testId === 'discovery-readiness');
+    if (locationRequired && locationsTest?.status !== 'PASS') {
+      discoveryReasons.push('NO_VERIFIED_ACTIVE_LOCATIONS');
+    }
 
     return {
       providerSlug: this.adapter.providerSlug,
@@ -587,6 +644,12 @@ export class ProviderCertificationRunner {
       missingMandatoryCapabilities,
       capabilitiesTested: declaredCaps,
       profile,
+      providerType: providerInfo?.type,
+      fulfillmentMode,
+      discoveryReadiness: {
+        isReady: isProductionReady && discoveryReasons.length === 0,
+        reasons: [...new Set(discoveryReasons)]
+      },
       tests: results
     };
   }

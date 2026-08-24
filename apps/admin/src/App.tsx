@@ -46,6 +46,21 @@ const REVIEW_REASON_OPTIONS = [
   ['OTHER', 'Boshqa sabab']
 ] as const;
 
+const DISCOVERY_REASON_LABELS: Record<string, string> = {
+  NOT_PUBLISHED: 'Publish gate talablari bajarilmagan',
+  NOT_CERTIFIED: 'Provider sertifikatlanmagan',
+  CATALOG_EMPTY: 'Katalog bo‘sh',
+  NO_AVAILABLE_OFFERINGS: 'Katalogda faol taklif yo‘q',
+  PROVIDER_UNHEALTHY_OR_UNAVAILABLE: 'Provider ishlamayapti yoki vaqtincha yopiq',
+  NO_ACTIVE_LOCATIONS: 'Kamida bitta faol filial kerak'
+};
+
+const formatDiscoveryReason = (reason: string) => {
+  if (reason.startsWith('STATUS_')) return `Provider statusi ${reason.slice(7)}`;
+  if (reason.startsWith('REVIEW_')) return `Review statusi ${reason.slice(7)}`;
+  return DISCOVERY_REASON_LABELS[reason] || reason;
+};
+
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem('zayuno_admin_token') || '');
   const [email, setEmail] = useState('');
@@ -796,6 +811,18 @@ export default function App() {
                             <div><span className="text-slate-500">Base URL:</span> <code className="bg-slate-800 px-2 py-0.5 rounded text-amber-300">{p.baseUrl || 'In-Process'}</code></div>
                             <div><span className="text-slate-500">Adapter Type:</span> <code className="bg-slate-800 px-2 py-0.5 rounded text-emerald-300">{p.adapterType}</code></div>
                             <div><span className="text-slate-500">Type:</span> {p.type}</div>
+                            <div><span className="text-slate-500">Faol filiallar:</span> {p.activeLocationsCount ?? 0}</div>
+                          </div>
+
+                          <div className={`rounded-xl border p-3 text-xs ${p.discoveryReady ? 'border-emerald-500/30 bg-emerald-950/20 text-emerald-200' : 'border-amber-500/30 bg-amber-950/20 text-amber-100'}`}>
+                            <div className="font-bold">
+                              {p.discoveryReady ? 'AI discovery: KO‘RINADI' : 'AI discovery: YASHIRILGAN'}
+                            </div>
+                            {!p.discoveryReady && (
+                              <p className="mt-1 text-[11px] text-amber-200/80">
+                                Sabab: {(p.discoveryUnreadyReasons || []).map(formatDiscoveryReason).join(', ') || 'Discovery readiness talablari bajarilmagan.'}
+                              </p>
+                            )}
                           </div>
 
                           <div>

@@ -52,6 +52,32 @@ function valueAtPath(value: unknown, path: Array<string | number>): unknown {
   return current;
 }
 
+const MANDATORY_FIELD_NAMES = new Set([
+  'id',
+  'providerId',
+  'providerSlug',
+  'offeringCode',
+  'title',
+  'basePrice',
+  'currency',
+  'status',
+  'type',
+  'name',
+  'address',
+  'total',
+  'subtotal',
+  'lines',
+  'items',
+  'customer',
+  'userConfirmed',
+  'timestamp',
+  'latencyMs',
+  'categories',
+  'offerings',
+  'eventId',
+  'eventType'
+]);
+
 export function validateProviderResponse<S extends z.ZodTypeAny>(
   endpoint: string,
   docsAnchor: string,
@@ -65,15 +91,38 @@ export function validateProviderResponse<S extends z.ZodTypeAny>(
   const issues: ProviderContractIssue[] = parsed.error.issues.map(err => {
     const path = err.path.length ? `response.${err.path.join('.')}` : 'response';
     const receivedValue = valueAtPath(value, err.path);
-    const expected = err.message;
+    const received = valueKind(receivedValue);
+    const rawExpected = err.message;
+
+    let expected = rawExpected;
+    let message = `${endpoint} javobi Provider Contract v1 ga mos emas: ${path} — ${rawExpected}.`;
+    let fixExample: string | undefined;
+
+    // Framework-aware actionable diagnosis when null is received
+    if (received === 'null') {
+      const fieldName = err.path.length ? String(err.path[err.path.length - 1]) : '';
+      const isMandatory = MANDATORY_FIELD_NAMES.has(fieldName);
+
+      if (isMandatory) {
+        expected = `Majburiy maydon; real qiymat qaytarilishi shart (null yoki olib tashlash taqiqlanadi)`;
+        message = `${endpoint} javobida majburiy '${path}' maydoni null qilib yuborilgan. Ushbu maydon platforma uchun majburiy bo‘lib, real qiymat qaytarishi shart.`;
+        fixExample = `To‘g‘ri qiymat qaytaring: { "${fieldName}": <haqiqiy_qiymat> }`;
+      } else {
+        expected = `Optional maydon: to‘g‘ri tip yoki JSON’dan chiqarib tashlangan (undefined) bo‘lishi kerak`;
+        message = `${endpoint} javobida '${path}' maydoni null bo‘lib keldi. Backend (FastAPI, Go, .NET, Laravel) response’dan optional null maydonlarni chiqarib tashlashi kerak.`;
+        fixExample = `FastAPI: response_model_exclude_none=True | Go: json:"${fieldName},omitempty" | .NET: WhenWritingNull | PHP: array_filter`;
+      }
+    }
+
     return {
       code: 'PROVIDER_RESPONSE_SCHEMA_INVALID',
       endpoint,
       path,
       expected,
-      received: valueKind(receivedValue),
+      received,
       docsUrl,
-      message: `${endpoint} javobi Provider Contract v1 ga mos emas: ${path} — ${expected}.`
+      message,
+      fixExample
     };
   });
 

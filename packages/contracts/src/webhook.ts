@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ActionStatus, PaymentStatus } from './action';
-import { IsoDateTimeSchema } from './common';
+import { IsoDateTimeSchema, optionalNullable } from './common';
 
 export const WebhookEventTypeSchema = z.enum([
   'action.created',
@@ -19,13 +19,13 @@ export const NormalizedWebhookEventSchema = z.object({
   eventId: z.string(),
   eventType: WebhookEventTypeSchema,
   providerSlug: z.string(),
-  actionId: z.string().optional(),
-  externalActionId: z.string().optional(),
-  newStatus: z.nativeEnum(ActionStatus).optional(),
-  newPaymentStatus: z.nativeEnum(PaymentStatus).optional(),
+  actionId: optionalNullable(z.string()),
+  externalActionId: optionalNullable(z.string()),
+  newStatus: optionalNullable(z.nativeEnum(ActionStatus)),
+  newPaymentStatus: optionalNullable(z.nativeEnum(PaymentStatus)),
   timestamp: IsoDateTimeSchema,
-  description: z.string().optional(),
-  payload: z.record(z.any()).default({})
+  description: optionalNullable(z.string()),
+  payload: optionalNullable(z.record(z.any()), {})
 });
 export type NormalizedWebhookEvent = z.infer<typeof NormalizedWebhookEventSchema>;
 
@@ -35,6 +35,6 @@ export const WebhookProcessingResultSchema = z.object({
   isVerified: z.boolean(),
   isDuplicate: z.boolean().default(false),
   actionUpdated: z.boolean().default(false),
-  message: z.string().optional()
+  message: optionalNullable(z.string())
 });
 export type WebhookProcessingResult = z.infer<typeof WebhookProcessingResultSchema>;

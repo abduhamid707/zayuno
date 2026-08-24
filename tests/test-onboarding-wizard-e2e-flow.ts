@@ -72,9 +72,9 @@ async function main() {
     'Wizard Step 5 must implement in-wizard certification runner'
   );
   assert.ok(
-    wizardContent.includes('certReport.isCertified || certReport.isProductionReady') &&
+    wizardContent.includes('certReport.isProductionReady') &&
     wizardContent.includes('Davom etish (Xulosa va Ko‘rib chiqish)'),
-    'Step 5 must allow advancing to Step 6 only when certified/ready'
+    'Step 5 must allow advancing to Step 6 only when certification and AI discovery readiness both pass'
   );
   console.log('    ✓ In-wizard certification runner correctly implemented with pass/fail gates.');
 

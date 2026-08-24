@@ -4,7 +4,7 @@ import { ProviderRegistryService } from '../providers/provider-registry.service'
 import { UnmetDemandService } from '../analytics/unmet-demand.service';
 import { ProviderCertificationRunner, CertificationReport } from '@zayuno/provider-sdk';
 import { MetricsCollector } from '@zayuno/observability';
-import { redactForLogs, sanitizeHeaders } from '@zayuno/shared';
+import { isProviderDiscoveryReady, isProviderPublished, redactForLogs, sanitizeHeaders } from '@zayuno/shared';
 
 @Injectable()
 export class AdminService {
@@ -114,6 +114,7 @@ export class AdminService {
 
     return providers.map(p => {
       const meta = (p.metadata as any) || {};
+      const discovery = isProviderDiscoveryReady(p);
       return {
         id: p.id,
         slug: p.slug,
@@ -128,10 +129,13 @@ export class AdminService {
         isCertified: Boolean(meta.isCertified),
         reviewStatus: meta.reviewStatus || 'DRAFT',
         metadata: meta,
-        isPublished: p.status === ProviderStatus.ACTIVE,
+        isPublished: isProviderPublished(p),
+        discoveryReady: discovery.isReady,
+        discoveryUnreadyReasons: discovery.unreadyReasons,
         actionsCount: p._count.actions,
         quotesCount: p._count.quotes,
         locationsCount: p.locations.length,
+        activeLocationsCount: p.locations.filter(location => location.isActive).length,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt
       };

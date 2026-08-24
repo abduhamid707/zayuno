@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IsoDateTimeSchema } from './common';
+import { IsoDateTimeSchema, optionalNullable } from './common';
 import { Location, GetLocationsInput } from './location';
 import {
   Catalog,
@@ -38,6 +38,36 @@ export enum ProviderType {
   DIGITAL = 'DIGITAL',
   COMMERCE = 'COMMERCE',
   OTHER = 'OTHER'
+}
+
+/**
+ * Describes where a provider fulfils the service. Provider type/category alone
+ * is not enough: a booking can be an on-site restaurant table or a remote
+ * consultation. This value is the canonical source for location readiness.
+ */
+export enum ProviderFulfillmentMode {
+  ONSITE = 'ONSITE',
+  DELIVERY = 'DELIVERY',
+  PICKUP = 'PICKUP',
+  REMOTE = 'REMOTE',
+  HYBRID = 'HYBRID'
+}
+
+export function defaultFulfillmentModeForProviderType(type?: ProviderType): ProviderFulfillmentMode {
+  if (type === ProviderType.DELIVERY) return ProviderFulfillmentMode.DELIVERY;
+  if (type === ProviderType.RETAIL || type === ProviderType.BOOKINGS) return ProviderFulfillmentMode.ONSITE;
+  return ProviderFulfillmentMode.REMOTE;
+}
+
+export function requiresActiveLocations(
+  type?: ProviderType,
+  fulfillmentMode?: ProviderFulfillmentMode
+): boolean {
+  const mode = fulfillmentMode || defaultFulfillmentModeForProviderType(type);
+  return mode === ProviderFulfillmentMode.ONSITE ||
+    mode === ProviderFulfillmentMode.DELIVERY ||
+    mode === ProviderFulfillmentMode.PICKUP ||
+    mode === ProviderFulfillmentMode.HYBRID;
 }
 
 export enum ProviderCapability {
@@ -105,7 +135,7 @@ export function determineProviderCapabilityProfile(
 
 export function getMandatoryCapabilitiesForProfile(
   profileOrCapabilities: ProviderCapabilityProfile | ProviderCapability[],
-  options?: { isPhysical?: boolean; type?: ProviderType }
+  options?: { isPhysical?: boolean; type?: ProviderType; fulfillmentMode?: ProviderFulfillmentMode }
 ): ProviderCapability[] {
   const profile = Array.isArray(profileOrCapabilities)
     ? determineProviderCapabilityProfile(profileOrCapabilities)
@@ -116,11 +146,7 @@ export function getMandatoryCapabilitiesForProfile(
       ? [...READONLY_MANDATORY_CAPABILITIES]
       : [...TRANSACTIONAL_MANDATORY_CAPABILITIES];
 
-  const isPhysical =
-    options?.isPhysical ||
-    options?.type === ProviderType.DELIVERY ||
-    options?.type === ProviderType.RETAIL ||
-    options?.type === ProviderType.BOOKINGS;
+  const isPhysical = options?.isPhysical || requiresActiveLocations(options?.type, options?.fulfillmentMode);
 
   if (isPhysical && !baseMandatory.includes(ProviderCapability.LOCATIONS)) {
     baseMandatory.push(ProviderCapability.LOCATIONS);
@@ -145,12 +171,12 @@ export enum AuthMethod {
 }
 
 export const StructuredSupportContactSchema = z.object({
-  phone: z.string().optional(),
-  telegram: z.string().optional(),
-  email: z.string().optional(),
-  workingHours: z.string().optional(),
-  supportUrl: z.string().optional(),
-  locale: z.string().optional()
+  phone: optionalNullable(z.string()),
+  telegram: optionalNullable(z.string()),
+  email: optionalNullable(z.string()),
+  workingHours: optionalNullable(z.string()),
+  supportUrl: optionalNullable(z.string()),
+  locale: optionalNullable(z.string())
 });
 export type StructuredSupportContact = z.infer<typeof StructuredSupportContactSchema>;
 
@@ -172,27 +198,28 @@ export const ProviderInfoSchema = z.object({
   id: z.string(),
   slug: z.string(),
   name: z.string(),
-  description: z.string().optional(),
-  logoUrl: z.string().optional(),
+  description: optionalNullable(z.string()),
+  logoUrl: optionalNullable(z.string()),
   status: z.nativeEnum(ProviderStatus),
   type: z.nativeEnum(ProviderType),
+  fulfillmentMode: optionalNullable(z.nativeEnum(ProviderFulfillmentMode)),
   category: z.string().default('general'),
-  geography: z.array(z.string()).default(['UZ']),
+  geography: optionalNullable(z.array(z.string()), ['UZ']),
   adapterType: z.string().default('sandbox'),
   authMethod: z.nativeEnum(AuthMethod).default(AuthMethod.API_KEY),
   capabilities: z.array(z.nativeEnum(ProviderCapability)),
-  baseUrl: z.string().optional(),
-  supportContact: z.union([z.string(), StructuredSupportContactSchema]).optional(),
+  baseUrl: optionalNullable(z.string()),
+  supportContact: optionalNullable(z.union([z.string(), StructuredSupportContactSchema])),
   isCertified: z.boolean().default(false),
   isPublished: z.boolean().default(false),
-  metadata: z.record(z.any()).optional().default({})
+  metadata: optionalNullable(z.record(z.any()), {})
 });
 export type ProviderInfo = z.infer<typeof ProviderInfoSchema>;
 
 export const HealthCheckResultSchema = z.object({
   status: z.enum(['HEALTHY', 'DEGRADED', 'DOWN']),
   latencyMs: z.number().nonnegative(),
-  message: z.string().optional(),
+  message: optionalNullable(z.string()),
   timestamp: IsoDateTimeSchema
 });
 export type HealthCheckResult = z.infer<typeof HealthCheckResultSchema>;
@@ -226,6 +253,7 @@ export const RegisterProviderInputSchema = z.object({
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/),
   description: z.string().optional(),
   type: z.nativeEnum(ProviderType).default(ProviderType.SERVICES),
+  fulfillmentMode: z.nativeEnum(ProviderFulfillmentMode).optional(),
   category: z.string().default('general'),
   geography: z.array(z.string()).default(['UZ']),
   baseUrl: z.string().url().optional(),

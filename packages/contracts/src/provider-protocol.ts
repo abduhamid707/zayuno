@@ -78,13 +78,17 @@ export function extractRequiredFieldsFromZod(schema: z.ZodTypeAny): string[] {
   const required: string[] = [];
 
   for (const [key, fieldSchema] of Object.entries(shape)) {
-    const s = fieldSchema as any;
-    if (s && typeof s._def === 'object') {
-      const typeName = s._def.typeName;
-      // ZodOptional and ZodDefault do not require input from caller
-      if (typeName !== 'ZodOptional' && typeName !== 'ZodDefault') {
-        required.push(key);
-      }
+    let s = fieldSchema as any;
+    if (!s || typeof s._def !== 'object') continue;
+
+    while (s._def?.typeName === 'ZodEffects' && s._def?.schema) {
+      s = s._def.schema;
+    }
+
+    const typeName = s._def?.typeName;
+    // ZodOptional and ZodDefault do not require input from caller
+    if (typeName !== 'ZodOptional' && typeName !== 'ZodDefault') {
+      required.push(key);
     }
   }
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CurrencySchema, AddressSchema, CustomerContactSchema, IsoDateTimeSchema } from './common';
+import { CurrencySchema, AddressSchema, CustomerContactSchema, IsoDateTimeSchema, optionalNullable } from './common';
 import { QuoteLineSchema } from './quote';
 import { StructuredSupportContactSchema } from './provider';
 
@@ -30,33 +30,33 @@ export const NextActionSchema = z.object({
   type: z.enum(['OPEN_URL', 'REDIRECT', 'CONFIRMATION_REQUIRED', 'NONE']).default('OPEN_URL'),
   url: z.string().url().describe('Provider-owned checkout or verification URL'),
   label: z.string().default('Pay now'),
-  expiresAt: IsoDateTimeSchema.optional()
+  expiresAt: optionalNullable(IsoDateTimeSchema)
 });
 export type NextAction = z.infer<typeof NextActionSchema>;
 
 export const ActionItemInputSchema = z.object({
   offeringId: z.string().min(1),
-  variantId: z.string().optional(),
+  variantId: optionalNullable(z.string()),
   quantity: z.number().int().positive().default(1),
-  selectedOptions: z.array(z.object({
+  selectedOptions: optionalNullable(z.array(z.object({
     groupId: z.string(),
     optionId: z.string(),
     quantity: z.number().int().positive().default(1)
-  })).optional().default([])
+  })), [])
 });
 export type ActionItemInput = z.infer<typeof ActionItemInputSchema>;
 
 export const CreateActionInputSchema = z.object({
-  idempotencyKey: z.string().min(1).optional().describe('Unique client-generated idempotency key (UUID or cryptographically random string). Server auto-generates if omitted.'),
+  idempotencyKey: optionalNullable(z.string().min(1)).describe('Unique client-generated idempotency key (UUID or cryptographically random string). Server auto-generates if omitted.'),
   providerSlug: z.string().min(1).describe('Target provider slug'),
   quoteId: z.string().min(1).describe('Verified quote ID reviewed and confirmed by the user before submission'),
-  locationId: z.string().optional(),
+  locationId: optionalNullable(z.string()),
   items: z.array(ActionItemInputSchema).min(1).describe('Items or services requested in action'),
   customer: CustomerContactSchema.describe('Customer contact info'),
-  destination: AddressSchema.optional().describe('Optional destination address or fulfillment location'),
-  fulfillmentType: z.string().optional().describe('e.g. STANDARD, EXPRESS, PICKUP, DIGITAL'),
-  paymentMethod: z.string().optional().describe('e.g. "payme", "card", "cash", "invoice"'),
-  parameters: z.record(z.any()).optional().describe('Custom parameters passed to provider adapter'),
+  destination: optionalNullable(AddressSchema).describe('Optional destination address or fulfillment location'),
+  fulfillmentType: optionalNullable(z.string()).describe('e.g. STANDARD, EXPRESS, PICKUP, DIGITAL'),
+  paymentMethod: optionalNullable(z.string()).describe('e.g. "payme", "card", "cash", "invoice"'),
+  parameters: optionalNullable(z.record(z.any())).describe('Custom parameters passed to provider adapter'),
   userConfirmed: z.literal(true).describe('Must be true after the user explicitly confirms the reviewed quote')
 });
 export type CreateActionInput = z.infer<typeof CreateActionInputSchema>;
@@ -66,7 +66,7 @@ export const ActionEventSchema = z.object({
   status: z.nativeEnum(ActionStatus),
   description: z.string(),
   source: z.enum(['AI_AGENT', 'PROVIDER_WEBHOOK', 'SYSTEM_WORKER', 'USER', 'ADMIN']),
-  payload: z.record(z.any()).optional(),
+  payload: optionalNullable(z.record(z.any())),
   createdAt: IsoDateTimeSchema
 });
 export type ActionEvent = z.infer<typeof ActionEventSchema>;
@@ -75,12 +75,12 @@ export const NormalizedActionSchema = z.object({
   id: z.string().describe('Internal UUID'),
   publicId: z.string().describe('Public-facing reference ID (e.g. "ZY-ACT-12345")'),
   providerSlug: z.string(),
-  providerName: z.string().optional(),
-  externalActionId: z.string().optional().describe('External ID assigned by the provider system'),
-  quoteId: z.string().optional(),
-  locationId: z.string().optional(),
+  providerName: optionalNullable(z.string()),
+  externalActionId: optionalNullable(z.string()).describe('External ID assigned by the provider system'),
+  quoteId: optionalNullable(z.string()),
+  locationId: optionalNullable(z.string()),
   status: z.nativeEnum(ActionStatus),
-  nextAction: NextActionSchema.optional().describe('Provider-owned checkout or handoff instructions'),
+  nextAction: optionalNullable(NextActionSchema).describe('Provider-owned checkout or handoff instructions'),
   lines: z.array(QuoteLineSchema),
   subtotal: z.number().nonnegative(),
   fees: z.number().nonnegative().default(0),
@@ -88,23 +88,23 @@ export const NormalizedActionSchema = z.object({
   total: z.number().nonnegative(),
   currency: CurrencySchema.default('UZS'),
   customer: CustomerContactSchema,
-  destination: AddressSchema.optional(),
+  destination: optionalNullable(AddressSchema),
   fulfillmentType: z.string().default('STANDARD'),
-  paymentMethod: z.string().optional(),
+  paymentMethod: optionalNullable(z.string()),
   paymentStatus: z.nativeEnum(PaymentStatus).default(PaymentStatus.PENDING),
-  paymentUrl: z.string().url().optional().describe('Legacy checkout URL alias (prefer nextAction.url)'),
-  idempotencyKey: z.string().optional(),
-  supportContact: StructuredSupportContactSchema.optional().describe('Official support and escalation channels for the provider'),
-  parameters: z.record(z.any()).optional().default({}),
-  metadata: z.record(z.any()).optional().default({}),
-  timeline: z.array(ActionEventSchema).optional().default([]),
+  paymentUrl: optionalNullable(z.string().url()).describe('Legacy checkout URL alias (prefer nextAction.url)'),
+  idempotencyKey: optionalNullable(z.string()),
+  supportContact: optionalNullable(StructuredSupportContactSchema).describe('Official support and escalation channels for the provider'),
+  parameters: optionalNullable(z.record(z.any()), {}),
+  metadata: optionalNullable(z.record(z.any()), {}),
+  timeline: optionalNullable(z.array(ActionEventSchema), []),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema
 });
 export type NormalizedAction = z.infer<typeof NormalizedActionSchema>;
 
 export const GetActionInputSchema = z.object({
-  providerSlug: z.string().optional(),
+  providerSlug: optionalNullable(z.string()),
   actionId: z.string().min(1).describe('Public ID (e.g. "ZY-ACT-12345") or UUID')
 });
 export type GetActionInput = z.infer<typeof GetActionInputSchema>;
@@ -124,10 +124,10 @@ export const CancellationReasonCodeSchema = z.enum([
 export type CancellationReasonCode = z.infer<typeof CancellationReasonCodeSchema>;
 
 export const CancelActionInputSchema = z.object({
-  providerSlug: z.string().optional(),
+  providerSlug: optionalNullable(z.string()),
   actionId: z.string().min(1).describe('Public action ID or UUID'),
-  reasonCode: CancellationReasonCodeSchema.optional().describe('Stable cancellation category; defaults to CUSTOMER_CANCELLED'),
-  reason: z.string().trim().min(3).max(500).optional().describe('Clear human-readable reason for cancellation')
+  reasonCode: optionalNullable(CancellationReasonCodeSchema).describe('Stable cancellation category; defaults to CUSTOMER_CANCELLED'),
+  reason: optionalNullable(z.string().trim().min(3).max(500)).describe('Clear human-readable reason for cancellation')
 });
 export type CancelActionInput = z.infer<typeof CancelActionInputSchema>;
 

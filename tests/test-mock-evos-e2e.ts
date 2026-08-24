@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import http from 'http';
 import { createMockEvosApp } from '../integrations/mock-evos/src/server';
+import { ProviderCapability } from '../packages/contracts/src/provider';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -140,7 +141,8 @@ async function main() {
       slug: 'mock-evos',
       baseUrl: providerBase,
       secret: sharedSecret,
-      webhookSecret: sharedSecret
+      webhookSecret: sharedSecret,
+      metadata: { capabilities: Object.values(ProviderCapability) }
     });
 
     const certRunner = new ProviderCertificationRunner(remoteAdapter);

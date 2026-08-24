@@ -4,6 +4,35 @@ export const CurrencySchema = z.enum(['UZS', 'USD', 'EUR']).default('UZS');
 export type Currency = z.infer<typeof CurrencySchema>;
 
 /**
+ * Normalizes an optional provider response field.
+ * If a provider backend (e.g. FastAPI/Pydantic, Go, .NET, Laravel) sends `null` for an optional field,
+ * it is normalized to `undefined` (or the schema's default value if provided) during parsing.
+ * Non-null, non-undefined values are strictly validated against `innerSchema`.
+ */
+export function optionalNullable<T extends z.ZodTypeAny>(
+  innerSchema: T
+): z.ZodEffects<z.ZodOptional<T>, z.infer<T> | undefined, unknown>;
+export function optionalNullable<T extends z.ZodTypeAny, D extends z.infer<T>>(
+  innerSchema: T,
+  defaultValue: D
+): z.ZodEffects<z.ZodDefault<T>, z.infer<T>, unknown>;
+export function optionalNullable<T extends z.ZodTypeAny, D extends z.infer<T>>(
+  innerSchema: T,
+  defaultValue?: D
+) {
+  if (defaultValue !== undefined) {
+    return z.preprocess(
+      val => (val === null || val === undefined ? defaultValue : val),
+      innerSchema.default(defaultValue)
+    );
+  }
+  return z.preprocess(
+    val => (val === null ? undefined : val),
+    innerSchema.optional()
+  );
+}
+
+/**
  * Canonical provider timestamp. RFC 3339 offsets are accepted so providers can
  * use the native UTC output of Node.js, Python, Go, Java, and .NET without
  * rewriting a valid `+00:00`/`+05:00` timestamp to the `Z` form first.

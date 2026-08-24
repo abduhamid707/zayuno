@@ -11,6 +11,7 @@ import {
 import {
   ProviderStatus,
   ProviderType,
+  ProviderFulfillmentMode,
   ProviderCapability
 } from '../packages/contracts/src/provider.ts';
 import { QuotesService } from '../apps/api/src/modules/quotes/quotes.service.ts';
@@ -141,6 +142,19 @@ async function main() {
   };
   const digitalResult = isProviderDiscoveryReady(digitalProvider);
   assert.equal(digitalResult.isReady, true, 'Digital/remote provider without locations must be ready for discovery');
+
+  const remoteBookingProvider = {
+    ...baseProvider,
+    type: ProviderType.BOOKINGS,
+    locations: [],
+    metadata: {
+      ...baseProvider.metadata,
+      fulfillmentMode: ProviderFulfillmentMode.REMOTE,
+      activeLocationsCount: 0
+    }
+  };
+  const remoteBookingResult = isProviderDiscoveryReady(remoteBookingProvider);
+  assert.equal(remoteBookingResult.isReady, true, 'Remote booking provider must not require a physical branch');
 
   // E. Unhealthy Provider (DOWN)
   const unhealthyProvider = {

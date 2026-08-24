@@ -147,54 +147,64 @@ function getFrameworkTask(framework: AiFramework, goal: AiIntegrationGoal): stri
       return `### Framework: Node.js (TypeScript / Express)
 - Use \`express.json({ verify: (req, res, buf) => { (req as any).rawBody = buf; } })\` so the raw body buffer is preserved for HMAC verification.
 - Use \`crypto.createHmac('sha256', process.env.ZAYUNO_WEBHOOK_SECRET!).update(req.rawBody).digest('hex')\` for webhook signature verification.
+- Omit undefined optional properties when serializing JSON responses; never emit explicit \`{ field: null }\` for optional properties.
 - Return structured error responses with HTTP 400/404/409 matching Zayuno contract error structures.`;
 
     case 'nestjs':
       return `### Framework: NestJS
 - Configure \`rawBody: true\` in \`NestFactory.create(AppModule, { rawBody: true })\`.
 - Create a dedicated \`@Controller('zayuno')\` with endpoints: \`@Get('health')\`, \`@Get('provider-info')\`, \`@Get('catalog')\`, \`@Post('quote')\`, \`@Post('actions')\`, \`@Get('actions/:id')\`, \`@Post('webhooks')\`.
-- Use an \`IdempotencyGuard\` or Redis-backed service for mutating \`POST /actions\` requests.`;
+- Use an \`IdempotencyGuard\` or Redis-backed service for mutating \`POST /actions\` requests.
+- Omit optional null properties using \`class-transformer\` or custom interceptor.`;
 
     case 'python-fastapi':
       return `### Framework: Python / FastAPI
 - Use \`async def webhook(request: Request)\` and read \`raw_body = await request.body()\` before calculating \`hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()\`.
 - Use Pydantic v2 models matching Zayuno schemas for automatic request/response validation.
+- Add \`response_model_exclude_none=True\` to route decorators or use \`model.model_dump(exclude_none=True)\` to omit optional None fields.
+- Mandatory fields (\`id\`, \`providerId\`, \`offeringCode\`, \`title\`, \`basePrice\`, \`currency\`) must never be None.
 - Implement strict quote calculation: \`total = subtotal + fees - discount\`.`;
 
     case 'python-django':
       return `### Framework: Python / Django (Ninja / DRF)
 - In Django views, access \`request.body\` directly for raw HMAC validation before parsing JSON.
 - Store actions and quotes in Django models with an \`idempotency_key\` unique constraint.
-- Ensure decimal precision is used for monetary computations.`;
+- Ensure decimal precision is used for monetary computations.
+- Exclude None values in serialization dictionary: \`{k: v for k, v in data.items() if v is not None or k in MANDATORY_FIELDS}\`.`;
 
     case 'php-laravel':
       return `### Framework: PHP / Laravel
 - Read raw payload with \`$request->getContent()\` for \`hash_hmac('sha256', $rawBody, config('services.zayuno.webhook_secret'))\`.
 - Use Laravel FormRequest validation for incoming quote and action payloads.
-- Dispatch database transactions with unique \`idempotency_key\` locks.`;
+- Dispatch database transactions with unique \`idempotency_key\` locks.
+- Clean optional nulls: \`array_filter($response, fn($v, $k) => !is_null($v) || in_array($k, $mandatoryFields), ARRAY_FILTER_USE_BOTH)\`.`;
 
     case 'java-spring':
       return `### Framework: Java / Spring Boot
 - Use a \`ContentCachingRequestWrapper\` to read the raw request payload for HMAC-SHA256 signature verification.
 - Create DTO records for \`NormalizedQuote\`, \`CreateActionInput\`, and \`NormalizedAction\`.
+- Use \`@JsonInclude(JsonInclude.Include.NON_NULL)\` on DTO classes.
 - Use \`@Transactional\` with unique database constraint on \`idempotencyKey\`.`;
 
     case 'go':
       return `### Framework: Go (net/http / Gin)
 - Read request body using \`bodyBytes, _ := io.ReadAll(r.Body)\` and re-assign \`r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))\`.
 - Calculate signature with \`h := hmac.New(sha256.New, []byte(secret)); h.Write(bodyBytes); sig := hex.EncodeToString(h.Sum(nil))\`.
-- Structure responses using standard Go structs with \`json:"..."\` tags.`;
+- Structure responses using standard Go structs with \`json:"field,omitempty"\` tags on optional fields.
+- Never add \`omitempty\` to mandatory fields (\`basePrice\`, \`title\`, \`providerSlug\`, \`currency\`).`;
 
     case 'dotnet':
       return `### Framework: .NET / C# (ASP.NET Core)
 - Enable \`HttpRequest.EnableBuffering()\` to read the raw request body stream for HMAC-SHA256 verification.
 - Define strongly-typed records matching Zayuno API contracts.
+- Configure \`JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull\` or use \`[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]\` on optional properties.
 - Use \`IMemoryCache\` or Distributed Redis Cache for idempotency keys.`;
 
     default:
       return `### Framework: Raw HTTP / cURL
 - All endpoints must accept and return \`application/json; charset=utf-8\`.
 - Verify HMAC-SHA256 signatures over the raw byte stream of incoming webhook requests.
+- Omit optional null fields from JSON responses for optimal compatibility.
 - Return explicit HTTP status codes (200 OK, 400 Bad Request, 404 Not Found, 409 Conflict).`;
   }
 }

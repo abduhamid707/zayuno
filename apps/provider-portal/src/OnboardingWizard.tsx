@@ -34,8 +34,12 @@ import {
 import { DocsViewer } from './DocsViewer';
 import {
   createProviderOpenApiDocument,
+  defaultFulfillmentModeForProviderType,
   getProviderProtocolEndpoints,
+  ProviderFulfillmentMode,
+  ProviderType,
   PROVIDER_CONTRACT_VERSION,
+  requiresActiveLocations,
   ZAYUNO_WEBHOOK_INGESTION_PATH
 } from '@zayuno/contracts';
 
@@ -207,6 +211,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   // Step 3: Business Profile
   const [businessName, setBusinessName] = useState(initialProvider?.name || savedDraft?.businessName || '');
   const [category, setCategory] = useState(initialProvider?.metadata?.category || savedDraft?.category || 'general_services');
+  const initialProviderType = (CATEGORIES.find(item => item.id === (initialProvider?.metadata?.category || savedDraft?.category || 'general_services'))?.providerType || 'SERVICES') as ProviderType;
+  const [fulfillmentMode, setFulfillmentMode] = useState<ProviderFulfillmentMode>(
+    initialProvider?.fulfillmentMode || initialProvider?.metadata?.fulfillmentMode || savedDraft?.fulfillmentMode || defaultFulfillmentModeForProviderType(initialProviderType)
+  );
   const [description, setDescription] = useState(initialProvider?.metadata?.description || savedDraft?.description || '');
   const [supportPhone, setSupportPhone] = useState(initialProvider?.config?.supportContact?.phone || savedDraft?.supportPhone || '');
   const [supportTelegram, setSupportTelegram] = useState(initialProvider?.config?.supportContact?.telegram || savedDraft?.supportTelegram || '');
@@ -296,6 +304,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         email,
         businessName,
         category,
+        fulfillmentMode,
         description,
         supportPhone,
         supportTelegram,
@@ -315,6 +324,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     email,
     businessName,
     category,
+    fulfillmentMode,
     description,
     supportPhone,
     supportTelegram,
@@ -615,6 +625,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     const profile = isTrans ? 'TRANSACTIONAL' : 'DISCOVERY_READONLY';
     const selectedCategory = CATEGORIES.find(c => c.id === category);
     const canonicalProviderType = selectedCategory?.providerType || 'SERVICES';
+    const locationRequired = requiresActiveLocations(canonicalProviderType as ProviderType, fulfillmentMode);
     const endpoints = getProviderProtocolEndpoints(profile)
       .filter(endpoint => endpoint.required)
       .map((endpoint, index) => {
@@ -637,6 +648,7 @@ Provider Slug: ${slug.trim() || 'my-provider-slug'}
 Biznes toifasi (UI): ${selectedCategory?.label || category}
 Provider type (CANONICAL API ENUM): ${canonicalProviderType}
 Tanlangan rejim: ${isTrans ? 'Variant B — Topish va buyurtma berish (TRANSACTIONAL)' : 'Variant A — Faqat topish va ko‘rish (DISCOVERY)'}
+Xizmat bajarilish usuli: ${fulfillmentMode}${locationRequired ? ' (LOCATIONS majburiy)' : ' (filial majburiy emas)'}
 Autentifikatsiya formati: ${authMethod} (${authMethod === 'API_KEY' ? 'X-API-KEY header: x-provider-api-key' : authMethod === 'BEARER_TOKEN' ? 'Authorization: Bearer token' : 'HMAC-SHA256 imzosi: x-zayuno-signature'})
 
 --------------------------------------------------------------------------------
@@ -654,6 +666,7 @@ MUHIM:
 - UI'dagi biznes toifasi va API'dagi provider type bir xil matn emas. API javobida faqat canonical enum ishlating: RETAIL, DELIVERY, SERVICES, BOOKINGS, TICKETING, DIGITAL, COMMERCE yoki OTHER.
 - Masalan, "Kuryer va logistika (Logistics)" tanlangan bo'lsa JSON ichida "type": "DELIVERY" qaytaring. LOGISTICS canonical enum emas va ishlatilmasin.
 - Ushbu integratsiya uchun to'g'ri qiymat: "type": "${canonicalProviderType}".
+${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajariladi. LOCATIONS capability, GET /locations va kamida bitta isActive=true filial majburiy. Aks holda provider AI qidiruvida ko‘rinmaydi.' : '- Bu masofaviy xizmat. LOCATIONS faqat haqiqatan filiallar mavjud bo‘lsa e’lon qilinadi.'}
 - Katalog offeringlarida "providerId", "offeringCode", "title", "basePrice", "currency" va "isAvailable" maydonlari majburiydir.
 - GET /offerings/:id bitta mahsulot tafsilotini aynan OfferingSchema formatida qaytarishi shart.
 - Quote javobi "id" va itemized "lines" qaytaradi (formula: total == subtotal + totalFees - totalDiscount).
@@ -708,6 +721,14 @@ MUHIM:
       capability: test.capability,
       endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : test.endpoint,
       issue: test.issue || { message: test.error },
+      fixGuidance: test.issue?.fixExample || undefined,
+      frameworkSerializationTips: {
+        fastapi: 'response_model_exclude_none=True yoki model_dump(exclude_none=True)',
+        go: 'json:"field,omitempty"',
+        dotnet: 'JsonIgnoreCondition.WhenWritingNull',
+        laravel: 'array_filter($data, fn($v) => !is_null($v))',
+        nodejs: 'Omit undefined properties from output object'
+      },
       canonicalProviderType: canonicalType,
       canonicalResponseExample: canonicalResponse,
       instruction: 'Provider javobini canonicalResponseExample va Expected talabiga moslang. Secret yoki real mijoz ma’lumotini AI chatiga yubormang.'
@@ -739,6 +760,8 @@ MUHIM:
       const capabilities = capabilityProfile === 'transactional'
         ? ['METADATA', 'HEALTH', 'CATALOG', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK']
         : ['METADATA', 'HEALTH', 'CATALOG'];
+      const providerType = (CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES') as ProviderType;
+      if (requiresActiveLocations(providerType, fulfillmentMode) && !capabilities.includes('LOCATIONS')) capabilities.push('LOCATIONS');
       const res = await fetch(`${apiBase}/api/v1/providers/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
@@ -746,7 +769,8 @@ MUHIM:
           name: businessName.trim(),
           slug: cleanSlug,
           description: description.trim() || undefined,
-          type: CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES',
+          type: providerType,
+          fulfillmentMode,
           category,
           geography: ['UZ'],
           baseUrl: baseUrl.trim(),
@@ -794,6 +818,8 @@ MUHIM:
       capabilityProfile === 'transactional'
         ? ['METADATA', 'HEALTH', 'CATALOG', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK']
         : ['METADATA', 'HEALTH', 'CATALOG'];
+    const providerType = (CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES') as ProviderType;
+    if (requiresActiveLocations(providerType, fulfillmentMode) && !capabilities.includes('LOCATIONS')) capabilities.push('LOCATIONS');
 
     setLoading(true);
     try {
@@ -816,7 +842,8 @@ MUHIM:
           description: description.trim() || undefined,
           // Human-readable category labels never become wire enum values.
           // For example, "Digital Services" maps to the canonical `DIGITAL` value.
-          type: CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES',
+          type: providerType,
+          fulfillmentMode,
           category: category,
           geography: ['UZ'],
           baseUrl: baseUrl.trim() || undefined,
@@ -890,7 +917,7 @@ MUHIM:
         throw new Error(data?.message || 'Sertifikatlash jarayonida server xatosi yuz berdi.');
       }
       setCertReport(data);
-      if (data.isCertified || data.isProductionReady) {
+      if (data.isProductionReady) {
         setSuccessMsg('Barcha mandatory sertifikatlash testlari muvaffaqiyatli o‘tdi!');
       }
     } catch (err: any) {
@@ -1314,7 +1341,12 @@ MUHIM:
                 <label className="block text-slate-300 mb-1 font-medium">Xizmat Toifasi (Category) *</label>
                 <select
                   value={category}
-                  onChange={e => setCategory(e.target.value)}
+                  onChange={e => {
+                    const nextCategory = e.target.value;
+                    const nextType = (CATEGORIES.find(item => item.id === nextCategory)?.providerType || 'SERVICES') as ProviderType;
+                    setCategory(nextCategory);
+                    setFulfillmentMode(defaultFulfillmentModeForProviderType(nextType));
+                  }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500"
                 >
                   {CATEGORIES.map(c => (
@@ -1324,6 +1356,35 @@ MUHIM:
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+              <div>
+                <h4 className="font-semibold text-white">Xizmat qayerda yoki qanday bajariladi? *</h4>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Bu tanlov AI qidiruvida filial majburiyligini belgilaydi. Jismoniy xizmatlarda kamida bitta faol filial kerak; masofaviy xizmatda filial talab qilinmaydi.
+                </p>
+              </div>
+              <select
+                value={fulfillmentMode}
+                onChange={e => setFulfillmentMode(e.target.value as ProviderFulfillmentMode)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value={ProviderFulfillmentMode.ONSITE}>Mijoz filialga/joyga keladi (On-site)</option>
+                <option value={ProviderFulfillmentMode.DELIVERY}>Mijoz manziliga yetkazib beriladi (Delivery)</option>
+                <option value={ProviderFulfillmentMode.PICKUP}>Filialdan olib ketiladi (Pickup)</option>
+                <option value={ProviderFulfillmentMode.HYBRID}>Filial va masofaviy/yetkazib berish (Hybrid)</option>
+                <option value={ProviderFulfillmentMode.REMOTE}>To‘liq masofaviy yoki raqamli (Remote)</option>
+              </select>
+              {requiresActiveLocations((CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES') as ProviderType, fulfillmentMode) ? (
+                <div className="text-[11px] text-amber-200 bg-amber-950/30 border border-amber-500/30 rounded-xl p-3">
+                  <strong>Faol filial majburiy:</strong> LOCATIONS capability avtomatik qo‘shiladi. API <code>GET /locations</code> orqali kamida bitta <code>isActive: true</code> filial qaytarishi shart; aks holda sertifikatlash o‘tmaydi va provider AI qidiruvida ko‘rinmaydi.
+                </div>
+              ) : (
+                <div className="text-[11px] text-emerald-200 bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-3">
+                  Masofaviy xizmat tanlandi: filial majburiy emas.
+                </div>
+              )}
             </div>
 
             <div>
@@ -1663,6 +1724,12 @@ MUHIM:
                     <span className="font-mono text-slate-200">GET /catalog</span>
                     <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy</span>
                   </div>
+                  {requiresActiveLocations((CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES') as ProviderType, fulfillmentMode) && (
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-amber-950/30 border border-amber-500/30">
+                      <span className="font-mono text-amber-100">GET /locations · ≥1 active</span>
+                      <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 font-semibold text-[10px]">Discovery uchun majburiy</span>
+                    </div>
+                  )}
 
                   {capabilityProfile === 'transactional' ? (
                     <>
@@ -2075,13 +2142,13 @@ MUHIM:
               {/* Summary Card */}
               <div
                 className={`p-4 rounded-2xl border flex items-center justify-between flex-wrap gap-3 ${
-                  certReport.isCertified || certReport.isProductionReady
+                  certReport.isProductionReady
                     ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
                     : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  {certReport.isCertified || certReport.isProductionReady ? (
+                  {certReport.isProductionReady ? (
                     <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                       <CheckCircle2 className="w-6 h-6" />
                     </div>
@@ -2092,12 +2159,12 @@ MUHIM:
                   )}
                   <div>
                     <h4 className="font-bold text-white text-sm">
-                      {certReport.isCertified || certReport.isProductionReady
+                      {certReport.isProductionReady
                         ? 'Sertifikatlash muvaffaqiyatli yakunlandi!'
                         : 'Sertifikatlashda muammolar aniqlandi'}
                     </h4>
                     <p className="text-[11px] mt-0.5 opacity-90">
-                      {certReport.isCertified || certReport.isProductionReady
+                      {certReport.isProductionReady
                         ? 'Barcha talab etiladigan endpointlar tekshiruvdan o‘tdi. Arizani ko‘rib chiqishga yuborishingiz mumkin.'
                         : 'Ayrim endpointlar yoki kalitlar talablarga javob bermadi. Quyidagi hisobotni tekshiring.'}
                     </p>
@@ -2148,6 +2215,7 @@ MUHIM:
                                 {t.issue.path && <div><b>Path:</b> <code>{t.issue.path}</code></div>}
                                 {t.issue.expected && <div><b>Expected:</b> {t.issue.expected}</div>}
                                 {t.issue.received && <div><b>Received:</b> {t.issue.received}</div>}
+                                {t.issue.fixExample && <div className="text-amber-300"><b>Maslahat:</b> {t.issue.fixExample}</div>}
                                 {t.issue.docsUrl && <button type="button" onClick={() => openDocModal('spec-v1')} className="text-indigo-400 hover:text-indigo-300">Kontraktni ochish →</button>}
                               </div>
                             )}

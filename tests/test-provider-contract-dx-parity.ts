@@ -342,8 +342,176 @@ assert.ok(expressStarter.includes('basePrice: 10000'));
 
 const fastapiStarter = read('packages/cli/templates/fastapi/main.py');
 assert.ok(fastapiStarter.includes('/offerings/{offering_id}'));
+assert.ok(fastapiStarter.includes('response_model_exclude_none=True'));
 
 const goStarter = read('packages/cli/templates/go/main.go');
 assert.ok(goStarter.includes('/offerings/'));
 
-console.log('✅ ALL PROVIDER CONTRACT, SSRF HARDENING & DX PARITY CHECKS PASSED PERFECTLY!');
+console.log('9. Testing Cross-Language Compatibility (Null Normalization & Diagnostics)...');
+
+// 9.1 Catalog locationId: null -> undefined
+const catalogWithNullLocation = {
+  providerSlug: 'test-cafe',
+  locationId: null,
+  categories: [{ id: 'c1', slug: 'drinks', title: 'Drinks', displayOrder: 0 }],
+  offerings: [{
+    id: 'off-1',
+    providerId: 'p-1',
+    offeringCode: 'latte',
+    title: 'Hot Latte',
+    basePrice: 25000,
+    currency: 'UZS'
+  }]
+};
+const parsedCatalog = CatalogSchema.parse(catalogWithNullLocation);
+assert.equal(parsedCatalog.locationId, undefined, 'locationId: null must normalize to undefined');
+
+// 9.2 Offering parametersSchema: null -> undefined
+const offeringWithNullParams = {
+  id: 'off-1',
+  providerId: 'p-1',
+  offeringCode: 'latte',
+  title: 'Hot Latte',
+  basePrice: 25000,
+  currency: 'UZS',
+  parametersSchema: null,
+  description: null,
+  imageUrl: null
+};
+const parsedOffering = OfferingSchema.parse(offeringWithNullParams);
+assert.equal(parsedOffering.parametersSchema, undefined, 'parametersSchema: null must normalize to undefined');
+assert.equal(parsedOffering.description, undefined, 'description: null must normalize to undefined');
+assert.equal(parsedOffering.imageUrl, undefined, 'imageUrl: null must normalize to undefined');
+
+// 9.3 Nested optional response fields normalization
+const quoteWithNulls = {
+  id: 'q-100',
+  providerSlug: 'test-cafe',
+  locationId: null,
+  lines: [{
+    offeringId: 'off-1',
+    offeringTitle: 'Hot Latte',
+    variantId: null,
+    variantTitle: null,
+    unitPrice: 25000,
+    quantity: 1,
+    optionsTotal: 0,
+    lineTotal: 25000,
+    selectedOptions: null
+  }],
+  subtotal: 25000,
+  total: 25000,
+  fees: null,
+  discounts: null,
+  expiresAt: '2026-08-25T12:00:00Z',
+  estimatedDurationMinutes: null
+};
+const parsedQuote = NormalizedQuoteSchema.parse(quoteWithNulls);
+assert.equal(parsedQuote.locationId, undefined);
+assert.equal(parsedQuote.lines[0].variantId, undefined);
+assert.equal(parsedQuote.estimatedDurationMinutes, undefined);
+assert.deepEqual(parsedQuote.fees, []);
+assert.deepEqual(parsedQuote.discounts, []);
+
+// 9.4 Invalid type rejection: locationId: 123 must fail
+const invalidLocationType = { ...catalogWithNullLocation, locationId: 123 };
+assert.equal(CatalogSchema.safeParse(invalidLocationType).success, false);
+
+// 9.5 Invalid type rejection: parametersSchema: "invalid" or [] must fail
+assert.equal(OfferingSchema.safeParse({ ...offeringWithNullParams, parametersSchema: 'invalid' }).success, false);
+assert.equal(OfferingSchema.safeParse({ ...offeringWithNullParams, parametersSchema: ['array'] }).success, false);
+
+// 9.6 Mandatory field rejection: basePrice: null must fail
+assert.equal(OfferingSchema.safeParse({ ...offeringWithNullParams, basePrice: null }).success, false);
+
+// 9.7 Mandatory field rejection: currency: null must fail
+assert.equal(OfferingSchema.safeParse({ ...offeringWithNullParams, currency: null }).success, false);
+
+// 9.8 Mandatory field rejection: publicId: null on NormalizedAction must fail
+const actionWithNullPublicId = {
+  id: 'act-1',
+  publicId: null,
+  providerSlug: 'test-cafe',
+  status: 'CREATED',
+  lines: parsedQuote.lines,
+  subtotal: 25000,
+  total: 25000,
+  customer: { name: 'Ali', phone: '+998901234567' },
+  createdAt: '2026-08-25T10:00:00Z',
+  updatedAt: '2026-08-25T10:00:00Z'
+};
+assert.equal(NormalizedActionSchema.safeParse(actionWithNullPublicId).success, false);
+
+// 9.9 OpenAPI required / nullable parity
+const openApiDoc = createProviderOpenApiDocument();
+const openApiOffering = openApiDoc.components?.schemas?.Offering;
+assert.ok(openApiOffering, 'OpenAPI Offering schema must exist');
+assert.ok(openApiOffering.required?.includes('title'), 'title must be in OpenAPI required list');
+assert.ok(openApiOffering.required?.includes('basePrice'), 'basePrice must be in OpenAPI required list');
+assert.ok(!openApiOffering.required?.includes('description'), 'description must not be in required list');
+assert.ok(!openApiOffering.required?.includes('parametersSchema'), 'parametersSchema must not be in required list');
+
+// 9.10 Certification diagnostics on mandatory null gives strict error
+try {
+  validateProviderResponse('GET /offerings/:id', 'offering', OfferingSchema, {
+    ...offeringWithNullParams,
+    basePrice: null
+  });
+  assert.fail('Should have thrown ProviderContractValidationError');
+} catch (err: any) {
+  assert.ok(err instanceof ProviderContractValidationError);
+  assert.ok(err.issue.message.includes('majburiy'));
+  assert.ok(err.issue.message.includes('null qilib yuborilgan'));
+}
+
+// 9.11 Cross-language fixture parity (TS / FastAPI / Go / .NET responses parse identically)
+const tsStyle = {
+  id: 'off-1',
+  providerId: 'p-1',
+  offeringCode: 'latte',
+  title: 'Hot Latte',
+  basePrice: 25000,
+  currency: 'UZS'
+};
+const fastApiStyleWithNulls = {
+  id: 'off-1',
+  providerId: 'p-1',
+  offeringCode: 'latte',
+  title: 'Hot Latte',
+  description: null,
+  categorySlug: null,
+  categoryTitle: null,
+  imageUrl: null,
+  media: null,
+  basePrice: 25000,
+  currency: 'UZS',
+  isAvailable: true,
+  variants: null,
+  optionGroups: null,
+  tags: null,
+  parametersSchema: null,
+  metadata: null
+};
+const goStyleOmitEmpty = {
+  id: 'off-1',
+  providerId: 'p-1',
+  offeringCode: 'latte',
+  title: 'Hot Latte',
+  basePrice: 25000,
+  currency: 'UZS',
+  isAvailable: true
+};
+const parsedTs = OfferingSchema.parse(tsStyle);
+const parsedFastApi = OfferingSchema.parse(fastApiStyleWithNulls);
+const parsedGo = OfferingSchema.parse(goStyleOmitEmpty);
+
+assert.equal(parsedFastApi.description, undefined);
+assert.equal(parsedFastApi.parametersSchema, undefined);
+assert.equal(parsedFastApi.categorySlug, undefined);
+assert.equal(parsedFastApi.imageUrl, undefined);
+assert.equal(parsedFastApi.basePrice, 25000);
+assert.equal(parsedFastApi.title, 'Hot Latte');
+assert.deepEqual(JSON.parse(JSON.stringify(parsedTs)), JSON.parse(JSON.stringify(parsedFastApi)));
+assert.deepEqual(JSON.parse(JSON.stringify(parsedFastApi)), JSON.parse(JSON.stringify(parsedGo)));
+
+console.log('✅ ALL PROVIDER CONTRACT, SSRF HARDENING, DX & CROSS-LANGUAGE PARITY CHECKS PASSED PERFECTLY!');

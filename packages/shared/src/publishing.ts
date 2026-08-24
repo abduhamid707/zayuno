@@ -1,4 +1,10 @@
-import { ProviderCapability, ProviderStatus, ProviderType } from '@zayuno/contracts';
+import {
+  ProviderCapability,
+  ProviderFulfillmentMode,
+  ProviderStatus,
+  ProviderType,
+  requiresActiveLocations
+} from '@zayuno/contracts';
 
 /**
  * Canonical Provider Publishing Gate.
@@ -84,19 +90,11 @@ export function isProviderDiscoveryReady(provider: any): ProviderDiscoveryReadin
   }
 
   // 4. Locations & Physical Delivery Model Readiness
-  const isPhysicalModel =
-    type === ProviderType.DELIVERY ||
-    type === ProviderType.RETAIL ||
-    type === ProviderType.BOOKINGS ||
-    capabilities.includes(ProviderCapability.LOCATIONS);
+  const fulfillmentMode = metadata.fulfillmentMode as ProviderFulfillmentMode | undefined;
+  const needsActiveLocations =
+    requiresActiveLocations(type, fulfillmentMode) || capabilities.includes(ProviderCapability.LOCATIONS);
 
-  const isDigitalOrRemote =
-    type === ProviderType.DIGITAL ||
-    type === ProviderType.SERVICES ||
-    type === ProviderType.OTHER ||
-    type === ProviderType.TICKETING;
-
-  if (isPhysicalModel && !isDigitalOrRemote) {
+  if (needsActiveLocations) {
     const locations = provider.locations;
     const activeLocationsCount = Array.isArray(locations)
       ? locations.filter((loc: any) => loc.isActive !== false).length

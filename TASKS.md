@@ -107,6 +107,30 @@
 > discoverable, publishable va support qilinadigan developer mahsulotiga
 > aylantirish vazifasi.
 
+## AI Agent Chat Simulator for Provider Testing
+
+- [ ] Portal ichidagi Live Inspector va Certification imkoniyatlarini real
+  chat asosidagi AI agent simulyatori bilan kengaytirish.
+  - Provider o‘z servisini mijoz ko‘zi bilan tabiiy tilda sinay olsin: xizmatni
+    topish, katalogni ko‘rish, parametrlarni aniqlashtirish, quote olish,
+    tasdiqlash, action yaratish va statusni kuzatish.
+  - Har bir chat javobi qaysi MCP tool/provider endpointini chaqirgani bilan
+    Live Inspector trace’iga bog‘lansin.
+  - Request/response, HTTP status, latency, validation xatosi va redacted
+    payload bir timeline ichida ko‘rinsin.
+  - AI uydirma ma’lumot ishlatmasin; faqat provider qaytargan canonical
+    ma’lumotni customer-facing ko‘rinishda taqdim etsin.
+  - Sandbox va production muhiti aniq ajratilsin; simulator hech qachon
+    production action yoki haqiqiy to‘lovni tasodifan ishga tushirmasin.
+  - Provider muvaffaqiyatsiz suhbatni certification reproducer yoki supportga
+    yuboriladigan redacted diagnostic bundle sifatida eksport qila olsin.
+  - Read-only va transactional profillar uchun tayyor chat ssenariylari hamda
+    providerning o‘zi yozadigan custom test promptlari bo‘lsin.
+
+> Maqsad: provider o‘z integratsiyasini faqat API testlari bilan emas, AI
+> foydalanuvchisi qanday ko‘rishi va ishlatishi nuqtayi nazaridan ham tekshira
+> olishi.
+
 ## Future product ideas: AI-native business discovery + action network
 
 ### Product positioning

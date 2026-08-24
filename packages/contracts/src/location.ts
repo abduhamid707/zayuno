@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CoordinatesSchema } from './common';
+import { CoordinatesSchema, optionalNullable } from './common';
 
 export const LocationOperatingHoursSchema = z.object({
   open: z.string().describe('Opening time e.g. "09:00"'),
@@ -14,17 +14,17 @@ export const LocationSchema = z.object({
   providerLocationId: z.string().describe('External provider identifier for this branch or location'),
   name: z.string().min(1),
   address: z.string().min(1),
-  coordinates: CoordinatesSchema.optional(),
-  operatingHours: LocationOperatingHoursSchema.optional(),
-  serviceRadiusKm: z.number().nonnegative().optional().default(10.0),
+  coordinates: optionalNullable(CoordinatesSchema),
+  operatingHours: optionalNullable(LocationOperatingHoursSchema),
+  serviceRadiusKm: optionalNullable(z.number().nonnegative(), 10.0),
   isActive: z.boolean().default(true),
-  metadata: z.record(z.any()).optional().default({})
+  metadata: optionalNullable(z.record(z.any()), {})
 });
 export type Location = z.infer<typeof LocationSchema>;
 
 export const GetLocationsInputSchema = z.object({
   providerSlug: z.string().min(1),
-  activeOnly: z.boolean().optional(),
-  coordinates: CoordinatesSchema.optional()
+  activeOnly: optionalNullable(z.boolean()),
+  coordinates: optionalNullable(CoordinatesSchema)
 });
 export type GetLocationsInput = z.infer<typeof GetLocationsInputSchema>;
