@@ -127,6 +127,8 @@ async function main() {
   assert.ok(wizardContent.includes('API sozlamalarini tahrirlash'), 'Certification must allow in-place API settings editing');
   assert.ok(wizardContent.includes('AI uchun canonical tuzatish nusxalash'), 'Failed tests must provide a canonical copy-for-AI repair artifact');
   assert.ok(wizardContent.includes('setCertReport(null)'), 'Saving integration changes must invalidate stale certification results');
+  assert.ok(wizardContent.includes('Kamida bittasini kiriting: telefon, Telegram yoki support email.'), 'Support section must visibly require at least one customer contact');
+  assert.ok(wizardContent.includes("!supportPhone.trim() && !supportTelegram.trim() && !supportEmail.trim()"), 'Step 3 must block progression without a support contact');
   console.log('    ✓ Canonical enum guidance, OpenAPI and in-place certification repair UX verified.');
 
   console.log('\n🎉 ALL ONBOARDING WIZARD UX CLARITY & STEP 4 TESTS PASSED CLEANLY!\n');

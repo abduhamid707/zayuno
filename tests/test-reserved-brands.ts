@@ -95,7 +95,8 @@ async function main() {
           name: 'EVOS Fast Food',
           slug: 'official-evos',
           description: 'Fake EVOS',
-          capabilities: ['METADATA' as any, 'HEALTH' as any, 'CATALOG' as any]
+          capabilities: ['METADATA' as any, 'HEALTH' as any, 'CATALOG' as any],
+          supportContact: { email: 'support@fake-evos.uz' }
         },
         { id: 'user_123', role: UserRole.PROVIDER_OWNER }
       ),

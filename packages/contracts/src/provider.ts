@@ -160,6 +160,14 @@ export const SupportContactSchema = z.union([
 ]);
 export type SupportContact = z.infer<typeof SupportContactSchema>;
 
+export const RequiredSupportContactSchema = z.union([
+  z.string().trim().min(1, 'At least one customer support contact is required'),
+  StructuredSupportContactSchema.refine(
+    contact => Boolean(contact.phone?.trim() || contact.telegram?.trim() || contact.email?.trim()),
+    { message: 'At least one customer support contact (phone, Telegram, or email) is required' }
+  )
+]);
+
 export const ProviderInfoSchema = z.object({
   id: z.string(),
   slug: z.string(),
@@ -226,7 +234,7 @@ export const RegisterProviderInputSchema = z.object({
   authConfig: z.record(z.any()).optional(),
   capabilities: z.array(z.nativeEnum(ProviderCapability)).min(1),
   webhookUrl: z.string().url().optional(),
-  supportContact: z.union([z.string(), StructuredSupportContactSchema]).optional()
+  supportContact: RequiredSupportContactSchema
 });
 export type RegisterProviderInput = z.infer<typeof RegisterProviderInputSchema>;
 

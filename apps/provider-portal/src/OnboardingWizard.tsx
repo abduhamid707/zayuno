@@ -488,6 +488,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       setError('Iltimos, biznesingiz yoki xizmatingiz nomini kiriting.');
       return;
     }
+    if (!supportPhone.trim() && !supportTelegram.trim() && !supportEmail.trim()) {
+      setError('Mijozlar siz bilan bog‘lana olishi uchun kamida bitta support kontakti: telefon, Telegram yoki email kiriting.');
+      return;
+    }
     setCurrentStep(4);
   };
 
@@ -1335,8 +1339,9 @@ MUHIM:
 
             <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
               <h4 className="font-semibold text-white flex items-center gap-2">
-                <Phone className="w-4 h-4 text-indigo-400" /> Mijozlarni qo‘llab-quvvatlash kontaktlari
+                <Phone className="w-4 h-4 text-indigo-400" /> Mijozlarni qo‘llab-quvvatlash kontaktlari <span className="text-rose-400">*</span>
               </h4>
+              <p className="text-[11px] text-slate-400">Kamida bittasini kiriting: telefon, Telegram yoki support email.</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1">Telefon raqam</label>
@@ -1382,7 +1387,7 @@ MUHIM:
             </button>
             <button
               type="submit"
-              disabled={!businessName.trim()}
+              disabled={!businessName.trim() || (!supportPhone.trim() && !supportTelegram.trim() && !supportEmail.trim())}
               className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
             >
               Keyingi qadam (API sozlamalari) <ArrowRight className="w-4 h-4" />

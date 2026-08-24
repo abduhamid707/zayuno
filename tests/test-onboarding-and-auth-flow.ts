@@ -193,7 +193,8 @@ async function main() {
             category: 'general_services',
             geography: ['UZ'],
             capabilities: [ProviderCapability.METADATA, ProviderCapability.HEALTH, ProviderCapability.CATALOG],
-            authMethod: 'API_KEY'
+            authMethod: 'API_KEY',
+            supportContact: { email: 'support@mystore.uz' }
           },
           { id: mockDatabaseUser.id, role: UserRole.PROVIDER_OWNER }
         ),
@@ -212,12 +213,31 @@ async function main() {
             category: 'general_services',
             geography: ['UZ'],
             capabilities: [ProviderCapability.METADATA, ProviderCapability.HEALTH, ProviderCapability.CATALOG],
-            authMethod: 'API_KEY'
+            authMethod: 'API_KEY',
+            supportContact: { email: 'support@fake-evos.uz' }
           },
           { id: mockDatabaseUser.id, role: UserRole.PROVIDER_OWNER }
         ),
       /brand|himoyalangan/i,
       'Reserved brand names must be blocked during self-service registration'
+    );
+
+    await assert.rejects(
+      () =>
+        providersService.registerProvider(
+          {
+            name: 'No Support Business',
+            slug: 'no-support-business',
+            type: ProviderType.SERVICES,
+            category: 'general_services',
+            geography: ['UZ'],
+            capabilities: [ProviderCapability.METADATA, ProviderCapability.HEALTH, ProviderCapability.CATALOG],
+            authMethod: 'API_KEY'
+          } as any,
+          { id: mockDatabaseUser.id, role: UserRole.PROVIDER_OWNER }
+        ),
+      /supportContact|support contact/i,
+      'Provider registration without any customer support channel must be rejected'
     );
 
     // Valid provider registration
