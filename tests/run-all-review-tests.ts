@@ -42,7 +42,9 @@ const testSuites = [
   'tests/test-onboarding-wizard-e2e-flow.ts',
   'tests/test-credential-capture-and-sandbox-flow.ts',
   'tests/test-sandbox-production-credential-mapping.ts',
-  'tests/test-provider-contract-dx-parity.ts'
+  'tests/test-provider-contract-dx-parity.ts',
+  'tests/test-provider-health-monitoring-and-lifecycle.ts',
+  'tests/test-production-health-and-lease-real-e2e.ts'
 ];
 
 async function main() {

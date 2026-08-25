@@ -68,7 +68,11 @@ export function isProviderDiscoveryReady(provider: any): ProviderDiscoveryReadin
   }
 
   // 2. Health & Temporary Availability
-  if (metadata.healthStatus === 'DOWN' || metadata.isTemporarilyUnavailable === true) {
+  const healthData = (metadata.healthMonitoring as Record<string, any>) || {};
+  const isDown = metadata.healthStatus === 'DOWN' || healthData.state === 'DOWN';
+  const isUnavailable = metadata.isTemporarilyUnavailable === true || healthData.isTemporarilyUnavailable === true;
+
+  if (isDown || isUnavailable) {
     unreadyReasons.push('PROVIDER_UNHEALTHY_OR_UNAVAILABLE');
   }
 
@@ -91,8 +95,11 @@ export function isProviderDiscoveryReady(provider: any): ProviderDiscoveryReadin
 
   // 4. Locations & Physical Delivery Model Readiness
   const fulfillmentMode = metadata.fulfillmentMode as ProviderFulfillmentMode | undefined;
-  const needsActiveLocations =
-    requiresActiveLocations(type, fulfillmentMode) || capabilities.includes(ProviderCapability.LOCATIONS);
+  const isRemote = fulfillmentMode === ProviderFulfillmentMode.REMOTE;
+  const needsActiveLocations = !isRemote && (
+    requiresActiveLocations(type, fulfillmentMode) ||
+    (!fulfillmentMode && capabilities.includes(ProviderCapability.LOCATIONS))
+  );
 
   if (needsActiveLocations) {
     const locations = provider.locations;

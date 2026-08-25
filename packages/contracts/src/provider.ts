@@ -224,6 +224,28 @@ export const HealthCheckResultSchema = z.object({
 });
 export type HealthCheckResult = z.infer<typeof HealthCheckResultSchema>;
 
+export enum ProviderHealthState {
+  UNKNOWN = 'UNKNOWN',
+  HEALTHY = 'HEALTHY',
+  DEGRADED = 'DEGRADED',
+  DOWN = 'DOWN',
+  RECOVERING = 'RECOVERING'
+}
+
+export const ProviderHealthMonitoringDataSchema = z.object({
+  state: z.nativeEnum(ProviderHealthState).default(ProviderHealthState.UNKNOWN),
+  consecutiveFailures: z.number().int().nonnegative().default(0),
+  consecutiveSuccesses: z.number().int().nonnegative().default(0),
+  lastCheckedAt: optionalNullable(IsoDateTimeSchema),
+  lastSuccessAt: optionalNullable(IsoDateTimeSchema),
+  lastFailureAt: optionalNullable(IsoDateTimeSchema),
+  lastLatencyMs: optionalNullable(z.number().nonnegative()),
+  unavailableSince: optionalNullable(IsoDateTimeSchema),
+  lastFailureCode: optionalNullable(z.string()),
+  isTemporarilyUnavailable: z.boolean().default(false)
+});
+export type ProviderHealthMonitoringData = z.infer<typeof ProviderHealthMonitoringDataSchema>;
+
 /* -------------------------------------------------------------------------- */
 /*                       DISCOVERY / SEARCH CAPABILITY                        */
 /* -------------------------------------------------------------------------- */

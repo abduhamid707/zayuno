@@ -14,10 +14,15 @@ import {
   UpdateProviderIntegrationInput
 } from '@zayuno/contracts';
 
+import { ProviderHealthMonitorService } from './provider-health-monitor.service';
+
 @ApiTags('Providers & Developer Onboarding')
 @Controller('api/v1/providers')
 export class ProvidersController {
-  constructor(private providersService: ProvidersService) {}
+  constructor(
+    private providersService: ProvidersService,
+    private healthMonitor: ProviderHealthMonitorService
+  ) {}
 
   @Get()
   @UseGuards(ApiKeyGuard)
@@ -72,6 +77,14 @@ export class ProvidersController {
   @ApiOperation({ summary: 'Self-serve developer onboarding: register a new provider application' })
   async registerProvider(@Body() body: RegisterProviderInput, @Req() request: any) {
     return this.providersService.registerProvider(body, request.user);
+  }
+
+  @Post('integration/generate-secret')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Generate a cryptographically secure random secret for provider authentication' })
+  async generateSecret() {
+    return this.providersService.generateIntegrationSecret();
   }
 
   @Post('integration/check-url')
@@ -238,6 +251,37 @@ export class ProvidersController {
   @ApiOperation({ summary: 'Rotate the webhook HMAC secret for the provider and invalidate prior secret' })
   async rotateWebhookSecret(@Param('slug') slug: string, @Req() request: any) {
     return this.providersService.rotateWebhookSecret(slug, request.user);
+  }
+
+  @Post(':slug/rotate-credential')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROVIDER_OWNER, UserRole.PROVIDER_DEVELOPER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Rotate or update the outbound provider authentication credential' })
+  async rotateCredential(
+    @Param('slug') slug: string,
+    @Body() body: { authMethod?: any; apiSecret?: string; generateAutoSecret?: boolean },
+    @Req() request: any
+  ) {
+    return this.providersService.rotateProviderCredential(slug, body, request.user);
+  }
+
+  @Get(':slug/health-status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROVIDER_OWNER, UserRole.PROVIDER_DEVELOPER, UserRole.PROVIDER_ANALYST)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current automated health monitoring status and metrics' })
+  async getHealthStatus(@Param('slug') slug: string, @Req() request: any) {
+    return this.healthMonitor.getProviderHealthStatus(slug, request.user);
+  }
+
+  @Post(':slug/check-health-now')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROVIDER_OWNER, UserRole.PROVIDER_DEVELOPER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Trigger an immediate on-demand health check probe (rate-limited)' })
+  async checkHealthNow(@Param('slug') slug: string, @Req() request: any) {
+    return this.healthMonitor.checkProviderHealthNow(slug, request.user);
   }
 
   @Put(':slug/integration')

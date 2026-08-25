@@ -810,8 +810,29 @@ export default function App() {
                           <div className="text-xs text-slate-300 space-y-1">
                             <div><span className="text-slate-500">Base URL:</span> <code className="bg-slate-800 px-2 py-0.5 rounded text-amber-300">{p.baseUrl || 'In-Process'}</code></div>
                             <div><span className="text-slate-500">Adapter Type:</span> <code className="bg-slate-800 px-2 py-0.5 rounded text-emerald-300">{p.adapterType}</code></div>
-                            <div><span className="text-slate-500">Type:</span> {p.type}</div>
+                            <div><span className="text-slate-500">Type / Fulfillment:</span> {p.type} {p.fulfillmentMode ? `(${p.fulfillmentMode})` : ''}</div>
                             <div><span className="text-slate-500">Faol filiallar:</span> {p.activeLocationsCount ?? 0}</div>
+                            {p.metadata?.healthMonitoring && (
+                              <div className="flex items-center gap-2 pt-1">
+                                <span className="text-slate-500">Server Health:</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                  p.metadata.healthMonitoring.state === 'HEALTHY'
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                    : p.metadata.healthMonitoring.state === 'DEGRADED'
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                    : p.metadata.healthMonitoring.state === 'RECOVERING'
+                                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                }`}>
+                                  {p.metadata.healthMonitoring.state || 'UNKNOWN'}
+                                </span>
+                                {typeof p.metadata.healthMonitoring.lastLatencyMs === 'number' && (
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    {p.metadata.healthMonitoring.lastLatencyMs}ms
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           <div className={`rounded-xl border p-3 text-xs ${p.discoveryReady ? 'border-emerald-500/30 bg-emerald-950/20 text-emerald-200' : 'border-amber-500/30 bg-amber-950/20 text-amber-100'}`}>

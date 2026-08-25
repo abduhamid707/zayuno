@@ -223,7 +223,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   // Step 4: Integration Details
   const [slug, setSlug] = useState(urlParams.provider || initialProvider?.slug || savedDraft?.slug || '');
   const [baseUrl, setBaseUrl] = useState(initialProvider?.baseUrl || savedDraft?.baseUrl || '');
+  const [credentialMode, setCredentialMode] = useState<'auto' | 'byo'>('auto');
   const [apiSecret, setApiSecret] = useState('');
+  const [generatedSecret, setGeneratedSecret] = useState('');
+  const [hasConfirmedSavedSecret, setHasConfirmedSavedSecret] = useState(false);
+  const [copiedSecret, setCopiedSecret] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [hasSavedSecret, setHasSavedSecret] = useState(Boolean(savedDraft?.hasSavedSecret || initialProvider?.id));
   const [showSecretInput, setShowSecretInput] = useState(false);
@@ -506,8 +510,66 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   };
 
   // --------------------------------------------------------------------------
-  // STEP 4 Helpers: Base URL health testing and AI Brief copy
+  // STEP 4 Helpers: Base URL health testing, Secret Generation, and AI Brief copy
   // --------------------------------------------------------------------------
+  const handleGenerateSecret = async () => {
+    try {
+      setLoading(true);
+      const authToken = token || localStorage.getItem('zayuno_provider_token');
+      const res = await fetch(`${apiBase}/api/v1/providers/integration/generate-secret`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.secret) {
+          setGeneratedSecret(data.secret);
+          setApiSecret(data.secret);
+          setHasConfirmedSavedSecret(false);
+          setShowSecretInput(true);
+          return;
+        }
+      }
+      // Fallback
+      const array = new Uint8Array(32);
+      crypto.getRandomValues(array);
+      const hex = Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+      setGeneratedSecret(hex);
+      setApiSecret(hex);
+      setHasConfirmedSavedSecret(false);
+      setShowSecretInput(true);
+    } catch {
+      const array = new Uint8Array(32);
+      crypto.getRandomValues(array);
+      const hex = Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+      setGeneratedSecret(hex);
+      setApiSecret(hex);
+      setHasConfirmedSavedSecret(false);
+      setShowSecretInput(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadCredentialsJson = () => {
+    const secretValue = generatedSecret || apiSecret;
+    if (!secretValue) return;
+    const currentSlug = slug.toLowerCase().trim();
+    downloadJsonArtifact(`zayuno-provider-credentials-${currentSlug || 'secret'}.json`, {
+      providerName: businessName.trim(),
+      providerSlug: currentSlug,
+      authMethod,
+      secret: secretValue,
+      generatedAt: new Date().toISOString(),
+      direction: 'Zayuno -> Provider Server (Zayuno provayderingiz serveriga so‘rov yuborayotganda ushbu maxfiy kalitdan foydalanadi)',
+      headerUsed: authMethod === 'BEARER_TOKEN' ? 'Authorization: Bearer <secret>' : authMethod === 'HMAC_SIGNATURE' ? 'x-zayuno-signature' : 'x-provider-api-key',
+      instructions: 'Ushbu maxfiy kalitni backend .env faylingizga joylashtiring va xavfsiz saqlang.'
+    });
+  };
+
   const handleTestBaseUrl = async () => {
     const raw = baseUrl.trim();
     if (!raw) {
@@ -1788,22 +1850,145 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                 </select>
               </div>
 
+              {/* Direction Clarity Banner */}
+              <div className="p-3.5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-white font-semibold">
+                  <Lock className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span>Credentiallar yo‘nalishi va xavfsizlik</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 text-[11px]">
+                  <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
+                    <span className="font-semibold text-sky-400 block">1. Zayuno → Sizning serveringiz (Hozir sozlanadi)</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      Zayuno sizning API serveringizga so‘rov yuborayotganda o‘zini tasdiqlash uchun ushbu secret/tokendan foydalanadi.
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
+                    <span className="font-semibold text-emerald-400 block">2. Siz → Zayuno API (6-bosqichda beriladi)</span>
+                    <p className="text-slate-300 leading-relaxed">
+                      Sizning tizimingiz Zayuno platformasiga murojaat qilishi uchun 6-bosqichda alohida <code className="text-emerald-300 font-mono">zy_test_...</code> kaliti taqdim etiladi.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Credential Inputs for Real External APIs */}
               {!isOfficialSandboxUrl(baseUrl) && (
                 <div className="space-y-3 pt-1 animate-fadeIn">
-                  {hasSavedSecret && !showSecretInput && !apiSecret ? (
+                  {/* Mode Selector Tabs */}
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 border border-slate-800 rounded-xl text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setCredentialMode('auto')}
+                      className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-1.5 ${
+                        credentialMode === 'auto'
+                          ? 'bg-indigo-600 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Zayuno yaratsin (Tavsiya)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCredentialMode('byo')}
+                      className={`py-2 px-3 rounded-lg font-medium transition flex items-center justify-center gap-1.5 ${
+                        credentialMode === 'byo'
+                          ? 'bg-indigo-600 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Key className="w-3.5 h-3.5 text-sky-300" />
+                      <span>Mavjud kalitimni kiritaman</span>
+                    </button>
+                  </div>
+
+                  {hasSavedSecret && !showSecretInput && !apiSecret && !generatedSecret ? (
                     <div className="p-4 rounded-2xl bg-slate-950/80 border border-emerald-500/30 flex items-center justify-between animate-fadeIn">
                       <div className="flex items-center gap-2 text-xs text-emerald-300">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>Credential saqlangan (Serverda xavfsiz shifrlangan)</span>
+                        <div>
+                          <span className="font-semibold block">Credential saqlangan (Serverda xavfsiz shifrlangan)</span>
+                          <span className="text-[11px] text-slate-400">Yangi kalit kiritilmasa, mavjud kalit saqlab qolinadi.</span>
+                        </div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setShowSecretInput(true)}
+                        onClick={() => {
+                          setShowSecretInput(true);
+                          setHasConfirmedSavedSecret(false);
+                        }}
                         className="text-xs text-indigo-400 hover:text-indigo-300 font-medium px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 transition"
                       >
-                        Yangi kalit kiritish
+                        Yangi kalit kiritish / yaratish
                       </button>
+                    </div>
+                  ) : credentialMode === 'auto' ? (
+                    <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 animate-fadeIn">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-slate-200 font-semibold text-xs flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Zayuno tomonidan xavfsiz yaratiladigan secret</span>
+                        </label>
+                        {!generatedSecret && (
+                          <button
+                            type="button"
+                            onClick={handleGenerateSecret}
+                            disabled={loading}
+                            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5"
+                          >
+                            <Key className="w-3.5 h-3.5" />
+                            <span>Xavfsiz kalit yaratish</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {generatedSecret ? (
+                        <div className="space-y-2.5 p-3 rounded-xl bg-slate-900 border border-indigo-500/40 animate-fadeIn">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-300 font-medium">Yaratilgan maxfiy kalit (Faqat bir marta ko‘rsatiladi):</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(generatedSecret);
+                                  setCopiedSecret(true);
+                                  setTimeout(() => setCopiedSecret(false), 2500);
+                                }}
+                                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] flex items-center gap-1 transition"
+                              >
+                                {copiedSecret ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedSecret ? 'Nusxalandi!' : 'Nusxa olish'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleDownloadCredentialsJson}
+                                className="px-2 py-1 rounded bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/30 text-indigo-200 text-[11px] flex items-center gap-1 transition"
+                              >
+                                <span>JSON yuklab olish</span>
+                              </button>
+                            </div>
+                          </div>
+                          <div className="p-2.5 rounded-lg bg-black/60 font-mono text-xs text-amber-300 break-all select-all border border-slate-800">
+                            {generatedSecret}
+                          </div>
+                          <label className="flex items-start gap-2 pt-1 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={hasConfirmedSavedSecret}
+                              onChange={e => setHasConfirmedSavedSecret(e.target.checked)}
+                              className="mt-0.5 rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-[11px] text-slate-300 leading-snug">
+                              Men ushbu maxfiy kalitdan nusxa oldim va backend sozlamalarimga (<code className="text-amber-300 font-mono">.env</code>) joylashtirdim.
+                            </span>
+                          </label>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          "Xavfsiz kalit yaratish" tugmasini bosing. Zayuno backendda 256-bitli kriptografik kalit yaratadi. Ushbu kalitni o‘z serveringiz .env fayliga kiritasiz.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2.5 animate-fadeIn">
@@ -1832,7 +2017,10 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                             <input
                               type={showSecret ? "text" : "password"}
                               value={apiSecret}
-                              onChange={e => setApiSecret(e.target.value)}
+                              onChange={e => {
+                                setApiSecret(e.target.value);
+                                setHasConfirmedSavedSecret(true);
+                              }}
                               placeholder="Dasturchingiz yaratgan API key’ni kiriting"
                               autoComplete="new-password"
                               className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
@@ -1877,7 +2065,10 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                             <input
                               type={showSecret ? "text" : "password"}
                               value={apiSecret}
-                              onChange={e => setApiSecret(e.target.value)}
+                              onChange={e => {
+                                setApiSecret(e.target.value);
+                                setHasConfirmedSavedSecret(true);
+                              }}
                               placeholder="Bearer tokenni kiriting"
                               autoComplete="new-password"
                               className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
@@ -1922,7 +2113,10 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                             <input
                               type={showSecret ? "text" : "password"}
                               value={apiSecret}
-                              onChange={e => setApiSecret(e.target.value)}
+                              onChange={e => {
+                                setApiSecret(e.target.value);
+                                setHasConfirmedSavedSecret(true);
+                              }}
                               placeholder="HMAC request signing secretni kiriting"
                               autoComplete="new-password"
                               className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
@@ -1989,13 +2183,20 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Ortga
             </button>
-            <button
-              type="submit"
-              disabled={loading || !slug.trim()}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
-            >
-              {loading ? 'Saqlanmoqda…' : 'Davom etish'} <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-3">
+              {generatedSecret && !hasConfirmedSavedSecret && (
+                <span className="text-[11px] text-amber-400">
+                  ⚠️ Davom etish uchun yuqoridagi tasdiq katakchasini belgilang.
+                </span>
+              )}
+              <button
+                type="submit"
+                disabled={loading || !slug.trim() || (Boolean(generatedSecret) && !hasConfirmedSavedSecret)}
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
+              >
+                {loading ? 'Saqlanmoqda…' : 'Davom etish'} <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </form>
       )}

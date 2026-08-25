@@ -142,10 +142,14 @@ services:
       - DEVELOPERS_PUBLIC_URL=https://developers.zayuno.uz
       - API_PUBLIC_URL=https://api.zayuno.uz
       - MCP_PUBLIC_URL=https://mcp.zayuno.uz
-      - API_BASE_URL=https://api.zayuno.uz
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - EMAIL_FROM=${EMAIL_FROM:-Zayuno <noreply@zayuno.uz>}
       - PROVIDER_PORTAL_URL=${PROVIDER_PORTAL_URL:-https://developers.zayuno.uz}
+      - PROVIDER_HEALTH_INTERVAL_MS=${PROVIDER_HEALTH_INTERVAL_MS:-60000}
+      - PROVIDER_HEALTH_TIMEOUT_MS=${PROVIDER_HEALTH_TIMEOUT_MS:-5000}
+      - PROVIDER_HEALTH_FAILURE_THRESHOLD=${PROVIDER_HEALTH_FAILURE_THRESHOLD:-3}
+      - PROVIDER_HEALTH_RECOVERY_THRESHOLD=${PROVIDER_HEALTH_RECOVERY_THRESHOLD:-2}
+      - PROVIDER_HEALTH_MAX_CONCURRENCY=${PROVIDER_HEALTH_MAX_CONCURRENCY:-10}
     depends_on:
       postgres:
         condition: service_healthy

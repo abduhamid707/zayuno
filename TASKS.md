@@ -131,6 +131,29 @@
 > foydalanuvchisi qanday ko‘rishi va ishlatishi nuqtayi nazaridan ham tekshira
 > olishi.
 
+## End-of-project: Provider Health Incident Notifications
+
+- [ ] Avtomatik provider health monitoring va vaqtincha discovery’dan yashirish
+  mexanizmi barqaror ishlagach, provider hamda Operations uchun incident
+  notification tizimini loyiha yakunida qo‘shish.
+  - Provider ketma-ket health-check xatolaridan so‘ng `DOWN` holatiga o‘tganda
+    bir marta xabar yuborish; har bir tekshiruvda takroriy spam yubormaslik.
+  - Provider qayta barqaror ishlay boshlaganda `RECOVERED` xabarini yuborish.
+  - Email asosiy kanal bo‘lsin; keyinchalik Telegram va provider webhook kanallari
+    opt-in sifatida qo‘shilishi mumkin.
+  - Xabarda provider nomi, muhit, hodisa boshlangan vaqt, oxirgi tekshiruv va
+    xavfsiz qisqa sabab bo‘lsin; token, credential, request body, mijoz ma’lumoti
+    yoki ichki stack trace yuborilmasin.
+  - Notification preference, cooldown, deduplication, acknowledgement va incident
+    history boshqaruvi bo‘lsin.
+  - Notification yuborilmay qolishi provider health state, discovery visibility,
+    auto-recovery yoki asosiy buyurtma oqimini bloklamasin.
+  - DOWN → DEGRADED/RECOVERING → HEALTHY flapping holatlari uchun hysteresis va
+    cooldown testlari yozilsin.
+
+> Hozirgi sprintga kirmaydi. Bu vazifa health monitor, vaqtincha discovery hiding
+> va auto-recovery productionda ishonchli ishlagandan keyin bajariladi.
+
 ## Future product ideas: AI-native business discovery + action network
 
 ### Product positioning

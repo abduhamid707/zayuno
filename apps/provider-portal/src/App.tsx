@@ -32,6 +32,7 @@ import {
   Mail,
   HelpCircle,
   AlertTriangle,
+  AlertCircle,
   Download,
   Building2,
   Phone,
@@ -516,6 +517,15 @@ export default function App() {
       setIntegrationForm(current => ({ ...current, apiSecret: '', webhookSecret: '' }));
       await refetchProvider();
     }
+  });
+
+  const checkHealthNowMutation = useMutation({
+    mutationFn: async () => {
+      if (!providerData?.slug) throw new Error('Provider topilmadi.');
+      const res = await apiFetch(`/api/v1/providers/${providerData.slug}/check-health-now`, { method: 'POST' });
+      return res.json();
+    },
+    onSuccess: () => refetchProvider()
   });
 
   const registerWizardMutation = useMutation({
@@ -1188,6 +1198,48 @@ export default function App() {
                     <p className="text-xs text-slate-400">Manage your registered provider endpoints, authentication secrets, and review status.</p>
                   </div>
                 </div>
+
+                {/* Health / Temporary Unavailability Banner */}
+                {(provider.metadata?.isTemporarilyUnavailable || provider.metadata?.healthMonitoring?.isTemporarilyUnavailable || provider.metadata?.healthMonitoring?.state === 'DOWN') && (
+                  <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-rose-200 space-y-2 animate-fadeIn">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <h3 className="font-bold text-white text-sm">Serveringiz vaqtincha javob bermayapti</h3>
+                          <p className="text-xs text-rose-200 leading-relaxed">
+                            AI agentlar qidiruvidan vaqtincha yashirildi. Server tiklangach tizim avtomatik tarzda qayta faollashtiradi.
+                          </p>
+                          {provider.metadata?.healthMonitoring?.lastFailureCode && (
+                            <div className="text-[11px] text-rose-300 font-mono">
+                              Oxirgi xatolik kodi: {provider.metadata.healthMonitoring.lastFailureCode}
+                              {provider.metadata.healthMonitoring.lastCheckedAt && ` (${new Date(provider.metadata.healthMonitoring.lastCheckedAt).toLocaleTimeString()})`}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => checkHealthNowMutation.mutate()}
+                        disabled={checkHealthNowMutation.isPending}
+                        className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold shrink-0 transition flex items-center gap-1.5 shadow-md shadow-rose-950"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${checkHealthNowMutation.isPending ? 'animate-spin' : ''}`} />
+                        <span>{checkHealthNowMutation.isPending ? 'Tekshirilmoqda...' : 'Hozir tekshirish'}</span>
+                      </button>
+                    </div>
+                    {checkHealthNowMutation.isError && (
+                      <p className="text-xs text-rose-300 font-medium pt-1">
+                        {(checkHealthNowMutation.error as Error).message}
+                      </p>
+                    )}
+                    {checkHealthNowMutation.isSuccess && (
+                      <p className="text-xs text-emerald-300 font-medium pt-1">
+                        {checkHealthNowMutation.data?.message}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
                   {[

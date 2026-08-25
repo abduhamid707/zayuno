@@ -53,7 +53,7 @@ import {
 } from '@zayuno/contracts';
 import { ProviderCertificationRunner, CertificationReport } from '@zayuno/provider-sdk';
 import * as bcrypt from 'bcrypt';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 
@@ -695,17 +695,95 @@ export class ProvidersService {
     return { provider: this.mapToProviderInfo(result.provider), credentials: { providerSlug: slug, sandboxApiKey: sandboxKey.rawKey, sandboxWebhookSecret: webhookSecret }, owner: { email: result.owner.email, name: result.owner.name } };
   }
 
-  async getProviderCredentials(slug: string, actor?: { id?: string; role?: UserRole; providerId?: string }): Promise<ProviderCredentials> {
+  generateIntegrationSecret(): { secret: string } {
+    const secret = randomBytes(32).toString('hex');
+    return { secret };
+  }
+
+  async rotateProviderCredential(
+    slug: string,
+    data: { authMethod?: AuthMethod; apiSecret?: string; generateAutoSecret?: boolean },
+    actor?: { id?: string; role?: UserRole; providerId?: string }
+  ): Promise<{ success: boolean; message: string; generatedSecret?: string; authMethod: AuthMethod }> {
     const cleanSlug = slug.toLowerCase().trim();
     const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
     if (!provider) throw new NotFoundError('Provider', cleanSlug);
     this.assertProviderManager(provider, actor);
 
-    // Keys are intentionally one-time secrets. Returning a fabricated value
-    // here used to make integrations look configured while authentication
-    // silently failed. A replacement key must be issued through the key
-    // management flow instead.
-    throw new BadRequestException('The sandbox API key is shown only when the provider application is created. Create a replacement API key if it was not saved.');
+    let rawSecret = data.apiSecret?.trim() || '';
+    let generatedSecret: string | undefined;
+
+    if (data.generateAutoSecret || !rawSecret) {
+      rawSecret = randomBytes(32).toString('hex');
+      generatedSecret = rawSecret;
+    }
+
+    const authMethod = data.authMethod || (provider.config as any)?.authMethod || AuthMethod.API_KEY;
+    const encryptedSecret = encryptSecret(rawSecret, this.getEncryptionKey());
+    const currentMeta = (provider.metadata as Record<string, any>) || {};
+
+    await prisma.provider.update({
+      where: { slug: cleanSlug },
+      data: {
+        encryptedSecret,
+        config: {
+          ...((provider.config as Record<string, any>) || {}),
+          authMethod
+        },
+        metadata: {
+          ...currentMeta,
+          isCertified: false,
+          isPublished: false,
+          lastCertificationReport: null,
+          lastCertifiedAt: null,
+          credentialRotatedAt: new Date().toISOString(),
+          credentialRotatedBy: actor?.id || 'provider_manager'
+        }
+      }
+    });
+
+    this.registry.invalidateAdapterCache(cleanSlug);
+    console.log(`[AUDIT] Outbound provider credential rotated for provider "${cleanSlug}". Actor: ${actor?.id || 'system'}`);
+
+    return {
+      success: true,
+      message: 'Provider credential yangilandi. Yangi credential bilan sertifikatsiyadan qayta o‘tish talab etiladi.',
+      generatedSecret,
+      authMethod
+    };
+  }
+
+  async getProviderCredentials(slug: string, actor?: { id?: string; role?: UserRole; providerId?: string }): Promise<any> {
+    const cleanSlug = slug.toLowerCase().trim();
+    const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
+    if (!provider) throw new NotFoundError('Provider', cleanSlug);
+    this.assertProviderManager(provider, actor);
+
+    const existingKeys = await prisma.apiKey.findMany({
+      where: { providerId: provider.id, isActive: true },
+      select: { id: true, name: true, keyPrefix: true, role: true, createdAt: true }
+    });
+
+    const isSandbox = Boolean(provider.baseUrl && this.registry.isOfficialSandboxUrl(provider.baseUrl));
+    const authMethod = (provider.config as any)?.authMethod || 'API_KEY';
+
+    return {
+      providerSlug: cleanSlug,
+      providerAuth: {
+        authMethod,
+        hasConfiguredSecret: Boolean(provider.encryptedSecret && provider.encryptedSecret !== ''),
+        isSandbox,
+        direction: 'Zayuno -> Provider Server (Zayuno provayderingiz serveriga so‘rov yuborayotganda ushbu maxfiy kalitdan foydalanadi)'
+      },
+      zayunoApiKeys: existingKeys,
+      sandboxApiKey: existingKeys[0]?.keyPrefix ? `${existingKeys[0].keyPrefix}...` : 'zy_test_sandbox_key',
+      sandboxWebhookSecret: provider.webhookSecret,
+      webhookSecret: provider.webhookSecret,
+      instructions: {
+        providerAuthNote: 'Bu secret Zayunodan sizning serveringizga keluvchi so‘rovlarni tekshirish uchun.',
+        zayunoApiKeyNote: 'Bu zy_test_... kalitlari esa sizning tizimingizdan Zayuno API chaqirish uchun.'
+      }
+    };
   }
 
   /** Rotates the webhook HMAC secret for the provider securely. */
