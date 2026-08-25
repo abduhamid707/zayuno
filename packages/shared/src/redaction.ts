@@ -106,3 +106,33 @@ export function sanitizeHeaders(headers: Record<string, any> | undefined): Recor
   }
   return sanitized;
 }
+
+const STRICT_SECRET_KEY_PATTERN =
+  /password|secret|encrypted|key.?hash|token|authorization|cookie|session|api.?key|database.?url|salt|raw.?secrets?|private.?key|ssn|cvv/i;
+
+export function stripSensitiveSecrets<T = unknown>(value: T): T {
+  const walk = (current: unknown): unknown => {
+    if (current === null || current === undefined) return current;
+    if (typeof current === 'string') {
+      return scrubSensitiveString(current);
+    }
+    if (typeof current === 'number' || typeof current === 'boolean') {
+      return current;
+    }
+    if (Array.isArray(current)) {
+      return current.map(item => walk(item));
+    }
+    if (typeof current === 'object') {
+      const result: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(current as Record<string, unknown>)) {
+        if (STRICT_SECRET_KEY_PATTERN.test(key)) {
+          continue;
+        }
+        result[key] = walk(val);
+      }
+      return result;
+    }
+    return current;
+  };
+  return walk(value) as T;
+}

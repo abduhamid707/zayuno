@@ -19,7 +19,7 @@ async function runChatGptAppVerification() {
   
   console.log(`✅ Discovered ${toolsData.tools.length} Tools for ChatGPT App:`);
   for (const t of toolsData.tools) {
-    const badge = t.annotations?.readOnly ? '📖 Read-Only' : '✍️ Action/Write';
+    const badge = t.annotations?.readOnlyHint ? '📖 Read-Only' : '✍️ Action/Write';
     console.log(`   - [${t.name.padEnd(26)}] (${badge}) : ${t.description?.slice(0, 70)}...`);
   }
 

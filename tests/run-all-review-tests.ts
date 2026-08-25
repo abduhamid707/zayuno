@@ -44,7 +44,8 @@ const testSuites = [
   'tests/test-sandbox-production-credential-mapping.ts',
   'tests/test-provider-contract-dx-parity.ts',
   'tests/test-provider-health-monitoring-and-lifecycle.ts',
-  'tests/test-production-health-and-lease-real-e2e.ts'
+  'tests/test-production-health-and-lease-real-e2e.ts',
+  'tests/test-openai-plugin-mcp-contract.ts'
 ];
 
 async function main() {

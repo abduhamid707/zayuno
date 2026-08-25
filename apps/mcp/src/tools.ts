@@ -16,16 +16,17 @@ import {
   formatCustomerPaymentOptions,
   formatCustomerError,
   getWelcomeMessage,
-  getDynamicServiceMessage
+  getDynamicServiceMessage,
+  stripSensitiveSecrets
 } from '@zayuno/shared';
 
 export interface McpToolDefinition {
   name: string;
   description: string;
   annotations?: {
-    readOnly?: boolean;
-    openWorld?: boolean;
-    destructive?: boolean;
+    readOnlyHint?: boolean;
+    openWorldHint?: boolean;
+    destructiveHint?: boolean;
   };
   inputSchema: {
     type: 'object';
@@ -50,9 +51,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'get_welcome_message',
     description: 'Get the natural conversational welcome greeting (customerMessage) and dynamic capability metrics for customers. The AI assistant must use customerMessage directly when starting a conversation.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -85,9 +86,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'find_providers',
     description: 'Discover and filter capability providers across categories (e.g. food_delivery, logistics, bookings, retail), specific required capabilities (e.g. ACTION_CREATE, QUOTE), geographic coverage, or keyword queries.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -130,9 +131,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'list_providers',
     description: 'List all registered and active capability providers (e.g. services, logistics, commerce). Returns provider slugs, names, types, and supported capability flags.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -160,9 +161,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'get_provider',
     description: 'Get comprehensive metadata, supported capabilities, operational status, and details for a specific capability provider by slug.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -189,9 +190,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'get_provider_capabilities',
     description: 'Retrieve the explicit capability matrix for a provider (e.g. CATALOG, QUOTE, ACTION_CREATE, LOCATIONS, PAYMENT_OPTIONS). Use this to determine which tools can be invoked against the provider.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -219,9 +220,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'get_locations',
     description: 'Retrieve physical operational locations, fulfillment centers, or branches for a specific provider, including addresses, operating hours, and service radii.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -253,9 +254,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'get_catalog',
     description: 'Retrieve the full structured catalog, categories, offerings, base pricing, and option groups from a provider. Can be filtered by category or location.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -295,9 +296,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'search_catalog',
     description: 'Search static or real-time provider offerings. For dynamic domains such as tickets, appointments, hotels, and transport, pass structured parameters (dates, origin/destination, passengers, capacity, or preferences).',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -345,9 +346,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'get_offering',
     description: 'Get deep item details for an offering including variants, modifiers, option groups, required selections, and availability.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -386,9 +387,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'check_availability',
     description: 'Read-only real-time inventory check before requesting a quote. Use for seats, appointment slots, rooms, tickets, limited stock, or any capacity that can change. This does not reserve or hold inventory.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -442,9 +443,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'request_quote',
     description: 'Mandatory pre-requisite before creating an action. Calculates verified real-time pricing and returns pre-formatted customerMessage. The AI assistant must present customerMessage directly to the customer without exposing internal quote IDs.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: false,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -521,9 +522,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'create_action',
     description: 'Execute an action with the external provider. MUST only be called after request_quote and AFTER the user has explicitly reviewed and confirmed the quote. Returns pre-formatted customerMessage with secure checkout link. The AI assistant must present customerMessage directly to the customer and keep actionId/tokens internal.',
     annotations: {
-      readOnly: false,
-      openWorld: true,
-      destructive: false
+      readOnlyHint: false,
+      openWorldHint: true,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -625,9 +626,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'get_action',
     description: 'Retrieve live status for an active or completed action. Returns pre-formatted customerMessage in natural Uzbek. The AI assistant must present customerMessage directly to the customer and never expose raw status enums or action IDs.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -654,9 +655,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'cancel_action',
     description: 'Cancel an eligible active action before fulfillment lock or completion. Returns pre-formatted customerMessage. The AI assistant must use customerMessage directly.',
     annotations: {
-      readOnly: false,
-      openWorld: true,
-      destructive: false
+      readOnlyHint: false,
+      openWorldHint: true,
+      destructiveHint: true
     },
     inputSchema: {
       type: 'object',
@@ -692,9 +693,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     name: 'get_payment_options',
     description: 'Retrieve provider-supplied checkout URLs and available payment options for an action. Sensitive card data is never handled in chat; payment occurs via secure HTTPS redirection.',
     annotations: {
-      readOnly: true,
-      openWorld: false,
-      destructive: false
+      readOnlyHint: true,
+      openWorldHint: false,
+      destructiveHint: false
     },
     inputSchema: {
       type: 'object',
@@ -757,7 +758,8 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
       zodShape,
       async (args: any) => {
         try {
-          const result = await tool.handler(args, client);
+          const rawResult = await tool.handler(args, client);
+          const result = stripSensitiveSecrets(rawResult);
           return {
             content: [
               {

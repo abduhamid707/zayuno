@@ -30,7 +30,7 @@ async function runRemotePublicFlowTest() {
   const toolsData = await toolsRes.json();
   console.log(`✅ Discovered ${toolsData.tools.length} Tools:`);
   for (const tool of toolsData.tools) {
-    const badge = tool.annotations?.readOnly ? '📖 Read-Only' : '✍️ Action/Write';
+    const badge = tool.annotations?.readOnlyHint ? '📖 Read-Only' : '✍️ Action/Write';
     console.log(`   - [${tool.name}] (${badge}) -> ${tool.description?.slice(0, 70)}...`);
   }
 

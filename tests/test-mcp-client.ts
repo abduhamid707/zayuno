@@ -28,7 +28,7 @@ async function runMcpClientTest() {
   const toolsResult = await client.listTools();
   console.log(`✅ Discovered ${toolsResult.tools.length} Tools:`);
   for (const tool of toolsResult.tools) {
-    const isReadOnly = tool.annotations?.readOnly ? '📖 Read-Only' : '✍️ Action/Write';
+    const isReadOnly = tool.annotations?.readOnlyHint ? '📖 Read-Only' : '✍️ Action/Write';
     console.log(`   - [${tool.name}] (${isReadOnly}) -> ${tool.description?.slice(0, 70)}...`);
   }
 

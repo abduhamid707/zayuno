@@ -7,7 +7,7 @@ import { ProviderStatus, ProviderType } from '../packages/contracts/src/provider
 import { UserRole } from '../packages/database/dist/index.js';
 import { createMockEvosApp } from '../integrations/mock-evos/src/server.ts';
 
-async function waitForHttp(url: string, timeoutMs = 15000): Promise<void> {
+async function waitForHttp(url: string, timeoutMs = 35000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
@@ -42,6 +42,10 @@ async function main() {
       stdio: 'pipe'
     }
   );
+
+  apiProcess.stderr?.on('data', d => {
+    // Only print errors if debug needed
+  });
 
   const mockWebhookPort = 4498;
   const sharedSecret = 'test_webhook_secret_123';

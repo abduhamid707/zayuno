@@ -226,10 +226,11 @@ async function runE2EVerification() {
     ];
 
     for (const toolName of expectedTools) {
-      if (!submission.tool_justifications[toolName]) {
+      const toolEntry = submission.tools?.[toolName];
+      const just = toolEntry?.justifications || submission.tool_justifications?.[toolName];
+      if (!just) {
         throw new Error(`Missing tool justification in submission for: ${toolName}`);
       }
-      const just = submission.tool_justifications[toolName];
       if (!just.read_only_justification || !just.open_world_justification || !just.destructive_justification) {
         throw new Error(`Incomplete justifications for tool: ${toolName}`);
       }

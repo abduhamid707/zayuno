@@ -154,6 +154,38 @@
 > Hozirgi sprintga kirmaydi. Bu vazifa health monitor, vaqtincha discovery hiding
 > va auto-recovery productionda ishonchli ishlagandan keyin bajariladi.
 
+## Later: Runtime Health Truthfulness, Checkout Provenance & Latency UX
+
+- [ ] Customer-facing javoblarda providerning administrativ lifecycle holati
+  (`ACTIVE`, `APPROVED`, `isPublished`, `isCertified`) bilan serverning real
+  runtime health holatini (`HEALTHY`, `DEGRADED`, `DOWN`, `RECOVERING`) qat’iy
+  ajratish.
+  - “Server ishlayaptimi?” kabi savollarga faqat health monitor holati yoki
+    rate-limited live health check asosida javob berish.
+  - `ACTIVE` qiymatini hech qachon “server hozir ishlayapti” degan dalil sifatida
+    ishlatmaslik.
+  - Javobda mavjud bo‘lsa `lastCheckedAt`, health state va xavfsiz qisqa sababni
+    mijozbop shaklda ko‘rsatish; stale/unknown holatda taxmin qilmaslik.
+- [ ] Checkout/payment URL provenance’ini qat’iy kafolatlash.
+  - AI yoki presenter checkout URL’ni action/public ID asosida o‘zi yasamasin.
+  - Faqat provider action javobidagi canonical `nextAction`/payment URL
+    validatsiyadan o‘tgach mijozga ko‘rsatilsin.
+  - URL yo‘q, invalid yoki xavfsiz bo‘lmasa uydirma link bermasdan tushunarli
+    fallback qaytarilsin.
+  - Provider-supplied URL, rejected URL va missing URL uchun regression testlar
+    yozilsin.
+- [ ] Oddiy quote/action/status oqimlaridagi 18–25 soniyalik kechikishlarni Live
+  Inspector trace’lari orqali tahlil qilish va bosqichma-bosqich latency’ni
+  ko‘rsatish.
+  - Provider request, retry, health lookup, DB va MCP/presenter vaqtlarini alohida
+    o‘lchash.
+  - Keraksiz ketma-ket chaqiruvlar va retrylarni yo‘qotish, mavjud timeout/SLA
+    chegaralarini customer-facing xatolar bilan uyg‘unlashtirish.
+  - Fast, slow va timeout holatlari uchun regression/performance testlar qo‘shish.
+
+> Telefon raqamini lokal 9 xonali formatdan `+998` formatiga normalizatsiya qilish
+> hozirgi qabul qilingan UX hisoblanadi va ushbu task scope’iga kirmaydi.
+
 ## Future product ideas: AI-native business discovery + action network
 
 ### Product positioning

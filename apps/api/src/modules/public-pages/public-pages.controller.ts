@@ -3,6 +3,7 @@ import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import { Response, Request } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getOpenAiAppsChallengeToken } from '@zayuno/shared';
 
 @Controller()
 export class PublicPagesController {
@@ -57,6 +58,15 @@ export class PublicPagesController {
     </head>
     <body>Verification: f58af2445b7b4bbf</body>
 </html>`);
+  }
+
+  // 3.2. OpenAI Apps Domain Verification Challenge: /.well-known/openai-apps-challenge
+  @Get('.well-known/openai-apps-challenge')
+  @ApiExcludeEndpoint()
+  getOpenAiAppsChallenge(@Res() res: Response) {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.send(getOpenAiAppsChallengeToken());
   }
 
   // 4. Robots.txt: /robots.txt

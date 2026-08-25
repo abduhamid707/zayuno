@@ -6,7 +6,7 @@ import cors from 'cors';
 import { randomUUID } from 'crypto';
 import { ZayunoApiClient } from './client.js';
 import { registerZayunoTools, ZAYUNO_MCP_TOOLS } from './tools.js';
-import { getWelcomeMessage, formatCustomerError } from '@zayuno/shared';
+import { getWelcomeMessage, formatCustomerError, getOpenAiAppsChallengeToken, stripSensitiveSecrets } from '@zayuno/shared';
 
 export const ZAYUNO_MCP_PROMPTS = [
   {
@@ -145,6 +145,13 @@ export function runHttpSseServer(port = 4002): Express {
   // Store active SSE sessions
   const sseTransports = new Map<string, SSEServerTransport>();
 
+  // 0. OpenAI Domain Verification Challenge: GET /.well-known/openai-apps-challenge
+  app.get('/.well-known/openai-apps-challenge', (_req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.status(200).send(getOpenAiAppsChallengeToken());
+  });
+
   // 1. Health Endpoint: GET /health
   app.get('/health', (req: Request, res: Response) => {
     res.json({
@@ -280,12 +287,11 @@ export function runHttpSseServer(port = 4002): Express {
       if (method === 'tools/call') {
         const toolName = params?.name;
         const toolArgs = params?.arguments || {};
-        const apiClient = new ZayunoApiClient();
 
         try {
           const tool = ZAYUNO_MCP_TOOLS.find(candidate => candidate.name === toolName);
           if (!tool) {
-            res.status(404).json({
+            res.json({
               jsonrpc: '2.0',
               id,
               error: { code: -32601, message: `Tool not found: ${toolName}` }
@@ -293,9 +299,12 @@ export function runHttpSseServer(port = 4002): Express {
             return;
           }
 
+          const apiClient = new ZayunoApiClient();
+
           // Tool discovery and execution share the same definition. This prevents
           // an advertised MCP tool from being omitted from a separate dispatcher.
-          const result = await tool.handler(toolArgs, apiClient);
+          const rawResult = await tool.handler(toolArgs, apiClient);
+          const result = stripSensitiveSecrets(rawResult);
 
           res.json({
             jsonrpc: '2.0',
@@ -310,10 +319,23 @@ export function runHttpSseServer(port = 4002): Express {
             }
           });
         } catch (err: any) {
+          const friendlyMessage = formatCustomerError(err);
           res.json({
             jsonrpc: '2.0',
             id,
-            error: { code: -32000, message: err.message || 'Internal tool execution error' }
+            result: {
+              isError: true,
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    isError: true,
+                    customerMessage: friendlyMessage,
+                    message: friendlyMessage
+                  }, null, 2)
+                }
+              ]
+            }
           });
         }
         return;
