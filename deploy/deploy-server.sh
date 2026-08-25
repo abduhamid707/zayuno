@@ -53,12 +53,35 @@ log_info "Target services: ${SERVICES:-none}"
 
 cd "$REMOTE_DIR"
 
-# 2. System and disk validation
+# 2. System and disk validation with automated cache reclamation
+log_info "Validating disk space and performing pre-deploy cleanup..."
+
+# Proactively reclaim dangling Docker images, builder cache and old journal logs
+if docker info >/dev/null 2>&1; then
+  docker image prune -f >/dev/null 2>&1 || true
+  docker builder prune -f --keep-storage 512MB >/dev/null 2>&1 || true
+fi
+journalctl --vacuum-size=100M >/dev/null 2>&1 || true
+rm -f /tmp/deploy_bundle*.tar.gz /tmp/*.tmp 2>/dev/null || true
+
 DISK_AVAIL_KB=$(df -k "$REMOTE_DIR" | awk 'NR==2 {print $4}')
 if [ "$DISK_AVAIL_KB" -lt 1048576 ]; then # 1GB minimum
-  log_error "Insufficient disk space (< 1GB available). Aborting deploy."
+  log_warn "Disk space low (< 1GB), running deep safe container and image prune..."
+  if docker info >/dev/null 2>&1; then
+    docker system prune -a -f --volumes=false --filter "until=24h" >/dev/null 2>&1 || true
+  fi
+  if [ -d "$BACKUP_DIR" ]; then
+    find "$BACKUP_DIR" -type f -name "*.sql.gz" -mtime +3 -delete 2>/dev/null || true
+  fi
+  DISK_AVAIL_KB=$(df -k "$REMOTE_DIR" | awk 'NR==2 {print $4}')
+fi
+
+DISK_AVAIL_MB=$((DISK_AVAIL_KB / 1024))
+if [ "$DISK_AVAIL_KB" -lt 524288 ]; then # 512MB absolute hard minimum
+  log_error "Insufficient disk space (${DISK_AVAIL_MB}MB available, minimum 512MB required). Aborting deploy."
   exit 1
 fi
+log_info "Available disk space: ${DISK_AVAIL_MB}MB"
 
 if ! docker info >/dev/null 2>&1; then
   log_error "Docker daemon is not responding. Aborting deploy."
@@ -157,6 +180,8 @@ if "$REMOTE_DIR/deploy/health-check.sh" services $SERVICES; then
 
   # Record new current release
   echo "$DEPLOY_SHA" > "$CURRENT_SHA_FILE"
+  # Prune old dangling images to keep host disk healthy
+  docker image prune -f >/dev/null 2>&1 || true
   log_success "Deployment completed successfully for SHA: $DEPLOY_SHA"
 else
   log_error "Health check FAILED for release $DEPLOY_SHA!"

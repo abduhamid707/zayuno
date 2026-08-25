@@ -153,6 +153,9 @@ jobs:
           SSH_CMD="ssh -i ~/.ssh/id_rsa_prod -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
           SCP_CMD="scp -i ~/.ssh/id_rsa_prod -P ${PROD_PORT}"
 
+          echo "Running pre-flight disk cache cleanup on server..."
+          $SSH_CMD "docker image prune -f >/dev/null 2>&1 || true; journalctl --vacuum-size=100M >/dev/null 2>&1 || true"
+
           echo "Ensuring deploy directories on server..."
           $SSH_CMD "mkdir -p /root/zayuno/deploy"
 
