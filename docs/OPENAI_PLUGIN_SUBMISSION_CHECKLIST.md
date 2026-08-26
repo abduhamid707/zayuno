@@ -2,8 +2,9 @@
 
 > **Version**: 1.1.0
 > **Protocol Standard**: Model Context Protocol (MCP) Streamable HTTP + SSE
-> **Production Base URL**: `https://zayuno.uz`
-> **MCP Endpoint**: `https://zayuno.uz/mcp`
+> **Website Base URL**: `https://zayuno.uz`
+> **MCP Base URL**: `https://mcp.zayuno.uz`
+> **MCP Endpoint**: `https://mcp.zayuno.uz/mcp`
 > **Status**: Ready for OpenAI App Directory Submission Review
 
 ---
@@ -18,10 +19,10 @@
 | **Privacy Policy URL** | `https://zayuno.uz/privacy` | `PASS` |
 | **Terms of Service URL** | `https://zayuno.uz/terms` | `PASS` |
 | **Support Help Desk URL** | `https://zayuno.uz/support` | `PASS` |
-| **Production MCP Server (HTTP)** | `https://zayuno.uz/mcp` | `PASS` |
-| **Production MCP Server (SSE)** | `https://zayuno.uz/sse` | `PASS` |
-| **MCP Tools Introspection** | `https://zayuno.uz/tools` | `PASS` |
-| **Health Check Endpoint** | `https://zayuno.uz/health` | `PASS` |
+| **Production MCP Server (HTTP)** | `https://mcp.zayuno.uz/mcp` | `PASS` |
+| **Production MCP Server (SSE)** | `https://mcp.zayuno.uz/sse` | `PASS` |
+| **MCP Tools Introspection** | `https://mcp.zayuno.uz/tools` | `PASS` |
+| **MCP Health Check Endpoint** | `https://mcp.zayuno.uz/health` | `PASS` |
 
 ### Domain Verification
 - **Apex Domain**: `zayuno.uz`

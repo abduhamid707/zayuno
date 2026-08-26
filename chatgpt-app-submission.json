@@ -13,7 +13,7 @@
     "support_url": "https://zayuno.uz/support"
   },
   "mcp_server": {
-    "url": "https://zayuno.uz/mcp",
+    "url": "https://mcp.zayuno.uz/mcp",
     "transport": "streamable-http",
     "authentication": {
       "type": "api_key",

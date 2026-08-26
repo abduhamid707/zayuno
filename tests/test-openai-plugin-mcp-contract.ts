@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import http, { type Server } from 'node:http';
 import { ZAYUNO_MCP_TOOLS, McpToolDefinition } from '../apps/mcp/src/tools.ts';
 import { runHttpSseServer } from '../apps/mcp/src/server.ts';
@@ -524,8 +525,26 @@ async function main() {
   const validatedSubmission = await validateSubmissionManifest();
   assert.equal(validatedSubmission.app_info.category, 'SHOPPING');
   assert.equal(validatedSubmission.schema_version, 1);
+  assert.equal(
+    validatedSubmission.mcp_server.url,
+    'https://mcp.zayuno.uz/mcp',
+    'Submission MCP URL must point to the dedicated production MCP host'
+  );
   assert.ok(validatedSubmission.test_cases.length >= 5);
   assert.ok(validatedSubmission.negative_test_cases.length >= 3);
+
+  const submissionChecklist = readFileSync(
+    new URL('../docs/OPENAI_PLUGIN_SUBMISSION_CHECKLIST.md', import.meta.url),
+    'utf8'
+  );
+  assert.ok(
+    submissionChecklist.includes('https://mcp.zayuno.uz/mcp'),
+    'Submission checklist must document the canonical production MCP endpoint'
+  );
+  assert.ok(
+    !submissionChecklist.includes('https://zayuno.uz/mcp'),
+    'Submission checklist must not reference the website host as the MCP endpoint'
+  );
 
   console.log(`    ✓ chatgpt-app-submission.json passed official OpenAI Draft 2020-12 specification.`);
 

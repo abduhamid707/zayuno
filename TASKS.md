@@ -473,3 +473,12 @@
   - **`PAYMENT`**: Payme/Click yoki yuridik shaxslar uchun hisob-faktura (Invoys) orqali to‘lov handoff.
 - [ ] AI foydalanuvchilari uchun: *"Toshkentdan Farg‘onaga 800 kg tovarim bor, ertaga soat 10:00 da olib ketadigan Porter yoki Labo top va narxini ayt"* kabi logistika ehtiyojlarini orkestratsiya qilish.
 - [ ] Logistika hamkorlari integratsiyasi: BTS Express, Oson Pochta, Fargo Express, EMU, Starex, shahar ichi yuk agregatorlari (Yandex Cargo/Labo) va viloyatlararo yuk terminallari API/Webhooklari bilan bog‘lanish.
+
+### 11. Scalability & Concurrent Load Testing (Yuklama va Stress Testlari)
+- [ ] 700+ Concurrent User / RPS Stress & Load Test (k6 / Locust / Autocannon) benchmark o‘tkazish:
+  - **Haqiqiy holat**: Hozirda repoda 46 ta funksional va E2E integratsion testlar mavjud bo‘lib, ular parallel lease lock (10 parallel raqobatchi), tranzaksiya izolyatsiyasi va HTTP boundary xavfsizligini tekshiradi.
+  - **Lekin**: 700 concurrent RPS darajasidagi yuklama (masalan, k6, Locust yoki autocannon orqali stress test) hali alohida o‘tkazilmagan (NOT IMPLEMENTED). Shuning uchun 700 foydalanuvchida P99 latency va pool to‘yinganligini faqat stress test o‘tkazilgandan keyin empirik tasdiqlash mumkin.
+  - Test ssenariylari:
+    - Discovery (`POST /mcp` `find_providers`, `list_providers`) yuqori parallel oqimda.
+    - PostgreSQL connection pool to‘yinganligi va Redis cache hit-rate tahlili.
+    - Distributed lease lock va action idempotency qulflarining 700 RPS ostidagi latency profili (P95, P99).
