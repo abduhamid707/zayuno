@@ -16,7 +16,9 @@ on:
       - 'pnpm-workspace.yaml'
       - 'turbo.json'
       - 'tsconfig.base.json'
-      - '.github/workflows/build-images.yml'
+      - 'chatgpt-app-submission.json'
+      - 'schemas/**'
+      - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       service_override:
