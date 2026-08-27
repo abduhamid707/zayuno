@@ -148,7 +148,7 @@ async function main() {
     assert.ok(createdIdempotencyKey, 'Server must generate idempotency key when omitted by client');
     assert.ok(actionResult.customerMessage, 'Action result must contain customerMessage');
     assert.match(actionResult.customerMessage, /Buyurtmangiz yaratildi\. To‘lov kutilmoqda\./);
-    assert.match(actionResult.customerMessage, /Bu sandbox buyurtmasi, haqiqiy to‘lov qilinmaydi\./);
+    assert.match(actionResult.customerMessage, /Bu Coffee Time sandbox demo xizmati\. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi\./);
     assert.match(actionResult.customerMessage, /\[To‘lov sahifasini ochish\]/);
 
     // 2c. Retry action creation with same quoteId -> must use the exact same idempotency key

@@ -278,12 +278,23 @@ export function formatCustomerActionConfirmation(action: any, providerInfo?: any
     action.fulfillmentType === 'DIGITAL_TICKET' ||
     Boolean(action.parameters?.tripId || action.parameters?.trainNumber);
 
-  const isDemo = isDemoOrSandboxProvider(providerInfo) || isDemoOrSandboxProvider(action);
+  const isCoffeeTime =
+    providerInfo?.slug === 'coffee-time' ||
+    action?.providerSlug === 'coffee-time' ||
+    action?.providerName?.toLowerCase().includes('coffee') ||
+    action?.paymentUrl?.includes('coffee-time');
+
+  const isDemo = isCoffeeTime || isDemoOrSandboxProvider(providerInfo) || isDemoOrSandboxProvider(action);
   const checkoutUrl = action.nextAction?.url || action.paymentUrl || 'https://zayuno.uz/pay';
 
-  const demoDisclaimer = isDemo
-    ? 'Bu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.\n\n'
-    : '';
+  let demoDisclaimer = '';
+  if (isCoffeeTime) {
+    demoDisclaimer = 'Bu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.\n\n';
+  } else if (isTicket && isDemo) {
+    demoDisclaimer = 'Bu demo buyurtma, haqiqiy to‘lov olinmaydi.\n';
+  } else if (isDemo) {
+    demoDisclaimer = 'Bu sandbox buyurtmasi, haqiqiy to‘lov qilinmaydi.\n';
+  }
 
   if (isTicket) {
     return `Chipta band qilindi. Endi to‘lovni yakunlang:\n\n${demoDisclaimer}[To‘lov sahifasini ochish](${checkoutUrl})`;
