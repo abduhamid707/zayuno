@@ -18,7 +18,8 @@ import {
   ChevronRight,
   TrendingUp,
   MapPin,
-  Cpu
+  Cpu,
+  LogOut
 } from 'lucide-react';
 
 const API_BASE =
@@ -86,11 +87,21 @@ export default function App() {
     capabilities: ['METADATA', 'HEALTH', 'CATALOG', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK']
   });
   const queryClient = useQueryClient();
+  const logout = () => {
+    localStorage.removeItem('zayuno_admin_token');
+    setToken('');
+    queryClient.clear();
+  };
+
   const apiFetch = async (path: string, init: RequestInit = {}) => {
     const response = await fetch(`${API_BASE}${path}`, {
       ...init,
       headers: { Authorization: `Bearer ${token}`, ...(init.headers || {}) }
     });
+    if (response.status === 401) {
+      logout();
+      throw new Error('Sessiya muddati tugadi. Qaytadan kiring.');
+    }
     if (!response.ok) throw new Error((await response.json().catch(() => null))?.message || 'Request failed');
     return response;
   };
@@ -335,6 +346,15 @@ export default function App() {
             <Cpu className="w-3.5 h-3.5" />
             <span>Sandbox Health</span>
           </a>
+
+          <button
+            onClick={logout}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 text-xs font-semibold rounded-lg border border-rose-500/20 transition cursor-pointer"
+            title="Tizimdan chiqish"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Chiqish</span>
+          </button>
         </div>
       </header>
 
