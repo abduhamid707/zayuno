@@ -29,9 +29,178 @@ async function main() {
   });
   console.log(`✅ Admin user: ${adminUser.email} (role: ${adminUser.role})`);
 
-  // 2. Fictional Domain-Neutral Sandbox Provider
+  // 2. Canonical Review Provider: Coffee Time Sandbox Demo
   const encryptedSandboxSecret = encryptSecret('sandbox_secret_token_live_xyz_987654', ENCRYPTION_KEY);
+  const COFFEE_TIME_BASE_URL = process.env.COFFEE_TIME_PROVIDER_BASE_URL || 'https://coffee-time-sandbox.shopla.uz';
 
+  const coffeeTimeProvider = await prisma.provider.upsert({
+    where: { slug: 'coffee-time' },
+    update: {
+      name: 'Coffee Time Sandbox Demo',
+      status: ProviderStatus.ACTIVE,
+      type: ProviderType.DELIVERY,
+      adapterType: 'remote-http',
+      baseUrl: COFFEE_TIME_BASE_URL,
+      encryptedSecret: encryptedSandboxSecret,
+      webhookSecret: WEBHOOK_SECRET,
+      capabilities: [
+        ProviderCapability.METADATA,
+        ProviderCapability.HEALTH,
+        ProviderCapability.LOCATIONS,
+        ProviderCapability.CATALOG,
+        ProviderCapability.SEARCH,
+        ProviderCapability.QUOTE,
+        ProviderCapability.ACTION_CREATE,
+        ProviderCapability.ACTION_STATUS,
+        ProviderCapability.ACTION_CANCEL,
+        ProviderCapability.PAYMENT_OPTIONS,
+        ProviderCapability.WEBHOOK
+      ],
+      config: {
+        authMethod: 'API_KEY',
+        supportContact: {
+          phone: '+998712000000',
+          telegram: '@coffeetime_support',
+          email: 'support@coffee-time.example',
+          workingHours: '08:00 - 22:00 (Har kuni)',
+          supportUrl: 'https://zayuno.uz/support'
+        }
+      },
+      metadata: {
+        description: 'Coffee Time sandbox demo. Bu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.',
+        tier: 'STANDARD',
+        environment: 'SANDBOX',
+        category: 'food_delivery',
+        geography: ['UZ', 'Tashkent'],
+        reviewStatus: 'APPROVED',
+        isCertified: true,
+        isPublished: true,
+        isTemporarilyUnavailable: false,
+        fulfillmentMode: 'DELIVERY',
+        catalogSummary: { totalCount: 4, availableCount: 4 },
+        activeLocationsCount: 2,
+        supportContact: {
+          phone: '+998712000000',
+          telegram: '@coffeetime_support',
+          email: 'support@coffee-time.example',
+          workingHours: '08:00 - 22:00 (Har kuni)',
+          supportUrl: 'https://zayuno.uz/support'
+        }
+      }
+    },
+    create: {
+      slug: 'coffee-time',
+      name: 'Coffee Time Sandbox Demo',
+      logoUrl: 'https://zayuno.uz/assets/coffee-time-logo.png',
+      status: ProviderStatus.ACTIVE,
+      type: ProviderType.DELIVERY,
+      adapterType: 'remote-http',
+      baseUrl: COFFEE_TIME_BASE_URL,
+      encryptedSecret: encryptedSandboxSecret,
+      webhookSecret: WEBHOOK_SECRET,
+      capabilities: [
+        ProviderCapability.METADATA,
+        ProviderCapability.HEALTH,
+        ProviderCapability.LOCATIONS,
+        ProviderCapability.CATALOG,
+        ProviderCapability.SEARCH,
+        ProviderCapability.QUOTE,
+        ProviderCapability.ACTION_CREATE,
+        ProviderCapability.ACTION_STATUS,
+        ProviderCapability.ACTION_CANCEL,
+        ProviderCapability.PAYMENT_OPTIONS,
+        ProviderCapability.WEBHOOK
+      ],
+      config: {
+        authMethod: 'API_KEY',
+        supportContact: {
+          phone: '+998712000000',
+          telegram: '@coffeetime_support',
+          email: 'support@coffee-time.example',
+          workingHours: '08:00 - 22:00 (Har kuni)',
+          supportUrl: 'https://zayuno.uz/support'
+        }
+      },
+      metadata: {
+        description: 'Coffee Time sandbox demo. Bu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.',
+        tier: 'STANDARD',
+        environment: 'SANDBOX',
+        category: 'food_delivery',
+        geography: ['UZ', 'Tashkent'],
+        reviewStatus: 'APPROVED',
+        isCertified: true,
+        isPublished: true,
+        isTemporarilyUnavailable: false,
+        fulfillmentMode: 'DELIVERY',
+        catalogSummary: { totalCount: 4, availableCount: 4 },
+        activeLocationsCount: 2,
+        supportContact: {
+          phone: '+998712000000',
+          telegram: '@coffeetime_support',
+          email: 'support@coffee-time.example',
+          workingHours: '08:00 - 22:00 (Har kuni)',
+          supportUrl: 'https://zayuno.uz/support'
+        }
+      }
+    }
+  });
+  console.log(`✅ Canonical Review Provider: ${coffeeTimeProvider.name} (slug: ${coffeeTimeProvider.slug})`);
+
+  // Seed Coffee Time Locations
+  const coffeeLocations = [
+    {
+      providerLocationId: 'coffee-time-chilonzor',
+      name: 'Coffee Time — Chilonzor Test Branch',
+      address: 'Toshkent, Chilonzor tumani',
+      latitude: 41.285,
+      longitude: 69.204,
+      operatingHours: { open: '08:00', close: '22:00', days: [1, 2, 3, 4, 5, 6, 7] },
+      serviceRadiusKm: 7.0
+    },
+    {
+      providerLocationId: 'coffee-time-yunusobod',
+      name: 'Coffee Time — Yunusobod Test Branch',
+      address: 'Toshkent, Yunusobod tumani',
+      latitude: 41.364,
+      longitude: 69.287,
+      operatingHours: { open: '08:00', close: '23:00', days: [1, 2, 3, 4, 5, 6, 7] },
+      serviceRadiusKm: 6.0
+    }
+  ];
+
+  for (const loc of coffeeLocations) {
+    await prisma.location.upsert({
+      where: {
+        providerId_providerLocationId: {
+          providerId: coffeeTimeProvider.id,
+          providerLocationId: loc.providerLocationId
+        }
+      },
+      update: {
+        name: loc.name,
+        address: loc.address,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        operatingHours: loc.operatingHours,
+        serviceRadiusKm: loc.serviceRadiusKm,
+        isActive: true
+      },
+      create: {
+        providerId: coffeeTimeProvider.id,
+        providerLocationId: loc.providerLocationId,
+        name: loc.name,
+        address: loc.address,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        operatingHours: loc.operatingHours,
+        serviceRadiusKm: loc.serviceRadiusKm,
+        isActive: true
+      }
+    });
+  }
+  console.log(`✅ Seeded ${coffeeLocations.length} Coffee Time locations.`);
+
+  // 3. Internal Developer Simulator Provider (Hidden from public production discovery)
   const sandboxProvider = await prisma.provider.upsert({
     where: { slug: 'sandbox-provider' },
     update: {
@@ -66,14 +235,15 @@ async function main() {
         }
       },
       metadata: {
-        description: 'Fictional domain-neutral sandbox provider for end-to-end testing of capability discovery, quotes, and actions.',
+        description: 'Internal developer sandbox provider simulator.',
         tier: 'STANDARD',
         environment: 'SANDBOX',
         category: 'general',
         geography: ['UZ', 'Tashkent'],
         reviewStatus: 'APPROVED',
-        isCertified: true,
-        isPublished: true,
+        isCertified: false,
+        isPublished: false,
+        isInternal: true,
         catalogSummary: { totalCount: 2, availableCount: 2 },
         activeLocationsCount: 3,
         supportContact: {
@@ -119,14 +289,15 @@ async function main() {
         }
       },
       metadata: {
-        description: 'Fictional domain-neutral sandbox provider for end-to-end testing of capability discovery, quotes, and actions.',
+        description: 'Internal developer sandbox provider simulator.',
         tier: 'STANDARD',
         environment: 'SANDBOX',
         category: 'general',
         geography: ['UZ', 'Tashkent'],
         reviewStatus: 'APPROVED',
-        isCertified: true,
-        isPublished: true,
+        isCertified: false,
+        isPublished: false,
+        isInternal: true,
         catalogSummary: { totalCount: 2, availableCount: 2 },
         activeLocationsCount: 3,
         supportContact: {
@@ -139,28 +310,28 @@ async function main() {
       }
     }
   });
-  console.log(`✅ Sandbox Provider: ${sandboxProvider.name} (slug: ${sandboxProvider.slug})`);
+  console.log(`✅ Internal Simulator Provider: ${sandboxProvider.name} (slug: ${sandboxProvider.slug})`);
 
-  // 3. Provider Owner User
-  const ownerPasswordHash = await bcrypt.hash('sandbox12345', 10);
+  // 4. Provider Owner User
+  const ownerPasswordHash = await bcrypt.hash('coffee12345', 10);
   const ownerUser = await prisma.user.upsert({
-    where: { email: 'sandbox.owner@zayuno.io' },
+    where: { email: 'coffee.owner@zayuno.io' },
     update: {
       passwordHash: ownerPasswordHash,
-      providerId: sandboxProvider.id
+      providerId: coffeeTimeProvider.id
     },
     create: {
-      email: 'sandbox.owner@zayuno.io',
-      name: 'Sandbox Provider Operator',
+      email: 'coffee.owner@zayuno.io',
+      name: 'Coffee Time Operator',
       passwordHash: ownerPasswordHash,
       role: UserRole.PROVIDER_OWNER,
-      providerId: sandboxProvider.id,
+      providerId: coffeeTimeProvider.id,
       isActive: true
     }
   });
   console.log(`✅ Provider User: ${ownerUser.email} (role: ${ownerUser.role})`);
 
-  // 4. API Key for AI Agent / MCP Server
+  // 5. API Key for AI Agent / MCP Server
   const agentApiKey = 'zy_live_agent_secret_key_12345';
   const agentKeyHash = hashApiKey(agentApiKey);
   await prisma.apiKey.upsert({
@@ -176,69 +347,6 @@ async function main() {
     }
   });
   console.log(`✅ Default AI Agent API Key: ${agentApiKey}`);
-
-  // 5. Locations for Sandbox Provider
-  const locations = [
-    {
-      providerLocationId: 'loc_central_01',
-      name: 'Sandbox Central Hub',
-      address: 'Central District, Zone A, Facility 101',
-      latitude: 41.3111,
-      longitude: 69.2797,
-      operatingHours: { open: '08:00', close: '22:00', days: [1, 2, 3, 4, 5, 6, 7] },
-      serviceRadiusKm: 15.0
-    },
-    {
-      providerLocationId: 'loc_north_02',
-      name: 'Sandbox North Facility',
-      address: 'North District, Sector 4, Suite 22',
-      latitude: 41.3500,
-      longitude: 69.2900,
-      operatingHours: { open: '09:00', close: '20:00', days: [1, 2, 3, 4, 5, 6] },
-      serviceRadiusKm: 10.0
-    },
-    {
-      providerLocationId: 'loc_west_03',
-      name: 'Sandbox West Fulfillment Point',
-      address: 'West Industrial Park, Building 8',
-      latitude: 41.2800,
-      longitude: 69.2200,
-      operatingHours: { open: '00:00', close: '23:59', days: [1, 2, 3, 4, 5, 6, 7] },
-      serviceRadiusKm: 20.0
-    }
-  ];
-
-  for (const loc of locations) {
-    await prisma.location.upsert({
-      where: {
-        providerId_providerLocationId: {
-          providerId: sandboxProvider.id,
-          providerLocationId: loc.providerLocationId
-        }
-      },
-      update: {
-        name: loc.name,
-        address: loc.address,
-        latitude: loc.latitude,
-        longitude: loc.longitude,
-        operatingHours: loc.operatingHours,
-        serviceRadiusKm: loc.serviceRadiusKm,
-        isActive: true
-      },
-      create: {
-        providerId: sandboxProvider.id,
-        providerLocationId: loc.providerLocationId,
-        name: loc.name,
-        address: loc.address,
-        latitude: loc.latitude,
-        longitude: loc.longitude,
-        operatingHours: loc.operatingHours,
-        serviceRadiusKm: loc.serviceRadiusKm,
-        isActive: true
-      }
-    });
-  }
-  console.log(`✅ Seeded ${locations.length} domain-neutral sandbox locations.`);
 
   console.log('✨ Zayuno Database Seeding Completed Successfully!\n');
 }

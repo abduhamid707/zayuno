@@ -16,7 +16,7 @@ Barcha user-facing havolalar qat'iy **Public HTTPS** formatida taqdim etiladi (`
   🔗 https://zayuno-mcp-1508.loca.lt/sse
   🌐 https://zayuno-mcp-1508.loca.lt/mcp
         │
-        ▼ (x-api-key: zy_live_agent_secret_key_12345)
+        ▼ (ZAYUNO_API_KEY server environment)
 [Zayuno Core Public API]
         │
         ▼
@@ -99,9 +99,9 @@ npx tsx tests/test-remote-public-flow.ts
    ```
 
 ### 3-qadam: MCP Server Endpointini kiritish
-- **Action / MCP URL**: `https://<YOUR_MCP_TUNNEL>/sse` (masalan: `https://zayuno-mcp-1508.loca.lt/sse`)
-- **Transport**: SSE yoki Streamable HTTP (`/mcp`)
-- **Authentication**: `API Key` (Custom Header: `x-api-key`, Value: `zy_live_agent_secret_key_12345`)
+- **Production MCP Endpoint**: `https://mcp.zayuno.uz/mcp`
+- **Transport**: Streamable HTTP (`/mcp`) yoki SSE (`/sse`)
+- **Authentication**: `No authentication` (Ommaviy Public MCP Endpoint)
 
 ---
 

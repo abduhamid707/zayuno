@@ -131,6 +131,54 @@
 > foydalanuvchisi qanday ko‘rishi va ishlatishi nuqtayi nazaridan ham tekshira
 > olishi.
 
+## Future product initiative: Zayuno Hosted Provider Dashboard (No-code)
+
+- [ ] API yoki alohida dasturchisi bo‘lmagan kichik bizneslarni ham Zayuno
+  tarmog‘iga ulaydigan no-code **Hosted Provider** rejimini yaratish.
+  - Mavjud integratsiya yo‘lini saqlash: API’si bor bizneslar `Zayuno Connect`,
+    API’si yo‘qlar `Zayuno Hosted` orqali ulansin.
+  - Ikkala rejim ham ichkarida ayni canonical Provider Contract va capability
+    modelidan foydalansin; MCP uchun alohida maxsus kontrakt yaratilmasin.
+  - Biznes turi bo‘yicha boshqariladigan onboarding shablonlari bo‘lsin:
+    `SERVICES/BOOKINGS`, food/delivery, retail/catalog va boshqa vertikallar.
+  - Oddiy formalar orqali biznes profili, support kontaktlari, katalog yoki
+    xizmatlar, narxlar, variantlar, filiallar, ish vaqti, xizmat hududi,
+    availability va booking jadvali boshqarilsin.
+  - Zayuno hosted runtime biznes nomidan canonical `/health`, `/catalog`,
+    `/search`, `/quote`, `/actions` va `/actions/:id` imkoniyatlarini taqdim
+    etsin; capability profiliga kirmaydigan endpointlar majburan ochilmasin.
+  - Barcha kiruvchi buyurtma/bron/actionlar yagona operations dashboardga
+    tushsin; biznes ularni qabul qilish, bajarish, bekor qilish va statusini
+    yangilash imkoniga ega bo‘lsin.
+  - Team access, role/permission, audit history, idempotency, inventory yoki
+    slot collision protection va customer support escalation hisobga olinsin.
+  - Hosted providerlar ham certification, moderation, publishing gate, health
+    monitoring va AI discovery readiness qoidalaridan istisnosiz o‘tsin.
+- [ ] Birinchi MVPni katta universal ERP sifatida emas, bitta sodda vertikalda
+  — avvalo `SERVICES/BOOKINGS` — real bizneslar bilan validatsiya qilish;
+  keyin food va retail imkoniyatlarini modul sifatida kengaytirish.
+- [ ] To‘lovlarning birinchi bosqichida qat’iy provider-owned payment boundary
+  saqlansin.
+  - Biznes o‘z Payme, Click yoki boshqa merchant hisobini/checkoutini ulasin.
+  - Mijoz puli bevosita providerning merchant hisobiga tushsin; Zayuno pulni
+    qabul qilmasin, saqlamasin va bizneslarga mustaqil ravishda tarqatmasin.
+  - Merchant credentiallari serverda shifrlangan saqlansin, tenantlar orasida
+    izolyatsiya qilinsin va log/client bundle’da ko‘rinmasin.
+  - Zayuno buyurtma, payment handoff va provider qaytargan payment statusini
+    boshqarsin; karta raqami, CVV yoki OTP’ni hech qachon qabul qilmasin.
+- [ ] Split payment, platform balance, avtomatik payout yoki settlementni faqat
+  keyingi alohida bosqichda, yuridik tahlil va Markaziy bank talablariga mos
+  litsenziyalangan bank/to‘lov tashkiloti hamkorligi bilan loyihalash.
+  - KYC/AML, refund, chargeback, reconciliation, antifraud, soliq va hisob-kitob
+    mas’uliyati aniq belgilanmaguncha Zayuno merchant-of-record bo‘lmasin.
+  - Ushbu imkoniyat oddiy checkout connector ichiga yashirincha qo‘shilmasin;
+    alohida approval, audit va rollout rejasiga ega bo‘lsin.
+
+> Maqsad: Zayunoni faqat API’si bor yirik providerlar tarmog‘i emas, dasturchisiz
+> kichik bizneslar ham AI orqali topiladigan va buyurtma qabul qiladigan universal
+> operatsion platformaga aylantirish. Birinchi versiyada Zayuno pulni ushlab
+> turmaydi.
+
 ## End-of-project: Provider Health Incident Notifications
 
 - [ ] Avtomatik provider health monitoring va vaqtincha discovery’dan yashirish

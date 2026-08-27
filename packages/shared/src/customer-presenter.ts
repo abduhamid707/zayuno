@@ -46,7 +46,7 @@ export function getDynamicServiceMessage(count?: number | null, isStale?: boolea
  */
 export function getWelcomeMessage(serviceCount?: number | null, isStale?: boolean): string {
   const dynamicMessage = getDynamicServiceMessage(serviceCount, isStale);
-  return `Zayuno sizga uzoqni yaqin qiladi. Nima qilishni xohlaysiz?\n\nMen ovqat buyurtma qilish, poyez yoki aviachipta topish, turli xizmatlarni qidirish va buyurtmalarni kuzatishda yordam bera olaman. ${dynamicMessage}`;
+  return `Zayuno sizga uzoqni yaqin qiladi. Nima qilishni xohlaysiz?\n\nMen qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman. ${dynamicMessage}`;
 }
 
 /**
@@ -57,8 +57,11 @@ export function isDemoOrSandboxProvider(provider: any): boolean {
   if (!provider) return false;
   const metadata = (provider.metadata as Record<string, any>) || {};
   const config = (provider.config as Record<string, any>) || {};
+  const slug = (provider.slug || provider.providerSlug || '').toLowerCase();
 
   return (
+    slug === 'coffee-time' ||
+    slug === 'sandbox-provider' ||
     provider.status === 'SANDBOX' ||
     provider.adapterType === 'sandbox' ||
     metadata.sandbox === true ||
@@ -278,11 +281,9 @@ export function formatCustomerActionConfirmation(action: any, providerInfo?: any
   const isDemo = isDemoOrSandboxProvider(providerInfo) || isDemoOrSandboxProvider(action);
   const checkoutUrl = action.nextAction?.url || action.paymentUrl || 'https://zayuno.uz/pay';
 
-  const demoDisclaimer = isTicket && isDemo
-    ? 'Bu demo buyurtma, haqiqiy to‘lov olinmaydi.\n'
-    : isDemo
-      ? 'Bu sandbox buyurtmasi, haqiqiy to‘lov qilinmaydi.\n'
-      : '';
+  const demoDisclaimer = isDemo
+    ? 'Bu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.\n\n'
+    : '';
 
   if (isTicket) {
     return `Chipta band qilindi. Endi to‘lovni yakunlang:\n\n${demoDisclaimer}[To‘lov sahifasini ochish](${checkoutUrl})`;
@@ -449,10 +450,12 @@ export function formatCustomerOffering(offering: any): string {
  */
 export function formatCustomerPaymentOptions(options: any[], action?: any): string {
   const url = action?.paymentUrl || action?.nextAction?.url || options?.[0]?.checkoutUrl;
+  const isDemo = isDemoOrSandboxProvider(action) || (Array.isArray(options) && options.some(o => o.metadata?.sandbox === true || isDemoOrSandboxProvider(o)));
+  const demoDisclaimer = isDemo ? 'Bu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.\n\n' : '';
   if (url) {
-    return `To‘lov sahifasi tayyor:\n\n[To‘lov sahifasini ochish](${url})`;
+    return `To‘lov sahifasi tayyor:\n\n${demoDisclaimer}[To‘lov sahifasini ochish](${url})`;
   }
-  return 'To‘lov usullari checkout sahifasida taqdim etiladi.';
+  return `To‘lov usullari checkout sahifasida taqdim etiladi.\n\n${demoDisclaimer}`;
 }
 
 /**
@@ -466,6 +469,6 @@ export function formatCustomerError(error?: unknown): string {
  * Formats general conversational response when user asks about capabilities.
  */
 export function formatCustomerGeneralHelp(): string {
-  return 'Men ovqat buyurtma qilish, chipta topish, turli xizmatlardan foydalanish va buyurtmalarni kuzatishda yordam bera olaman. Nimadan boshlaymiz?';
+  return 'Men qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman. Nimadan boshlaymiz?';
 }
 

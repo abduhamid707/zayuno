@@ -1,15 +1,16 @@
 async function runLiveDemonstration() {
-  const BASE = 'https://zayuno.shopla.uz';
-  const API_KEY = 'zy_live_agent_secret_key_12345';
+  const BASE = process.env.API_BASE_URL || 'https://api.zayuno.uz';
+  const MCP_BASE = process.env.MCP_BASE_URL || 'https://mcp.zayuno.uz';
+  const API_KEY = process.env.ZAYUNO_API_KEY || '<API_KEY>';
 
   console.log('------------------------------------------------------------------------');
-  console.log('1. Fetching active providers from Live API (https://zayuno.shopla.uz/api/v1/providers):');
+  console.log(`1. Fetching active providers from Live API (${BASE}/api/v1/providers):`);
   const r1 = await fetch(`${BASE}/api/v1/providers`, { headers: { 'x-api-key': API_KEY } });
   const providers = await r1.json();
-  console.log('   Provider:', providers[0].name, '| Slug:', providers[0].slug, '| Status:', providers[0].status);
+  console.log('   Provider:', providers[0]?.name, '| Slug:', providers[0]?.slug, '| Status:', providers[0]?.status);
 
-  console.log('\n2. Fetching MCP Tools for ChatGPT (https://zayuno.shopla.uz/tools):');
-  const r2 = await fetch(`${BASE}/tools`);
+  console.log(`\n2. Fetching MCP Tools for ChatGPT (${MCP_BASE}/tools):`);
+  const r2 = await fetch(`${MCP_BASE}/tools`);
   const tools = await r2.json();
   console.log('   Total tools:', tools.tools.length);
   console.log('   Tools:', tools.tools.map((t: any) => t.name).join(', '));

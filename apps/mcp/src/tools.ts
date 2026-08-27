@@ -33,6 +33,11 @@ export interface McpToolDefinition {
     properties: Record<string, any>;
     required?: string[];
   };
+  outputSchema?: {
+    type: 'object';
+    properties: Record<string, any>;
+    required?: string[];
+  };
   handler: (args: any, client: ZayunoApiClient) => Promise<any>;
 }
 
@@ -58,6 +63,16 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {}
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted customer greeting in natural Uzbek' },
+        welcomeMessage: { type: 'string', description: 'Canonical welcome greeting' },
+        availableServiceCount: { type: ['number', 'null'], description: 'Total verified service count' },
+        dynamicServiceMessage: { type: 'string', description: 'Dynamic service capability summary' }
+      },
+      required: ['customerMessage']
     },
     handler: async (_args, client) => {
       try {
@@ -115,6 +130,32 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         }
       }
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted discovery summary for customer' },
+        providers: {
+          type: 'array',
+          description: 'List of matching active and certified capability providers',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              slug: { type: 'string' },
+              name: { type: 'string' },
+              description: { type: 'string' },
+              status: { type: 'string' },
+              type: { type: 'string' },
+              category: { type: 'string' },
+              capabilities: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['id', 'slug', 'name', 'status']
+          }
+        },
+        total: { type: 'number' }
+      },
+      required: ['customerMessage', 'providers']
+    },
     handler: async (args, client) => {
       const result = await client.findProviders(args);
       const list = Array.isArray(result) ? result : result?.providers || [];
@@ -144,6 +185,29 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           description: 'Filter providers by operational status (default: ACTIVE and SANDBOX).'
         }
       }
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted provider list for customer' },
+        providers: {
+          type: 'array',
+          description: 'List of active capability providers',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              slug: { type: 'string' },
+              name: { type: 'string' },
+              status: { type: 'string' },
+              type: { type: 'string' }
+            },
+            required: ['id', 'slug', 'name', 'status']
+          }
+        },
+        total: { type: 'number' }
+      },
+      required: ['customerMessage', 'providers']
     },
     handler: async (args, client) => {
       const result = await client.listProviders(args.status);
@@ -175,6 +239,21 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       },
       required: ['providerSlug']
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted provider profile for customer' },
+        id: { type: 'string' },
+        slug: { type: 'string' },
+        name: { type: 'string' },
+        description: { type: 'string' },
+        status: { type: 'string' },
+        type: { type: 'string' },
+        capabilities: { type: 'array', items: { type: 'string' } },
+        supportContact: { type: 'object' }
+      },
+      required: ['customerMessage', 'id', 'slug', 'name']
+    },
     handler: async (args, client) => {
       const provider = await client.getProvider(args.providerSlug);
       const customerMessage = formatCustomerProvider(provider);
@@ -203,6 +282,15 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         }
       },
       required: ['providerSlug']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted capability summary for customer' },
+        providerSlug: { type: 'string' },
+        capabilities: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['customerMessage', 'capabilities']
     },
     handler: async (args, client) => {
       const result = await client.getProviderCapabilities(args.providerSlug);
@@ -237,6 +325,26 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         }
       },
       required: ['providerSlug']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted locations summary for customer' },
+        locations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              address: { type: 'string' },
+              isActive: { type: 'boolean' }
+            },
+            required: ['id', 'name']
+          }
+        }
+      },
+      required: ['customerMessage', 'locations']
     },
     handler: async (args, client) => {
       const locations = await client.getLocations(args.providerSlug, args.activeOnly);
@@ -279,6 +387,29 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         }
       },
       required: ['providerSlug']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted catalog offerings for customer' },
+        offerings: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              description: { type: 'string' },
+              price: { type: 'number' },
+              currency: { type: 'string' },
+              isAvailable: { type: 'boolean' }
+            },
+            required: ['id', 'name', 'price']
+          }
+        },
+        categories: { type: 'array', items: { type: 'object' } }
+      },
+      required: ['customerMessage', 'offerings']
     },
     handler: async (args, client) => {
       const catalog = await client.getCatalog(args.providerSlug, args.locationId, args.category, args.parameters);
@@ -330,6 +461,28 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       },
       required: ['providerSlug']
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted search results for customer' },
+        offerings: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              description: { type: 'string' },
+              price: { type: 'number' },
+              currency: { type: 'string' }
+            },
+            required: ['id', 'name', 'price']
+          }
+        },
+        total: { type: 'number' }
+      },
+      required: ['customerMessage', 'offerings']
+    },
     handler: async (args, client) => {
       const result = await client.searchCatalog(args.providerSlug, args.query || '', args.category, args.locationId, args.limit, args.parameters);
       const offerings = Array.isArray(result) ? result : result?.offerings || [];
@@ -371,6 +524,20 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         }
       },
       required: ['providerSlug', 'offeringId']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted offering details for customer' },
+        id: { type: 'string' },
+        name: { type: 'string' },
+        description: { type: 'string' },
+        price: { type: 'number' },
+        currency: { type: 'string' },
+        isAvailable: { type: 'boolean' },
+        optionGroups: { type: 'array', items: { type: 'object' } }
+      },
+      required: ['customerMessage', 'id', 'name', 'price']
     },
     handler: async (args, client) => {
       const offering = await client.getOffering(args.providerSlug, args.offeringId, args.locationId, args.parameters);
@@ -428,11 +595,23 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       },
       required: ['providerSlug', 'items']
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted availability status for customer' },
+        available: { type: 'boolean' },
+        reason: { type: 'string' },
+        items: { type: 'array', items: { type: 'object' } }
+      },
+      required: ['customerMessage', 'available']
+    },
     handler: async (args, client) => {
       const result = await client.checkAvailability(args);
       const customerMessage = formatCustomerAvailability(result);
+      const available = typeof result?.available === 'boolean' ? result.available : typeof result?.isAvailable === 'boolean' ? result.isAvailable : true;
       return {
         customerMessage,
+        available,
         ...result
       };
     }
@@ -506,6 +685,39 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         }
       },
       required: ['providerSlug', 'items']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted quote summary for customer' },
+        id: { type: 'string', description: 'Unique verified quote ID required for action creation' },
+        quoteId: { type: 'string', description: 'Quote ID alias' },
+        providerSlug: { type: 'string' },
+        lines: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              offeringId: { type: 'string' },
+              offeringTitle: { type: 'string' },
+              quantity: { type: 'number' },
+              unitPrice: { type: 'number' },
+              lineTotal: { type: 'number' }
+            },
+            required: ['offeringId', 'quantity', 'lineTotal']
+          }
+        },
+        subtotal: { type: 'number' },
+        fees: { type: 'array', items: { type: 'object' } },
+        totalFees: { type: 'number' },
+        discounts: { type: 'array', items: { type: 'object' } },
+        totalDiscount: { type: 'number' },
+        total: { type: 'number', description: 'Final verified payable amount' },
+        currency: { type: 'string' },
+        expiresAt: { type: 'string' },
+        estimatedDurationMinutes: { type: 'number' }
+      },
+      required: ['customerMessage', 'id', 'total', 'currency', 'expiresAt']
     },
     handler: async (args, client) => {
       const quote = await client.requestQuote(args);
@@ -607,6 +819,30 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       },
       required: ['providerSlug', 'quoteId', 'items', 'customer', 'userConfirmed']
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted confirmation and payment link for customer' },
+        id: { type: 'string', description: 'Internal action identifier' },
+        actionId: { type: 'string', description: 'Action reference identifier' },
+        publicId: { type: 'string', description: 'Public order identifier (e.g. ZY-ORD-123)' },
+        providerSlug: { type: 'string' },
+        status: { type: 'string' },
+        paymentStatus: { type: 'string' },
+        total: { type: 'number' },
+        currency: { type: 'string' },
+        checkoutUrl: { type: 'string', description: 'Secure external payment URL' },
+        nextAction: {
+          type: 'object',
+          properties: {
+            type: { type: 'string' },
+            url: { type: 'string' },
+            description: { type: 'string' }
+          }
+        }
+      },
+      required: ['customerMessage', 'id', 'publicId', 'status']
+    },
     handler: async (args, client) => {
       const idempotencyKey = args.idempotencyKey || getOrCreateActionIdempotencyKey(args.quoteId);
       const action = await client.createAction({
@@ -616,6 +852,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       const customerMessage = formatCustomerActionConfirmation(action);
       return {
         customerMessage,
+        actionId: action.publicId || action.id,
         ...action
       };
     }
@@ -640,11 +877,29 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       },
       required: ['actionId']
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted action status in natural Uzbek' },
+        id: { type: 'string' },
+        actionId: { type: 'string' },
+        publicId: { type: 'string' },
+        providerSlug: { type: 'string' },
+        status: { type: 'string' },
+        paymentStatus: { type: 'string' },
+        total: { type: 'number' },
+        currency: { type: 'string' },
+        checkoutUrl: { type: 'string' },
+        timeline: { type: 'array', items: { type: 'object' } }
+      },
+      required: ['customerMessage', 'id', 'publicId', 'status']
+    },
     handler: async (args, client) => {
       const action = await client.getAction(args.actionId);
       const customerMessage = formatCustomerActionStatus(action);
       return {
         customerMessage,
+        actionId: action.publicId || action.id,
         ...action
       };
     }
@@ -678,11 +933,24 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       },
       required: ['actionId']
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted cancellation result' },
+        id: { type: 'string' },
+        actionId: { type: 'string' },
+        publicId: { type: 'string' },
+        status: { type: 'string' },
+        cancellationReason: { type: 'string' }
+      },
+      required: ['customerMessage', 'id', 'status']
+    },
     handler: async (args, client) => {
       const result = await client.cancelAction(args.actionId, args.reason, args.reasonCode);
       const customerMessage = formatCustomerActionCancellation(result);
       return {
         customerMessage,
+        actionId: result.publicId || result.id,
         ...result
       };
     }
@@ -706,6 +974,26 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         }
       },
       required: ['actionId']
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        customerMessage: { type: 'string', description: 'Pre-formatted payment options for customer' },
+        paymentOptions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              method: { type: 'string' },
+              name: { type: 'string' },
+              checkoutUrl: { type: 'string' },
+              isAvailable: { type: 'boolean' }
+            },
+            required: ['method', 'name']
+          }
+        }
+      },
+      required: ['customerMessage', 'paymentOptions']
     },
     handler: async (args, client) => {
       const options = await client.getPaymentOptions(args.actionId);

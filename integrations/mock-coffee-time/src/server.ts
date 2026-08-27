@@ -10,7 +10,7 @@ import { COFFEE_CATEGORIES, COFFEE_LOCATIONS, COFFEE_OFFERINGS } from './data';
 
 type StoredAction = NormalizedAction & { sandboxState: 'AWAITING_PAYMENT' | 'ACCEPTED' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED' };
 const SLUG = 'coffee-time';
-const DISCLAIMER = 'Coffee Time sandbox demo. No real orders or payments.';
+const DISCLAIMER = 'Bu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.';
 const makeId = (prefix: string) => `${prefix}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 const html = (value: unknown) => String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
 

@@ -310,12 +310,20 @@ async function main() {
     get_payment_options: ['actionId']
   };
 
-  for (const [name, requiredFields] of Object.entries(schemaSnapshot)) {
-    const tool = ZAYUNO_MCP_TOOLS.find(t => t.name === name)!;
-    const actualRequired = tool.inputSchema.required || [];
-    assert.deepEqual(actualRequired.sort(), requiredFields.sort(), `Tool ${name} required fields drifted: expected ${requiredFields.join(',')}, got ${actualRequired.join(',')}`);
-  }
-  console.log('    ✓ Input schema required properties match canonical backward-compatible snapshot.');
+    for (const [name, requiredFields] of Object.entries(schemaSnapshot)) {
+      const tool = ZAYUNO_MCP_TOOLS.find(t => t.name === name)!;
+      const actualRequired = tool.inputSchema.required || [];
+      assert.deepEqual(actualRequired.sort(), requiredFields.sort(), `Tool ${name} required fields drifted: expected ${requiredFields.join(',')}, got ${actualRequired.join(',')}`);
+
+      // Verify explicit outputSchema contract on each tool
+      assert.ok(tool.outputSchema, `Tool ${name} missing outputSchema definition!`);
+      assert.equal(tool.outputSchema.type, 'object', `Tool ${name} outputSchema.type must be 'object'`);
+      assert.ok(tool.outputSchema.properties, `Tool ${name} outputSchema missing properties object`);
+      assert.ok(tool.outputSchema.properties.customerMessage, `Tool ${name} outputSchema missing required 'customerMessage' property`);
+      assert.ok(Array.isArray(tool.outputSchema.required), `Tool ${name} outputSchema missing required array`);
+      assert.ok(tool.outputSchema.required.includes('customerMessage'), `Tool ${name} outputSchema must declare 'customerMessage' in required`);
+    }
+    console.log('    ✓ Input schema & outputSchema required properties match canonical backward-compatible snapshot.');
 
   // ---------------------------------------------------------------------------
   // 9. Full HTTP Wire Protocol Execution across ALL 15 Tools (Success & Error Modes)
@@ -358,35 +366,35 @@ async function main() {
     res.writeHead(200, { 'Content-Type': 'application/json' });
 
     if (url.includes('/welcome')) {
-      res.end(JSON.stringify({ customerMessage: 'Xush kelibsiz! Zayuno orqali xizmatlardan foydalanishingiz mumkin.', availableServiceCount: 12, dynamicServiceMessage: '12 ta xizmat mavjud.', ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ customerMessage: 'Zayuno sizga uzoqni yaqin qiladi. Nima qilishni xohlaysiz?\n\nMen qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman. Bir qancha yo‘nalishlarda yordam bera olaman.', availableServiceCount: 1, dynamicServiceMessage: 'Bir qancha yo‘nalishlarda yordam bera olaman.', ...dirtySecretsInjection }));
     } else if (url.includes('/providers/search') || url.includes('/providers/find') || url.includes('/find')) {
-      res.end(JSON.stringify({ providers: [{ slug: 'mock-evos', name: 'EVOS Fast Food', type: 'FOOD', ...dirtySecretsInjection }], total: 1, ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ providers: [{ slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', status: 'ACTIVE', isCertified: true, isPublished: true, ...dirtySecretsInjection }], total: 1, ...dirtySecretsInjection }));
     } else if (url.includes('/capabilities')) {
-      res.end(JSON.stringify({ capabilities: ['CATALOG', 'QUOTE', 'ACTION_CREATE'], ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ capabilities: ['METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'ACTION_CANCEL', 'PAYMENT_OPTIONS', 'WEBHOOK'], ...dirtySecretsInjection }));
     } else if (url.includes('/locations')) {
-      res.end(JSON.stringify([{ id: 'loc_1', name: 'Amir Temur Branch', address: 'Amir Temur 107', isActive: true, ...dirtySecretsInjection }]));
+      res.end(JSON.stringify([{ id: 'coffee-time-chilonzor', name: 'Coffee Time — Chilonzor Test Branch', address: 'Toshkent, Chilonzor tumani', isActive: true, ...dirtySecretsInjection }, { id: 'coffee-time-yunusobod', name: 'Coffee Time — Yunusobod Test Branch', address: 'Toshkent, Yunusobod tumani', isActive: true, ...dirtySecretsInjection }]));
     } else if (url.includes('/catalog/search')) {
-      res.end(JSON.stringify({ offerings: [{ id: 'lavash_beef', name: 'Beef Lavash', price: 34000, ...dirtySecretsInjection }], total: 1, ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ offerings: [{ id: 'ct_cappuccino', title: 'Cappuccino', basePrice: 18000, ...dirtySecretsInjection }], total: 1, ...dirtySecretsInjection }));
     } else if (url.includes('/catalog')) {
-      res.end(JSON.stringify({ categories: [{ id: 'cat_1', name: 'Lavash', ...dirtySecretsInjection }], offerings: [{ id: 'lavash_beef', name: 'Beef Lavash', price: 34000, ...dirtySecretsInjection }], ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ categories: [{ id: 'coffee-cat-hot', slug: 'hot-coffee', title: 'Issiq qahvalar', ...dirtySecretsInjection }], offerings: [{ id: 'ct_cappuccino', title: 'Cappuccino', basePrice: 18000, ...dirtySecretsInjection }, { id: 'ct_americano', title: 'Americano', basePrice: 15000, ...dirtySecretsInjection }], ...dirtySecretsInjection }));
     } else if (url.includes('/offerings/')) {
-      res.end(JSON.stringify({ id: 'lavash_beef', name: 'Beef Lavash', price: 34000, optionGroups: [{ id: 'cheese', name: 'Add Cheese', options: [{ id: 'extra_cheese', name: 'Extra Cheese', price: 4000, ...dirtySecretsInjection }] }], ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ id: 'ct_cappuccino', title: 'Cappuccino', basePrice: 18000, optionGroups: [{ id: 'syrup', name: 'Sirop', options: [{ id: 'vanilla', name: 'Vanil', priceDelta: 3000, ...dirtySecretsInjection }] }], ...dirtySecretsInjection }));
     } else if (url.includes('/availability')) {
-      res.end(JSON.stringify({ isAvailable: true, availableItems: [{ offeringId: 'lavash_beef', requestedQuantity: 2, ...dirtySecretsInjection }], unavailableItems: [], ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ isAvailable: true, availableItems: [{ offeringId: 'ct_cappuccino', requestedQuantity: 1, ...dirtySecretsInjection }], unavailableItems: [], ...dirtySecretsInjection }));
     } else if (url.includes('/quotes')) {
-      res.end(JSON.stringify({ id: 'qt_test_123', providerSlug: 'mock-evos', lines: [{ offeringId: 'lavash_beef', name: 'Beef Lavash', quantity: 2, unitPrice: 34000, totalPrice: 68000, ...dirtySecretsInjection }], subtotal: 68000, totalFees: 12000, totalDiscount: 0, total: 80000, currency: 'UZS', expiresAt: new Date(Date.now() + 900000).toISOString(), ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ id: 'ct_quote_test_123', providerSlug: 'coffee-time', lines: [{ offeringId: 'ct_cappuccino', offeringTitle: 'Cappuccino', quantity: 1, unitPrice: 18000, lineTotal: 18000, ...dirtySecretsInjection }], subtotal: 18000, totalFees: 10000, totalDiscount: 0, total: 28000, currency: 'UZS', expiresAt: new Date(Date.now() + 900000).toISOString(), ...dirtySecretsInjection }));
     } else if (url.includes('/actions/') && req.method === 'POST' && url.includes('/cancel')) {
-      res.end(JSON.stringify({ id: 'act_test_123', publicId: 'ZY-EVOS-98421', status: 'CANCELLED', cancellationReason: 'Customer requested', ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ id: 'ct_act_test_123', publicId: 'CT-SB-84920', status: 'CANCELLED', cancellationReason: 'Customer requested', ...dirtySecretsInjection }));
     } else if (url.includes('/actions/') && url.includes('/payment-options')) {
-      res.end(JSON.stringify({ paymentOptions: [{ id: 'payme', name: 'Payme', checkoutUrl: 'https://checkout.evos.uz/pay/payme', ...dirtySecretsInjection }], ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ paymentOptions: [{ id: 'ct_test_checkout', name: 'Coffee Time test checkout', checkoutUrl: 'https://coffee-time-sandbox.shopla.uz/pay/CT_test_123', ...dirtySecretsInjection }], ...dirtySecretsInjection }));
     } else if (url.includes('/actions/') && req.method === 'GET') {
-      res.end(JSON.stringify({ id: 'act_test_123', publicId: 'ZY-EVOS-98421', status: 'CONFIRMED', fulfillmentStatus: 'IN_PREPARATION', customerMessage: 'Buyurtmangiz tayyorlanmoqda.', ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ id: 'ct_act_test_123', publicId: 'CT-SB-84920', status: 'CONFIRMED', fulfillmentStatus: 'IN_PREPARATION', customerMessage: 'Buyurtmangiz tayyorlanmoqda.', paymentUrl: 'https://coffee-time-sandbox.shopla.uz/pay/CT_test_123', ...dirtySecretsInjection }));
     } else if (url.includes('/actions') && req.method === 'POST') {
-      res.end(JSON.stringify({ id: 'act_test_123', publicId: 'ZY-EVOS-98421', providerSlug: 'mock-evos', status: 'AWAITING_PAYMENT', total: 80000, currency: 'UZS', paymentHandoffUrl: 'https://checkout.evos.uz/pay/98421', ...dirtySecretsInjection }));
-    } else if (url.includes('/providers/mock-evos')) {
-      res.end(JSON.stringify({ slug: 'mock-evos', name: 'EVOS Fast Food', type: 'FOOD', status: 'ACTIVE', capabilities: ['CATALOG', 'QUOTE', 'ACTION_CREATE'], ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ id: 'ct_act_test_123', publicId: 'CT-SB-84920', providerSlug: 'coffee-time', status: 'AWAITING_PAYMENT', total: 28000, currency: 'UZS', paymentUrl: 'https://coffee-time-sandbox.shopla.uz/pay/CT_test_123', ...dirtySecretsInjection }));
+    } else if (url.includes('/providers/coffee-time')) {
+      res.end(JSON.stringify({ slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', status: 'ACTIVE', isCertified: true, isPublished: true, capabilities: ['METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'ACTION_CANCEL', 'PAYMENT_OPTIONS', 'WEBHOOK'], ...dirtySecretsInjection }));
     } else if (url.includes('/providers')) {
-      res.end(JSON.stringify([{ slug: 'mock-evos', name: 'EVOS Fast Food', type: 'FOOD', ...dirtySecretsInjection }]));
+      res.end(JSON.stringify([{ slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', isCertified: true, isPublished: true, ...dirtySecretsInjection }]));
     } else {
       res.end(JSON.stringify({ status: 'ok', ...dirtySecretsInjection }));
     }
@@ -411,26 +419,26 @@ async function main() {
 
   const sampleToolInputs: Record<string, Record<string, any>> = {
     get_welcome_message: {},
-    find_providers: { category: 'food' },
+    find_providers: { category: 'food_delivery' },
     list_providers: { status: 'ACTIVE' },
-    get_provider: { providerSlug: 'mock-evos' },
-    get_provider_capabilities: { providerSlug: 'mock-evos' },
-    get_locations: { providerSlug: 'mock-evos', activeOnly: true },
-    get_catalog: { providerSlug: 'mock-evos' },
-    search_catalog: { providerSlug: 'mock-evos', query: 'lavash' },
-    get_offering: { providerSlug: 'mock-evos', offeringId: 'lavash_beef' },
-    check_availability: { providerSlug: 'mock-evos', items: [{ offeringId: 'lavash_beef', quantity: 2 }] },
-    request_quote: { providerSlug: 'mock-evos', items: [{ offeringId: 'lavash_beef', quantity: 2 }] },
+    get_provider: { providerSlug: 'coffee-time' },
+    get_provider_capabilities: { providerSlug: 'coffee-time' },
+    get_locations: { providerSlug: 'coffee-time', activeOnly: true },
+    get_catalog: { providerSlug: 'coffee-time' },
+    search_catalog: { providerSlug: 'coffee-time', query: 'cappuccino' },
+    get_offering: { providerSlug: 'coffee-time', offeringId: 'ct_cappuccino' },
+    check_availability: { providerSlug: 'coffee-time', items: [{ offeringId: 'ct_cappuccino', quantity: 1 }] },
+    request_quote: { providerSlug: 'coffee-time', items: [{ offeringId: 'ct_cappuccino', quantity: 1 }] },
     create_action: {
-      providerSlug: 'mock-evos',
-      quoteId: 'qt_test_123',
-      items: [{ offeringId: 'lavash_beef', quantity: 2 }],
+      providerSlug: 'coffee-time',
+      quoteId: 'ct_quote_test_123',
+      items: [{ offeringId: 'ct_cappuccino', quantity: 1 }],
       customer: { name: 'Alisher', phone: '+998901234567', email: 'alisher@example.com' },
       userConfirmed: true
     },
-    get_action: { actionId: 'ZY-EVOS-98421' },
-    cancel_action: { actionId: 'ZY-EVOS-98421', reason: 'Change of plan', reasonCode: 'CUSTOMER_CANCELLED' },
-    get_payment_options: { actionId: 'ZY-EVOS-98421' }
+    get_action: { actionId: 'CT-SB-84920' },
+    cancel_action: { actionId: 'CT-SB-84920', reason: 'Change of plan', reasonCode: 'CUSTOMER_CANCELLED' },
+    get_payment_options: { actionId: 'CT-SB-84920' }
   };
 
   try {
@@ -546,10 +554,310 @@ async function main() {
     'Submission checklist must not reference the website host as the MCP endpoint'
   );
 
-  console.log(`    ✓ chatgpt-app-submission.json passed official OpenAI Draft 2020-12 specification.`);
+  // ---------------------------------------------------------------------------
+  // 11. Real Coffee Time Mock Server E2E Flow & Safety Guardrails
+  // ---------------------------------------------------------------------------
+  console.log('  [11/11] Executing Real Coffee Time Wire-Level E2E Flow & Safety Guardrails...');
+  const { createCoffeeTimeSandboxApp } = await import('../integrations/mock-coffee-time/src/server.ts');
+  const ctApp = createCoffeeTimeSandboxApp();
+  const ctServer: Server = await new Promise(resolve => {
+    const s = ctApp.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const ctPort = (ctServer.address() as any).port;
+  const ctUrl = `http://127.0.0.1:${ctPort}`;
+
+  // Helper to read request body
+  const readBody = (req: http.IncomingMessage): Promise<string> =>
+    new Promise((resolve, reject) => {
+      let data = '';
+      req.on('data', chunk => { data += chunk; });
+      req.on('end', () => resolve(data));
+      req.on('error', reject);
+    });
+
+  // Create API server bridging to Coffee Time
+  let ctActionId = '';
+  let ctPublicId = '';
+  const ctApiServer = http.createServer(async (req, res) => {
+    try {
+      const url = req.url || '';
+      const method = req.method || 'GET';
+
+      if (url.includes('/welcome')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          customerMessage: 'Zayuno sizga uzoqni yaqin qiladi. Nima qilishni xohlaysiz?\n\nMen qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman.',
+          availableServiceCount: 1,
+          dynamicServiceMessage: 'Bir qancha yo‘nalishlarda yordam bera olaman.'
+        }));
+        return;
+      }
+
+      if (url.includes('/providers/coffee-time/capabilities')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ capabilities: ['METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'ACTION_CANCEL', 'PAYMENT_OPTIONS', 'WEBHOOK'] }));
+        return;
+      }
+
+      if (url.includes('/providers/coffee-time/locations') || (url.includes('/locations') && url.includes('coffee-time'))) {
+        const resp = await fetch(`${ctUrl}/locations`);
+        const data = await resp.json();
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      if (url.includes('/providers/coffee-time/catalog') || (url.includes('/catalog') && url.includes('coffee-time'))) {
+        const resp = await fetch(`${ctUrl}/catalog`);
+        const data = await resp.json();
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      if (url.includes('/providers/coffee-time/availability') || (url.includes('/availability') && url.includes('coffee-time'))) {
+        const rawBody = await readBody(req);
+        const resp = await fetch(`${ctUrl}/availability`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: rawBody });
+        const data = await resp.json();
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      if (url.includes('/providers/coffee-time')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          id: 'ct_provider_01',
+          slug: 'coffee-time',
+          name: 'Coffee Time Sandbox Demo',
+          type: 'DELIVERY',
+          status: 'ACTIVE',
+          isCertified: true,
+          isPublished: true,
+          capabilities: ['METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'ACTION_CANCEL', 'PAYMENT_OPTIONS', 'WEBHOOK']
+        }));
+        return;
+      }
+
+      if (url.includes('/providers/find') || url.includes('/providers/search') || (url.includes('/providers') && method === 'GET')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          providers: [{ id: 'ct_provider_01', slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', status: 'ACTIVE', isCertified: true, isPublished: true }],
+          total: 1
+        }));
+        return;
+      }
+
+      if (url.includes('/locations')) {
+        const resp = await fetch(`${ctUrl}/locations`);
+        const data = await resp.json();
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      if (url.includes('/catalog')) {
+        const resp = await fetch(`${ctUrl}/catalog`);
+        const data = await resp.json();
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      if (url.includes('/availability')) {
+        const rawBody = await readBody(req);
+        const resp = await fetch(`${ctUrl}/availability`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: rawBody });
+        const data = await resp.json();
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      if (url.includes('/quotes')) {
+        const rawBody = await readBody(req);
+        const resp = await fetch(`${ctUrl}/quote`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: rawBody });
+        const data = await resp.json();
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      if (url.includes('/actions') && method === 'POST' && url.includes('/cancel')) {
+        await readBody(req);
+        const resp = await fetch(`${ctUrl}/actions/${ctActionId}/cancel`, { method: 'POST' });
+        const data = await resp.json();
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      if (url.includes('/actions') && url.includes('/payment-options')) {
+        const resp = await fetch(`${ctUrl}/actions/${ctActionId}/payment-options`);
+        const data = await resp.json();
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      if (url.includes('/actions') && method === 'POST') {
+        const rawBody = await readBody(req);
+        const parsed = JSON.parse(rawBody || '{}');
+        if (parsed.userConfirmed !== true) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ statusCode: 400, message: 'Explicit user confirmation is required.' }));
+          return;
+        }
+        const resp = await fetch(`${ctUrl}/actions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'idempotency-key': parsed.idempotencyKey || 'test-key' },
+          body: rawBody
+        });
+        const data = await resp.json();
+        if (data.id) ctActionId = data.id;
+        if (data.publicId) ctPublicId = data.publicId;
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      if (url.includes('/actions')) {
+        const resp = await fetch(`${ctUrl}/actions/${ctActionId}`);
+        const data = await resp.json();
+        res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(data));
+        return;
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok' }));
+    } catch (err: any) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message || String(err) }));
+    }
+  });
+
+  const ctApiPort: number = await new Promise(resolve => {
+    ctApiServer.listen(0, '127.0.0.1', () => resolve((ctApiServer.address() as any).port));
+  });
+
+  process.env.API_BASE_URL = `http://127.0.0.1:${ctApiPort}`;
+  const ctMcpApp = runHttpSseServer(0);
+  const ctMcpServer: Server = await new Promise(resolve => {
+    const s = ctMcpApp.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  const ctMcpPort = (ctMcpServer.address() as any).port;
+  const ctMcpUrl = `http://127.0.0.1:${ctMcpPort}`;
+
+  const callCtMcp = async (name: string, args: Record<string, any>) => {
+    const res = await fetch(`${ctMcpUrl}/mcp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: `ct-test-${name}-${Date.now()}`,
+        method: 'tools/call',
+        params: { name, arguments: args }
+      })
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    if (body.error) return { isError: true, error: body.error };
+    const text = body.result?.content?.[0]?.text;
+    const parsed = typeof text === 'string' ? JSON.parse(text) : text;
+    assertNoSecretLeakage(parsed, name);
+    return parsed;
+  };
+
+  try {
+    // 1. Welcome
+    const welcome = await callCtMcp('get_welcome_message', {});
+    assert.ok(welcome.customerMessage.includes('Zayuno sizga uzoqni yaqin qiladi'));
+
+    // 2. Discover Coffee Time
+    const discovery = await callCtMcp('find_providers', { category: 'food_delivery' });
+    assert.ok(Array.isArray(discovery.providers));
+    assert.equal(discovery.providers[0].slug, 'coffee-time');
+
+    // 3. Provider profile
+    const profile = await callCtMcp('get_provider', { providerSlug: 'coffee-time' });
+    assert.equal(profile.slug, 'coffee-time');
+
+    // 4. Locations
+    const locs = await callCtMcp('get_locations', { providerSlug: 'coffee-time' });
+    assert.ok(locs.locations.length >= 2);
+
+    // 5. Catalog
+    const cat = await callCtMcp('get_catalog', { providerSlug: 'coffee-time' });
+    assert.ok(cat.offerings.length >= 4);
+
+    // 6. Check Availability
+    const avail = await callCtMcp('check_availability', { providerSlug: 'coffee-time', items: [{ offeringId: 'ct_cappuccino', quantity: 1 }] });
+    assert.equal(avail.available, true);
+
+    // 7. Request Quote
+    const quote = await callCtMcp('request_quote', { providerSlug: 'coffee-time', items: [{ offeringId: 'ct_cappuccino', quantity: 1 }] });
+    assert.ok(quote.id || quote.quoteId);
+    assert.equal(quote.total, 28000);
+    const validQuoteId = quote.id || quote.quoteId;
+
+    // 8. Safety Guardrail: create_action WITHOUT userConfirmed (userConfirmed=false) MUST FAIL
+    const unconfirmedAction = await callCtMcp('create_action', {
+      providerSlug: 'coffee-time',
+      quoteId: validQuoteId,
+      userConfirmed: false,
+      customer: { name: 'Alisher', phone: '+998901234567' },
+      items: [{ offeringId: 'ct_cappuccino', quantity: 1 }]
+    });
+    assert.equal(unconfirmedAction.isError, true, 'create_action without confirmation must fail');
+
+    // 9. Safety Guardrail: create_action with userConfirmed=true MUST SUCCEED
+    const createdAction = await callCtMcp('create_action', {
+      providerSlug: 'coffee-time',
+      quoteId: validQuoteId,
+      userConfirmed: true,
+      idempotencyKey: 'idemp-coffee-test-01',
+      customer: { name: 'Alisher', phone: '+998901234567' },
+      destination: { raw: 'Toshkent, Chilonzor tumani' },
+      items: [{ offeringId: 'ct_cappuccino', quantity: 1 }]
+    });
+    assert.ok(createdAction.id || createdAction.publicId);
+    assert.ok(createdAction.customerMessage.includes('Bu Coffee Time sandbox demo xizmati'));
+    const actionRefId = createdAction.publicId || createdAction.id;
+
+    // 10. Safety Guardrail: duplicate create_action with same idempotencyKey -> Idempotent
+    const duplicateAction = await callCtMcp('create_action', {
+      providerSlug: 'coffee-time',
+      quoteId: validQuoteId,
+      userConfirmed: true,
+      idempotencyKey: 'idemp-coffee-test-01',
+      customer: { name: 'Alisher', phone: '+998901234567' },
+      destination: { raw: 'Toshkent, Chilonzor tumani' },
+      items: [{ offeringId: 'ct_cappuccino', quantity: 1 }]
+    });
+    assert.equal(duplicateAction.publicId || duplicateAction.id, actionRefId, 'Duplicate action must be idempotent');
+
+    // 11. Payment Options
+    const payOpts = await callCtMcp('get_payment_options', { actionId: actionRefId });
+    assert.ok(payOpts.customerMessage.includes('To‘lov sahifasi tayyor'));
+    assert.ok(payOpts.customerMessage.includes('Bu Coffee Time sandbox demo xizmati'));
+
+    // 12. Get Action Status
+    const statusRes = await callCtMcp('get_action', { actionId: actionRefId });
+    assert.ok(statusRes.customerMessage);
+
+    // 13. Cancel Action
+    const cancelRes = await callCtMcp('cancel_action', { actionId: actionRefId, reason: 'Customer requested cancel' });
+    assert.ok(cancelRes.customerMessage.includes('bekor qilingan'));
+
+    console.log('    ✓ All 13 Coffee Time wire-level actions, quotes, disclaimers, and guardrail tests passed.');
+  } finally {
+    await new Promise(resolve => ctMcpServer.close(resolve));
+    await new Promise(resolve => ctApiServer.close(resolve));
+    await new Promise(resolve => ctServer.close(resolve));
+  }
 
   console.log('\n================================================================');
-  console.log('🎉 ALL 10 OPENAI PLUGIN & MCP CONTRACT TESTS PASSED PERFECTLY!');
+  console.log('🎉 ALL 11 OPENAI PLUGIN & MCP CONTRACT TESTS PASSED PERFECTLY!');
   console.log('================================================================\n');
 
   process.exit(0);

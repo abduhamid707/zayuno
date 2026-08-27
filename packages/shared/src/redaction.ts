@@ -32,7 +32,7 @@ const STRING_SCRUBBERS: Array<{ pattern: RegExp; replacement: string }> = [
   // Email addresses
   { pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/gi, replacement: '[REDACTED_EMAIL]' },
   // Phone numbers (Uzbekistan / International / E.164)
-  { pattern: /(?:\+?998|\b998)?\s*(?:\(?\d{2}\)?[\s-]?)?\d{3}[\s-]?\d{2}[\s-]?\d{2}\b|(?:\+\d{9,15}\b)|(?:\b\d{9,15}\b)/g, replacement: '[REDACTED_PHONE]' },
+  { pattern: /(?:\+998[\s-]?(?:\d{2}[\s-]?)?\d{3}[\s-]?\d{2}[\s-]?\d{2}\b)|(?:\b998[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}\b)|(?:\+\d{9,15}\b)/g, replacement: '[REDACTED_PHONE]' },
   // Credit card 13-19 digit patterns
   { pattern: /\b(?:\d{4}[ -]?){3}\d{4}\b/g, replacement: '[REDACTED_CARD]' }
 ];

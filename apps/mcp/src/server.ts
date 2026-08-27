@@ -140,7 +140,28 @@ export async function runStdioServer() {
 export function runHttpSseServer(port = 4002): Express {
   const app = express();
   app.use(cors({ origin: true, credentials: true }));
-  app.use(express.json());
+  app.use(express.json({ limit: '1mb' }));
+
+  // Sliding-window IP rate limiter guardrail (120 req/min for public MCP endpoints)
+  const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+  const mcpRateLimit = (req: Request, res: Response, next: express.NextFunction) => {
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const entry = rateLimitMap.get(ip);
+    if (!entry || now > entry.resetAt) {
+      rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
+      return next();
+    }
+    if (entry.count >= 120) {
+      res.status(429).json({
+        jsonrpc: '2.0',
+        error: { code: -32000, message: 'Too many requests from this IP. Rate limit: 120 requests/minute.' }
+      });
+      return;
+    }
+    entry.count += 1;
+    return next();
+  };
 
   // Store active SSE sessions
   const sseTransports = new Map<string, SSEServerTransport>();
@@ -171,14 +192,14 @@ export function runHttpSseServer(port = 4002): Express {
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema,
-        outputSchema: (tool as any).outputSchema,
+        outputSchema: tool.outputSchema,
         annotations: tool.annotations
       }))
     });
   });
 
   // 3. Streamable HTTP JSON-RPC Endpoint: POST /mcp & GET /mcp
-  app.all('/mcp', async (req: Request, res: Response) => {
+  app.all('/mcp', mcpRateLimit, async (req: Request, res: Response) => {
     if (req.method === 'GET') {
       res.json({
         status: 'online',
@@ -277,6 +298,7 @@ export function runHttpSseServer(port = 4002): Express {
               name: t.name,
               description: t.description,
               inputSchema: t.inputSchema,
+              outputSchema: t.outputSchema,
               annotations: t.annotations
             }))
           }

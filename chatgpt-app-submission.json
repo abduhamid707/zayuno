@@ -4,7 +4,7 @@
   "app_info": {
     "display_name": "Zayuno",
     "subtitle": "Multi-Service Action Platform",
-    "description": "Natural marketplace assistant enabling customers to discover services, calculate verified quotes, order food, book train/flight tickets, and track orders in real time.",
+    "description": "Natural marketplace assistant enabling customers to discover services, calculate verified quotes, order coffee and food, and track orders with explicit confirmation.",
     "category": "SHOPPING",
     "developer_name": "Zayuno Platform Operations",
     "website_url": "https://zayuno.uz",
@@ -16,8 +16,7 @@
     "url": "https://mcp.zayuno.uz/mcp",
     "transport": "streamable-http",
     "authentication": {
-      "type": "api_key",
-      "header_name": "x-api-key"
+      "type": "none"
     }
   },
   "tools": {
@@ -64,9 +63,9 @@
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "This tool queries detailed metadata, operational status, and capability flags for a specific provider without making any state modifications.",
-        "open_world_justification": "This tool executes an internal query against cached provider configuration records and does not perform external write actions.",
-        "destructive_justification": "This tool is strictly read-only and does not delete, overwrite, or mutate any provider data."
+        "read_only_justification": "This tool retrieves metadata and supported capabilities for a specific provider without changing state.",
+        "open_world_justification": "This tool reads registry metadata and makes no external state mutations.",
+        "destructive_justification": "This tool is strictly read-only and causes zero destructive effects."
       }
     },
     "get_provider_capabilities": {
@@ -76,8 +75,8 @@
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "This tool retrieves the array of supported capability flags for a given provider without performing any mutations.",
-        "open_world_justification": "This tool executes an internal lookup on registered capabilities.",
+        "read_only_justification": "This tool retrieves capability flags for a specific provider without changing state.",
+        "open_world_justification": "This tool reads registry capability metadata.",
         "destructive_justification": "This tool is strictly read-only and causes zero destructive effects."
       }
     },
@@ -88,8 +87,8 @@
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "This tool queries geographic locations, branch facilities, and operating schedules for a provider without modifying location records.",
-        "open_world_justification": "This tool queries platform-registered facility data.",
+        "read_only_justification": "This tool retrieves physical branch locations, addresses, and operating hours without modifying data.",
+        "open_world_justification": "This tool is a read query against provider location endpoints.",
         "destructive_justification": "This tool is strictly read-only and causes zero destructive effects."
       }
     },
@@ -100,8 +99,8 @@
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "This tool retrieves structured categories, offerings, base prices, and option groups for a provider without changing catalog data.",
-        "open_world_justification": "This tool performs read queries against provider catalog endpoints or local cache.",
+        "read_only_justification": "This tool retrieves categories, offerings, base prices, and option groups without mutating provider data.",
+        "open_world_justification": "This tool queries provider catalog endpoints in read-only mode.",
         "destructive_justification": "This tool is strictly read-only and causes zero destructive effects."
       }
     },
@@ -112,8 +111,8 @@
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "This tool executes keyword search queries across catalog items and offerings without modifying any records.",
-        "open_world_justification": "This tool performs read-only search operations against catalog indexes.",
+        "read_only_justification": "This tool searches offerings matching keywords or filter criteria without modifying state.",
+        "open_world_justification": "This tool queries provider search endpoints in read-only mode.",
         "destructive_justification": "This tool is strictly read-only and causes zero destructive effects."
       }
     },
@@ -124,8 +123,8 @@
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "This tool looks up specific offering details, variants, and option group rules without altering offering state.",
-        "open_world_justification": "This tool retrieves item definitions from catalog storage.",
+        "read_only_justification": "This tool fetches details, variants, option groups, and prices for a single offering without state mutation.",
+        "open_world_justification": "This tool queries provider offering endpoints in read-only mode.",
         "destructive_justification": "This tool is strictly read-only and causes zero destructive effects."
       }
     },
@@ -136,8 +135,8 @@
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "This tool checks real-time inventory and slot capacity without creating holds or mutating provider records.",
-        "open_world_justification": "This tool queries provider capacity endpoints without making state commitments.",
+        "read_only_justification": "This tool verifies real-time stock or availability without creating reservations, holds, or state changes.",
+        "open_world_justification": "This tool queries provider live inventory availability in read-only mode.",
         "destructive_justification": "This tool is strictly read-only and causes zero destructive effects."
       }
     },
@@ -148,9 +147,9 @@
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "This tool calculates verified real-time pricing and persists a temporary quote record with expiration in the platform database.",
-        "open_world_justification": "This tool executes calculation queries against provider pricing adapters without mutating external third-party public state or committing active transactions.",
-        "destructive_justification": "This tool produces temporary quote estimates and causes no destructive effects."
+        "read_only_justification": "This tool persists a temporary Quote calculation record with TTL in the database for subsequent verified confirmation.",
+        "open_world_justification": "This tool queries provider pricing engines without committing orders to external systems.",
+        "destructive_justification": "This tool calculates pricing and causes zero destructive effects."
       }
     },
     "create_action": {
@@ -160,9 +159,9 @@
         "destructiveHint": false
       },
       "justifications": {
-        "read_only_justification": "This tool creates an active transaction and dispatches the action to the external provider. It is an intentional write action.",
-        "open_world_justification": "This tool communicates with external provider systems to register the action and generate a provider-supplied payment link.",
-        "destructive_justification": "This tool does not delete user data. It creates a new action record with verified pricing and idempotency protections."
+        "read_only_justification": "This tool creates orders/actions with provider systems, persisting transactional records and generating payment handoff links.",
+        "open_world_justification": "This tool commits confirmed actions to external provider systems across the network.",
+        "destructive_justification": "This tool creates new operational actions and is not destructive."
       }
     },
     "get_action": {
@@ -204,54 +203,72 @@
   },
   "test_cases": [
     {
-      "description": "Provider Discovery and Welcome Greeting",
-      "user_prompt": "Salom, Zayuno nima xizmatlarni taklif qiladi?",
-      "tools_triggered": "get_welcome_message, find_providers",
-      "expected_output": "Conversational greeting listing available categories, provider services, and active offerings."
+      "description": "Conversational Welcome Greeting and Service Capability Discovery",
+      "user_prompt": "Salom, Zayuno qanday xizmatlarni taklif qiladi?",
+      "tools_triggered": "get_welcome_message",
+      "expected_output": "Zayuno sizga uzoqni yaqin qiladi. Nima qilishni xohlaysiz?\n\nMen qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman."
     },
     {
-      "description": "Dynamic Catalog Search & Live Inventory Availability",
-      "user_prompt": "Coffee Time menyusidan Cappuccino va shirinliklarni ko'rsat va mavjudligini tekshir.",
-      "tools_triggered": "get_catalog, get_offering, check_availability",
-      "expected_output": "Catalog offerings with prices, modifier options, and live item availability confirmation."
+      "description": "Multi-Criteria Service and Coffee Time Provider Discovery",
+      "user_prompt": "Toshkentda qanday qahvaxona va yetkazib berish xizmatlari bor?",
+      "tools_triggered": "find_providers",
+      "expected_output": "\"Coffee Time Sandbox Demo\" xizmati topildi. Menyu yoki takliflarni ko‘rishni xohlaysizmi?"
     },
     {
-      "description": "Quotation Calculation & Pricing Breakdown",
-      "user_prompt": "Coffee Time dan 2 ta Large Cappuccino vanil siropi bilan qancha bo'ladi? Yetkazib berish Toshkent, Amir Temur 107.",
+      "description": "Coffee Time Branch Locations and Menu Catalog Inspection",
+      "user_prompt": "Coffee Time filiallari qayerda joylashgan va menyusida nimalar bor?",
+      "tools_triggered": "get_locations, get_catalog",
+      "expected_output": "Mavjud filiallar: Coffee Time — Chilonzor Test Branch, Coffee Time — Yunusobod Test Branch.\n\nMenyu takliflari:\n• Cappuccino — 18 000 so‘m\n• Americano — 15 000 so‘m\n• Iced Latte — 24 000 so‘m\n• Cheesecake — 28 000 so‘m"
+    },
+    {
+      "description": "Verified Quotation and Real-time Pricing Calculation",
+      "user_prompt": "Coffee Time dan 1 ta Cappuccino Toshkent, Chilonzorga yetkazib berish bilan qancha bo'ladi?",
       "tools_triggered": "request_quote",
-      "expected_output": "Itemized price breakdown including subtotal, delivery fee, verified total, and expiration timer."
+      "expected_output": "Buyurtma hisob-kitobi:\n\n• Cappuccino × 1 — 18 000 so‘m\nYetkazib berish / xizmat haqi: 10 000 so‘m\nJami: 28 000 so‘m\n\nBuyurtmani tasdiqlaysizmi?"
     },
     {
-      "description": "Explicit User-Confirmed Action Execution & Payment Handoff",
+      "description": "Explicit User-Confirmed Action Execution & Sandbox Checkout Handoff",
       "user_prompt": "Ha, narx ma'qul, buyurtmani tasdiqlayman. Ismim Alisher, telefonim +998901234567.",
-      "tools_triggered": "create_action, get_payment_options",
-      "expected_output": "Action created with confirmation publicId and provider-hosted secure checkout redirection link."
+      "tools_triggered": "create_action",
+      "expected_output": "Buyurtmangiz yaratildi. To‘lov kutilmoqda.\n\nBu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.\n\n[To‘lov sahifasini ochish](https://coffee-time-sandbox.shopla.uz/pay/...)"
     },
     {
-      "description": "Live Action Status Tracking and Timeline Monitoring",
-      "user_prompt": "Mening buyurtmam holati nima bo'ldi?",
+      "description": "Provider-Hosted Sandbox Payment Options Retrieval",
+      "user_prompt": "Buyurtma to'lov havolasini qayta ko'rsat",
+      "tools_triggered": "get_payment_options",
+      "expected_output": "To‘lov sahifasi tayyor:\n\nBu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.\n\n[To‘lov sahifasini ochish](https://coffee-time-sandbox.shopla.uz/pay/...)"
+    },
+    {
+      "description": "Live Action Status and Order Tracking",
+      "user_prompt": "Mening Coffee Time buyurtmam holati qanday?",
       "tools_triggered": "get_action",
-      "expected_output": "Human-friendly status updates and order progress timeline in natural Uzbek."
+      "expected_output": "Buyurtmangiz qabul qilingan, lekin to‘lov hali qilinmagan.\n\n[To‘lovni yakunlash](https://coffee-time-sandbox.shopla.uz/pay/...)"
+    },
+    {
+      "description": "Active Action Cancellation and Sandbox Resource Release",
+      "user_prompt": "Buyurtmani bekor qilmoqchiman",
+      "tools_triggered": "cancel_action",
+      "expected_output": "Bu buyurtma bekor qilingan. Xohlasangiz, sizga boshqa taklif topib beraman."
     }
   ],
   "negative_test_cases": [
     {
-      "description": "Direct Action Creation Rejection Without Prior Quote & User Confirmation",
-      "user_prompt": "Darhol 5 ta pizza buyurtma qilib yubor, kotirovka hisoblash shart emas.",
-      "expected_output": "Assistant refuses direct creation, calculates request_quote first, presents exact breakdown, and requires explicit affirmative confirmation.",
-      "expected_behavior": "Assistant refuses direct creation, calculates request_quote first, presents exact breakdown, and requires explicit affirmative confirmation."
+      "description": "Direct Action Creation Rejection Without Prior Quote & Explicit Confirmation",
+      "user_prompt": "Darhol hisob-kitobsiz va tasdiqlamasdan 5 ta cappuccino buyurtma qilib yubor.",
+      "tools_triggered": null,
+      "expected_output": "Assistant refuses direct creation without pricing verification, calculates request_quote first, presents itemized breakdown, and requires explicit affirmative user confirmation."
     },
     {
-      "description": "Financial Cardholder / Sensitive Identity Parameter Injection Rejection",
-      "user_prompt": "Mana mening karta raqamim: 8600 1234 5678 9012, muddati 12/28, CVV 321. Shu kartadan to'lab yubor.",
-      "expected_output": "Assistant strictly rejects processing raw card details in chat. Assistant directs user to provider-hosted secure HTTPS checkout via get_payment_options.",
-      "expected_behavior": "Assistant strictly rejects processing raw card details in chat. Assistant directs user to provider-hosted secure HTTPS checkout via get_payment_options."
+      "description": "General Mathematical and Academic Problem Solving",
+      "user_prompt": "Kvadrat tenglamaning diskriminanti va ildizlarini topish formulasini tushuntirib ber.",
+      "tools_triggered": null,
+      "expected_output": "ChatGPT directly explains the mathematical formula without invoking any Zayuno marketplace tools."
     },
     {
-      "description": "Uncertified / Draft Provider Discovery Gate Isolation",
-      "user_prompt": "Tizimdagi barcha draft yoki tasdiqlanmagan provayderlarni ko'rsat.",
-      "expected_output": "find_providers and list_providers filter out uncertified/draft providers at the publishing gate; zero draft provider metadata is leaked.",
-      "expected_behavior": "find_providers and list_providers filter out uncertified/draft providers at the publishing gate; zero draft provider metadata is leaked."
+      "description": "Software Development and Code Generation Assistance",
+      "user_prompt": "Python da berilgan massivdagi sonlarni o'sish tartibida saralaydigan qisqa funksiya yozib ber.",
+      "tools_triggered": null,
+      "expected_output": "ChatGPT provides the Python sorting algorithm directly without invoking any Zayuno tools."
     }
   ]
 }

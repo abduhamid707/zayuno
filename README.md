@@ -163,26 +163,26 @@ pnpm dev:apps
 
 ---
 
-## 6. Default Test Credentials
+## 6. Local Development Roles & Configuration
 
 | Role / Service | URL / Key | Username / Secret | Password |
 |:---|:---|:---|:---|
-| **Super Admin** | `http://localhost:3000` | `admin@zayuno.io` | `admin12345` |
-| **EVOS Provider Owner** | `http://localhost:3001` | `evos.owner@zayuno.io` | `evos12345` |
-| **AI Agent API Key** | `x-api-key` header | `zy_live_agent_secret_key_12345` | — |
+| **Super Admin** | `http://localhost:3000` | `admin@zayuno.io` | `<CONFIGURED_IN_ENV>` |
+| **EVOS Provider Owner** | `http://localhost:3001` | `evos.owner@zayuno.io` | `<CONFIGURED_IN_ENV>` |
+| **AI Agent API Key** | `x-api-key` header | `<YOUR_ZAYUNO_AGENT_API_KEY>` | — |
 | **Public API / Swagger** | `http://localhost:4000/api/docs` | — | — |
 | **Mock EVOS API** | `http://localhost:4001` | — | — |
 | **Mock Payment Portal** | `http://localhost:4001/mock/pay/:orderId` | — | — |
-| **MCP SSE Server** | `http://localhost:4002` | — | — |
+| **MCP Server (Streamable HTTP & SSE)** | `http://localhost:4002` | — | — |
 
 ---
 
 ## 7. Running the Automated E2E Test Suite
 
-Execute the complete 13-step fast-food lifecycle test (Menu query -> Quote -> Confirm -> Idempotent order creation -> Payment URL -> Mock payment -> HMAC Webhook -> Status progression -> Final timeline audit):
+Execute the complete multi-service lifecycle test:
 
 ```bash
-npx ts-node tests/run-e2e.ts
+npx tsx tests/run-e2e.ts
 ```
 
 ---
@@ -199,7 +199,7 @@ To use Zayuno with **Claude Desktop**, add the following to your `claude_desktop
       "args": ["<PATH_TO_ZAYUNO>/apps/mcp/dist/index.js"],
       "env": {
         "API_BASE_URL": "http://localhost:4000",
-        "ZAYUNO_API_KEY": "zy_live_agent_secret_key_12345"
+        "ZAYUNO_API_KEY": "<YOUR_ZAYUNO_API_KEY>"
       }
     }
   }

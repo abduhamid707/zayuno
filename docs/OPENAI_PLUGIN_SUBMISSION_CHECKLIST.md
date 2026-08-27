@@ -32,11 +32,12 @@
 
 ---
 
-## 2. Authentication & Reviewer Demo Credentials
+## 2. Authentication & Public Access Configuration
 
-- **Public MCP Protocol Authentication**: `x-api-key` header (or `Authorization: Bearer zy_...`).
-- **Reviewer Demo API Key**: Provided securely in the OpenAI Submission Portal notes.
-- **Pre-configured Test Provider**: `sandbox-provider` / `mock-evos` / `coffee-time` (available in non-production sandbox mode for testing end-to-end flows with mock payments).
+- **Submission Portal Authentication**: Select **"No authentication"** (Public MCP Server).
+- **Public MCP Protocol**: `https://mcp.zayuno.uz/mcp` is an open Streamable HTTP endpoint accessible to ChatGPT / Codex without user login barriers.
+- **Internal Server-to-API Auth**: Handled internally in server environment via `ZAYUNO_API_KEY` (never exposed to client).
+- **Pre-configured Production-Ready Provider**: `sandbox-provider` (`Zayuno Sandbox Demonstration Provider`, verified active, certified, and published for end-to-end evaluation).
 - **Payment Handoff Safety**: Real payment is never processed during reviewer verification; simulated test cards or sandbox handoff links are utilized. Zero card numbers or CVVs are collected in the chat conversation.
 
 ---

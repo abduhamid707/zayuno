@@ -42,7 +42,7 @@ This script provides an exact step-by-step recording guide for producing the dem
 - **User Prompt**: *"Ha, buyurtma qil"* (or *"Yes, place the order"*)
 - **Tool Invoked**: `create_order(...)` $\rightarrow$ `get_payment_options(...)`
 - **Display**: ChatGPT returns order confirmation with Public Order ID (`ZY-EVOS-XXXXX`) and public HTTPS payment link:
-  > `https://zayuno.shopla.uz/mock/pay/EVOS-ORD-XXXXXX`
+  > `https://evos-sandbox.shopla.uz/mock/pay/EVOS-ORD-XXXXXX`
 - **Narration**:
   > *Uzbek:* "Foydalanuvchi tasdiqlaganidan so‘ng buyurtma yaratiladi va provayder to‘lov havolasi beriladi."
   > *English:* "Upon user confirmation, the order is registered and a provider payment link is generated."
@@ -50,7 +50,7 @@ This script provides an exact step-by-step recording guide for producing the dem
 ---
 
 ### Step 4: Provider Checkout & Webhook Delivery (1:05 – 1:30)
-- **Action**: Click the payment link. Browser opens `https://zayuno.shopla.uz/mock/pay/EVOS-ORD-XXXXXX`.
+- **Action**: Click the payment link. Browser opens `https://evos-sandbox.shopla.uz/mock/pay/EVOS-ORD-XXXXXX`.
 - **Payment Page Action**: Click **"Payme orqali to‘lash"** (Simulated Payment).
 - **Display**: Page updates to green **"TO‘LOV MUVAFFAQITYATLI"** badge; status updates to `ACCEPTED / PAID`.
 - **Narration**:

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   BaseProviderAdapter,
   ProviderAdapterConfig
@@ -162,7 +163,7 @@ export class SandboxProviderAdapter extends BaseProviderAdapter {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     return {
-      id: `quote_sb_${Date.now()}`,
+      id: `quote_sb_${randomUUID()}`,
       providerSlug: this.providerSlug,
       locationId: input.locationId,
       lines,
@@ -186,7 +187,7 @@ export class SandboxProviderAdapter extends BaseProviderAdapter {
       return this.actions.get(input.idempotencyKey)!;
     }
 
-    const actionId = `act_sb_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const actionId = `act_sb_${randomUUID()}`;
     const publicId = `ZY-SANDBOX-${Math.floor(10000 + Math.random() * 90000)}`;
 
     let subtotal = 0;

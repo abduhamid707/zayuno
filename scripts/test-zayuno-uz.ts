@@ -20,17 +20,18 @@ async function testZayunoUz() {
   const buf512 = await r5.arrayBuffer();
   console.log('5. 512×512 Icon:    HTTP', r5.status, `(${buf512.byteLength} bytes)`);
 
-  const r6 = await fetch(BASE + '/tools');
+  const r6 = await fetch('https://mcp.zayuno.uz/tools');
   const tools = await r6.json();
   console.log('6. MCP Tools:       HTTP', r6.status, `(${tools.tools.length} active tools)`);
 
+  const apiKey = process.env.ZAYUNO_API_KEY || 'zy_live_agent_secret_key_12345';
   const r7 = await fetch('https://api.zayuno.uz/api/v1/providers', {
-    headers: { 'x-api-key': 'zy_live_agent_secret_key_12345' }
+    headers: { 'x-api-key': apiKey }
   });
   console.log('7. API Subdomain:   HTTP', r7.status, '(https://api.zayuno.uz/api/v1/providers)');
 
-  const r8 = await fetch('https://mcp.zayuno.uz/tools');
-  console.log('8. MCP Subdomain:   HTTP', r8.status, '(https://mcp.zayuno.uz/tools)');
+  const r8 = await fetch('https://mcp.zayuno.uz/health');
+  console.log('8. MCP Health:      HTTP', r8.status, '(https://mcp.zayuno.uz/health)');
 
   console.log('\n======================================================');
   console.log('🎉 ALL OFFICIAL HTTPS ENDPOINTS ON zayuno.uz ARE LIVE!');
