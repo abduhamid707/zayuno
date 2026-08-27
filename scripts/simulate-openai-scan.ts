@@ -4,7 +4,7 @@ async function simulateOpenAiScan() {
   // 1. Verify Challenge Token
   const chRes = await fetch('https://zayuno.uz/.well-known/openai-apps-challenge');
   const chText = await chRes.text();
-  console.log('1. Challenge Token check:', chRes.status, 'Token match:', chText === 'e6VxyvQ2NNxoSqMFTivLNHwd2Zfi1SiKU3GP_VrfL4s');
+  console.log('1. Challenge Token check:', chRes.status, 'Token match:', chText === 'EVEW8GwWNVKe1uuYBHLPl36l8t-Fh7Xt_Vth2uS7304');
 
   // 2. Streamable HTTP tools/list check
   console.log('\n2. Testing POST https://zayuno.uz/mcp (tools/list)...');
