@@ -482,3 +482,23 @@
     - Discovery (`POST /mcp` `find_providers`, `list_providers`) yuqori parallel oqimda.
     - PostgreSQL connection pool to‘yinganligi va Redis cache hit-rate tahlili.
     - Distributed lease lock va action idempotency qulflarining 700 RPS ostidagi latency profili (P95, P99).
+
+### 12. Future Vertical: GovTech & Civic Services Integration (Davlat xizmatlari, Kadastr, Ovoz berish va Murojaatlar)
+- [ ] Zayuno platformasiga `GOVTECH` / `CIVIC_SERVICES` toifasini kiritish va milliy AI Gateway sifatida standartlashtirish:
+  - **`SEARCH` / `DISCOVERY`**: Davlat xizmatlari, kadastr ma'lumotlari, ochiq budjet loyihalari, kommunal xizmatlar va jamoat qabulxonalari katalogini qidirish.
+  - **`CATALOG` / `OFFERINGS`**: Xizmat shartlari, kerakli hujjatlar ro‘yxati, arizalar turlari, davlat boji / yig‘imlari tariflari.
+  - **`CHECK_AVAILABILITY`**: Qabul kunlari/soatlari, navbat bandligi (Maktab/Bog‘cha/Pasport) va ovoz berish mavsumining ochiqligini tekshirish.
+  - **`REQUEST_QUOTE`**: Davlat bojlari, xizmat ko‘rsatish to‘lovlari va soliq/jarima summalarini aniq kotirovka qilish.
+  - **`ACTION_CREATE`**:
+    - **Tashabbusli Budjet (Open Budget)**: Fuqaroning mahallasi bo‘yicha loyihalarga SMS-tasdiq orqali rasmiy ovoz berish.
+    - **Kadastr va Ko‘chmas Mulk**: Kadastr pasporti, taqiq (zapret) mavjudligini tekshirish va mulkni ro‘yxatga olishga ariza yuborish.
+    - **Xalq Nazorati / Kommunal Muammolar**: Ko‘chadagi nosozliklar, svet/gaz/yo‘l muammolari bo‘yicha rasm va geolokatsiya bilan murojaat shakllantirish.
+    - **Yagona Portal (My.gov.uz)**: Davlat ma’lumotnomalari (STIR, sudlanmaganlik, yashash joyi) olishga ariza topshirish.
+  - **`ACTION_STATUS` / `TRACKING`**: Ariza va murojaatlarning idoralar bo‘yicha ijro holatini kuzatish (`SUBMITTED` &rarr; `IN_REVIEW` &rarr; `ACCEPTED` &rarr; `RESOLVED` / `REJECTED`).
+  - **`PAYMENT`**: Davlat bojlari va jarimalarni Payme/Click/Uzum orqali xavfsiz to‘lash (`checkoutUrl`).
+- [ ] **OneID & Mobile-ID Xavfsiz Handoff**:
+  - Fuqaroning maxfiy pasport va biometrik ma’lumotlarini Zayuno platformasida saqlamasdan, shaxsni tasdiqlash uchun rasmiy `https://id.egov.uz` OAuth2/Mobile-ID tizimiga xavfsiz `nextAction: OPEN_URL` yo‘naltirishi.
+- [ ] AI foydalanuvchilari uchun:
+  - *"Mening mahallamda yo‘l ta’mirlash bo‘yicha Open Budgetga ovoz berib yubor"*
+  - *"Ushbu kadastr raqamiga taqiq bor-yo‘qligini tekshirib ber"*
+  - *"Ko‘chamizda chiroq o‘chdi, Xalq Nazoratiga foto bilan murojaat yubor va raqamini ber"*
