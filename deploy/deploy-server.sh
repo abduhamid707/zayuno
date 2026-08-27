@@ -147,7 +147,9 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
       exit 1
     fi
   fi
-  log_success "Database migrations applied successfully."
+  log_info "Executing idempotent database seed for canonical review provider..."
+  docker compose -f docker-compose.prod.yml run --rm --no-deps api pnpm --filter @zayuno/database run seed || true
+  log_success "Database seed check completed."
 fi
 
 # 7. Recreate containers with new images
