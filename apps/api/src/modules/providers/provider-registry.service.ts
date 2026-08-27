@@ -85,14 +85,11 @@ export class ProviderRegistryService implements OnModuleInit {
     }
 
     // Safely resolve server-side test credential for recognized sandbox hosts
-    // if no specific provider secret has been configured or default generated test key was used.
     let webhookSecret: string | undefined = provider.webhookSecret;
     if (this.isOfficialSandboxUrl(provider.baseUrl) || provider.slug === 'coffee-time' || provider.slug === 'evos' || provider.slug === 'poyez') {
-      if (!secret || secret.startsWith('zy_sb_sec_') || secret === '') {
-        const sandboxCredential = this.resolveSandboxTestCredential(provider.baseUrl, provider.slug);
-        if (sandboxCredential) {
-          secret = sandboxCredential;
-        }
+      const sandboxCredential = this.resolveSandboxTestCredential(provider.baseUrl, provider.slug);
+      if (sandboxCredential) {
+        secret = sandboxCredential;
       }
       if (!webhookSecret || webhookSecret === '') {
         webhookSecret = secret || undefined;
