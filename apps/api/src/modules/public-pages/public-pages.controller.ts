@@ -26,6 +26,7 @@ export class PublicPagesController {
       else if (safeName.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
       else if (safeName.endsWith('.ico')) res.setHeader('Content-Type', 'image/x-icon');
       else if (safeName.endsWith('.webp')) res.setHeader('Content-Type', 'image/webp');
+      else if (safeName.endsWith('.webmanifest') || safeName.endsWith('.json')) res.setHeader('Content-Type', 'application/manifest+json');
       
       res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
       return res.sendFile(assetPath);
@@ -42,6 +43,19 @@ export class PublicPagesController {
       res.setHeader('Content-Type', 'image/x-icon');
       res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
       return res.sendFile(faviconPath);
+    }
+    return res.status(404).send('Not found');
+  }
+
+  // 3.0. Web Manifest: /site.webmanifest
+  @Get('site.webmanifest')
+  @ApiExcludeEndpoint()
+  serveManifest(@Res() res: Response) {
+    const manifestPath = path.join(process.cwd(), 'apps/api/public/assets/site.webmanifest');
+    if (fs.existsSync(manifestPath)) {
+      res.setHeader('Content-Type', 'application/manifest+json');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(manifestPath);
     }
     return res.status(404).send('Not found');
   }
@@ -251,8 +265,12 @@ Sitemap: https://zayuno.uz/sitemap.xml
 
   <!-- Favicons & Icons -->
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/png" sizes="128x128" href="/assets/icon-128.png">
-  <link rel="apple-touch-icon" sizes="512x512" href="/assets/icon-512.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/assets/icon-512.png">
+  <link rel="manifest" href="/assets/site.webmanifest">
 
   <!-- Open Graph / Facebook -->
   <meta property="og:site_name" content="Zayuno">

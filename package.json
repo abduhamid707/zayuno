@@ -45,6 +45,7 @@
     "localtunnel": "^2.0.2",
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
+    "sharp": "^0.35.4",
     "tsx": "^4.23.12",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2",
