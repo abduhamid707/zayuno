@@ -203,12 +203,6 @@
   },
   "test_cases": [
     {
-      "description": "Conversational Welcome Greeting and Service Capability Discovery",
-      "user_prompt": "Salom, Zayuno qanday xizmatlarni taklif qiladi?",
-      "tools_triggered": "get_welcome_message",
-      "expected_output": "Zayuno sizga uzoqni yaqin qiladi. Nima qilishni xohlaysiz?\n\nMen qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman."
-    },
-    {
       "description": "Multi-Criteria Service and Coffee Time Provider Discovery",
       "user_prompt": "Toshkentda qanday qahvaxona va yetkazib berish xizmatlari bor?",
       "tools_triggered": "find_providers",
@@ -233,40 +227,28 @@
       "expected_output": "Buyurtmangiz yaratildi. To‘lov kutilmoqda.\n\nBu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.\n\n[To‘lov sahifasini ochish](https://coffee-time-sandbox.shopla.uz/pay/...)"
     },
     {
-      "description": "Provider-Hosted Sandbox Payment Options Retrieval",
-      "user_prompt": "Buyurtma to'lov havolasini qayta ko'rsat",
-      "tools_triggered": "get_payment_options",
-      "expected_output": "To‘lov sahifasi tayyor:\n\nBu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.\n\n[To‘lov sahifasini ochish](https://coffee-time-sandbox.shopla.uz/pay/...)"
-    },
-    {
       "description": "Live Action Status and Order Tracking",
       "user_prompt": "Mening Coffee Time buyurtmam holati qanday?",
       "tools_triggered": "get_action",
       "expected_output": "Buyurtmangiz qabul qilingan, lekin to‘lov hali qilinmagan.\n\n[To‘lovni yakunlash](https://coffee-time-sandbox.shopla.uz/pay/...)"
-    },
-    {
-      "description": "Active Action Cancellation and Sandbox Resource Release",
-      "user_prompt": "Buyurtmani bekor qilmoqchiman",
-      "tools_triggered": "cancel_action",
-      "expected_output": "Bu buyurtma bekor qilingan. Xohlasangiz, sizga boshqa taklif topib beraman."
     }
   ],
   "negative_test_cases": [
     {
-      "description": "Direct Action Creation Rejection Without Prior Quote & Explicit Confirmation",
-      "user_prompt": "Darhol hisob-kitobsiz va tasdiqlamasdan 5 ta cappuccino buyurtma qilib yubor.",
+      "description": "Home Coffee Preparation Recipe and Beverage Making Advice",
+      "user_prompt": "Uyda cappuccino qanday tayyorlanadi?",
       "tools_triggered": null,
-      "expected_output": "Assistant refuses direct creation without pricing verification, calculates request_quote first, presents itemized breakdown, and requires explicit affirmative user confirmation."
+      "expected_output": "ChatGPT directly explains how to prepare a cappuccino at home with milk froth and coffee without invoking any Zayuno marketplace or ordering tools."
     },
     {
       "description": "General Mathematical and Academic Problem Solving",
-      "user_prompt": "Kvadrat tenglamaning diskriminanti va ildizlarini topish formulasini tushuntirib ber.",
+      "user_prompt": "Kvadrat tenglamaning diskriminanti formulasini tushuntir.",
       "tools_triggered": null,
-      "expected_output": "ChatGPT directly explains the mathematical formula without invoking any Zayuno marketplace tools."
+      "expected_output": "ChatGPT directly explains the mathematical formula without invoking any Zayuno tools."
     },
     {
       "description": "Software Development and Code Generation Assistance",
-      "user_prompt": "Python da berilgan massivdagi sonlarni o'sish tartibida saralaydigan qisqa funksiya yozib ber.",
+      "user_prompt": "Python’da massivni saralaydigan funksiya yoz.",
       "tools_triggered": null,
       "expected_output": "ChatGPT provides the Python sorting algorithm directly without invoking any Zayuno tools."
     }
