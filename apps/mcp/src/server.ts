@@ -139,8 +139,21 @@ export async function runStdioServer() {
 
 export function runHttpSseServer(port = 4002): Express {
   const app = express();
-  app.use(cors({ origin: true, credentials: true }));
-  app.use(express.json({ limit: '1mb' }));
+
+  app.use((req: Request, res: Response, next: express.NextFunction) => {
+    const origin = (req.headers.origin as string) || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE, HEAD');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id, x-api-key, *');
+    res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
+  app.use(express.json({ limit: '1mb', type: ['application/json', 'application/json-rpc', 'application/*+json'] }));
 
   // Sliding-window IP rate limiter guardrail (120 req/min for public MCP endpoints)
   const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -165,6 +178,268 @@ export function runHttpSseServer(port = 4002): Express {
 
   // Store active SSE sessions
   const sseTransports = new Map<string, SSEServerTransport>();
+
+  // Helper to process a single JSON-RPC 2.0 message
+  const processSingleJsonRpc = async (msg: any, _sessionId?: string): Promise<{ response?: any; isNotification: boolean }> => {
+    if (!msg || typeof msg !== 'object') {
+      return {
+        response: { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid Request' } },
+        isNotification: false
+      };
+    }
+
+    const { id, method, params } = msg;
+    const isNotification = id === undefined || id === null;
+
+    // 1. initialize
+    if (method === 'initialize') {
+      const requestedVersion = params?.protocolVersion || '2024-11-05';
+      return {
+        response: {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            protocolVersion: requestedVersion,
+            capabilities: {
+              tools: { listChanged: false },
+              prompts: { listChanged: false },
+              resources: { subscribe: false, listChanged: false },
+              logging: {}
+            },
+            serverInfo: {
+              name: 'zayuno-action-server',
+              version: '1.0.0'
+            }
+          }
+        },
+        isNotification: false
+      };
+    }
+
+    // 2. notifications/initialized and any other MCP notifications
+    if (method === 'notifications/initialized' || (typeof method === 'string' && method.startsWith('notifications/'))) {
+      return {
+        response: isNotification ? undefined : { jsonrpc: '2.0', id, result: {} },
+        isNotification: true
+      };
+    }
+
+    // 3. ping
+    if (method === 'ping') {
+      return {
+        response: { jsonrpc: '2.0', id, result: {} },
+        isNotification: false
+      };
+    }
+
+    // 4. tools/list
+    if (method === 'tools/list') {
+      return {
+        response: {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            tools: ZAYUNO_MCP_TOOLS.map(t => ({
+              name: t.name,
+              description: t.description,
+              inputSchema: t.inputSchema,
+              outputSchema: t.outputSchema,
+              annotations: t.annotations
+            }))
+          }
+        },
+        isNotification: false
+      };
+    }
+
+    // 5. tools/call
+    if (method === 'tools/call') {
+      const toolName = params?.name;
+      const toolArgs = params?.arguments || {};
+
+      try {
+        const tool = ZAYUNO_MCP_TOOLS.find(candidate => candidate.name === toolName);
+        if (!tool) {
+          return {
+            response: {
+              jsonrpc: '2.0',
+              id,
+              error: { code: -32601, message: `Tool not found: ${toolName}` }
+            },
+            isNotification: false
+          };
+        }
+
+        const apiClient = new ZayunoApiClient();
+        const rawResult = await tool.handler(toolArgs, apiClient);
+        const result = stripSensitiveSecrets(rawResult);
+
+        return {
+          response: {
+            jsonrpc: '2.0',
+            id,
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+                }
+              ]
+            }
+          },
+          isNotification: false
+        };
+      } catch (err: any) {
+        const friendlyMessage = formatCustomerError(err);
+        return {
+          response: {
+            jsonrpc: '2.0',
+            id,
+            result: {
+              isError: true,
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    isError: true,
+                    customerMessage: friendlyMessage,
+                    message: friendlyMessage
+                  }, null, 2)
+                }
+              ]
+            }
+          },
+          isNotification: false
+        };
+      }
+    }
+
+    // 6. prompts/list
+    if (method === 'prompts/list') {
+      return {
+        response: {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            prompts: ZAYUNO_MCP_PROMPTS.map(p => ({
+              name: p.name,
+              description: p.description
+            }))
+          }
+        },
+        isNotification: false
+      };
+    }
+
+    // 7. prompts/get
+    if (method === 'prompts/get') {
+      const promptName = params?.name;
+      const prompt = ZAYUNO_MCP_PROMPTS.find(p => p.name === promptName);
+      if (!prompt) {
+        return {
+          response: {
+            jsonrpc: '2.0',
+            id,
+            error: { code: -32602, message: `Prompt not found: ${promptName}` }
+          },
+          isNotification: false
+        };
+      }
+
+      if (promptName === 'welcome') {
+        const apiClient = new ZayunoApiClient();
+        let welcomeText = getWelcomeMessage(null);
+        try {
+          const welcomeInfo = await apiClient.getWelcome();
+          welcomeText = welcomeInfo.customerMessage || welcomeInfo.welcomeMessage || getWelcomeMessage(welcomeInfo.availableServiceCount);
+        } catch {
+          welcomeText = getWelcomeMessage(null);
+        }
+        return {
+          response: {
+            jsonrpc: '2.0',
+            id,
+            result: {
+              description: prompt.description,
+              messages: [{ role: 'assistant', content: { type: 'text', text: welcomeText } }]
+            }
+          },
+          isNotification: false
+        };
+      }
+
+      return {
+        response: {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            description: prompt.description,
+            messages: prompt.messages
+          }
+        },
+        isNotification: false
+      };
+    }
+
+    // 8. resources/list
+    if (method === 'resources/list') {
+      return {
+        response: {
+          jsonrpc: '2.0',
+          id,
+          result: { resources: [] }
+        },
+        isNotification: false
+      };
+    }
+
+    // 9. resources/templates/list
+    if (method === 'resources/templates/list') {
+      return {
+        response: {
+          jsonrpc: '2.0',
+          id,
+          result: { resourceTemplates: [] }
+        },
+        isNotification: false
+      };
+    }
+
+    // 10. logging/setLevel
+    if (method === 'logging/setLevel') {
+      return {
+        response: { jsonrpc: '2.0', id, result: {} },
+        isNotification: false
+      };
+    }
+
+    // 11. completion/complete
+    if (method === 'completion/complete') {
+      return {
+        response: {
+          jsonrpc: '2.0',
+          id,
+          result: { completion: { values: [], hasMore: false } }
+        },
+        isNotification: false
+      };
+    }
+
+    // If client sent an unhandled notification without id, silently accept
+    if (isNotification) {
+      return { response: undefined, isNotification: true };
+    }
+
+    // Unsupported method with id
+    return {
+      response: {
+        jsonrpc: '2.0',
+        id,
+        error: { code: -32601, message: `Unsupported method: ${method}` }
+      },
+      isNotification: false
+    };
+  };
 
   // 0. OpenAI Domain Verification Challenge: GET /.well-known/openai-apps-challenge
   app.get('/.well-known/openai-apps-challenge', (_req: Request, res: Response) => {
@@ -200,174 +475,67 @@ export function runHttpSseServer(port = 4002): Express {
 
   // 3. Streamable HTTP JSON-RPC Endpoint: POST /mcp & GET /mcp
   app.all('/mcp', mcpRateLimit, async (req: Request, res: Response) => {
+    // Standard CORS & headers for MCP clients
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id, x-api-key, *');
+    res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+
     if (req.method === 'GET') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.json({
         status: 'online',
         transport: 'streamable-http',
+        protocolVersion: '2024-11-05',
         toolsCount: ZAYUNO_MCP_TOOLS.length,
-        version: '1.0.0'
+        version: '1.0.0',
+        serverInfo: {
+          name: 'zayuno-action-server',
+          version: '1.0.0'
+        }
       });
       return;
     }
 
     if (req.method === 'POST') {
-      const { id, method, params } = req.body || {};
+      const sessionId = (req.headers['mcp-session-id'] as string) || randomUUID();
+      res.setHeader('Mcp-Session-Id', sessionId);
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
 
-      if (method === 'initialize') {
-        res.json({
-          jsonrpc: '2.0',
-          id,
-          result: {
-            protocolVersion: '2024-11-05',
-            capabilities: {
-              tools: { listChanged: false },
-              prompts: { listChanged: false }
-            },
-            serverInfo: {
-              name: 'zayuno-action-server',
-              version: '1.0.0'
-            }
-          }
-        });
-        return;
-      }
+      const body = req.body;
 
-      if (method === 'prompts/list') {
-        res.json({
-          jsonrpc: '2.0',
-          id,
-          result: {
-            prompts: ZAYUNO_MCP_PROMPTS.map(p => ({
-              name: p.name,
-              description: p.description
-            }))
-          }
-        });
-        return;
-      }
-
-      if (method === 'prompts/get') {
-        const promptName = params?.name;
-        const prompt = ZAYUNO_MCP_PROMPTS.find(p => p.name === promptName);
-        if (!prompt) {
-          res.status(404).json({
-            jsonrpc: '2.0',
-            id,
-            error: { code: -32602, message: `Prompt not found: ${promptName}` }
-          });
-          return;
-        }
-
-        if (promptName === 'welcome') {
-          const apiClient = new ZayunoApiClient();
-          let welcomeText = getWelcomeMessage(null);
-          try {
-            const welcomeInfo = await apiClient.getWelcome();
-            welcomeText = welcomeInfo.customerMessage || welcomeInfo.welcomeMessage || getWelcomeMessage(welcomeInfo.availableServiceCount);
-          } catch {
-            welcomeText = getWelcomeMessage(null);
-          }
-          res.json({
-            jsonrpc: '2.0',
-            id,
-            result: {
-              description: prompt.description,
-              messages: [{ role: 'assistant', content: { type: 'text', text: welcomeText } }]
-            }
-          });
-          return;
-        }
-
-        res.json({
-          jsonrpc: '2.0',
-          id,
-          result: {
-            description: prompt.description,
-            messages: prompt.messages
-          }
-        });
-        return;
-      }
-
-      if (method === 'tools/list') {
-        res.json({
-          jsonrpc: '2.0',
-          id,
-          result: {
-            tools: ZAYUNO_MCP_TOOLS.map(t => ({
-              name: t.name,
-              description: t.description,
-              inputSchema: t.inputSchema,
-              outputSchema: t.outputSchema,
-              annotations: t.annotations
-            }))
-          }
-        });
-        return;
-      }
-
-      if (method === 'tools/call') {
-        const toolName = params?.name;
-        const toolArgs = params?.arguments || {};
-
-        try {
-          const tool = ZAYUNO_MCP_TOOLS.find(candidate => candidate.name === toolName);
-          if (!tool) {
-            res.json({
-              jsonrpc: '2.0',
-              id,
-              error: { code: -32601, message: `Tool not found: ${toolName}` }
-            });
-            return;
-          }
-
-          const apiClient = new ZayunoApiClient();
-
-          // Tool discovery and execution share the same definition. This prevents
-          // an advertised MCP tool from being omitted from a separate dispatcher.
-          const rawResult = await tool.handler(toolArgs, apiClient);
-          const result = stripSensitiveSecrets(rawResult);
-
-          res.json({
-            jsonrpc: '2.0',
-            id,
-            result: {
-              content: [
-                {
-                  type: 'text',
-                  text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
-                }
-              ]
-            }
-          });
-        } catch (err: any) {
-          const friendlyMessage = formatCustomerError(err);
-          res.json({
-            jsonrpc: '2.0',
-            id,
-            result: {
-              isError: true,
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify({
-                    isError: true,
-                    customerMessage: friendlyMessage,
-                    message: friendlyMessage
-                  }, null, 2)
-                }
-              ]
-            }
-          });
+      // Handle batch JSON-RPC requests
+      if (Array.isArray(body)) {
+        const results = await Promise.all(body.map(item => processSingleJsonRpc(item, sessionId)));
+        const responses = results.map(r => r.response).filter(Boolean);
+        if (responses.length === 0) {
+          res.status(204).end();
+        } else {
+          res.json(responses);
         }
         return;
       }
 
-      res.status(400).json({
-        jsonrpc: '2.0',
-        id,
-        error: { code: -32601, message: `Unsupported method: ${method}` }
-      });
+      // Handle single JSON-RPC request / notification
+      const { response, isNotification } = await processSingleJsonRpc(body, sessionId);
+
+      if (isNotification && response === undefined) {
+        res.status(200).json({ jsonrpc: '2.0' });
+        return;
+      }
+
+      if (response?.error && !response.id) {
+        res.status(400).json(response);
+        return;
+      }
+
+      res.status(200).json(response);
       return;
     }
 

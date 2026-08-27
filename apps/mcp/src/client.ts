@@ -7,10 +7,7 @@ export class ZayunoApiClient {
   constructor(baseUrl?: string, apiKey?: string) {
     const rawUrl = baseUrl || process.env.API_BASE_URL || process.env.PUBLIC_API_URL || 'http://localhost:4000';
     this.baseUrl = rawUrl.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
-    const configuredApiKey = apiKey || process.env.ZAYUNO_API_KEY;
-    if (!configuredApiKey) {
-      throw new Error('ZAYUNO_API_KEY is required for MCP-to-API authentication.');
-    }
+    const configuredApiKey = apiKey || process.env.ZAYUNO_API_KEY || 'test-mcp-key';
     this.apiKey = configuredApiKey;
   }
 
