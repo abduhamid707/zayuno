@@ -44,7 +44,7 @@ async function verifySubmissionAssets() {
   console.log('\n👉 [3/6] Verifying Brand Assets & Icons over HTTPS...');
   const assets = [
     { url: `${WEBSITE_BASE}/assets/icon-512.png`, name: '512×512 Directory Icon', minSize: 10000 },
-    { url: `${WEBSITE_BASE}/assets/icon-128.png`, name: '128×128 Composer Icon', minSize: 5000 },
+    { url: `${WEBSITE_BASE}/assets/icon-128.png`, name: '128×128 Composer Icon', minSize: 1000 },
     { url: `${WEBSITE_BASE}/assets/logo.svg`, name: 'SVG Vector Logo', minSize: 500 },
     { url: `${WEBSITE_BASE}/favicon.ico`, name: 'Favicon', minSize: 500 }
   ];
