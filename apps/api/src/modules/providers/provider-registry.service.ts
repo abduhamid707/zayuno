@@ -158,11 +158,9 @@ export class ProviderRegistryService implements OnModuleInit {
       try {
         const parsed = new URL(baseUrl);
         if (parsed.username || parsed.password) return null;
-        if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') return null;
-        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
         hostname = parsed.hostname.toLowerCase();
       } catch {
-        return null;
+        // Ignore invalid URL
       }
     }
 

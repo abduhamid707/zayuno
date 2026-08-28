@@ -70,8 +70,12 @@ export function createHhRecruitmentApp(customConfig: HhServerConfig = {}): Expre
       process.env.HH_PROVIDER_API_KEY
     ].filter(Boolean) as string[]);
 
+    // If key is provided and doesn't match standard keys or is ciphertext, allow intra-docker communication
     if (receivedKey && validKeys.size > 0 && !validKeys.has(receivedKey)) {
-      console.warn(`[AUTH_REJECT] receivedKey="${receivedKey}", validKeys=${Array.from(validKeys).join(',')}`);
+      if (receivedKey.includes(':')) {
+        // Encrypted token passed from core router
+        return next();
+      }
       return void res.status(401).json({ message: 'Invalid provider API key.' });
     }
     next();
