@@ -267,23 +267,16 @@ export class HeadHunterClient {
   public async checkHealth(): Promise<{ status: 'HEALTHY' | 'DEGRADED' | 'DOWN'; latencyMs: number; message: string }> {
     const start = Date.now();
 
-    // Probe 1: Public vacancy search (no auth required)
-    let publicSearchOk = false;
+    // Probe 1: Vacancy search availability (uses auth if configured)
+    let searchOk = false;
     try {
-      const res = await fetch(`${this.apiBaseUrl}/vacancies?per_page=1&area=97`, {
-        method: 'GET',
-        headers: {
-          'User-Agent': this.userAgent,
-          'HH-User-Agent': this.userAgent,
-          'Accept': 'application/json'
-        }
-      });
-      publicSearchOk = res.ok;
+      await this.request('/vacancies', { query: { per_page: 1, area: '97' } });
+      searchOk = true;
     } catch {
-      publicSearchOk = false;
+      searchOk = false;
     }
 
-    if (!publicSearchOk) {
+    if (!searchOk) {
       return {
         status: 'DOWN',
         latencyMs: Date.now() - start,
