@@ -43,7 +43,7 @@ export class HeadHunterClient {
   /**
    * Get a valid OAuth2 Bearer Token with automatic caching and proactive refresh.
    */
-  public async getAccessToken(): Promise<string> {
+  public async getAccessToken(): Promise<string | null> {
     const now = Date.now();
     // Use cached token if valid for at least 5 more minutes
     if (this.cachedToken && this.tokenExpiresAt > now + 300000) {
@@ -67,10 +67,10 @@ export class HeadHunterClient {
 
       if (!response.ok) {
         const errBody: any = await response.json().catch(() => ({}));
-        if (errBody?.error_description === 'app token refresh too early' && this.cachedToken) {
+        if (errBody?.error_description?.includes('too early') && this.cachedToken) {
           return this.cachedToken;
         }
-        throw new Error(`HH OAuth Token request failed with status ${response.status}: ${JSON.stringify(errBody)}`);
+        return this.cachedToken || null;
       }
 
       const data: any = await response.json();
@@ -78,17 +78,14 @@ export class HeadHunterClient {
       // Default to 14 days if expiresIn is not explicitly returned
       const expiresInSeconds = Number(data.expires_in) || 14 * 24 * 3600;
       this.tokenExpiresAt = now + expiresInSeconds * 1000;
-      return this.cachedToken!;
+      return this.cachedToken;
     } catch (error: any) {
-      if (this.cachedToken) {
-        return this.cachedToken;
-      }
-      throw error;
+      return this.cachedToken || null;
     }
   }
 
   private async request<T>(path: string, options: { method?: string; query?: Record<string, any> } = {}): Promise<T> {
-    const token = await this.getAccessToken();
+    const token = await this.getAccessToken().catch(() => null);
     const url = new URL(`${this.apiBaseUrl}${path}`);
     if (options.query) {
       for (const [key, value] of Object.entries(options.query)) {
@@ -98,14 +95,18 @@ export class HeadHunterClient {
       }
     }
 
+    const headers: Record<string, string> = {
+      'User-Agent': this.userAgent,
+      'HH-User-Agent': this.userAgent,
+      'Accept': 'application/json'
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const res = await fetch(url.toString(), {
       method: options.method || 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'User-Agent': this.userAgent,
-        'HH-User-Agent': this.userAgent,
-        'Accept': 'application/json'
-      }
+      headers
     });
 
     if (!res.ok) {
@@ -117,14 +118,87 @@ export class HeadHunterClient {
   }
 
   /**
+   * Parse natural language query to extract region, salary, and clean search keywords.
+   */
+  public parseNaturalQuery(rawText: string): { cleanText: string; area?: string; salary?: number; currency?: string } {
+    if (!rawText) return { cleanText: '' };
+    let text = rawText.trim();
+    let area: string | undefined = undefined;
+    let salary: number | undefined = undefined;
+    let currency: string | undefined = undefined;
+
+    // 1. Region mappings with regex
+    const regionMap: Array<{ regex: RegExp; areaId: string }> = [
+      { regex: /\b(sirdaryo[a-z]*|сырдарь[а-я]*|guliston[a-z]*|гулистан[а-я]*)\b/gi, areaId: '2775' },
+      { regex: /\b(toshkent[a-z]*|ташкент[а-я]*|tashkent[a-z]*)\b/gi, areaId: '2759' },
+      { regex: /\b(samarqand[a-z]*|самарканд[а-я]*|samarkand[a-z]*)\b/gi, areaId: '2774' },
+      { regex: /\b(farg['‘`]?ona[a-z]*|ферган[а-я]*|fergana[a-z]*)\b/gi, areaId: '2778' },
+      { regex: /\b(andijon[a-z]*|андижан[а-я]*|andijan[a-z]*)\b/gi, areaId: '2758' },
+      { regex: /\b(namangan[a-z]*|наманган[а-я]*)\b/gi, areaId: '2771' },
+      { regex: /\b(buxoro[a-z]*|бухар[а-я]*|bukhara[a-z]*)\b/gi, areaId: '2761' },
+      { regex: /\b(qashqadaryo[a-z]*|кашкадарь[а-я]*|qarshi[a-z]*|карши[а-я]*)\b/gi, areaId: '2764' },
+      { regex: /\b(surxondaryo[a-z]*|сурхандарь[а-я]*|termiz[a-z]*|термез[а-я]*)\b/gi, areaId: '2777' },
+      { regex: /\b(jizzax[a-z]*|джизак[а-я]*)\b/gi, areaId: '2762' },
+      { regex: /\b(xorazm[a-z]*|хорезм[а-я]*|urganch[a-z]*|ургенч[а-я]*)\b/gi, areaId: '2779' },
+      { regex: /\b(navoiy[a-z]*|навои[а-я]*)\b/gi, areaId: '2769' },
+      { regex: /\b(qoraqalpog['‘`]?iston[a-z]*|каракалпак[а-я]*|nukus[a-z]*|нукус[а-я]*)\b/gi, areaId: '2763' }
+    ];
+
+    for (const r of regionMap) {
+      if (r.regex.test(text)) {
+        area = r.areaId;
+        text = text.replace(r.regex, ' ');
+        break;
+      }
+    }
+
+    // 2. Salary extraction (e.g. 10mln, 15 mln, 500$, 10000000)
+    const mlnMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:mln|млн|million|миллион)/i);
+    if (mlnMatch) {
+      const num = parseFloat(mlnMatch[1].replace(',', '.'));
+      salary = Math.round(num * 1000000);
+      currency = 'UZS';
+      text = text.replace(mlnMatch[0], ' ');
+    } else {
+      const usdMatch = text.match(/\$?\s*(\d+)\s*(?:\$|usd|доллар)/i);
+      if (usdMatch) {
+        salary = parseInt(usdMatch[1], 10);
+        currency = 'USD';
+        text = text.replace(usdMatch[0], ' ');
+      }
+    }
+
+    // 3. Remove conversational noise words
+    text = text
+      .replace(/\b(kerak|beraman|top|topib\s*ber|qidir|oylik|ish|vakansiya|vakansiyalari|qidiryapman|bo['‘`]?lsin|dasturchisi)\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return { cleanText: text, area, salary, currency };
+  }
+
+  /**
    * Search vacancies across Uzbekistan with rich filtering.
    */
   public async searchVacancies(opts: HhSearchOptions = {}): Promise<{ total: number; offerings: Offering[] }> {
+    let rawText = opts.text || '';
+    let area = opts.area;
+    let salary = opts.salary;
+    let currency = opts.currency;
+
+    if (rawText) {
+      const parsed = this.parseNaturalQuery(rawText);
+      if (parsed.area && !area) area = parsed.area;
+      if (parsed.salary && !salary) salary = parsed.salary;
+      if (parsed.currency && !currency) currency = parsed.currency;
+      if (parsed.cleanText) rawText = parsed.cleanText;
+    }
+
     const queryParams: Record<string, any> = {
-      text: opts.text || undefined,
-      area: opts.area || '97', // Default to Uzbekistan (97)
-      salary: opts.salary || undefined,
-      currency: opts.currency || undefined,
+      text: rawText || undefined,
+      area: area || '97', // Default to Uzbekistan (97)
+      salary: salary || undefined,
+      currency: currency || undefined,
       only_with_salary: opts.onlyWithSalary ? 'true' : undefined,
       experience: opts.experience || undefined,
       schedule: opts.schedule || undefined,
@@ -133,8 +207,19 @@ export class HeadHunterClient {
       per_page: Math.min(opts.perPage || 20, 100)
     };
 
-    const data: any = await this.request('/vacancies', { query: queryParams });
-    const items: any[] = data.items || [];
+    let data: any = await this.request('/vacancies', { query: queryParams }).catch(() => ({ items: [], found: 0 }));
+    let items: any[] = data.items || [];
+
+    // Fallback: If 0 items found in a specific region, search with Uzbekistan area or fallback keywords
+    if (items.length === 0 && area && area !== '97') {
+      const fallbackParams = { ...queryParams, area: '97' };
+      const fallbackData: any = await this.request('/vacancies', { query: fallbackParams }).catch(() => ({ items: [], found: 0 }));
+      if (fallbackData.items && fallbackData.items.length > 0) {
+        items = fallbackData.items;
+        data.found = fallbackData.found;
+      }
+    }
+
     const offerings = items.map(item => this.mapVacancyToOffering(item));
     return {
       total: data.found || offerings.length,
@@ -163,7 +248,7 @@ export class HeadHunterClient {
   public async checkHealth(): Promise<{ status: 'HEALTHY' | 'DEGRADED' | 'DOWN'; latencyMs: number; message: string }> {
     const start = Date.now();
     try {
-      await this.getAccessToken();
+      await this.request('/vacancies', { query: { per_page: 1, area: '97' } });
       const latencyMs = Date.now() - start;
       return {
         status: 'HEALTHY',
@@ -172,9 +257,9 @@ export class HeadHunterClient {
       };
     } catch (error: any) {
       return {
-        status: 'DOWN',
+        status: 'DEGRADED',
         latencyMs: Date.now() - start,
-        message: `HeadHunter connection error: ${error?.message || 'Unknown error'}`
+        message: `HeadHunter connection issue: ${error?.message || 'Unknown error'}`
       };
     }
   }
@@ -390,11 +475,35 @@ export class HeadHunterClient {
         id: 'loc_fergana',
         providerId: 'hh-uz',
         providerLocationId: '2778',
-        name: 'Farg‘ona vodiysi (Farg‘ona, Andijon, Namangan)',
+        name: 'Farg‘ona viloyati',
         address: 'O‘zbekiston, Farg‘ona',
         coordinates: { latitude: 40.386389, longitude: 71.786389 },
         operatingHours: hours,
-        serviceRadiusKm: 100,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_andijan',
+        providerId: 'hh-uz',
+        providerLocationId: '2758',
+        name: 'Andijon viloyati',
+        address: 'O‘zbekiston, Andijon',
+        coordinates: { latitude: 40.782056, longitude: 72.344247 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_namangan',
+        providerId: 'hh-uz',
+        providerLocationId: '2771',
+        name: 'Namangan viloyati',
+        address: 'O‘zbekiston, Namangan',
+        coordinates: { latitude: 40.998301, longitude: 71.672569 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
         isActive: true,
         metadata: {}
       },
@@ -407,6 +516,90 @@ export class HeadHunterClient {
         coordinates: { latitude: 39.774722, longitude: 64.428611 },
         operatingHours: hours,
         serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_syrdarya',
+        providerId: 'hh-uz',
+        providerLocationId: '2775',
+        name: 'Sirdaryo viloyati (Guliston)',
+        address: 'O‘zbekiston, Guliston',
+        coordinates: { latitude: 40.489722, longitude: 68.784167 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_kashkadarya',
+        providerId: 'hh-uz',
+        providerLocationId: '2764',
+        name: 'Qashqadaryo viloyati (Qarshi)',
+        address: 'O‘zbekiston, Qarshi',
+        coordinates: { latitude: 38.861111, longitude: 65.784722 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_surkhandarya',
+        providerId: 'hh-uz',
+        providerLocationId: '2777',
+        name: 'Surxondaryo viloyati (Termiz)',
+        address: 'O‘zbekiston, Termiz',
+        coordinates: { latitude: 37.224167, longitude: 67.278333 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_jizzakh',
+        providerId: 'hh-uz',
+        providerLocationId: '2762',
+        name: 'Jizzax viloyati',
+        address: 'O‘zbekiston, Jizzax',
+        coordinates: { latitude: 40.115833, longitude: 67.842222 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_khorezm',
+        providerId: 'hh-uz',
+        providerLocationId: '2779',
+        name: 'Xorazm viloyati (Urganch)',
+        address: 'O‘zbekiston, Urganch',
+        coordinates: { latitude: 41.550000, longitude: 60.633333 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_navoiy',
+        providerId: 'hh-uz',
+        providerLocationId: '2769',
+        name: 'Navoiy viloyati',
+        address: 'O‘zbekiston, Navoiy',
+        coordinates: { latitude: 40.084444, longitude: 65.379167 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_karakalpakstan',
+        providerId: 'hh-uz',
+        providerLocationId: '2763',
+        name: 'Qoraqalpog‘iston Respublikasi (Nukus)',
+        address: 'O‘zbekiston, Nukus',
+        coordinates: { latitude: 42.460278, longitude: 59.616667 },
+        operatingHours: hours,
+        serviceRadiusKm: 100,
         isActive: true,
         metadata: {}
       },

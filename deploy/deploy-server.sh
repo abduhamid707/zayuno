@@ -155,8 +155,15 @@ fi
 # 7. Recreate containers with new images
 if [ -n "$SERVICES" ]; then
   log_info "Recreating target containers..."
+  for svc in $SERVICES; do
+    docker compose -f docker-compose.prod.yml stop --timeout 10 "$svc" 2>/dev/null || true
+    docker compose -f docker-compose.prod.yml rm -f "$svc" 2>/dev/null || true
+  done
   # shellcheck disable=SC2086
   docker compose -f docker-compose.prod.yml up -d --no-deps $SERVICES
+  if [[ " $SERVICES " =~ " hh-recruitment " ]]; then
+    docker network connect --alias hh-recruitment zayuno_zayuno_net zayuno-hh-recruitment 2>/dev/null || true
+  fi
 else
   log_info "No runtime service changed; skipping container recreation."
 fi
