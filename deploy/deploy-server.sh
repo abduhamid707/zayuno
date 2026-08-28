@@ -7,7 +7,7 @@ set -euo pipefail
 # ==============================================================================
 
 DEPLOY_SHA="${1:?Deploy commit SHA is required}"
-SERVICES="${2:-mock-evos mock-coffee-time mock-poyez api mcp admin provider-portal worker}"
+SERVICES="${2:-mock-evos mock-coffee-time mock-poyez hh-recruitment api mcp admin provider-portal worker}"
 IMAGE_PREFIX="${3:-ghcr.io/zayuno}"
 RUN_MIGRATIONS="${4:-true}"
 
@@ -37,7 +37,7 @@ fi
 
 log_info "Starting zero-downtime deployment for SHA: $DEPLOY_SHA"
 
-ALL_SERVICES="mock-evos mock-coffee-time mock-poyez api mcp admin provider-portal worker"
+ALL_SERVICES="mock-evos mock-coffee-time mock-poyez hh-recruitment api mcp admin provider-portal worker"
 if [ "$SERVICES" = "all" ]; then
   SERVICES="$ALL_SERVICES"
 fi

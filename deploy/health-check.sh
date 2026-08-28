@@ -31,6 +31,7 @@ INTERNAL_TARGETS=(
   "provider-portal|http://127.0.0.1:4104"
   "mock-coffee-time|http://127.0.0.1:4105/health"
   "mock-poyez|http://127.0.0.1:4106/health"
+  "hh-recruitment|http://127.0.0.1:4108/health"
 )
 
 target_for_service() {
@@ -42,6 +43,7 @@ target_for_service() {
     provider-portal) echo "provider-portal|http://127.0.0.1:4104" ;;
     mock-coffee-time) echo "mock-coffee-time|http://127.0.0.1:4105/health" ;;
     mock-poyez) echo "mock-poyez|http://127.0.0.1:4106/health" ;;
+    hh-recruitment) echo "hh-recruitment|http://127.0.0.1:4108/health" ;;
     worker) echo "" ;; # Background worker has no HTTP port to health check
     *) return 1 ;;
   esac

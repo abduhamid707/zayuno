@@ -316,6 +316,7 @@ async function main() {
   const HH_RECRUITMENT_BASE_URL = process.env.HH_RECRUITMENT_PROVIDER_BASE_URL || (
     process.env.NODE_ENV === 'production' ? 'http://hh-recruitment:4008' : 'http://localhost:4008'
   );
+  const encryptedHhSecret = encryptSecret(process.env.HH_PROVIDER_API_KEY || 'hh_recruitment_provider_secret_12345', ENCRYPTION_KEY);
   const hhProvider = await prisma.provider.upsert({
     where: { slug: 'hh-uz' },
     update: {
@@ -324,7 +325,7 @@ async function main() {
       type: ProviderType.SERVICES,
       adapterType: 'remote-http',
       baseUrl: HH_RECRUITMENT_BASE_URL,
-      encryptedSecret: encryptedSandboxSecret,
+      encryptedSecret: encryptedHhSecret,
       capabilities: [
         ProviderCapability.METADATA,
         ProviderCapability.HEALTH,
@@ -369,7 +370,7 @@ async function main() {
       type: ProviderType.SERVICES,
       adapterType: 'remote-http',
       baseUrl: HH_RECRUITMENT_BASE_URL,
-      encryptedSecret: encryptedSandboxSecret,
+      encryptedSecret: encryptedHhSecret,
       webhookSecret: WEBHOOK_SECRET,
       capabilities: [
         ProviderCapability.METADATA,

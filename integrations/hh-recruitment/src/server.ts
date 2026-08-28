@@ -23,7 +23,7 @@ export function createHhRecruitmentApp(customConfig: HhServerConfig = {}): Expre
   const clientId = customConfig.clientId || process.env.HH_CLIENT_ID || 'GDA6CB0JF48PE0PES2VM89IU10AP6N4KS0677Q8Q9QV2JHJ70VP6I2IC1POE98DF';
   const clientSecret = customConfig.clientSecret || process.env.HH_CLIENT_SECRET || 'RQJ6OAKVK18K5Q5CLLNPAV4NN5R6P9AV1FIPM5E07T1V0H19NJD8VNJS16F5GN78';
   const userAgent = customConfig.userAgent || process.env.HH_USER_AGENT || 'Zayuno/1.0 (support@zayuno.uz)';
-  const apiKey = customConfig.apiKey || process.env.PROVIDER_API_KEY || '';
+  const apiKey = customConfig.apiKey || process.env.PROVIDER_API_KEY || 'sandbox_secret_token_live_xyz_987654';
 
   const hhClient = new HeadHunterClient({
     clientId,

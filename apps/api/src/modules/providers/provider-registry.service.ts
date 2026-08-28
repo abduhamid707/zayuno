@@ -186,6 +186,12 @@ export class ProviderRegistryService implements OnModuleInit {
       return secret || null;
     }
 
+    // 4. HeadHunter Uzbekistan Live Recruitment Provider
+    if (hostname === 'hh-recruitment' || cleanSlug === 'hh-uz' || cleanSlug === 'hh-recruitment') {
+      const secret = process.env.HH_PROVIDER_API_KEY?.trim() || 'hh_recruitment_provider_secret_12345';
+      return secret || null;
+    }
+
     // Strict fail-closed: No server-side test credentials for any other URL/domain
     return null;
   }
