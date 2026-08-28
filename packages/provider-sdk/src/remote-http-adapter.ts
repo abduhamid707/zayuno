@@ -76,11 +76,19 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
     const normalized = value.replace(/\/+$/, '');
     if (!normalized) return normalized;
     let url: URL;
-    try { url = new URL(normalized); } catch { throw new Error('Provider baseUrl must be a valid absolute HTTPS URL.'); }
+    try { url = new URL(normalized); } catch { throw new Error('Provider baseUrl must be a valid absolute URL.'); }
     const host = url.hostname.toLowerCase();
     const isPrivate = this.isPrivateAddress(host);
-    if (process.env.NODE_ENV === 'production' && (url.protocol !== 'https:' || isPrivate)) {
-      throw new Error('Provider baseUrl must be public HTTPS and must not target private or loopback networks.');
+    const isInternalDockerHost = /^[a-z0-9-_]+$/i.test(host) && !host.includes('.');
+    const allowInternal = process.env.ALLOW_INTERNAL_PROVIDERS === 'true' || isInternalDockerHost;
+
+    if (process.env.NODE_ENV === 'production') {
+      if (isInternalDockerHost && allowInternal) {
+        return normalized;
+      }
+      if (url.protocol !== 'https:' || isPrivate) {
+        throw new Error('Provider baseUrl must be public HTTPS and must not target private or loopback networks.');
+      }
     }
     return normalized;
   }
@@ -99,6 +107,8 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
   private async assertResolvedAddressIsPublic(): Promise<void> {
     if (process.env.NODE_ENV !== 'production') return;
     const host = new URL(this.targetUrl).hostname;
+    const isInternalDockerHost = /^[a-z0-9-_]+$/i.test(host) && !host.includes('.');
+    if (isInternalDockerHost) return;
     if (isIP(host)) return;
     const addresses = await lookup(host, { all: true, verbatim: true });
     if (!addresses.length || addresses.some(({ address }) => this.isPrivateAddress(address))) {

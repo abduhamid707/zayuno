@@ -150,6 +150,7 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - ALLOW_INSECURE_DEV_AUTH=false
+      - ALLOW_INTERNAL_PROVIDERS=true
       - CORS_ORIGINS=https://zayuno.uz,https://developers.zayuno.uz,https://admin.zayuno.uz,https://partners.zayuno.uz
       - ENABLE_SWAGGER=false
       - ZAYUNO_WEBHOOK_SECRET=${ZAYUNO_WEBHOOK_SECRET:?ZAYUNO_WEBHOOK_SECRET is required}
