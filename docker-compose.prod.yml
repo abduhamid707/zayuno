@@ -128,6 +128,8 @@ services:
       - HH_USER_AGENT=${HH_USER_AGENT:-Zayuno/1.0 (support@zayuno.uz)}
       - PROVIDER_API_KEY=${HH_PROVIDER_API_KEY:?HH_PROVIDER_API_KEY is required}
       - CORS_ALLOWED_ORIGINS=https://zayuno.uz,https://admin.zayuno.uz,https://partners.zayuno.uz,https://developers.zayuno.uz,https://mcp.zayuno.uz
+    volumes:
+      - zayuno_hh_cache:/app/.cache
     networks:
       - zayuno_net
 
@@ -275,3 +277,5 @@ volumes:
 networks:
   zayuno_net:
     driver: bridge
+    z a y u n o _ h h _ c a c h e :  
+ 

@@ -40,14 +40,34 @@ export class HeadHunterClient {
     this.authBaseUrl = (config.authBaseUrl || 'https://hh.ru').replace(/\/$/, '');
   }
 
+  private get cacheFilePath(): string {
+    return require('path').join(process.cwd(), '.cache', '.hh-token-cache.json');
+  }
+
   /**
    * Get a valid OAuth2 Bearer Token with automatic caching and proactive refresh.
    */
   public async getAccessToken(): Promise<string | null> {
     const now = Date.now();
-    // Use cached token if valid for at least 5 more minutes
+    
+    // 1. Try memory cache
     if (this.cachedToken && this.tokenExpiresAt > now + 300000) {
       return this.cachedToken;
+    }
+
+    // 2. Try file cache
+    try {
+      const fs = require('fs');
+      if (fs.existsSync(this.cacheFilePath)) {
+        const fileData = JSON.parse(fs.readFileSync(this.cacheFilePath, 'utf8'));
+        if (fileData.cachedToken && fileData.tokenExpiresAt > now + 300000) {
+          this.cachedToken = fileData.cachedToken;
+          this.tokenExpiresAt = fileData.tokenExpiresAt;
+          return this.cachedToken;
+        }
+      }
+    } catch (err) {
+      // Ignore file read errors
     }
 
     try {
@@ -78,6 +98,23 @@ export class HeadHunterClient {
       // Default to 14 days if expiresIn is not explicitly returned
       const expiresInSeconds = Number(data.expires_in) || 14 * 24 * 3600;
       this.tokenExpiresAt = now + expiresInSeconds * 1000;
+
+      // Save to file cache
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const dir = path.dirname(this.cacheFilePath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(this.cacheFilePath, JSON.stringify({
+          cachedToken: this.cachedToken,
+          tokenExpiresAt: this.tokenExpiresAt
+        }), 'utf8');
+      } catch (err) {
+        // Ignore file write errors
+      }
+
       return this.cachedToken;
     } catch (error: any) {
       return this.cachedToken || null;
@@ -211,9 +248,10 @@ export class HeadHunterClient {
     try {
       data = await this.request('/vacancies', { query: queryParams });
     } catch (err: any) {
+      console.error('HH API Search Error:', err.message || err);
       // Do NOT swallow upstream HTTP errors as empty results.
       // Let callers distinguish "0 results found" from "upstream failed".
-      throw new Error('Upstream recruitment service unavailable');
+      throw new Error(`Upstream recruitment service unavailable: ${err.message}`);
     }
     let items: any[] = data.items || [];
 
