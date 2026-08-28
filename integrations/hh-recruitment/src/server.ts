@@ -1,5 +1,6 @@
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import cors, { type CorsOptions } from 'cors';
+import crypto from 'crypto';
 import {
   ProviderCapability,
   ProviderStatus,
@@ -20,10 +21,22 @@ export interface HhServerConfig {
 export function createHhRecruitmentApp(customConfig: HhServerConfig = {}): Express {
   const app = express();
 
-  const clientId = customConfig.clientId || process.env.HH_CLIENT_ID || 'GDA6CB0JF48PE0PES2VM89IU10AP6N4KS0677Q8Q9QV2JHJ70VP6I2IC1POE98DF';
-  const clientSecret = customConfig.clientSecret || process.env.HH_CLIENT_SECRET || 'RQJ6OAKVK18K5Q5CLLNPAV4NN5R6P9AV1FIPM5E07T1V0H19NJD8VNJS16F5GN78';
+  // Credentials — env-only; no hardcoded fallbacks in production.
+  // customConfig fields are accepted in test fixtures only.
+  const clientId = customConfig.clientId || process.env.HH_CLIENT_ID || '';
+  const clientSecret = customConfig.clientSecret || process.env.HH_CLIENT_SECRET || '';
   const userAgent = customConfig.userAgent || process.env.HH_USER_AGENT || 'Zayuno/1.0 (support@zayuno.uz)';
-  const apiKey = customConfig.apiKey || process.env.PROVIDER_API_KEY || 'sandbox_secret_token_live_xyz_987654';
+  const apiKey = customConfig.apiKey || process.env.PROVIDER_API_KEY || process.env.HH_PROVIDER_API_KEY || '';
+
+  // Fail closed: refuse to start if required credentials are missing in production
+  if (process.env.NODE_ENV === 'production') {
+    if (!clientId || !clientSecret) {
+      throw new Error('HH_CLIENT_ID and HH_CLIENT_SECRET environment variables are required in production.');
+    }
+    if (!apiKey) {
+      throw new Error('PROVIDER_API_KEY (or HH_PROVIDER_API_KEY) environment variable is required in production.');
+    }
+  }
 
   const hhClient = new HeadHunterClient({
     clientId,
@@ -60,23 +73,45 @@ export function createHhRecruitmentApp(customConfig: HhServerConfig = {}): Expre
     return next(error);
   });
   app.use(express.json());
-  const auth = (req: Request, res: Response, next: () => void) => {
-    const receivedKey = req.header('x-provider-api-key') || req.header('authorization')?.replace(/^Bearer\s+/i, '');
-    const validKeys = new Set([
-      apiKey,
-      'hh_recruitment_provider_secret_12345',
-      'sandbox_secret_token_live_xyz_987654',
-      process.env.PROVIDER_API_KEY,
-      process.env.HH_PROVIDER_API_KEY
-    ].filter(Boolean) as string[]);
 
-    // If key is provided and doesn't match standard keys or is ciphertext, allow intra-docker communication
-    if (receivedKey && validKeys.size > 0 && !validKeys.has(receivedKey)) {
-      if (receivedKey.includes(':')) {
-        // Encrypted token passed from core router
-        return next();
-      }
-      return void res.status(401).json({ message: 'Invalid provider API key.' });
+  /**
+   * Strict provider API key authentication middleware.
+   * - /health is always public — no auth required.
+   * - All other routes require x-provider-api-key or Authorization: Bearer <key>.
+   * - Uses crypto.timingSafeEqual to prevent timing attacks.
+   * - No includes(':') bypass or any other special-case shortcut.
+   * - Missing or invalid key → 401 with a generic message (no key details in response).
+   * - Always fail-closed: if PROVIDER_API_KEY is not configured, ALL requests return 401.
+   */
+  const auth = (req: Request, res: Response, next: () => void) => {
+    const receivedKey = (
+      req.header('x-provider-api-key') ||
+      req.header('authorization')?.replace(/^Bearer\s+/i, '') ||
+      ''
+    ).trim();
+
+    // Missing key → always 401
+    if (!receivedKey) {
+      return void res.status(401).json({ message: 'Invalid or missing provider API key.' });
+    }
+
+    // Fail-closed: if server has no configured API key, reject everything.
+    // A misconfigured container must NOT become an open proxy.
+    if (!apiKey) {
+      return void res.status(401).json({ message: 'Invalid or missing provider API key.' });
+    }
+
+    // Timing-safe comparison to prevent side-channel timing attacks
+    const expected = Buffer.from(apiKey);
+    const received = Buffer.from(receivedKey);
+    // Pad to equal length before comparison (timingSafeEqual requires same length)
+    const maxLen = Math.max(expected.length, received.length);
+    const paddedExpected = Buffer.concat([expected, Buffer.alloc(maxLen - expected.length)]);
+    const paddedReceived = Buffer.concat([received, Buffer.alloc(maxLen - received.length)]);
+
+    const isValid = crypto.timingSafeEqual(paddedExpected, paddedReceived) && expected.length === received.length;
+    if (!isValid) {
+      return void res.status(401).json({ message: 'Invalid or missing provider API key.' });
     }
     next();
   };

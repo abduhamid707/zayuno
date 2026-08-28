@@ -110,6 +110,33 @@ if [ ! -f "/etc/letsencrypt/live/poyez-sandbox.shopla.uz/fullchain.pem" ] || [ !
   exit 1
 fi
 
+# HeadHunter provider preflight — required before any deploy that includes hh-recruitment.
+# Values are NEVER printed or logged — only presence and minimum length (16 chars) are validated.
+if echo " $SERVICES " | grep -q ' hh-recruitment '; then
+  log_info "Validating HeadHunter provider environment variables..."
+
+  if ! grep -Eq '^HH_CLIENT_ID=.{16,}$' "$REMOTE_DIR/.env"; then
+    log_error "HH_CLIENT_ID is missing or too short in .env (minimum 16 characters required)."
+    log_error "Register at https://dev.hh.ru/ and set HH_CLIENT_ID in $REMOTE_DIR/.env before deploying."
+    exit 1
+  fi
+
+  if ! grep -Eq '^HH_CLIENT_SECRET=.{16,}$' "$REMOTE_DIR/.env"; then
+    log_error "HH_CLIENT_SECRET is missing or too short in .env (minimum 16 characters required)."
+    log_error "Register at https://dev.hh.ru/ and set HH_CLIENT_SECRET in $REMOTE_DIR/.env before deploying."
+    exit 1
+  fi
+
+  if ! grep -Eq '^HH_PROVIDER_API_KEY=.{16,}$' "$REMOTE_DIR/.env"; then
+    log_error "HH_PROVIDER_API_KEY is missing or too short in .env (minimum 16 characters required)."
+    log_error "Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+    log_error "Then set HH_PROVIDER_API_KEY in $REMOTE_DIR/.env before deploying."
+    exit 1
+  fi
+
+  log_success "HeadHunter provider environment variables validated (values not logged)."
+fi
+
 # 4. Record previous release SHA
 PREVIOUS_SHA=""
 if [ -f "$CURRENT_SHA_FILE" ]; then

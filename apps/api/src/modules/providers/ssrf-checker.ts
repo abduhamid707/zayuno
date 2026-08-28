@@ -3,6 +3,7 @@ import https from 'https';
 import { lookup as dnsLookup } from 'dns';
 import { lookup as dnsLookupPromise } from 'dns/promises';
 import { isIP } from 'net';
+import { isTrustedInternalProviderTarget } from '@zayuno/shared';
 
 export function isPrivateOrReservedIp(addr: string): boolean {
   const value = addr.toLowerCase().trim();
@@ -58,26 +59,34 @@ export class SsrfSecurityError extends Error {
  * - Checks DNS resolutions at socket creation time to eliminate TOCTOU / rebinding attacks.
  * - Streams chunks and destroys socket immediately if response body exceeds maxBytes (64KB).
  * - Imposes hard 5000ms timeout with immediate abort.
+ * - `providerSlug` may be supplied to allow exact-allowlisted internal provider probes in production.
  */
 export async function executeSsrfSafeGet(
   rawUrl: string,
   headers: Record<string, string>,
-  options: { timeoutMs?: number; maxBytes?: number; allowLocalDev?: boolean } = {}
+  options: { timeoutMs?: number; maxBytes?: number; allowLocalDev?: boolean; providerSlug?: string } = {}
 ): Promise<SsrfSafeGetResult> {
   const timeoutMs = options.timeoutMs || 5000;
   const maxBytes = options.maxBytes || 65536;
   const isDevOrTest = process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'staging';
   const allowLocalDev = Boolean(options.allowLocalDev && isDevOrTest);
 
+  // Check allowlist FIRST вЂ” trusted internal provider targets skip production HTTP/private-IP checks.
+  // Cloud metadata hosts are NEVER allowed regardless.
+  const isTrustedInternal = options.providerSlug
+    ? isTrustedInternalProviderTarget(options.providerSlug, rawUrl)
+    : false;
+
+
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
   } catch {
-    throw new SsrfSecurityError('INVALID_URL', 'Noto‘g‘ri URL formati kiritildi.');
+    throw new SsrfSecurityError('INVALID_URL', 'URL format xato.');
   }
 
   if (parsed.username || parsed.password) {
-    throw new SsrfSecurityError('INVALID_URL', 'URL ichida username yoki password bo‘lishi taqiqlangan.');
+    throw new SsrfSecurityError('INVALID_URL', 'URL userinfo not allowed.');
   }
 
   const hostname = parsed.hostname.toLowerCase();
@@ -89,17 +98,17 @@ export async function executeSsrfSafeGet(
   const isHttp = parsed.protocol === 'http:';
 
   if (!isHttps && !isHttp) {
-    throw new SsrfSecurityError('INVALID_URL', 'Faqat HTTP yoki HTTPS protokoli qo‘llab-quvvatlanadi.');
+    throw new SsrfSecurityError('INVALID_URL', 'Only HTTP or HTTPS protocol is supported.');
   }
 
-  if (process.env.NODE_ENV === 'production' && !isHttps) {
+  if (process.env.NODE_ENV === 'production' && !isHttps && !isTrustedInternal) {
     throw new SsrfSecurityError('INVALID_URL', 'Production muhitida faqat xavfsiz HTTPS protokoli qabul qilinadi.');
   }
 
   const isExplicitLocalHost = ['localhost', '127.0.0.1', '::1'].includes(hostname);
 
-  // Pre-resolve DNS
-  if (!allowLocalDev || !isExplicitLocalHost) {
+  // Pre-resolve DNS вЂ” skip for trusted internal Docker hostnames (they resolve only inside the Docker network)
+  if (!isTrustedInternal && (!allowLocalDev || !isExplicitLocalHost)) {
     if (isPrivateOrReservedIp(hostname)) {
       throw new SsrfSecurityError('FORBIDDEN_ADDRESS', 'Private yoki loopback IP manzillariga murojaat qilish bloklangan.');
     }
@@ -107,13 +116,14 @@ export async function executeSsrfSafeGet(
     try {
       const resolved = isIP(hostname) ? [{ address: hostname }] : await dnsLookupPromise(hostname, { all: true, verbatim: true });
       if (!resolved.length || resolved.some(r => isPrivateOrReservedIp(r.address) || isCloudMetadataHost(r.address))) {
-        throw new SsrfSecurityError('FORBIDDEN_ADDRESS', 'Domen ichki tarmoq yoki cloud metadata IP manziliga yo‘naltirilgan.');
+        throw new SsrfSecurityError('FORBIDDEN_ADDRESS', 'Domain resolves to private/cloud metadata IP.');
       }
     } catch (err: any) {
       if (err instanceof SsrfSecurityError) throw err;
       throw new SsrfSecurityError('UNREACHABLE', 'DNS tekshiruvi muvaffaqiyatsiz: domen topilmadi.');
     }
   }
+
 
   const client = isHttps ? https : http;
   const startTime = Date.now();
@@ -142,10 +152,10 @@ export async function executeSsrfSafeGet(
             for (const item of addrs) {
               const addrStr = typeof item === 'string' ? item : item.address;
               if (isCloudMetadataHost(addrStr)) {
-                return cb(new SsrfSecurityError('FORBIDDEN_ADDRESS', 'DNS cloud metadata manziliga yo‘naltirildi.'), address, family);
+                return cb(new SsrfSecurityError('FORBIDDEN_ADDRESS', 'DNS resolves to cloud metadata IP.'), address, family);
               }
-              if ((!allowLocalDev || !isExplicitLocalHost) && isPrivateOrReservedIp(addrStr)) {
-                return cb(new SsrfSecurityError('FORBIDDEN_ADDRESS', 'DNS ichki tarmoq IP manziliga yo‘naltirildi.'), address, family);
+              if ((!allowLocalDev || !isExplicitLocalHost) && !isTrustedInternal && isPrivateOrReservedIp(addrStr)) {
+                return cb(new SsrfSecurityError('FORBIDDEN_ADDRESS', 'DNS resolves to private/internal IP.'), address, family);
               }
             }
             cb(null, address, family);
@@ -213,7 +223,7 @@ export async function executeSsrfSafeGet(
           }
           return;
         }
-        if ((!allowLocalDev || !isExplicitLocalHost) && isPrivateOrReservedIp(remoteIp)) {
+        if ((!allowLocalDev || !isExplicitLocalHost) && !isTrustedInternal && isPrivateOrReservedIp(remoteIp)) {
           if (!finished) {
             finished = true;
             cleanup();

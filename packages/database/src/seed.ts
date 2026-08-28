@@ -316,7 +316,13 @@ async function main() {
   const HH_RECRUITMENT_BASE_URL = process.env.HH_RECRUITMENT_PROVIDER_BASE_URL || (
     process.env.NODE_ENV === 'production' ? 'http://hh-recruitment:4008' : 'http://localhost:4008'
   );
-  const encryptedHhSecret = encryptSecret(process.env.HH_PROVIDER_API_KEY || 'hh_recruitment_provider_secret_12345', ENCRYPTION_KEY);
+  // Seed secret: required from env in production; use a non-functional placeholder in dev/test.
+  const hhSeedSecret = process.env.HH_PROVIDER_API_KEY || (
+    process.env.NODE_ENV === 'production'
+      ? (() => { throw new Error('HH_PROVIDER_API_KEY is required in production.'); })()
+      : 'hh_local_dev_placeholder'
+  );
+  const encryptedHhSecret = encryptSecret(hhSeedSecret, ENCRYPTION_KEY);
   const hhProvider = await prisma.provider.upsert({
     where: { slug: 'hh-uz' },
     update: {

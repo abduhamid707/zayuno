@@ -247,7 +247,8 @@ export class ProviderHealthMonitorService implements OnModuleInit, OnModuleDestr
       const res = await executeSsrfSafeGet(healthUrl, headers, {
         timeoutMs,
         maxBytes: 65536,
-        allowLocalDev: process.env.NODE_ENV !== 'production'
+        allowLocalDev: process.env.NODE_ENV !== 'production',
+        providerSlug: provider.slug
       });
 
       const latencyMs = Date.now() - start;

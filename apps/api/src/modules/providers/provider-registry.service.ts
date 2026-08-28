@@ -186,7 +186,7 @@ export class ProviderRegistryService implements OnModuleInit {
 
     // 4. HeadHunter Uzbekistan Live Recruitment Provider
     if (hostname === 'hh-recruitment' || cleanSlug === 'hh-uz' || cleanSlug === 'hh-recruitment') {
-      const secret = process.env.HH_PROVIDER_API_KEY?.trim() || 'hh_recruitment_provider_secret_12345';
+      const secret = process.env.HH_PROVIDER_API_KEY?.trim();
       return secret || null;
     }
 

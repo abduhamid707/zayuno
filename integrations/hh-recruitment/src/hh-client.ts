@@ -207,13 +207,25 @@ export class HeadHunterClient {
       per_page: Math.min(opts.perPage || 20, 100)
     };
 
-    let data: any = await this.request('/vacancies', { query: queryParams }).catch(() => ({ items: [], found: 0 }));
+    let data: any;
+    try {
+      data = await this.request('/vacancies', { query: queryParams });
+    } catch (err: any) {
+      // Do NOT swallow upstream HTTP errors as empty results.
+      // Let callers distinguish "0 results found" from "upstream failed".
+      throw new Error('Upstream recruitment service unavailable');
+    }
     let items: any[] = data.items || [];
 
     // Fallback: If 0 items found in a specific region, search with Uzbekistan area or fallback keywords
     if (items.length === 0 && area && area !== '97') {
       const fallbackParams = { ...queryParams, area: '97' };
-      const fallbackData: any = await this.request('/vacancies', { query: fallbackParams }).catch(() => ({ items: [], found: 0 }));
+      let fallbackData: any;
+      try {
+        fallbackData = await this.request('/vacancies', { query: fallbackParams });
+      } catch {
+        fallbackData = { items: [], found: 0 };
+      }
       if (fallbackData.items && fallbackData.items.length > 0) {
         items = fallbackData.items;
         data.found = fallbackData.found;
@@ -244,25 +256,68 @@ export class HeadHunterClient {
 
   /**
    * Check connection health to HeadHunter API.
+   * Probe 1: Public vacancy search availability (must succeed for any useful operation).
+   * Probe 2: OAuth client credentials token fetch (needed for employer-only features).
+   *
+   * Status semantics:
+   *   HEALTHY  — both probes passed
+   *   DEGRADED — public search OK, OAuth credentials unconfigured or failing
+   *   DOWN     — public search unreachable (upstream HH API down)
    */
   public async checkHealth(): Promise<{ status: 'HEALTHY' | 'DEGRADED' | 'DOWN'; latencyMs: number; message: string }> {
     const start = Date.now();
+
+    // Probe 1: Public vacancy search (no auth required)
+    let publicSearchOk = false;
     try {
-      await this.request('/vacancies', { query: { per_page: 1, area: '97' } });
-      const latencyMs = Date.now() - start;
+      const res = await fetch(`${this.apiBaseUrl}/vacancies?per_page=1&area=97`, {
+        method: 'GET',
+        headers: {
+          'User-Agent': this.userAgent,
+          'HH-User-Agent': this.userAgent,
+          'Accept': 'application/json'
+        }
+      });
+      publicSearchOk = res.ok;
+    } catch {
+      publicSearchOk = false;
+    }
+
+    if (!publicSearchOk) {
+      return {
+        status: 'DOWN',
+        latencyMs: Date.now() - start,
+        message: 'Upstream HeadHunter API unreachable.'
+      };
+    }
+
+    // Probe 2: OAuth client credentials readiness
+    let oauthOk = false;
+    try {
+      const token = await this.getAccessToken();
+      oauthOk = typeof token === 'string' && token.length > 0;
+    } catch {
+      oauthOk = false;
+    }
+
+    const latencyMs = Date.now() - start;
+
+    if (oauthOk) {
       return {
         status: 'HEALTHY',
         latencyMs,
         message: 'HeadHunter Uzbekistan API gateway operational.'
       };
-    } catch (error: any) {
-      return {
-        status: 'DEGRADED',
-        latencyMs: Date.now() - start,
-        message: `HeadHunter connection issue: ${error?.message || 'Unknown error'}`
-      };
     }
+
+    // Public search works but OAuth is degraded (no credentials configured or token rejected)
+    return {
+      status: 'DEGRADED',
+      latencyMs,
+      message: 'Public vacancy search operational; OAuth credentials unconfigured or degraded.'
+    };
   }
+
 
   /**
    * Convert an HH Vacancy object to a standardized Zayuno Offering.
