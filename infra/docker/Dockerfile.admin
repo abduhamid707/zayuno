@@ -1,6 +1,6 @@
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9.15.0
 
 COPY package.json pnpm-workspace.yaml turbo.json tsconfig.base.json ./
 COPY apps/admin ./apps/admin

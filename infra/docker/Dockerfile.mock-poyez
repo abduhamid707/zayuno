@@ -1,6 +1,6 @@
 FROM node:20-alpine
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9.15.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
 COPY packages/contracts/package.json ./packages/contracts/package.json
 COPY integrations/mock-poyez/package.json ./integrations/mock-poyez/package.json
