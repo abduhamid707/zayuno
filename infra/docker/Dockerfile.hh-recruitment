@@ -1,0 +1,13 @@
+FROM node:20-alpine
+WORKDIR /app
+RUN npm install -g pnpm
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY packages/contracts/package.json ./packages/contracts/package.json
+COPY integrations/hh-recruitment/package.json ./integrations/hh-recruitment/package.json
+RUN pnpm install --filter @zayuno/hh-recruitment... --frozen-lockfile
+COPY packages/contracts ./packages/contracts
+COPY integrations/hh-recruitment ./integrations/hh-recruitment
+RUN pnpm --filter @zayuno/contracts run build
+RUN pnpm --filter @zayuno/hh-recruitment run build
+EXPOSE 4008
+CMD ["node", "integrations/hh-recruitment/dist/index.js"]

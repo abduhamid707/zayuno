@@ -1,0 +1,427 @@
+import fetch from 'node-fetch';
+import { type CatalogCategory, type Location, type Offering } from '@zayuno/contracts';
+
+export interface HhClientConfig {
+  clientId: string;
+  clientSecret: string;
+  userAgent?: string;
+  apiBaseUrl?: string;
+  authBaseUrl?: string;
+}
+
+export interface HhSearchOptions {
+  text?: string;
+  area?: string;
+  salary?: number;
+  currency?: string;
+  onlyWithSalary?: boolean;
+  experience?: string;
+  schedule?: string;
+  employment?: string;
+  page?: number;
+  perPage?: number;
+}
+
+export class HeadHunterClient {
+  private clientId: string;
+  private clientSecret: string;
+  private userAgent: string;
+  private apiBaseUrl: string;
+  private authBaseUrl: string;
+
+  private cachedToken: string | null = null;
+  private tokenExpiresAt: number = 0;
+
+  constructor(config: HhClientConfig) {
+    this.clientId = config.clientId;
+    this.clientSecret = config.clientSecret;
+    this.userAgent = config.userAgent || 'Zayuno/1.0 (support@zayuno.uz)';
+    this.apiBaseUrl = (config.apiBaseUrl || 'https://api.hh.ru').replace(/\/$/, '');
+    this.authBaseUrl = (config.authBaseUrl || 'https://hh.ru').replace(/\/$/, '');
+  }
+
+  /**
+   * Get a valid OAuth2 Bearer Token with automatic caching and proactive refresh.
+   */
+  public async getAccessToken(): Promise<string> {
+    const now = Date.now();
+    // Use cached token if valid for at least 5 more minutes
+    if (this.cachedToken && this.tokenExpiresAt > now + 300000) {
+      return this.cachedToken;
+    }
+
+    try {
+      const response = await fetch(`${this.authBaseUrl}/oauth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': this.userAgent,
+          'HH-User-Agent': this.userAgent
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: this.clientId,
+          client_secret: this.clientSecret
+        })
+      });
+
+      if (!response.ok) {
+        const errBody: any = await response.json().catch(() => ({}));
+        if (errBody?.error_description === 'app token refresh too early' && this.cachedToken) {
+          return this.cachedToken;
+        }
+        throw new Error(`HH OAuth Token request failed with status ${response.status}: ${JSON.stringify(errBody)}`);
+      }
+
+      const data: any = await response.json();
+      this.cachedToken = data.access_token;
+      // Default to 14 days if expiresIn is not explicitly returned
+      const expiresInSeconds = Number(data.expires_in) || 14 * 24 * 3600;
+      this.tokenExpiresAt = now + expiresInSeconds * 1000;
+      return this.cachedToken!;
+    } catch (error: any) {
+      if (this.cachedToken) {
+        return this.cachedToken;
+      }
+      throw error;
+    }
+  }
+
+  private async request<T>(path: string, options: { method?: string; query?: Record<string, any> } = {}): Promise<T> {
+    const token = await this.getAccessToken();
+    const url = new URL(`${this.apiBaseUrl}${path}`);
+    if (options.query) {
+      for (const [key, value] of Object.entries(options.query)) {
+        if (value !== undefined && value !== null && value !== '') {
+          url.searchParams.set(key, String(value));
+        }
+      }
+    }
+
+    const res = await fetch(url.toString(), {
+      method: options.method || 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'User-Agent': this.userAgent,
+        'HH-User-Agent': this.userAgent,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`HH API error ${res.status} on ${path}: ${errText}`);
+    }
+
+    return (await res.json()) as T;
+  }
+
+  /**
+   * Search vacancies across Uzbekistan with rich filtering.
+   */
+  public async searchVacancies(opts: HhSearchOptions = {}): Promise<{ total: number; offerings: Offering[] }> {
+    const queryParams: Record<string, any> = {
+      text: opts.text || undefined,
+      area: opts.area || '97', // Default to Uzbekistan (97)
+      salary: opts.salary || undefined,
+      currency: opts.currency || undefined,
+      only_with_salary: opts.onlyWithSalary ? 'true' : undefined,
+      experience: opts.experience || undefined,
+      schedule: opts.schedule || undefined,
+      employment: opts.employment || undefined,
+      page: opts.page || 0,
+      per_page: Math.min(opts.perPage || 20, 100)
+    };
+
+    const data: any = await this.request('/vacancies', { query: queryParams });
+    const items: any[] = data.items || [];
+    const offerings = items.map(item => this.mapVacancyToOffering(item));
+    return {
+      total: data.found || offerings.length,
+      offerings
+    };
+  }
+
+  /**
+   * Get full details for a single vacancy including key skills and employer metadata.
+   */
+  public async getVacancy(id: string): Promise<Offering | null> {
+    try {
+      const data: any = await this.request(`/vacancies/${id}`);
+      return this.mapVacancyToOffering(data, true);
+    } catch (err: any) {
+      if (String(err?.message || '').includes('404')) {
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Check connection health to HeadHunter API.
+   */
+  public async checkHealth(): Promise<{ status: 'HEALTHY' | 'DEGRADED' | 'DOWN'; latencyMs: number; message: string }> {
+    const start = Date.now();
+    try {
+      await this.getAccessToken();
+      const latencyMs = Date.now() - start;
+      return {
+        status: 'HEALTHY',
+        latencyMs,
+        message: 'HeadHunter Uzbekistan API gateway operational.'
+      };
+    } catch (error: any) {
+      return {
+        status: 'DOWN',
+        latencyMs: Date.now() - start,
+        message: `HeadHunter connection error: ${error?.message || 'Unknown error'}`
+      };
+    }
+  }
+
+  /**
+   * Convert an HH Vacancy object to a standardized Zayuno Offering.
+   */
+  public mapVacancyToOffering(item: any, isDetailed: boolean = false): Offering {
+    const rawId = String(item.id);
+    const id = `hh_${rawId}`;
+    const title = item.name || 'Vakansiya';
+    const employerName = item.employer?.name || 'Noma\'lum ish beruvchi';
+    const areaName = item.area?.name || 'O‘zbekiston';
+    
+    // Salary calculation
+    let basePrice = 0;
+    let currency: 'UZS' | 'USD' | 'EUR' = 'UZS';
+    let salaryText = 'Kelishilgan maosh';
+    if (item.salary) {
+      const rawCurr = String(item.salary.currency || 'UZS').toUpperCase();
+      if (rawCurr === 'USD') currency = 'USD';
+      else if (rawCurr === 'EUR') currency = 'EUR';
+      else currency = 'UZS';
+
+      if (item.salary.from && item.salary.to) {
+        basePrice = Number(item.salary.from) || 0;
+        salaryText = `${item.salary.from.toLocaleString()} - ${item.salary.to.toLocaleString()} ${rawCurr}`;
+      } else if (item.salary.from) {
+        basePrice = Number(item.salary.from) || 0;
+        salaryText = `${item.salary.from.toLocaleString()} ${rawCurr} dan`;
+      } else if (item.salary.to) {
+        basePrice = Number(item.salary.to) || 0;
+        salaryText = `${item.salary.to.toLocaleString()} ${rawCurr} gacha`;
+      }
+    }
+
+    const exp = item.experience?.name ? `Tajriba: ${item.experience.name}` : '';
+    const sched = item.schedule?.name ? `Ish tartibi: ${item.schedule.name}` : '';
+    const empType = item.employment?.name ? `Bandlik: ${item.employment.name}` : '';
+    const skillsList = Array.isArray(item.key_skills) && item.key_skills.length > 0
+      ? `Ko'nikmalar: ${item.key_skills.map((k: any) => k.name).join(', ')}`
+      : '';
+
+    let cleanDesc = '';
+    if (item.description) {
+      cleanDesc = item.description
+        .replace(/<[^>]*>?/gm, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    } else if (item.snippet?.requirement || item.snippet?.responsibility) {
+      cleanDesc = [item.snippet?.requirement, item.snippet?.responsibility]
+        .filter(Boolean)
+        .join(' ')
+        .replace(/<[^>]*>?/gm, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    const summaryParts = [
+      `🏢 Kompaniya: ${employerName}`,
+      `📍 Hudud: ${areaName}`,
+      `💰 Maosh: ${salaryText}`,
+      exp,
+      sched,
+      empType,
+      skillsList,
+      cleanDesc ? `\n\nTavsif: ${cleanDesc.substring(0, isDetailed ? 600 : 200)}...` : '',
+      `\n🔗 Batafsil va ariza topshirish: ${item.alternate_url || `https://hh.uz/vacancy/${rawId}`}`
+    ].filter(Boolean);
+
+    const description = summaryParts.join('\n').substring(0, 1950);
+    const categorySlug = this.inferCategorySlug(title, cleanDesc);
+
+    return {
+      id,
+      providerId: 'hh-uz',
+      offeringCode: rawId,
+      title: `${title} (${employerName})`.substring(0, 255),
+      description,
+      categorySlug,
+      categoryTitle: this.getCategoryTitle(categorySlug),
+      imageUrl: 'https://zayuno.uz/assets/hh-logo.png',
+      basePrice,
+      currency,
+      isAvailable: !item.archived,
+      variants: [],
+      optionGroups: [],
+      tags: [
+        'vakansiya',
+        'ish',
+        'recruitment',
+        'job',
+        areaName.toLowerCase(),
+        employerName.toLowerCase(),
+        categorySlug
+      ],
+      metadata: {
+        employerName,
+        employerId: item.employer?.id,
+        trustedEmployer: item.employer?.trusted,
+        alternateUrl: item.alternate_url || `https://hh.uz/vacancy/${rawId}`,
+        rawSalary: item.salary
+      }
+    };
+  }
+
+  private inferCategorySlug(title: string, desc: string): string {
+    const text = `${title} ${desc}`.toLowerCase();
+    if (text.includes('developer') || text.includes('dasturchi') || text.includes('frontend') || text.includes('backend') || text.includes('devops') || text.includes('qa') || text.includes('python') || text.includes('node') || text.includes('react') || text.includes('flutter') || text.includes('java')) {
+      return 'it-software';
+    }
+    if (text.includes('sotuv') || text.includes('savdo') || text.includes('sales') || text.includes('operator') || text.includes('kassir')) {
+      return 'sales-commerce';
+    }
+    if (text.includes('marketing') || text.includes('dizayn') || text.includes('design') || text.includes('smm') || text.includes('target') || text.includes('grafik')) {
+      return 'marketing-design';
+    }
+    if (text.includes('buxgalter') || text.includes('moliya') || text.includes('hisobchi') || text.includes('auditor') || text.includes('finance')) {
+      return 'finance-accounting';
+    }
+    if (text.includes('direktor') || text.includes('rahbar') || text.includes('menejer') || text.includes('manager') || text.includes('lead')) {
+      return 'management';
+    }
+    return 'general';
+  }
+
+  private getCategoryTitle(slug: string): string {
+    switch (slug) {
+      case 'it-software': return 'IT, Dasturlash va Raqamli Texnologiyalar';
+      case 'sales-commerce': return 'Savdo, Sotuv va Mijozlar Bilan Ishlash';
+      case 'marketing-design': return 'Marketing, Reklama va Dizayn';
+      case 'finance-accounting': return 'Moliya, Buxgalteriya va Audit';
+      case 'management': return 'Boshqaruv va Loyiha Menejmenti';
+      default: return 'Boshqa Kasblar va Xizmatlar';
+    }
+  }
+
+  public getStandardCategories(): CatalogCategory[] {
+    return [
+      {
+        id: 'cat_it',
+        slug: 'it-software',
+        title: 'IT, Dasturlash va Raqamli Texnologiyalar',
+        description: 'Dasturchilar, DevOps, QA muhandislari va IT mutaxassislari uchun vakansiyalar',
+        displayOrder: 1
+      },
+      {
+        id: 'cat_sales',
+        slug: 'sales-commerce',
+        title: 'Savdo, Sotuv va Mijozlar Bilan Ishlash',
+        description: 'Sotuv menejerlari, savdo vakillari, operatorlar va kassa mutaxassislari',
+        displayOrder: 2
+      },
+      {
+        id: 'cat_marketing',
+        slug: 'marketing-design',
+        title: 'Marketing, Reklama va Dizayn',
+        description: 'SMM, targetologlar, grafik dizaynerlar va brend menejerlari',
+        displayOrder: 3
+      },
+      {
+        id: 'cat_finance',
+        slug: 'finance-accounting',
+        title: 'Moliya, Buxgalteriya va Audit',
+        description: 'Bosh buxgalterlar, moliyaviy tahlilchilar va auditorlar',
+        displayOrder: 4
+      },
+      {
+        id: 'cat_management',
+        slug: 'management',
+        title: 'Boshqaruv va Loyiha Menejmenti',
+        description: 'Project managerlar, mahsulot rahbarlari va top-menejerlar',
+        displayOrder: 5
+      },
+      {
+        id: 'cat_general',
+        slug: 'general',
+        title: 'Boshqa Kasblar va Xizmatlar',
+        description: 'Barcha yo‘nalishlardagi faol ochiq ish o‘rinlari',
+        displayOrder: 6
+      }
+    ];
+  }
+
+  public getStandardLocations(): Location[] {
+    const hours = { open: '00:00', close: '23:59', days: [1, 2, 3, 4, 5, 6, 7] };
+    return [
+      {
+        id: 'loc_tashkent',
+        providerId: 'hh-uz',
+        providerLocationId: '2759',
+        name: 'Toshkent shahri va viloyati',
+        address: 'O‘zbekiston, Toshkent',
+        coordinates: { latitude: 41.311081, longitude: 69.240562 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_samarkand',
+        providerId: 'hh-uz',
+        providerLocationId: '2774',
+        name: 'Samarqand viloyati',
+        address: 'O‘zbekiston, Samarqand',
+        coordinates: { latitude: 39.654167, longitude: 66.959722 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_fergana',
+        providerId: 'hh-uz',
+        providerLocationId: '2778',
+        name: 'Farg‘ona vodiysi (Farg‘ona, Andijon, Namangan)',
+        address: 'O‘zbekiston, Farg‘ona',
+        coordinates: { latitude: 40.386389, longitude: 71.786389 },
+        operatingHours: hours,
+        serviceRadiusKm: 100,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_bukhara',
+        providerId: 'hh-uz',
+        providerLocationId: '2761',
+        name: 'Buxoro viloyati',
+        address: 'O‘zbekiston, Buxoro',
+        coordinates: { latitude: 39.774722, longitude: 64.428611 },
+        operatingHours: hours,
+        serviceRadiusKm: 50,
+        isActive: true,
+        metadata: {}
+      },
+      {
+        id: 'loc_remote',
+        providerId: 'hh-uz',
+        providerLocationId: 'remote',
+        name: 'Masofaviy ish (Remote / Uydan ishlash)',
+        address: 'Butun O‘zbekiston bo‘ylab masofaviy',
+        coordinates: { latitude: 41.311081, longitude: 69.240562 },
+        operatingHours: hours,
+        serviceRadiusKm: 1000,
+        isActive: true,
+        metadata: {}
+      }
+    ];
+  }
+}

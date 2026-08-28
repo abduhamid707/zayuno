@@ -312,6 +312,104 @@ async function main() {
   });
   console.log(`✅ Internal Simulator Provider: ${sandboxProvider.name} (slug: ${sandboxProvider.slug})`);
 
+  // 4. HeadHunter Uzbekistan Live Recruitment Provider (Read-Only Discovery)
+  const HH_RECRUITMENT_BASE_URL = process.env.HH_RECRUITMENT_PROVIDER_BASE_URL || (
+    process.env.NODE_ENV === 'production' ? 'http://hh-recruitment:4008' : 'http://localhost:4008'
+  );
+  const hhProvider = await prisma.provider.upsert({
+    where: { slug: 'hh-uz' },
+    update: {
+      name: 'HeadHunter Uzbekistan Jobs',
+      status: ProviderStatus.ACTIVE,
+      type: ProviderType.SERVICES,
+      adapterType: 'remote-http',
+      baseUrl: HH_RECRUITMENT_BASE_URL,
+      encryptedSecret: encryptedSandboxSecret,
+      capabilities: [
+        ProviderCapability.METADATA,
+        ProviderCapability.HEALTH,
+        ProviderCapability.LOCATIONS,
+        ProviderCapability.CATALOG,
+        ProviderCapability.SEARCH
+      ],
+      config: {
+        authMethod: 'API_KEY',
+        supportContact: {
+          phone: '+998712000000',
+          email: 'support@hh.uz',
+          workingHours: '24/7 (Onlayn vakansiyalar bazasi)',
+          supportUrl: 'https://hh.uz'
+        }
+      },
+      metadata: {
+        description: 'HeadHunter (hh.uz) — O‘zbekistondagi eng yirik rasmiy ish va vakansiyalar qidiruv platformasi.',
+        tier: 'STANDARD',
+        environment: 'PRODUCTION',
+        category: 'recruitment',
+        geography: ['UZ', 'Tashkent', 'Samarkand', 'Bukhara', 'Fergana'],
+        reviewStatus: 'APPROVED',
+        isCertified: true,
+        isPublished: true,
+        isReadOnly: true,
+        isTemporarilyUnavailable: false,
+        fulfillmentMode: 'DISCOVERY',
+        supportContact: {
+          phone: '+998712000000',
+          email: 'support@hh.uz',
+          workingHours: '24/7 (Onlayn vakansiyalar bazasi)',
+          supportUrl: 'https://hh.uz'
+        }
+      }
+    },
+    create: {
+      slug: 'hh-uz',
+      name: 'HeadHunter Uzbekistan Jobs',
+      logoUrl: 'https://zayuno.uz/assets/hh-logo.png',
+      status: ProviderStatus.ACTIVE,
+      type: ProviderType.SERVICES,
+      adapterType: 'remote-http',
+      baseUrl: HH_RECRUITMENT_BASE_URL,
+      encryptedSecret: encryptedSandboxSecret,
+      webhookSecret: WEBHOOK_SECRET,
+      capabilities: [
+        ProviderCapability.METADATA,
+        ProviderCapability.HEALTH,
+        ProviderCapability.LOCATIONS,
+        ProviderCapability.CATALOG,
+        ProviderCapability.SEARCH
+      ],
+      config: {
+        authMethod: 'API_KEY',
+        supportContact: {
+          phone: '+998712000000',
+          email: 'support@hh.uz',
+          workingHours: '24/7 (Onlayn vakansiyalar bazasi)',
+          supportUrl: 'https://hh.uz'
+        }
+      },
+      metadata: {
+        description: 'HeadHunter (hh.uz) — O‘zbekistondagi eng yirik rasmiy ish va vakansiyalar qidiruv platformasi.',
+        tier: 'STANDARD',
+        environment: 'PRODUCTION',
+        category: 'recruitment',
+        geography: ['UZ', 'Tashkent', 'Samarkand', 'Bukhara', 'Fergana'],
+        reviewStatus: 'APPROVED',
+        isCertified: true,
+        isPublished: true,
+        isReadOnly: true,
+        isTemporarilyUnavailable: false,
+        fulfillmentMode: 'DISCOVERY',
+        supportContact: {
+          phone: '+998712000000',
+          email: 'support@hh.uz',
+          workingHours: '24/7 (Onlayn vakansiyalar bazasi)',
+          supportUrl: 'https://hh.uz'
+        }
+      }
+    }
+  });
+  console.log(`✅ Live Provider: ${hhProvider.name} (slug: ${hhProvider.slug}, certified: true)`);
+
   // 4. Provider Owner User
   const ownerPasswordHash = await bcrypt.hash('coffee12345', 10);
   const ownerUser = await prisma.user.upsert({
