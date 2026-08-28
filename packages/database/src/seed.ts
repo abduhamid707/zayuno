@@ -313,9 +313,7 @@ async function main() {
   console.log(`✅ Internal Simulator Provider: ${sandboxProvider.name} (slug: ${sandboxProvider.slug})`);
 
   // 4. HeadHunter Uzbekistan Live Recruitment Provider (Read-Only Discovery)
-  const HH_RECRUITMENT_BASE_URL = process.env.HH_RECRUITMENT_PROVIDER_BASE_URL || (
-    process.env.NODE_ENV === 'production' ? 'http://hh-recruitment:4008' : 'http://localhost:4008'
-  );
+  const HH_RECRUITMENT_BASE_URL = process.env.HH_RECRUITMENT_PROVIDER_BASE_URL || 'https://hh-recruitment.shopla.uz';
   const hhProvider = await prisma.provider.upsert({
     where: { slug: 'hh-uz' },
     update: {
