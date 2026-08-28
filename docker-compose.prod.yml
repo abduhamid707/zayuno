@@ -273,9 +273,8 @@ volumes:
   zayuno_postgres_data:
   zayuno_redis_data:
   zayuno_nats_data:
+  zayuno_hh_cache:
 
 networks:
   zayuno_net:
     driver: bridge
-    z a y u n o _ h h _ c a c h e :  
- 
