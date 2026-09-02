@@ -105,6 +105,16 @@ if ! grep -Eq '^SIMULATOR_SESSION_SECRET=.{16,}$' "$REMOTE_DIR/.env"; then
   echo "SIMULATOR_SESSION_SECRET=${SIM_SEC}" >> "$REMOTE_DIR/.env"
 fi
 
+if ! grep -Eq '^CONSUMER_REFRESH_TOKEN_SECRET=.{16,}$' "$REMOTE_DIR/.env"; then
+  log_info "Configuring missing CONSUMER_REFRESH_TOKEN_SECRET in $REMOTE_DIR/.env..."
+  CONSUMER_SEC=$(openssl rand -hex 32)
+  echo "CONSUMER_REFRESH_TOKEN_SECRET=${CONSUMER_SEC}" >> "$REMOTE_DIR/.env"
+fi
+
+if ! grep -Eq '^GEMINI_MODEL=.*$' "$REMOTE_DIR/.env"; then
+  echo "GEMINI_MODEL=gemini-flash-latest" >> "$REMOTE_DIR/.env"
+fi
+
 if [ ! -f "/etc/letsencrypt/live/poyez-sandbox.shopla.uz/fullchain.pem" ] || [ ! -f "/etc/letsencrypt/live/poyez-sandbox.shopla.uz/privkey.pem" ]; then
   log_error "Poyez SSL certificate files are missing in /etc/letsencrypt/live/poyez-sandbox.shopla.uz/."
   exit 1

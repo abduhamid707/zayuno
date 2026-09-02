@@ -550,3 +550,184 @@
   - *"Mening mahallamda yo‘l ta’mirlash bo‘yicha Open Budgetga ovoz berib yubor"*
   - *"Ushbu kadastr raqamiga taqiq bor-yo‘qligini tekshirib ber"*
   - *"Ko‘chamizda chiroq o‘chdi, Xalq Nazoratiga foto bilan murojaat yubor va raqamini ber"*
+
+---
+
+## Mobile App Vision (User Input)
+
+Ha, **mobile app qilish mumkin va menimcha bu Zayuno uchun juda kuchli consumer layer bo‘lishi mumkin**. Ayniqsa sen aytgan eng muhim point — **juda qulay interface** — shu yerda katta farq qiladi.
+
+Men Zayuno mobile’ni oddiy “chatbot app” qilmasdim. Unga qaraganda kuchliroq model:
+
+> **Chat + structured UI + action flow**
+
+Masalan user yozadi:
+
+> “Ertaga 18:00 dan keyin Yunusobodda ko‘z doktori top.”
+
+AI javobni faqat text qilib bermaydi. Pastda:
+
+* doctor cardlar,
+* experience,
+* narx,
+* rating,
+* bo‘sh slotlar,
+* Book tugmasi
+
+chiqadi.
+
+Keyin:
+
+> “2-chisini 19:00 ga bron qil.”
+
+App confirmation card ko‘rsatadi, keyin booking yaratadi.
+
+Xuddi shu shell keyin:
+
+* food order
+* doctors booking
+* books reservation
+* railway
+* tours
+* hotels
+* flowers
+* local services
+
+uchun ishlaydi.
+
+### Eng kuchli UX modeli
+
+Men bosh sahifani shunday qilardim:
+
+`	ext
+[ Ask Zayuno anything... ]
+
+Quick actions:
+Food
+Doctors
+Travel
+Shopping
+Tickets
+Services
+`
+
+Lekin categories majburiy emas. User shunchaki intent yozadi.
+
+Keyin AI result turiga qarab dynamic component chiqaradi:
+
+* ProductCard
+* ProviderCard
+* DoctorCard
+* TimeSlotPicker
+* QuoteCard
+* BookingCard
+* PaymentCard
+* ActionStatusCard
+
+Bu juda muhim: **har vertical uchun alohida app UX emas, universal action UI kit**.
+
+### Architecture
+
+Core’ni o‘zgartirmaysan:
+
+`	ext
+Zayuno Mobile
+    ↓
+AI Orchestrator
+    ↓
+Zayuno Platform
+    ↓
+Providers
+`
+
+Mobile app hech qachon provider API’lariga to‘g‘ridan-to‘g‘ri bormaydi.
+
+Providerlar yana o‘sha:
+
+* discovery
+* catalog
+* availability
+* quote
+* action
+* payment
+* status
+
+contract orqali ishlaydi.
+
+### Mobile nimani yaxshilaydi?
+
+ChatGPT pluginning kuchi — distribution.
+
+Zayuno appning kuchi — **UX va ownership**.
+
+O‘z appingda:
+
+* push notification;
+* saved preferences;
+* recent orders;
+* favourite providers;
+* address book;
+* passenger/customer profiles;
+* booking calendar;
+* payment handoff;
+* live status;
+* voice;
+* camera/file upload
+
+hammasini nazorat qilasan.
+
+Masalan doctor bookingda user har safar:
+
+> ism, yosh, telefon, address
+
+yozib o‘tirmaydi. Profile’dan olinadi.
+
+Railway’da passenger profile saqlanadi.
+
+Food’da oldingi address va orderlar chiqadi.
+
+Shu bilan app asta-sekin user uchun **action memory**ga aylanadi.
+
+### Lekin bitta ehtiyotkorlik
+
+Hozir katta super-app qurib yuborma.
+
+Men **mobile v0**ni faqat 3 narsaga qaratardim:
+
+1. Universal chat
+2. Rich cards / confirmation UI
+3. Action history
+
+Va sandbox providerlar bilan:
+
+* food
+* booking
+* ticket
+
+3 xil flow ko‘rsat.
+
+Agar shu UX chiroyli ishlasa, keyin providerlar ortgani sayin app avtomatik boyiydi.
+
+### Stack
+
+Sen React/Vite tarafdan kelganing uchun:
+
+**React Native + Expo + TypeScript**
+
+eng tez va qulay variant.
+
+Backend esa hozirgi Zayuno.
+
+AI orchestration uchun alohida lightweight service yoki mavjud backend modul bo‘lishi mumkin.
+
+### Mening bahom
+
+**Long-term: albatta qilish kerak.**
+
+Hatto Zayuno’ning katta consumer vision’i men uchun shunday:
+
+> **“One place to ask, compare, book, buy and manage real-world services.”**
+
+Lekin hozir uni **provider networkdan oldin asosiy productga aylantirma**. Mobile app Zayuno’ning networkini ishlatadigan eng yaxshi interface bo‘lsin, networkning o‘rnini bosmasin.
+
+Agar xohlasang, keyingi qadamda men senga **Zayuno Mobile v0 uchun 5–6 screenli juda kuchli UX flow**ni chizib beraman.
