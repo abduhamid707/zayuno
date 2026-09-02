@@ -280,6 +280,36 @@ async function main() {
     "AI planning must keep every active catalog-capable delivery provider open",
   );
 
+  const selectionAnswer = (dynamicFoodChat as any).buildGroundedCatalogAnswer(
+    {
+      ...semanticPlan,
+      intent: "food_selection",
+      limit: 10,
+    },
+    [
+      {
+        slug: "maxifood-express",
+        name: "MaxiFood Express",
+        offerings: [
+          { title: "Klassik Gamburger", salary: "28000 UZS" },
+          { title: "Dabl Chizburger", salary: "38000 UZS" },
+        ],
+      },
+      {
+        slug: "coffee-time",
+        name: "Coffee Time Sandbox Demo",
+        offerings: [],
+      },
+    ],
+  );
+  assert.match(selectionAnswer, /Klassik Gamburger/);
+  assert.doesNotMatch(selectionAnswer, /Dabl Chizburger/);
+  assert.doesNotMatch(
+    selectionAnswer,
+    /demo provider/i,
+    "an empty demo provider must not label real provider results as demo",
+  );
+
   const capabilities = await (dynamicFoodChat as any).prepareChat({
     prompt: "rostan ham qanday yordam bera olasan?",
     messages: [],

@@ -313,6 +313,7 @@ Rules:
 - Job requests are recruitment_search. If profession/field is missing, use recruitment_clarification with needsCatalog=false.
 - For catalog-only providers, keep them selected and set allowCatalogFallback=true.
 - Put the most relevant provider slug first. The query must express the user's actual need, without conversational filler.
+- Use limit=6 unless the user explicitly requests a different result count.
 - General conversation uses general and needsCatalog=false.
 
 PROVIDERS=${JSON.stringify(directory)}
@@ -1010,16 +1011,18 @@ USER=${JSON.stringify(prompt)}`;
       return `${intro}\n\n${rows.join("\n\n")}`;
     }
 
-    const rows = offerings.slice(0, plan.limit).map(({ context, offering }) => {
+    const displayedOfferings = offerings.slice(
+      0,
+      plan.intent === "food_selection" ? 1 : plan.limit,
+    );
+    const rows = displayedOfferings.map(({ context, offering }) => {
       const title = this.cleanMarkdownText(offering.title);
       const price = this.cleanMarkdownText(offering.salary);
       const provider = this.cleanMarkdownText(context?.name);
       return `- **${title}** — ${price}${provider ? ` · ${provider}` : ""}`;
     });
-    const sandbox = contexts.some((context) =>
-      /sandbox|demo/i.test(
-        `${context?.name || ""} ${context?.description || ""}`,
-      ),
+    const sandbox = displayedOfferings.some(({ context }) =>
+      this.isDemoProvider(context),
     );
     const intro =
       plan.intent === "food_selection"
