@@ -112,6 +112,9 @@ async function main() {
       },
       getCatalog: async () => ({ offerings: [] }),
     } as any,
+    {} as any,
+    {} as any,
+    redis as any,
   );
   const chatInternals = chat as any;
   const clarification = chatInternals.planLiveContext("menga ish kerak", []);
@@ -183,6 +186,9 @@ async function main() {
         };
       },
     } as any,
+    {} as any,
+    {} as any,
+    redis as any,
   );
   (dynamicFoodChat as any).planWithAi = async () => ({
     intent: "food_browse",
@@ -190,6 +196,7 @@ async function main() {
     providerScope: "food",
     providerSlugs: [],
     query: "fast food",
+    quantity: 1,
     limit: 6,
     page: 0,
     allowCatalogFallback: true,
@@ -247,6 +254,7 @@ async function main() {
                 needsCatalog: true,
                 providerSlugs: ["maxifood-express"],
                 query: "fast food",
+                quantity: 1,
                 limit: 6,
                 page: 0,
                 allowCatalogFallback: true,
@@ -326,8 +334,130 @@ async function main() {
   assert.equal(providerListing.plan.intent, "provider_listing");
   assert.match(providerListing.directAnswer, /MaxiFood Express/);
 
+  const orderStore = new Map<string, string>();
+  const orderRedis = {
+    get: async (key: string) => orderStore.get(key) || null,
+    set: async (key: string, value: string) => void orderStore.set(key, value),
+    del: async (key: string) => void orderStore.delete(key),
+  };
+  let quoteCalls = 0;
+  let actionCalls = 0;
+  const orderChat = new ConsumerChatService(
+    {} as any,
+    {} as any,
+    {
+      requestQuote: async (input: any) => {
+        quoteCalls += 1;
+        assert.equal(input.providerSlug, "maxifood-express");
+        assert.equal(input.items[0].offeringId, "burger-1");
+        return {
+          id: "quote-real-1",
+          providerSlug: "maxifood-express",
+          lines: [
+            {
+              offeringId: "burger-1",
+              offeringTitle: "Klassik Gamburger",
+              unitPrice: 28_000,
+              quantity: 1,
+              optionsTotal: 0,
+              lineTotal: 28_000,
+              selectedOptions: [],
+            },
+          ],
+          subtotal: 28_000,
+          fees: [{ name: "Yetkazib berish", amount: 5_000 }],
+          totalFees: 5_000,
+          discounts: [],
+          totalDiscount: 0,
+          total: 33_000,
+          currency: "UZS",
+          expiresAt: new Date(Date.now() + 600_000).toISOString(),
+          parameters: {},
+        };
+      },
+    } as any,
+    {
+      createAction: async (input: any) => {
+        actionCalls += 1;
+        assert.equal(input.userConfirmed, true);
+        assert.equal(input.quoteId, "quote-real-1");
+        return {
+          id: "action-real-1",
+          publicId: "ZY-MAXI-1",
+          nextAction: {
+            type: "PAYMENT",
+            url: "https://pay.maxifood.example/checkout/1",
+          },
+        };
+      },
+      getPaymentOptions: async () => [],
+    } as any,
+    orderRedis as any,
+  );
+  const orderInternals = orderChat as any;
+  const selectionPrompt = await orderInternals.startOrderSelection(
+    "order-user",
+    "customer@example.com",
+    {
+      intent: "food_selection",
+      needsCatalog: true,
+      providerScope: "food",
+      providerSlugs: ["maxifood-express"],
+      query: "Klassik Gamburger",
+      quantity: 1,
+      limit: 1,
+      page: 0,
+      allowCatalogFallback: true,
+      excludedOfferingIds: [],
+    },
+    [
+      {
+        slug: "maxifood-express",
+        name: "MaxiFood Express",
+        offerings: [{ id: "burger-1", title: "Klassik Gamburger" }],
+      },
+    ],
+  );
+  assert.match(selectionPrompt, /telefon raqamingiz/i);
+  assert.equal(quoteCalls, 0, "selection must not create a quote prematurely");
+  assert.equal(actionCalls, 0, "selection must never create an action");
+
+  const confirmationPrompt = await orderInternals.handlePendingOrder(
+    "order-user",
+    "customer@example.com",
+    "+998901234567 | Toshkent, Chilonzor 5",
+  );
+  assert.equal(quoteCalls, 1, "contact details must request a live quote once");
+  assert.equal(actionCalls, 0, "quote must not create an action");
+  assert.match(confirmationPrompt, /33,000 UZS/);
+  assert.match(confirmationPrompt, /tasdiqlayman/i);
+
+  const reminder = await orderInternals.handlePendingOrder(
+    "order-user",
+    "customer@example.com",
+    "hozir emas",
+  );
+  assert.equal(actionCalls, 0, "non-confirmation must never create an action");
+  assert.match(reminder, /tasdiqlayman/i);
+
+  const paymentAnswer = await orderInternals.handlePendingOrder(
+    "order-user",
+    "customer@example.com",
+    "tasdiqlayman",
+  );
+  assert.equal(actionCalls, 1, "explicit confirmation must create one action");
+  assert.match(
+    paymentAnswer,
+    /\[To‘lov qilish\]\(https:\/\/pay\.maxifood\.example\/checkout\/1\)/,
+  );
+  assert.equal(
+    orderStore.size,
+    0,
+    "completed checkout handoff must clear state",
+  );
+
   console.log(
-    "Provider cache, dynamic food discovery, catalog fallback, parallel search, and complete grounded chat output passed.",
+    "Provider cache, dynamic food discovery, guarded order confirmation, payment handoff, parallel search, and complete grounded chat output passed.",
   );
 }
 

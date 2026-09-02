@@ -36,6 +36,7 @@ export class ConsumerChatController {
       prompt: body.prompt,
       messages: body.messages,
       userId: req.user.id,
+      userEmail: req.user.email,
     });
   }
 
@@ -64,6 +65,7 @@ export class ConsumerChatController {
           prompt: body.prompt,
           messages: body.messages,
           userId: req.user.id,
+          userEmail: req.user.email,
         },
         (content) => {
           if (!res.destroyed) {
