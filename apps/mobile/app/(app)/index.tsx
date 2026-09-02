@@ -22,6 +22,7 @@ import {
 } from "../../src/store/chatStore";
 import { streamChat } from "../../src/lib/api";
 import { theme } from "../../src/theme";
+import { ChatMarkdown } from "../../src/components/ChatMarkdown";
 
 const suggestions = [
   {
@@ -131,7 +132,9 @@ export default function HomeScreen() {
     return () => clearTimeout(timer);
   }, [messages.length, isLoading]);
 
-  const [streamingDuration, setStreamingDuration] = useState<number | null>(null);
+  const [streamingDuration, setStreamingDuration] = useState<number | null>(
+    null,
+  );
   const streamStartRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -214,7 +217,7 @@ export default function HomeScreen() {
       <View style={styles.assistantMessage}>
         <Ionicons name="sparkles" size={17} color="#8376FF" />
         <View style={styles.assistantContentWrap}>
-          <Text style={styles.assistantText}>{item.content}</Text>
+          <ChatMarkdown content={item.content} />
           {item.latencyMs !== undefined ? (
             <View style={styles.latencyBadge}>
               <Ionicons name="timer-outline" size={12} color="#7E86A5" />
@@ -296,7 +299,7 @@ export default function HomeScreen() {
                 <View style={styles.assistantMessage}>
                   <Ionicons name="sparkles" size={17} color="#8376FF" />
                   <View style={styles.assistantContentWrap}>
-                    <Text style={styles.assistantText}>{streamingText}</Text>
+                    <ChatMarkdown content={streamingText} />
                     {streamingDuration !== null ? (
                       <View style={styles.latencyBadge}>
                         <Ionicons
@@ -411,7 +414,9 @@ export default function HomeScreen() {
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
                 <View style={styles.historyEmpty}>
-                  <Text style={styles.historyEmptyTitle}>Hali chatlar yo‘q</Text>
+                  <Text style={styles.historyEmptyTitle}>
+                    Hali chatlar yo‘q
+                  </Text>
                   <Text style={styles.historyEmptyCopy}>
                     Yangi suhbat boshlashingiz mumkin.
                   </Text>
@@ -550,11 +555,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   assistantContentWrap: { flex: 1 },
-  assistantText: {
-    color: "#E8EAF2",
-    fontSize: 14,
-    lineHeight: 21,
-  },
   latencyBadge: {
     flexDirection: "row",
     alignItems: "center",
