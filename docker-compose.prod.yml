@@ -158,7 +158,7 @@ services:
       - GOOGLE_IOS_CLIENT_ID=${GOOGLE_IOS_CLIENT_ID:-}
       - GOOGLE_WEB_CLIENT_ID=${GOOGLE_WEB_CLIENT_ID:-1001050967149-deo7sualdjvqpuqkqb2r1hllm8cbl0be.apps.googleusercontent.com}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-latest}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash}
       - ALLOW_INSECURE_DEV_AUTH=false
       - ALLOW_INTERNAL_PROVIDERS=true
       - CORS_ORIGINS=https://zayuno.uz,https://developers.zayuno.uz,https://admin.zayuno.uz,https://partners.zayuno.uz

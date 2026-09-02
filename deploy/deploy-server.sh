@@ -111,10 +111,10 @@ if ! grep -Eq '^CONSUMER_REFRESH_TOKEN_SECRET=.{16,}$' "$REMOTE_DIR/.env"; then
   echo "CONSUMER_REFRESH_TOKEN_SECRET=${CONSUMER_SEC}" >> "$REMOTE_DIR/.env"
 fi
 
-if grep -Eq '^GEMINI_MODEL=gemini-3.5-flash-lite$' "$REMOTE_DIR/.env"; then
-  sed -i 's/^GEMINI_MODEL=gemini-3.5-flash-lite$/GEMINI_MODEL=gemini-flash-latest/' "$REMOTE_DIR/.env"
-elif ! grep -Eq '^GEMINI_MODEL=.*$' "$REMOTE_DIR/.env"; then
-  echo "GEMINI_MODEL=gemini-flash-latest" >> "$REMOTE_DIR/.env"
+if grep -Eq '^GEMINI_MODEL=.*$' "$REMOTE_DIR/.env"; then
+  sed -i 's/^GEMINI_MODEL=.*$/GEMINI_MODEL=gemini-3.5-flash/' "$REMOTE_DIR/.env"
+else
+  echo "GEMINI_MODEL=gemini-3.5-flash" >> "$REMOTE_DIR/.env"
 fi
 
 if [ ! -f "/etc/letsencrypt/live/poyez-sandbox.shopla.uz/fullchain.pem" ] || [ ! -f "/etc/letsencrypt/live/poyez-sandbox.shopla.uz/privkey.pem" ]; then
