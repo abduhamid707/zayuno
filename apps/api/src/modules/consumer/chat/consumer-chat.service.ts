@@ -22,6 +22,7 @@ type ChatRequest = {
 type ChatIntent =
   | "greeting"
   | "capabilities"
+  | "recruitment_clarification"
   | "recruitment_search"
   | "food_browse"
   | "food_selection"
@@ -172,8 +173,15 @@ STRICT RULES:
         )
       : [];
     const liveContext = await this.loadLiveContext(plan, providers);
+    const groundedAnswer = this.buildGroundedCatalogAnswer(plan, liveContext);
 
-    return { prompt, history, plan, liveContext };
+    return {
+      prompt,
+      history,
+      plan,
+      liveContext,
+      directAnswer: groundedAnswer,
+    };
   }
 
   private getDirectAnswer(intent: ChatIntent): string | undefined {
@@ -182,6 +190,9 @@ STRICT RULES:
     }
     if (intent === "capabilities") {
       return "Men Zayuno orqali O‘zbekistondagi xizmatlar va ish vakansiyalarini topish, solishtirish hamda mavjud provider imkon bersa buyurtma jarayonini boshlashga yordam bera olaman.";
+    }
+    if (intent === "recruitment_clarification") {
+      return "Albatta. Qaysi sohada ishlamoqchisiz va qaysi shahar yoki hududdan ish qidiramiz?";
     }
     return undefined;
   }
@@ -483,11 +494,13 @@ STRICT RULES:
       );
 
     if (recruitment) {
+      const query = this.extractSearchKeywords(effectivePrompt, history);
+      if (!query) return emptyPlan("recruitment_clarification");
       return {
         intent: "recruitment_search",
         needsCatalog: true,
         providerSlugs: ["hh-uz"],
-        query: this.extractSearchKeywords(effectivePrompt, history),
+        query,
         limit,
         page: continuation ? 1 : 0,
         allowCatalogFallback: false,
@@ -545,30 +558,37 @@ STRICT RULES:
             ? this.expandSearchTerms(plan.query)
             : [];
 
-          for (const term of searchTerms) {
-            try {
-              const results = await this.catalogService.searchOfferings(
-                provider.slug,
-                term,
-                undefined,
-                undefined,
-                Math.min(Math.max(plan.limit + excludedIds.size, 20), 50),
-                provider.slug === "hh-uz" ? { page: plan.page } : undefined,
-              );
-              if (Array.isArray(results)) {
-                for (const item of results) {
-                  if (!seenIds.has(item.id) && !excludedIds.has(item.id)) {
-                    seenIds.add(item.id);
-                    rawOfferings.push(item);
-                  }
-                }
-              }
-            } catch (err) {
+          const limitedTerms = searchTerms.slice(0, 6);
+          const searchResults = await Promise.allSettled(
+            limitedTerms.map((term) =>
+              this.withTimeout(
+                this.catalogService.searchOfferings(
+                  provider.slug,
+                  term,
+                  undefined,
+                  undefined,
+                  Math.min(Math.max(plan.limit + excludedIds.size, 20), 50),
+                  provider.slug === "hh-uz" ? { page: plan.page } : undefined,
+                ),
+                5_000,
+              ),
+            ),
+          );
+
+          for (let index = 0; index < searchResults.length; index += 1) {
+            const result = searchResults[index];
+            if (result.status === "rejected") {
               this.logger.warn(
-                `Search failed for ${provider.slug} term "${term}": ${String(err)}`,
+                `Search failed for ${provider.slug} term "${limitedTerms[index]}": ${String(result.reason)}`,
               );
+              continue;
             }
-            if (rawOfferings.length >= plan.limit) break;
+            for (const item of result.value) {
+              if (!seenIds.has(item.id) && !excludedIds.has(item.id)) {
+                seenIds.add(item.id);
+                rawOfferings.push(item);
+              }
+            }
           }
 
           // Full-catalog fallback is valid only for an explicit browse request.
@@ -640,6 +660,105 @@ STRICT RULES:
     if (from) return `${from.toLocaleString("en-US")} ${currency} dan`.trim();
     if (to) return `${to.toLocaleString("en-US")} ${currency} gacha`.trim();
     return "Kelishilgan maosh";
+  }
+
+  private buildGroundedCatalogAnswer(
+    plan: LiveContextPlan,
+    liveContext: any[],
+  ): string | undefined {
+    if (!plan.needsCatalog) return undefined;
+    const contexts = Array.isArray(liveContext) ? liveContext : [];
+    const offerings = contexts.flatMap((context) =>
+      Array.isArray(context?.offerings)
+        ? context.offerings.map((offering: any) => ({ context, offering }))
+        : [],
+    );
+
+    if (offerings.length === 0) {
+      if (plan.intent === "recruitment_search") {
+        return "Bu so‘rov bo‘yicha hozircha mos jonli vakansiya topilmadi. Kasb nomi yoki hududni aniqroq yozib ko‘ring.";
+      }
+      return "Bu so‘rov bo‘yicha hozircha mos xizmat topilmadi.";
+    }
+
+    if (plan.intent === "recruitment_search") {
+      const intro =
+        plan.page > 0
+          ? "Oldingi qidiruv bo‘yicha qo‘shimcha vakansiyalar:"
+          : "Sizga mos jonli vakansiyalar:";
+      const rows = offerings.slice(0, plan.limit).map(({ offering }) => {
+        const title = this.cleanMarkdownText(offering.title);
+        const employer = this.cleanMarkdownText(offering.employer);
+        const salary = this.cleanMarkdownText(offering.salary);
+        const location = this.cleanMarkdownText(offering.location);
+        const link = this.safeHttpUrl(offering.applicationLink);
+        return [
+          `- **${title}**`,
+          `  ${employer} · ${salary}${location ? ` · ${location}` : ""}`,
+          ...(link ? [`  [Ariza topshirish](${link})`] : []),
+        ].join("\n");
+      });
+      return `${intro}\n\n${rows.join("\n\n")}`;
+    }
+
+    const rows = offerings.slice(0, plan.limit).map(({ context, offering }) => {
+      const title = this.cleanMarkdownText(offering.title);
+      const price = this.cleanMarkdownText(offering.salary);
+      const provider = this.cleanMarkdownText(context?.name);
+      return `- **${title}** — ${price}${provider ? ` · ${provider}` : ""}`;
+    });
+    const sandbox = contexts.some((context) =>
+      /sandbox|demo/i.test(
+        `${context?.name || ""} ${context?.description || ""}`,
+      ),
+    );
+    const intro =
+      plan.intent === "food_selection"
+        ? "Tanlagan mahsulotlaringiz mavjud:"
+        : "Hozir mavjud taom va ichimliklar:";
+    const disclaimer = sandbox
+      ? "\n\nBu demo provider: haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi."
+      : "";
+    return `${intro}\n\n${rows.join("\n")}${disclaimer}`;
+  }
+
+  private cleanMarkdownText(value: unknown): string {
+    return String(value || "")
+      .replace(/[\r\n]+/g, " ")
+      .replace(/[\[\]_*`]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  private safeHttpUrl(value: unknown): string {
+    try {
+      const url = new URL(String(value || ""));
+      return url.protocol === "https:" || url.protocol === "http:"
+        ? url.toString().replace(/\)/g, "%29")
+        : "";
+    } catch {
+      return "";
+    }
+  }
+
+  private async withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+  ): Promise<T> {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<T>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error(`Provider search exceeded ${timeoutMs}ms`)),
+            timeoutMs,
+          );
+        }),
+      ]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
   }
 
   private async writeAnswer(input: {

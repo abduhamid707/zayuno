@@ -54,6 +54,9 @@ export class ConsumerChatController {
     res.setHeader("Connection", "keep-alive");
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
+    const heartbeat = setInterval(() => {
+      if (!res.destroyed) res.write(": keep-alive\n\n");
+    }, 8_000);
 
     try {
       await this.chatService.streamMessage(
@@ -64,7 +67,9 @@ export class ConsumerChatController {
         },
         (content) => {
           if (!res.destroyed) {
-            res.write(`data: ${JSON.stringify({ type: "delta", content })}\n\n`);
+            res.write(
+              `data: ${JSON.stringify({ type: "delta", content })}\n\n`,
+            );
           }
         },
       );
@@ -77,11 +82,10 @@ export class ConsumerChatController {
         error?.message ||
         "Zayuno hozir javob bera olmadi.";
       if (!res.destroyed) {
-        res.write(
-          `data: ${JSON.stringify({ type: "error", message })}\n\n`,
-        );
+        res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
       }
     } finally {
+      clearInterval(heartbeat);
       if (!res.destroyed) res.end();
     }
   }

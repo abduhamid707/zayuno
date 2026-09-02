@@ -45,6 +45,7 @@ const testSuites = [
   'tests/test-provider-contract-dx-parity.ts',
   'tests/test-provider-health-monitoring-and-lifecycle.ts',
   'tests/test-production-health-and-lease-real-e2e.ts',
+  'tests/test-provider-cache-and-consumer-chat.ts',
   'tests/test-openai-plugin-mcp-contract.ts'
 ];
 
@@ -89,14 +90,14 @@ async function main() {
   console.log('================================================================\n');
 
   if (failedCount > 0) {
-    console.error('❌ Failed suites:\n' + failedSuites.map(s => ` - ${s}`).join('\n'));
+    console.error('❌ Failed suites:\n' + failedSuites.map((s) => ` - ${s}`).join('\n'));
     process.exit(1);
   } else {
     console.log('🎉 ALL REVIEW AND REGRESSION TEST SUITES PASSED CLEANLY!');
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Fatal runner error:', err);
   process.exit(1);
 });

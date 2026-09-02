@@ -81,6 +81,7 @@ function executeChatStream(
     let buffer = "";
     let content = "";
     let streamError: ApiError | null = null;
+    let didComplete = false;
 
     const consume = () => {
       const next = xhr.responseText.slice(cursor);
@@ -101,6 +102,8 @@ function executeChatStream(
           if (event.type === "delta" && event.content) {
             content += event.content;
             onDelta(event.content);
+          } else if (event.type === "done") {
+            didComplete = true;
           } else if (event.type === "error") {
             streamError = new ApiError(xhr.status || 503, event.message);
           }
@@ -130,6 +133,14 @@ function executeChatStream(
       }
       if (!content.trim()) {
         return reject(new ApiError(502, "Zayuno javob qaytarmadi."));
+      }
+      if (!didComplete) {
+        return reject(
+          new ApiError(
+            502,
+            "Javob oqimi to‘liq tugamadi. Qayta urinib ko‘ring.",
+          ),
+        );
       }
       resolve(content.trim());
     };

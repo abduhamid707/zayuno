@@ -7,6 +7,7 @@ import { ZayunoEventTopic } from '@zayuno/event-schemas';
 import { ActionStatus as ContractActionStatus, ProviderCapability } from '@zayuno/contracts';
 import { RedisService } from '../../common/services/redis.service';
 import { canApplyPaymentStatus, canTransitionAction } from '../../common/action-state-machine';
+import { CatalogService } from '../catalog/catalog.service';
 
 @Injectable()
 export class WebhooksService {
@@ -15,7 +16,8 @@ export class WebhooksService {
   constructor(
     private registry: ProviderRegistryService,
     private natsService: NatsService,
-    private redisService: RedisService
+    private redisService: RedisService,
+    private catalogService: CatalogService
   ) {}
 
   async handleProviderWebhook(
@@ -91,6 +93,11 @@ export class WebhooksService {
     });
 
     this.logger.info(`Processing verified webhook [${parsedEvent.eventType}] for action ${parsedEvent.externalActionId || parsedEvent.actionId}`);
+
+    if (parsedEvent.eventType === 'catalog.updated' || parsedEvent.eventType === 'location.status_changed') {
+      const deleted = await this.catalogService.invalidateProviderCache(cleanSlug);
+      this.logger.info(`Invalidated ${deleted} cached provider responses for ${cleanSlug}`);
+    }
 
     // 4. Update Action State
     const action = await prisma.action.findFirst({
