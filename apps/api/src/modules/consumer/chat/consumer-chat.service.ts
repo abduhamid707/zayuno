@@ -46,27 +46,27 @@ Always answer directly and naturally to the user in fluent, polite Uzbek Latin.
 Be concise, warm, structured, and helpful.
 Never output thinking tags, meta-commentary, planning steps, or English notes.
 
-CRITICAL INSTRUCTION FOR LIVE DATA:
-1. When LIVE_DATA contains offerings/vacancies:
+RULES:
+1. When the user simply greets (e.g. "salom", "assalomu alaykum", "nima gaplar"), greet them warmly and ask how you can help with jobs or services in Uzbekistan. Do NOT list specific vacancies or items unless the user explicitly requested them.
+2. When LIVE_DATA contains offerings/vacancies matching a user's search request:
    - YOU MUST IMMEDIATELY LIST AND PRESENT THEM TO THE USER.
    - For each vacancy or service, clearly list:
      • Nomi (Position / Service Title)
      • Kompaniya / Muassasa (Employer / Company)
      • Maosh / Narx (Salary / Price)
      • Ariza topshirish / Havola (Application link from live context)
-   - NEVER say "hozircha takliflar mavjud emas" or "tizim yangilanmoqda" if offerings exist in LIVE_DATA.
-2. Only if LIVE_DATA is completely empty, explain what is available in Uzbekistan and ask a helpful follow-up question.
-3. Do not expose internal technical terms (like slugs, JSON keys, provider IDs).
-4. Use clean markdown bullet points (• or *) for readability.`;
+3. Only if LIVE_DATA is completely empty, explain what is available in Uzbekistan and ask a helpful follow-up question.
+4. Do not expose internal technical terms (like slugs, JSON keys, provider IDs).
+5. Use clean markdown bullet points (• or *) for readability.`;
 
     const key = process.env.GEMINI_API_KEY?.trim();
     const modelNames = Array.from(
       new Set([
-        process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash",
-        "gemini-3.5-flash",
-        "gemini-3.6-flash",
-        "gemini-3.7-flash",
+        process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-3.1-flash-lite-preview",
         "gemini-3.5-flash-lite",
+        "gemini-3.6-flash",
       ]),
     );
     const gemini = key ? new GoogleGenerativeAI(key) : null;
@@ -78,7 +78,7 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
             systemInstruction,
             generationConfig: {
               maxOutputTokens: 2048,
-              temperature: 0.6,
+              temperature: 0.5,
             },
           }),
         }))
@@ -103,7 +103,7 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
         let content = "";
         try {
           const result = await model.client.generateContentStream(instruction, {
-            timeout: 45_000,
+            timeout: 15_000,
           });
           for await (const chunk of result.stream) {
             const delta = chunk.text();
@@ -184,15 +184,11 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
       }));
   }
 
-  private isGeneralGreeting(prompt: string, history: ConversationMessage[]): boolean {
+  private isGeneralGreeting(prompt: string): boolean {
     const raw = prompt.toLowerCase().trim();
-    const isShort = raw.split(/\s+/).length <= 4;
-    const isGreetingPattern =
-      /^(salom|assalomu\s+alaykum|assalom|salom\s+alaykum|qandaysiz|qandaysan|qalaysiz|qalaysan|privet|hello|hi|hey|hayrli\s+tong|hayrli\s+kun|hayrli\s+kech|xush\s+kelibsiz)[\s!.,?]*$/i.test(
-        raw,
-      );
-    // Only treat as general greeting if it's a greeting pattern and history is short or empty
-    return isShort && isGreetingPattern && history.length <= 1;
+    return /^(salom|assalomu\s+alaykum|assalom|salom\s+alaykum|qandaysiz|qandaysan|qalaysiz|qalaysan|privet|hello|hi|hey|hayrli\s+tong|hayrli\s+kun|hayrli\s+kech|xush\s+kelibsiz|nima\s+gap|nima\s+gaplar|qalesiz)[\s!.,?]*$/i.test(
+      raw,
+    );
   }
 
   private expandSearchTerms(term: string): string[] {
@@ -245,7 +241,7 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
       "topib", "top", "ber", "bera", "olasanmi", "olasan", "bormi", "qanaqa", "qanday", "nima",
       "iltimos", "kerak", "qidir", "qidirib", "vakansiya", "vakansiyalar", "vakansiyakar", "vakansiyalari",
       "ishlar", "ish", "ishga", "taklif", "mavjud", "salom", "qani", "ko'rsat", "korsat", "aytib",
-      "boladimi", "bo'ladimi", "yordam", "qilmoqchiman", "izlayapman",
+      "boladimi", "bo'ladimi", "yordam", "qilmoqchiman", "izlayapman", "nima gap", "nima gaplar",
       "мне", "для", "по", "про", "найди", "есть", "какие", "пожалуйста", "вакансии", "работа",
       "find", "get", "for", "me", "please", "can", "you", "show", "jobs", "vacancies",
     ];
@@ -278,7 +274,7 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
     if (/kofe|coffee/i.test(raw)) return "coffee";
     if (/ovqat|food|lavash|burger/i.test(raw)) return "lavash";
 
-    return prompt.trim();
+    return "";
   }
 
   private planLiveContext(
@@ -287,7 +283,18 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
     providers: any[],
   ): LiveContextPlan {
     // 1. If it is just a greeting, do NOT pull random provider offerings
-    if (this.isGeneralGreeting(prompt, history)) {
+    if (this.isGeneralGreeting(prompt)) {
+      return {
+        needsCatalog: false,
+        providerSlugs: [],
+        query: "",
+      };
+    }
+
+    const currentText = prompt.toLowerCase();
+    const query = this.extractSearchKeywords(prompt, history);
+
+    if (!query) {
       return {
         needsCatalog: false,
         providerSlugs: [],
@@ -303,14 +310,12 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
 
     const recruitment =
       /ish|vakansi|headhunter|hh\b|job|resume|rezyume|cv\b|xodim|nomzod|developer|dasturchi|web|full|stack|frontend|backend|python|react|node|java|buxgalter|menejer|marketing/i.test(
-        fullContextText,
+        query + " " + fullContextText,
       );
     const food =
       /ovqat|restoran|kafe|cafe|coffee|kofe|cappuccino|latte|espresso|ichimlik|yetkaz|lavash|burger|pizza/i.test(
-        fullContextText,
+        query + " " + fullContextText,
       );
-
-    const query = this.extractSearchKeywords(prompt, history);
 
     const providerSlugs: string[] = [];
     if (recruitment) {
@@ -320,14 +325,13 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
       providerSlugs.push("coffee-time");
     }
 
-    // Only fallback to first providers if user explicitly asks for services
-    const isServiceQuery = /xizmat|buyurtma|narx|qancha|qayerda|bor|top|qidir/i.test(fullContextText);
+    const isServiceQuery = /xizmat|buyurtma|narx|qancha|qayerda|bor|top|qidir/i.test(currentText);
     if (providerSlugs.length === 0 && isServiceQuery) {
       providerSlugs.push(...providers.slice(0, 3).map((p) => p.slug));
     }
 
     return {
-      needsCatalog: providerSlugs.length > 0,
+      needsCatalog: providerSlugs.length > 0 && !!query,
       providerSlugs: Array.from(new Set(providerSlugs)),
       query,
     };
