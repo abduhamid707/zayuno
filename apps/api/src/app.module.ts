@@ -20,6 +20,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 import { DeveloperSandboxModule } from './modules/developer-sandbox/developer-sandbox.module';
 import { CommonModule } from './common/common.module';
+import { ConsumerModule } from './modules/consumer/consumer.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { CommonModule } from './common/common.module';
     WebhooksModule,
     AdminModule,
     PublicPagesModule,
+    ConsumerModule,
     DeveloperSandboxModule,
   ],
   providers: [

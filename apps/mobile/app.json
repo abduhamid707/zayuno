@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Zayuno",
+    "slug": "zayuno-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#050816",
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": ["expo-router", "expo-secure-store", "expo-font"],
+    "scheme": "zayuno",
+    "android": {
+      "package": "uz.zayuno.mobile"
+    },
+    "ios": {
+      "bundleIdentifier": "uz.zayuno.mobile"
+    }
+  }
+}

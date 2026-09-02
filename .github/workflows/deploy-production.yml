@@ -68,7 +68,7 @@ jobs:
         run: |
           INPUT_SERVICES="${{ github.event.inputs.services }}"
           if [ "$INPUT_SERVICES" = "all" ]; then
-            RESOLVED="mock-evos mock-coffee-time mock-poyez api mcp admin provider-portal worker"
+            RESOLVED="mock-evos mock-coffee-time mock-poyez hh-recruitment api mcp admin provider-portal worker"
           elif [ -n "$INPUT_SERVICES" ] && [ "$INPUT_SERVICES" != "auto" ]; then
             RESOLVED="$INPUT_SERVICES"
           else
@@ -90,7 +90,7 @@ jobs:
                 apps/provider-portal/*) add_service provider-portal ;;
                 packages/contracts/*|packages/shared/*|packages/provider-sdk/*) add_service mock-evos; add_service mock-coffee-time; add_service mock-poyez; add_service api; add_service mcp; add_service worker ;;
                 packages/database/*) add_service api; add_service worker ;;
-                docker-compose.prod.yml|infra/docker/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|tsconfig.base.json) RESOLVED="mock-evos mock-coffee-time mock-poyez api mcp admin provider-portal worker" ;;
+                docker-compose.prod.yml|infra/docker/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|tsconfig.base.json) RESOLVED="mock-evos mock-coffee-time mock-poyez hh-recruitment api mcp admin provider-portal worker" ;;
               esac
             done <<< "$CHANGED_FILES"
 
@@ -113,7 +113,7 @@ jobs:
             RESOLVED_MIGRATIONS="$INPUT_MIGRATIONS"
           else
             CHANGED_FILES=$(git diff --name-only "${TARGET_SHA}^" "$TARGET_SHA" || true)
-            if echo "$CHANGED_FILES" | grep -Eq '^packages/database/(prisma/|.*schema\.prisma|.*migrations/)'; then
+            if echo "$CHANGED_FILES" | grep -Eq '^packages/database/(prisma/|src/seed\.ts$|.*schema\.prisma|.*migrations/)'; then
               RESOLVED_MIGRATIONS=true
             else
               RESOLVED_MIGRATIONS=false

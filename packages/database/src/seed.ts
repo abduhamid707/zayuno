@@ -30,7 +30,14 @@ async function main() {
   console.log(`✅ Admin user: ${adminUser.email} (role: ${adminUser.role})`);
 
   // 2. Canonical Review Provider: Coffee Time Sandbox Demo
-  const encryptedSandboxSecret = encryptSecret('sandbox_secret_token_live_xyz_987654', ENCRYPTION_KEY);
+  const sandboxSecret = 'sandbox_secret_token_live_xyz_987654';
+  const encryptedSandboxSecret = encryptSecret(sandboxSecret, ENCRYPTION_KEY);
+  const coffeeTimeSecret = process.env.COFFEE_TIME_SHARED_SECRET || (
+    process.env.NODE_ENV === 'production'
+      ? (() => { throw new Error('COFFEE_TIME_SHARED_SECRET is required in production.'); })()
+      : sandboxSecret
+  );
+  const encryptedCoffeeTimeSecret = encryptSecret(coffeeTimeSecret, ENCRYPTION_KEY);
   const COFFEE_TIME_BASE_URL = process.env.COFFEE_TIME_PROVIDER_BASE_URL || 'https://coffee-time-sandbox.shopla.uz';
 
   const coffeeTimeProvider = await prisma.provider.upsert({
@@ -41,7 +48,7 @@ async function main() {
       type: ProviderType.DELIVERY,
       adapterType: 'remote-http',
       baseUrl: COFFEE_TIME_BASE_URL,
-      encryptedSecret: encryptedSandboxSecret,
+      encryptedSecret: encryptedCoffeeTimeSecret,
       webhookSecret: WEBHOOK_SECRET,
       capabilities: [
         ProviderCapability.METADATA,
@@ -96,7 +103,7 @@ async function main() {
       type: ProviderType.DELIVERY,
       adapterType: 'remote-http',
       baseUrl: COFFEE_TIME_BASE_URL,
-      encryptedSecret: encryptedSandboxSecret,
+      encryptedSecret: encryptedCoffeeTimeSecret,
       webhookSecret: WEBHOOK_SECRET,
       capabilities: [
         ProviderCapability.METADATA,
