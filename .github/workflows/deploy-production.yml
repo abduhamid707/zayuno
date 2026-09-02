@@ -90,7 +90,7 @@ jobs:
                 apps/provider-portal/*) add_service provider-portal ;;
                 packages/contracts/*|packages/shared/*|packages/provider-sdk/*) add_service mock-evos; add_service mock-coffee-time; add_service mock-poyez; add_service api; add_service mcp; add_service worker ;;
                 packages/database/*) add_service api; add_service worker ;;
-                docker-compose.prod.yml|infra/docker/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|tsconfig.base.json) RESOLVED="mock-evos mock-coffee-time mock-poyez hh-recruitment api mcp admin provider-portal worker" ;;
+                .github/workflows/*|deploy/*|docker-compose.prod.yml|infra/docker/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|turbo.json|tsconfig.base.json) RESOLVED="mock-evos mock-coffee-time mock-poyez hh-recruitment api mcp admin provider-portal worker" ;;
               esac
             done <<< "$CHANGED_FILES"
 
