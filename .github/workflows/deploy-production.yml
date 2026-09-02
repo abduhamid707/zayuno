@@ -2,7 +2,7 @@ name: Deploy to Production
 
 on:
   workflow_run:
-    workflows: ['Build & Push Container Images to GHCR']
+    workflows: ["Build & Push Container Images to GHCR"]
     types:
       - completed
     branches:
@@ -10,21 +10,21 @@ on:
   workflow_dispatch:
     inputs:
       deploy_sha:
-        description: 'Git commit SHA to deploy (defaults to current workflow commit)'
+        description: "Git commit SHA to deploy (defaults to current workflow commit)"
         required: false
-        default: ''
+        default: ""
         type: string
       services:
         description: 'Services to recreate ("auto", space-separated, or "all")'
         required: false
-        default: 'auto'
+        default: "auto"
         type: string
       run_migrations:
         description: 'Run database migrations ("auto", "true", or "false")'
         required: false
-        default: 'auto'
+        default: "auto"
         type: choice
-        options: [auto, 'true', 'false']
+        options: [auto, "true", "false"]
 
 concurrency:
   group: zayuno-production
@@ -134,7 +134,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          
+
           # Write known hosts securely
           echo "${{ secrets.PROD_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
@@ -175,8 +175,14 @@ jobs:
           PROD_HOST: ${{ secrets.PROD_HOST }}
           PROD_PORT: ${{ secrets.PROD_PORT || '22' }}
           PROD_USER: ${{ secrets.PROD_USER || 'root' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           SSH_CMD="ssh -i ~/.ssh/id_rsa_prod -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
+
+          if [ -n "$GEMINI_API_KEY" ]; then
+            echo "Syncing protected AI runtime configuration..."
+            printf '%s\n' "$GEMINI_API_KEY" | $SSH_CMD 'set -eu; umask 077; IFS= read -r value; env_file=/root/zayuno/.env; tmp_file=$(mktemp /root/zayuno/.env.XXXXXX); grep -v "^GEMINI_API_KEY=" "$env_file" > "$tmp_file" || true; printf "GEMINI_API_KEY=%s\n" "$value" >> "$tmp_file"; chmod 600 "$tmp_file"; mv "$tmp_file" "$env_file"'
+          fi
 
           echo "Triggering deployment on remote server..."
           $SSH_CMD "/root/zayuno/deploy/deploy-server.sh '${{ env.TARGET_SHA }}' '${{ env.TARGET_SERVICES }}' '${{ env.IMAGE_PREFIX }}' '${{ env.RUN_MIGRATIONS }}'"
