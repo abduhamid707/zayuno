@@ -8,6 +8,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  latencyMs?: number;
 }
 
 export interface ChatSession {
@@ -27,7 +28,9 @@ interface ChatState {
   newChat: () => void;
   selectSession: (id: string) => void;
   deleteSession: (id: string) => Promise<void>;
-  addMessage: (message: Pick<ChatMessage, "role" | "content">) => void;
+  addMessage: (
+    message: Pick<ChatMessage, "role" | "content"> & { latencyMs?: number },
+  ) => void;
   setLoading: (loading: boolean) => void;
 }
 
@@ -79,13 +82,14 @@ export const useChatStore = create<ChatState>((set) => ({
     });
   },
 
-  addMessage: ({ role, content }) => {
+  addMessage: ({ role, content, latencyMs }) => {
     const now = new Date().toISOString();
     const message: ChatMessage = {
       id: makeId(),
       role,
       content,
       createdAt: now,
+      latencyMs,
     };
     set((state) => {
       const active = state.sessions.find(

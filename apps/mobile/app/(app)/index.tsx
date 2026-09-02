@@ -131,6 +131,23 @@ export default function HomeScreen() {
     return () => clearTimeout(timer);
   }, [messages.length, isLoading]);
 
+  const [streamingDuration, setStreamingDuration] = useState<number | null>(null);
+  const streamStartRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let interval: any;
+    if (isLoading && streamStartRef.current) {
+      interval = setInterval(() => {
+        if (streamStartRef.current) {
+          setStreamingDuration((Date.now() - streamStartRef.current) / 1000);
+        }
+      }, 100);
+    } else {
+      setStreamingDuration(null);
+    }
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
   const sendMessage = async (value = input) => {
     const prompt = value.trim();
     if (!prompt || isLoading) return;
@@ -145,6 +162,8 @@ export default function HomeScreen() {
     Keyboard.dismiss();
     addMessage({ role: "user", content: prompt });
     setLoading(true);
+    const startTime = Date.now();
+    streamStartRef.current = startTime;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
       () => undefined,
     );
@@ -158,10 +177,12 @@ export default function HomeScreen() {
         (delta) => setStreamingText((current) => current + delta),
         controller.signal,
       );
-      addMessage({ role: "assistant", content });
+      const latencyMs = Date.now() - startTime;
+      addMessage({ role: "assistant", content, latencyMs });
       setStreamingText("");
     } catch (error: any) {
       setStreamingText("");
+      const latencyMs = Date.now() - startTime;
       if (error?.name !== "AbortError") {
         setLastFailed(prompt);
         addMessage({
@@ -169,10 +190,12 @@ export default function HomeScreen() {
           content:
             error?.message ||
             "Hozir javob bera olmadim. Internetni tekshirib, qayta urinib ko‘ring.",
+          latencyMs,
         });
       }
     } finally {
       abortRef.current = null;
+      streamStartRef.current = null;
       setLoading(false);
     }
   };
@@ -190,7 +213,17 @@ export default function HomeScreen() {
     return (
       <View style={styles.assistantMessage}>
         <Ionicons name="sparkles" size={17} color="#8376FF" />
-        <Text style={styles.assistantText}>{item.content}</Text>
+        <View style={styles.assistantContentWrap}>
+          <Text style={styles.assistantText}>{item.content}</Text>
+          {item.latencyMs !== undefined ? (
+            <View style={styles.latencyBadge}>
+              <Ionicons name="timer-outline" size={12} color="#7E86A5" />
+              <Text style={styles.latencyText}>
+                {(item.latencyMs / 1000).toFixed(2)}s
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
     );
   };
@@ -262,12 +295,31 @@ export default function HomeScreen() {
               streamingText ? (
                 <View style={styles.assistantMessage}>
                   <Ionicons name="sparkles" size={17} color="#8376FF" />
-                  <Text style={styles.assistantText}>{streamingText}</Text>
+                  <View style={styles.assistantContentWrap}>
+                    <Text style={styles.assistantText}>{streamingText}</Text>
+                    {streamingDuration !== null ? (
+                      <View style={styles.latencyBadge}>
+                        <Ionicons
+                          name="timer-outline"
+                          size={12}
+                          color="#7E86A5"
+                        />
+                        <Text style={styles.latencyText}>
+                          {streamingDuration.toFixed(1)}s…
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
               ) : (
                 <View style={styles.thinking}>
                   <View style={styles.pulse} />
-                  <Text style={styles.thinkingText}>Zayuno yozmoqda…</Text>
+                  <Text style={styles.thinkingText}>
+                    Zayuno yozmoqda…{" "}
+                    {streamingDuration !== null
+                      ? `(${streamingDuration.toFixed(1)}s)`
+                      : ""}
+                  </Text>
                 </View>
               )
             ) : lastFailed ? (
@@ -497,11 +549,27 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 10,
   },
+  assistantContentWrap: { flex: 1 },
   assistantText: {
-    flex: 1,
     color: "#E8EAF2",
     fontSize: 14,
     lineHeight: 21,
+  },
+  latencyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+  },
+  latencyText: {
+    fontSize: 11,
+    color: "#7E86A5",
+    fontWeight: "500",
   },
   thinking: {
     flexDirection: "row",
