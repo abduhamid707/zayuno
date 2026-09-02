@@ -27,8 +27,18 @@ async function bootstrap() {
   }
   app.use(cors({
     origin: (origin, callback) => {
-      // Server-to-server traffic (webhooks, health checks) has no Origin.
-      if (!origin || (process.env.NODE_ENV !== 'production' && configuredOrigins.length === 0) || configuredOrigins.includes(origin)) {
+      // Server-to-server traffic, mobile native apps (no Origin), or permitted web domains
+      if (
+        !origin ||
+        (process.env.NODE_ENV !== 'production' && configuredOrigins.length === 0) ||
+        configuredOrigins.includes(origin) ||
+        origin.endsWith('.exp.direct') ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1') ||
+        origin.startsWith('http://10.') ||
+        origin.startsWith('http://192.168.') ||
+        origin.startsWith('http://172.')
+      ) {
         return callback(null, true);
       }
       return callback(new Error('CORS origin is not allowed.'));

@@ -158,6 +158,48 @@ export default function WelcomeScreen() {
             </Pressable>
           )}
 
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tezkor Kirish Demo"
+            onPress={async () => {
+              const setSession = useAuthStore.getState().setSession;
+              try {
+                const session = await apiFetch<SessionResponse>(
+                  "/api/v1/consumer/auth/demo",
+                  { method: "POST" },
+                  false,
+                );
+                const accessToken = session.accessToken || session.token;
+                if (accessToken) {
+                  await setSession({
+                    accessToken,
+                    refreshToken: session.refreshToken,
+                    user: session.user,
+                  });
+                  return;
+                }
+              } catch {
+                // local fallback
+              }
+              await setSession({
+                accessToken: "demo_consumer_token_habibillo",
+                refreshToken: "demo_consumer_refresh_token_habibillo",
+                user: {
+                  id: "demo-user-habibillo",
+                  name: "Habibillo Jabborov",
+                  email: "habibillojaboruf@gmail.com",
+                },
+              });
+            }}
+            style={({ pressed }) => [
+              styles.demoButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons name="flash" size={20} color="#FBBF24" />
+            <Text style={styles.demoText}>⚡ Tezkor Kirish (Demo)</Text>
+          </Pressable>
+
           <View style={styles.legalRow}>
             <Ionicons
               name="shield-checkmark-outline"
@@ -309,6 +351,19 @@ const styles = StyleSheet.create({
   },
   googleText: { color: "#111827", fontSize: 16, fontWeight: "700" },
   googleTextDisabled: { color: "#6B7280" },
+  demoButton: {
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 12,
+  },
+  demoText: { color: "#F3F4F6", fontSize: 15, fontWeight: "600" },
   pressed: { transform: [{ scale: 0.985 }], opacity: 0.94 },
   disabled: { opacity: 0.72 },
   error: {
