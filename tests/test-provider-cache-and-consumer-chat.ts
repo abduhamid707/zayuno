@@ -148,7 +148,7 @@ async function main() {
         {
           slug: "courier-only",
           name: "Courier Only",
-          type: "DELIVERY",
+          type: "SERVICES",
           category: "logistics",
           capabilities: ["CATALOG"],
         },
@@ -184,8 +184,19 @@ async function main() {
       },
     } as any,
   );
+  (dynamicFoodChat as any).planWithAi = async () => ({
+    intent: "food_browse",
+    needsCatalog: true,
+    providerScope: "food",
+    providerSlugs: [],
+    query: "fast food",
+    limit: 6,
+    page: 0,
+    allowCatalogFallback: true,
+    excludedOfferingIds: [],
+  });
   const preparedFood = await (dynamicFoodChat as any).prepareChat({
-    prompt: "fastfood bormi?",
+    prompt: "men fast-food yemoqchiman",
     messages: [],
     userId: "test-user",
   });
@@ -197,6 +208,93 @@ async function main() {
   assert.match(preparedFood.directAnswer, /Maxi Burger/);
   assert.match(preparedFood.directAnswer, /Pepperoni Pizza/);
   assert.doesNotMatch(preparedFood.directAnswer, /Courier Only/);
+
+  const openCatalogPlan = {
+    ...(dynamicFoodChat as any).planLiveContext("burger", []),
+    intent: "food_browse",
+    needsCatalog: true,
+    query: "burger",
+  };
+  const rankedCatalog = (dynamicFoodChat as any).rankCatalogForPlan(
+    [
+      { id: "pizza", title: "Pizza" },
+      { id: "burger", title: "Burger" },
+    ],
+    openCatalogPlan,
+  );
+  assert.equal(
+    rankedCatalog.length,
+    2,
+    "catalog ranking must never hide offerings",
+  );
+  assert.equal(
+    rankedCatalog[0].id,
+    "burger",
+    "matching offerings should only move to the top",
+  );
+
+  delete (dynamicFoodChat as any).planWithAi;
+  (dynamicFoodChat as any).models = [
+    {
+      name: "semantic-test",
+      client: {
+        generateContent: async () => ({
+          response: {
+            candidates: [{ finishReason: "STOP" }],
+            text: () =>
+              JSON.stringify({
+                intent: "food_browse",
+                needsCatalog: true,
+                providerSlugs: ["maxifood-express"],
+                query: "fast food",
+                limit: 6,
+                page: 0,
+                allowCatalogFallback: true,
+              }),
+          },
+        }),
+      },
+    },
+  ];
+  const semanticPlan = await (dynamicFoodChat as any).planWithAi(
+    "tabiiy tildagi ovqat so‘rovi",
+    [],
+    [
+      {
+        slug: "maxifood-express",
+        type: "DELIVERY",
+        category: "food_delivery",
+        capabilities: ["CATALOG"],
+      },
+      {
+        slug: "second-food-provider",
+        type: "DELIVERY",
+        category: "food_delivery",
+        capabilities: ["CATALOG"],
+      },
+    ],
+  );
+  assert.deepEqual(
+    semanticPlan.providerSlugs,
+    ["maxifood-express", "second-food-provider"],
+    "AI planning must keep every active catalog-capable delivery provider open",
+  );
+
+  const capabilities = await (dynamicFoodChat as any).prepareChat({
+    prompt: "rostan ham qanday yordam bera olasan?",
+    messages: [],
+    userId: "test-user",
+  });
+  assert.match(capabilities.directAnswer, /MaxiFood Express/);
+  assert.match(capabilities.directAnswer, /Courier Only/);
+
+  const providerListing = await (dynamicFoodChat as any).prepareChat({
+    prompt: "senda qanday providerlar bor aniqlashtirchi",
+    messages: [],
+    userId: "test-user",
+  });
+  assert.equal(providerListing.plan.intent, "provider_listing");
+  assert.match(providerListing.directAnswer, /MaxiFood Express/);
 
   console.log(
     "Provider cache, dynamic food discovery, catalog fallback, parallel search, and complete grounded chat output passed.",
