@@ -44,9 +44,11 @@ export class ConsumerChatService {
     const key = process.env.GEMINI_API_KEY?.trim();
     const modelNames = Array.from(
       new Set([
-        process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite",
-        "gemini-3.5-flash-lite",
-        "gemini-3.6-flash",
+        process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest",
+        "gemini-flash-latest",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
       ]),
     );
     const gemini = key ? new GoogleGenerativeAI(key) : null;
