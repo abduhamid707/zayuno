@@ -184,6 +184,55 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
       }));
   }
 
+  private isGeneralGreeting(prompt: string, history: ConversationMessage[]): boolean {
+    const raw = prompt.toLowerCase().trim();
+    const isShort = raw.split(/\s+/).length <= 4;
+    const isGreetingPattern =
+      /^(salom|assalomu\s+alaykum|assalom|salom\s+alaykum|qandaysiz|qandaysan|qalaysiz|qalaysan|privet|hello|hi|hey|hayrli\s+tong|hayrli\s+kun|hayrli\s+kech|xush\s+kelibsiz)[\s!.,?]*$/i.test(
+        raw,
+      );
+    // Only treat as general greeting if it's a greeting pattern and history is short or empty
+    return isShort && isGreetingPattern && history.length <= 1;
+  }
+
+  private expandSearchTerms(term: string): string[] {
+    const t = term.toLowerCase().trim();
+    const synonyms: string[] = [];
+
+    if (/web\s*dastur|veb\s*dastur|sayt|web/i.test(t)) {
+      synonyms.push("web developer", "full stack", "frontend", "backend", "web dasturchi");
+    }
+    if (/node|express|nestjs/i.test(t)) {
+      synonyms.push("node.js", "backend developer", "full stack");
+    }
+    if (/react|vue|angular|frontend/i.test(t)) {
+      synonyms.push("react", "frontend developer", "javascript");
+    }
+    if (/python|django|fastapi/i.test(t)) {
+      synonyms.push("python", "backend developer");
+    }
+    if (/dastur|program|it\b|kod|software/i.test(t)) {
+      synonyms.push("developer", "dasturchi", "programmer");
+    }
+    if (/buxg|hisobchi|moliya|finans/i.test(t)) {
+      synonyms.push("бухгалтер", "hisobchi", "accountant");
+    }
+    if (/dizayn|grafik|ui|ux|figma/i.test(t)) {
+      synonyms.push("дизайнер", "designer", "ui ux");
+    }
+    if (/sotuv|menejer|sales|savdo/i.test(t)) {
+      synonyms.push("менеджер", "sotuvchi", "sales");
+    }
+    if (/haydov|shof/i.test(t)) {
+      synonyms.push("водитель", "haydovchi");
+    }
+    if (/oshpaz|povar/i.test(t)) {
+      synonyms.push("повар", "oshpaz");
+    }
+
+    return Array.from(new Set([term, ...synonyms])).filter(Boolean);
+  }
+
   private extractSearchKeywords(
     prompt: string,
     history: ConversationMessage[],
@@ -237,6 +286,15 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
     history: ConversationMessage[],
     providers: any[],
   ): LiveContextPlan {
+    // 1. If it is just a greeting, do NOT pull random provider offerings
+    if (this.isGeneralGreeting(prompt, history)) {
+      return {
+        needsCatalog: false,
+        providerSlugs: [],
+        query: "",
+      };
+    }
+
     const fullContextText = (
       prompt +
       " " +
@@ -244,7 +302,7 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
     ).toLowerCase();
 
     const recruitment =
-      /ish|vakansi|headhunter|hh\b|job|resume|rezyume|cv\b|xodim|nomzod|developer|dasturchi|web|full|stack|frontend|backend|python|react|java|buxgalter|menejer|marketing/i.test(
+      /ish|vakansi|headhunter|hh\b|job|resume|rezyume|cv\b|xodim|nomzod|developer|dasturchi|web|full|stack|frontend|backend|python|react|node|java|buxgalter|menejer|marketing/i.test(
         fullContextText,
       );
     const food =
@@ -262,25 +320,27 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
       providerSlugs.push("coffee-time");
     }
 
-    if (providerSlugs.length === 0) {
+    // Only fallback to first providers if user explicitly asks for services
+    const isServiceQuery = /xizmat|buyurtma|narx|qancha|qayerda|bor|top|qidir/i.test(fullContextText);
+    if (providerSlugs.length === 0 && isServiceQuery) {
       providerSlugs.push(...providers.slice(0, 3).map((p) => p.slug));
     }
 
     return {
-      needsCatalog: true,
+      needsCatalog: providerSlugs.length > 0,
       providerSlugs: Array.from(new Set(providerSlugs)),
       query,
     };
   }
 
   private async loadLiveContext(plan: LiveContextPlan, providers: any[]) {
-    const requested = plan.providerSlugs.length
-      ? providers.filter((provider: any) =>
-          plan.providerSlugs.includes(provider.slug),
-        )
-      : plan.needsCatalog
-        ? providers.slice(0, 4)
-        : [];
+    if (!plan.needsCatalog || plan.providerSlugs.length === 0) {
+      return [];
+    }
+
+    const requested = providers.filter((provider: any) =>
+      plan.providerSlugs.includes(provider.slug),
+    );
 
     return Promise.all(
       requested.map(async (provider: any) => {
@@ -291,35 +351,55 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
           description: provider.description,
           geography: provider.geography,
         };
-        if (!plan.needsCatalog) return base;
 
         try {
-          let offerings: any[] = [];
+          const rawOfferings: any[] = [];
+          const seenIds = new Set<string>();
 
-          // 1. Try search with extracted query keywords
-          if (plan.query) {
+          // 1. Expand search terms and query provider
+          const searchTerms = plan.query
+            ? this.expandSearchTerms(plan.query)
+            : [];
+
+          for (const term of searchTerms) {
             try {
-              offerings = await this.catalogService.searchOfferings(
+              const results = await this.catalogService.searchOfferings(
                 provider.slug,
-                plan.query,
+                term,
                 undefined,
                 undefined,
-                10,
+                8,
               );
+              if (Array.isArray(results)) {
+                for (const item of results) {
+                  if (!seenIds.has(item.id)) {
+                    seenIds.add(item.id);
+                    rawOfferings.push(item);
+                  }
+                }
+              }
             } catch (err) {
               this.logger.warn(
-                `Search failed for ${provider.slug}: ${String(err)}`,
+                `Search failed for ${provider.slug} term "${term}": ${String(err)}`,
               );
             }
+            if (rawOfferings.length >= 8) break;
           }
 
-          // 2. If 0 results or no query, try fallback / featured catalog
-          if (!offerings || offerings.length === 0) {
+          // 2. If 0 results, try fallback catalog
+          if (rawOfferings.length === 0) {
             try {
               const catalog = await this.catalogService.getCatalog(
                 provider.slug,
               );
-              offerings = catalog.offerings || [];
+              if (Array.isArray(catalog.offerings)) {
+                for (const item of catalog.offerings) {
+                  if (!seenIds.has(item.id)) {
+                    seenIds.add(item.id);
+                    rawOfferings.push(item);
+                  }
+                }
+              }
             } catch (err) {
               this.logger.warn(
                 `Catalog fallback failed for ${provider.slug}: ${String(err)}`,
@@ -329,8 +409,8 @@ CRITICAL INSTRUCTION FOR LIVE DATA:
 
           return {
             ...base,
-            offeringsCount: offerings.length,
-            offerings: offerings
+            offeringsCount: rawOfferings.length,
+            offerings: rawOfferings
               .filter((item) => item.isAvailable !== false)
               .slice(0, 6)
               .map((item) => ({
