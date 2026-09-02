@@ -31,6 +31,7 @@ type ChatIntent =
 type LiveContextPlan = {
   intent: ChatIntent;
   needsCatalog: boolean;
+  providerScope: "explicit" | "food";
   providerSlugs: string[];
   query: string;
   limit: number;
@@ -454,6 +455,7 @@ STRICT RULES:
     const emptyPlan = (intent: ChatIntent): LiveContextPlan => ({
       intent,
       needsCatalog: false,
+      providerScope: "explicit",
       providerSlugs: [],
       query: "",
       limit: 0,
@@ -489,7 +491,7 @@ STRICT RULES:
         effectiveText,
       );
     const food =
-      /ovqat|taom|restoran|kafe|cafe|coffee|kofe|cappuccino|latte|espresso|americano|cheesecake|ichimlik|yetkaz|lavash|burger|pizza/i.test(
+      /ovqat|taom|food|fast.?food|restoran|restaurant|kafe|cafe|coffee|kofe|cappuccino|latte|espresso|americano|cheesecake|ichimlik|yetkaz|lavash|burger|pizza|pitsa|hot.?dog|xot.?dog/i.test(
         effectiveText,
       );
 
@@ -499,6 +501,7 @@ STRICT RULES:
       return {
         intent: "recruitment_search",
         needsCatalog: true,
+        providerScope: "explicit",
         providerSlugs: ["hh-uz"],
         query,
         limit,
@@ -517,7 +520,8 @@ STRICT RULES:
       return {
         intent: selection ? "food_selection" : "food_browse",
         needsCatalog: true,
-        providerSlugs: ["coffee-time"],
+        providerScope: "food",
+        providerSlugs: [],
         query: this.extractSearchKeywords(effectivePrompt, history),
         limit,
         page: continuation ? 1 : 0,
@@ -530,13 +534,16 @@ STRICT RULES:
   }
 
   private async loadLiveContext(plan: LiveContextPlan, providers: any[]) {
-    if (!plan.needsCatalog || plan.providerSlugs.length === 0) {
+    if (!plan.needsCatalog) {
       return [];
     }
 
-    const requested = providers.filter((provider: any) =>
-      plan.providerSlugs.includes(provider.slug),
-    );
+    const requested =
+      plan.providerScope === "food"
+        ? providers.filter((provider: any) => this.isFoodProvider(provider))
+        : providers.filter((provider: any) =>
+            plan.providerSlugs.includes(provider.slug),
+          );
 
     return Promise.all(
       requested.map(async (provider: any) => {
@@ -552,6 +559,14 @@ STRICT RULES:
           const rawOfferings: any[] = [];
           const seenIds = new Set<string>();
           const excludedIds = new Set(plan.excludedOfferingIds);
+          const capabilities = Array.isArray(provider.capabilities)
+            ? provider.capabilities.map((value: unknown) =>
+                String(value).toUpperCase(),
+              )
+            : null;
+          const canSearch = capabilities
+            ? capabilities.includes("SEARCH")
+            : true;
 
           // 1. Expand search terms and query provider
           const searchTerms = plan.query
@@ -559,21 +574,25 @@ STRICT RULES:
             : [];
 
           const limitedTerms = searchTerms.slice(0, 6);
-          const searchResults = await Promise.allSettled(
-            limitedTerms.map((term) =>
-              this.withTimeout(
-                this.catalogService.searchOfferings(
-                  provider.slug,
-                  term,
-                  undefined,
-                  undefined,
-                  Math.min(Math.max(plan.limit + excludedIds.size, 20), 50),
-                  provider.slug === "hh-uz" ? { page: plan.page } : undefined,
+          const searchResults = canSearch
+            ? await Promise.allSettled(
+                limitedTerms.map((term) =>
+                  this.withTimeout(
+                    this.catalogService.searchOfferings(
+                      provider.slug,
+                      term,
+                      undefined,
+                      undefined,
+                      Math.min(Math.max(plan.limit + excludedIds.size, 20), 50),
+                      provider.slug === "hh-uz"
+                        ? { page: plan.page }
+                        : undefined,
+                    ),
+                    5_000,
+                  ),
                 ),
-                5_000,
-              ),
-            ),
-          );
+              )
+            : [];
 
           for (let index = 0; index < searchResults.length; index += 1) {
             const result = searchResults[index];
@@ -591,15 +610,22 @@ STRICT RULES:
             }
           }
 
-          // Full-catalog fallback is valid only for an explicit browse request.
-          // Search and continuation requests must never be padded with unrelated data.
-          if (rawOfferings.length === 0 && plan.allowCatalogFallback) {
+          // Providers are allowed to expose CATALOG without SEARCH. In that case
+          // query the catalog and filter it locally instead of hiding the provider.
+          if (
+            !canSearch ||
+            (rawOfferings.length === 0 && plan.allowCatalogFallback)
+          ) {
             try {
               const catalog = await this.catalogService.getCatalog(
                 provider.slug,
               );
               if (Array.isArray(catalog.offerings)) {
-                for (const item of catalog.offerings) {
+                const catalogOfferings = this.filterCatalogForPlan(
+                  catalog.offerings,
+                  plan,
+                );
+                for (const item of catalogOfferings) {
                   if (!seenIds.has(item.id)) {
                     seenIds.add(item.id);
                     rawOfferings.push(item);
@@ -649,6 +675,61 @@ STRICT RULES:
         }
       }),
     );
+  }
+
+  private isFoodProvider(provider: any): boolean {
+    const capabilities = Array.isArray(provider?.capabilities)
+      ? provider.capabilities.map((value: unknown) =>
+          String(value).toUpperCase(),
+        )
+      : [];
+    if (capabilities.length > 0 && !capabilities.includes("CATALOG")) {
+      return false;
+    }
+
+    const identity = [
+      provider?.type,
+      provider?.category,
+      provider?.name,
+      provider?.description,
+      provider?.metadata?.category,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return /food|ovqat|taom|restaurant|restoran|cafe|kafe|coffee|fast.?food/.test(
+      identity,
+    );
+  }
+
+  private filterCatalogForPlan(offerings: any[], plan: LiveContextPlan): any[] {
+    const query = plan.query.toLowerCase().trim();
+    if (!query) return offerings;
+
+    const genericFoodQuery =
+      /^(ovqat|taom|food|fast.?food|restoran|restaurant|kafe|cafe|yetkazib?\s*berish|delivery)$/.test(
+        query,
+      );
+    if (plan.intent === "food_browse" && genericFoodQuery) return offerings;
+
+    const terms = this.expandSearchTerms(query)
+      .flatMap((term) => term.toLowerCase().split(/\s+/))
+      .filter((term) => term.length >= 3);
+    if (terms.length === 0) return offerings;
+
+    return offerings.filter((item) => {
+      const searchable = [
+        item?.title,
+        item?.description,
+        item?.categorySlug,
+        item?.metadata?.category,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return terms.some((term) => searchable.includes(term));
+    });
   }
 
   private formatSalary(rawSalary: any): string {
