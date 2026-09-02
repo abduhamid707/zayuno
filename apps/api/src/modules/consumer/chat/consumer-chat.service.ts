@@ -41,14 +41,23 @@ export class ConsumerChatService {
     private readonly providersService: ProvidersService,
     private readonly catalogService: CatalogService,
   ) {
-    const systemInstruction = `You are Zayuno, a focused and helpful AI assistant for finding and using real services in Uzbekistan.
+    const systemInstruction = `You are Zayuno, a focused and helpful AI assistant for finding real services and jobs in Uzbekistan.
 Always answer directly and naturally to the user in fluent, polite Uzbek Latin.
 Be concise, warm, structured, and helpful.
 Never output thinking tags, meta-commentary, planning steps, or English notes.
-For provider names, services, availability, locations, and prices, prioritize LIVE_CONTEXT. Never invent false details.
-If information is missing, politely explain and guide the user on what to do next.
-Do not expose internal technical terms, IDs, or JSON syntax.
-Use clean markdown bullet points (• or *) for readability.`;
+
+CRITICAL INSTRUCTION FOR LIVE DATA:
+1. When LIVE_DATA contains offerings/vacancies:
+   - YOU MUST IMMEDIATELY LIST AND PRESENT THEM TO THE USER.
+   - For each vacancy or service, clearly list:
+     • Nomi (Position / Service Title)
+     • Kompaniya / Muassasa (Employer / Company)
+     • Maosh / Narx (Salary / Price)
+     • Ariza topshirish / Havola (Application link from live context)
+   - NEVER say "hozircha takliflar mavjud emas" or "tizim yangilanmoqda" if offerings exist in LIVE_DATA.
+2. Only if LIVE_DATA is completely empty, explain what is available in Uzbekistan and ask a helpful follow-up question.
+3. Do not expose internal technical terms (like slugs, JSON keys, provider IDs).
+4. Use clean markdown bullet points (• or *) for readability.`;
 
     const key = process.env.GEMINI_API_KEY?.trim();
     const modelNames = Array.from(
@@ -147,7 +156,7 @@ Use clean markdown bullet points (• or *) for readability.`;
       geography: provider.geography,
       capabilities: provider.capabilities,
     }));
-    const plan = this.planLiveContext(prompt, providers);
+    const plan = this.planLiveContext(prompt, history, providers);
     const liveContext = await this.loadLiveContext(plan, providers);
 
     return { prompt, history, providerIndex, liveContext };
@@ -175,56 +184,92 @@ Use clean markdown bullet points (• or *) for readability.`;
       }));
   }
 
-  private planLiveContext(prompt: string, providers: any[]): LiveContextPlan {
-    const normalized = prompt.toLocaleLowerCase("uz-UZ");
-    const serviceRequest =
-      /top|qidir|buyurtma|xizmat|narx|qancha|dorixona|ovqat|restoran|kafe|cafe|coffee|kofe|chipta|taksi|shifokor|klinika|bron|band|yaqin|manzil|mavjud|sotib|yetkaz|ish|vakansi|headhunter|hh\b|job|resume|rezyume|cv\b|xodim|nomzod|developer|dasturchi/i.test(
-        normalized,
-      );
-    if (!serviceRequest || !providers.length) {
-      return { needsCatalog: false, providerSlugs: [], query: prompt };
+  private extractSearchKeywords(
+    prompt: string,
+    history: ConversationMessage[],
+  ): string {
+    const raw = prompt.toLowerCase();
+
+    // Stopwords to strip
+    const stopwords = [
+      "menga", "bizga", "sizga", "sizdan", "uchun", "boyicha", "bo'yicha", "bo‘yicha", "haqida",
+      "topib", "top", "ber", "bera", "olasanmi", "olasan", "bormi", "qanaqa", "qanday", "nima",
+      "iltimos", "kerak", "qidir", "qidirib", "vakansiya", "vakansiyalar", "vakansiyakar", "vakansiyalari",
+      "ishlar", "ish", "ishga", "taklif", "mavjud", "salom", "qani", "ko'rsat", "korsat", "aytib",
+      "boladimi", "bo'ladimi", "yordam", "qilmoqchiman", "izlayapman",
+      "мне", "для", "по", "про", "найди", "есть", "какие", "пожалуйста", "вакансии", "работа",
+      "find", "get", "for", "me", "please", "can", "you", "show", "jobs", "vacancies",
+    ];
+
+    let cleaned = raw;
+    for (const w of stopwords) {
+      cleaned = cleaned.replace(new RegExp(`\\b${w}\\b`, "gi"), " ");
+    }
+    cleaned = cleaned
+      .replace(/[^\p{L}\p{N}\s+#.-]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    // If prompt is just a short follow-up (e.g. "Toshkent", "Senior", "Ha")
+    if (cleaned.length <= 2 && history.length > 0) {
+      const prevUserMsgs = history.filter((m) => m.role === "user");
+      if (prevUserMsgs.length > 0) {
+        const lastUserMsg = prevUserMsgs[prevUserMsgs.length - 1].content;
+        return this.extractSearchKeywords(lastUserMsg, []);
+      }
     }
 
-    const recruitmentRequest =
-      /ish|vakansi|headhunter|hh\b|job|resume|rezyume|cv\b|xodim|nomzod|developer|dasturchi/i.test(
-        normalized,
+    if (cleaned.length > 0) return cleaned;
+
+    // Fallback: check if prompt mentions general domains
+    if (/dasturchi|developer|it\b|program/i.test(raw)) return "developer";
+    if (/buxgalter|hisobchi|account/i.test(raw)) return "buxgalter";
+    if (/marketing|smm/i.test(raw)) return "marketing";
+    if (/haydovchi|driver/i.test(raw)) return "haydovchi";
+    if (/kofe|coffee/i.test(raw)) return "coffee";
+    if (/ovqat|food|lavash|burger/i.test(raw)) return "lavash";
+
+    return prompt.trim();
+  }
+
+  private planLiveContext(
+    prompt: string,
+    history: ConversationMessage[],
+    providers: any[],
+  ): LiveContextPlan {
+    const fullContextText = (
+      prompt +
+      " " +
+      history.map((h) => h.content).join(" ")
+    ).toLowerCase();
+
+    const recruitment =
+      /ish|vakansi|headhunter|hh\b|job|resume|rezyume|cv\b|xodim|nomzod|developer|dasturchi|web|full|stack|frontend|backend|python|react|java|buxgalter|menejer|marketing/i.test(
+        fullContextText,
       );
-    const foodRequest =
-      /ovqat|restoran|kafe|cafe|coffee|kofe|cappuccino|latte|espresso|ichimlik|yetkaz/i.test(
-        normalized,
+    const food =
+      /ovqat|restoran|kafe|cafe|coffee|kofe|cappuccino|latte|espresso|ichimlik|yetkaz|lavash|burger|pizza/i.test(
+        fullContextText,
       );
 
-    const ranked = providers
-      .map((provider: any) => {
-        const slug = String(provider.slug || "").toLowerCase();
-        const haystack = [
-          provider.slug,
-          provider.name,
-          provider.category,
-          provider.type,
-          provider.description,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        let score = normalized
-          .split(/[^\p{L}\p{N}]+/u)
-          .filter((word) => word.length > 2 && haystack.includes(word)).length;
-        if (recruitmentRequest && /hh|recruit|job/.test(slug)) score += 20;
-        if (foodRequest && /coffee|cafe|food|evos/.test(slug)) score += 20;
-        return { slug: provider.slug, score };
-      })
-      .filter((provider) => provider.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 4)
-      .map((provider) => provider.slug);
+    const query = this.extractSearchKeywords(prompt, history);
+
+    const providerSlugs: string[] = [];
+    if (recruitment) {
+      providerSlugs.push("hh-uz");
+    }
+    if (food) {
+      providerSlugs.push("coffee-time");
+    }
+
+    if (providerSlugs.length === 0) {
+      providerSlugs.push(...providers.slice(0, 3).map((p) => p.slug));
+    }
 
     return {
       needsCatalog: true,
-      providerSlugs: ranked.length
-        ? ranked
-        : providers.slice(0, 4).map((provider: any) => provider.slug),
-      query: prompt,
+      providerSlugs: Array.from(new Set(providerSlugs)),
+      query,
     };
   }
 
@@ -249,33 +294,65 @@ Use clean markdown bullet points (• or *) for readability.`;
         if (!plan.needsCatalog) return base;
 
         try {
-          let offerings: any[];
-          try {
-            offerings = await this.catalogService.searchOfferings(
-              provider.slug,
-              plan.query,
-              undefined,
-              undefined,
-              8,
-            );
-          } catch {
-            const catalog = await this.catalogService.getCatalog(provider.slug);
-            offerings = catalog.offerings || [];
+          let offerings: any[] = [];
+
+          // 1. Try search with extracted query keywords
+          if (plan.query) {
+            try {
+              offerings = await this.catalogService.searchOfferings(
+                provider.slug,
+                plan.query,
+                undefined,
+                undefined,
+                10,
+              );
+            } catch (err) {
+              this.logger.warn(
+                `Search failed for ${provider.slug}: ${String(err)}`,
+              );
+            }
+          }
+
+          // 2. If 0 results or no query, try fallback / featured catalog
+          if (!offerings || offerings.length === 0) {
+            try {
+              const catalog = await this.catalogService.getCatalog(
+                provider.slug,
+              );
+              offerings = catalog.offerings || [];
+            } catch (err) {
+              this.logger.warn(
+                `Catalog fallback failed for ${provider.slug}: ${String(err)}`,
+              );
+            }
           }
 
           return {
             ...base,
+            offeringsCount: offerings.length,
             offerings: offerings
               .filter((item) => item.isAvailable !== false)
-              .slice(0, 8)
+              .slice(0, 6)
               .map((item) => ({
                 id: item.id,
                 title: item.title,
-                description: item.description,
-                category: item.categoryTitle,
-                price: item.basePrice,
-                currency: item.currency,
-                isAvailable: item.isAvailable !== false,
+                employer:
+                  item.metadata?.employerName ||
+                  item.description?.match(/Kompaniya:\s*([^\n]+)/)?.[1] ||
+                  "Kompaniya",
+                salary: item.metadata?.rawSalary
+                  ? `${item.metadata.rawSalary.from || ""} - ${item.metadata.rawSalary.to || ""} ${item.metadata.rawSalary.currency || ""}`.trim()
+                  : item.basePrice > 0
+                    ? `${item.basePrice} ${item.currency}`
+                    : "Kelishilgan maosh",
+                location:
+                  item.description?.match(/Hudud:\s*([^\n]+)/)?.[1] ||
+                  "O'zbekiston",
+                applicationLink:
+                  item.metadata?.alternateUrl ||
+                  item.description?.match(/https:\/\/[^\s]+/)?.[0] ||
+                  "",
+                summary: item.description?.substring(0, 200) || "",
               })),
           };
         } catch (error) {
