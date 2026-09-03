@@ -11,6 +11,7 @@ import { QuotesService } from "../../quotes/quotes.service";
 import { ActionsService } from "../../actions/actions.service";
 import { RedisService } from "../../../common/services/redis.service";
 import { randomUUID } from "crypto";
+import { validateParametersAgainstDeclaration } from "@zayuno/contracts";
 
 type ConversationMessage = {
   role: "user" | "assistant";
@@ -25,13 +26,29 @@ type ChatRequest = {
 };
 
 type PendingConsumerOrder = {
-  version: 1;
-  stage: "awaiting_contact" | "awaiting_confirmation";
+  version: 2;
+  stage: "collecting_requirements" | "awaiting_confirmation";
   providerSlug: string;
   providerName: string;
+  providerFulfillmentMode: string;
   offeringId: string;
   offeringTitle: string;
   quantity: number;
+  locationId?: string;
+  variants: any[];
+  optionGroups: any[];
+  parametersSchema?: any;
+  selectedVariantId?: string;
+  selectedOptions: Array<{
+    groupId: string;
+    optionId: string;
+    quantity: number;
+  }>;
+  resolvedOptionGroupIds: string[];
+  parameters: Record<string, unknown>;
+  fulfillmentType?: string;
+  requiresPhone: boolean;
+  requiresDestination: boolean;
   customerEmail?: string;
   phone?: string;
   address?: string;
@@ -46,6 +63,16 @@ type PendingConsumerOrder = {
     expiresAt: string;
   };
   idempotencyKey: string;
+};
+
+type ActiveConsumerAction = {
+  version: 1;
+  actionId: string;
+  publicId: string;
+  providerSlug: string;
+  providerName: string;
+  paymentUrl?: string;
+  createdAt: string;
 };
 
 type ChatIntent =
@@ -202,6 +229,19 @@ STRICT RULES:
         directAnswer: pendingOrderAnswer,
       };
     }
+    const activeActionAnswer = await this.handleActiveActionFollowUp(
+      input.userId,
+      prompt,
+    );
+    if (activeActionAnswer) {
+      return {
+        prompt,
+        history: this.normalizeHistory(input.messages),
+        plan: this.emptyPlan("general"),
+        liveContext: [],
+        directAnswer: activeActionAnswer,
+      };
+    }
 
     const history = this.normalizeHistory(input.messages);
     const fallbackPlan = this.planLiveContext(prompt, history);
@@ -226,6 +266,29 @@ STRICT RULES:
       fallbackPlan.intent === "provider_listing"
         ? fallbackPlan
         : ((await this.planWithAi(prompt, history, providers)) ?? fallbackPlan);
+    const explicitlyMentionedProviders = this.findMentionedProviderSlugs(
+      prompt,
+      providers,
+    );
+    const fallbackIsFood =
+      fallbackPlan.intent === "food_browse" ||
+      fallbackPlan.intent === "food_selection";
+    if (
+      explicitlyMentionedProviders.length > 0 &&
+      (fallbackIsFood ||
+        plan.intent === "food_browse" ||
+        plan.intent === "food_selection")
+    ) {
+      if (plan.intent !== "food_browse" && plan.intent !== "food_selection") {
+        plan.intent = fallbackPlan.intent;
+        plan.query = fallbackPlan.query;
+        plan.quantity = fallbackPlan.quantity;
+        plan.limit = fallbackPlan.limit;
+      }
+      plan.providerScope = "explicit";
+      plan.providerSlugs = explicitlyMentionedProviders;
+      plan.needsCatalog = true;
+    }
 
     const providerAnswer = this.buildProviderAnswer(plan.intent, providers);
     if (providerAnswer) {
@@ -300,7 +363,12 @@ STRICT RULES:
       return undefined;
     }
 
-    const visible = [...providers]
+    const productionProviders = providers.filter(
+      (provider) => !this.isDemoProvider(provider),
+    );
+    const visible = [
+      ...(productionProviders.length ? productionProviders : providers),
+    ]
       .sort((left, right) => {
         const demoDifference =
           Number(this.isDemoProvider(left)) -
@@ -369,6 +437,10 @@ STRICT RULES:
     return `consumer:chat:pending-order:${userId}`;
   }
 
+  private activeActionStateKey(userId: string): string {
+    return `consumer:chat:active-action:${userId}`;
+  }
+
   private async readPendingOrder(
     userId: string,
   ): Promise<PendingConsumerOrder | null> {
@@ -376,7 +448,7 @@ STRICT RULES:
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw) as PendingConsumerOrder;
-      if (parsed?.version !== 1 || !parsed.providerSlug || !parsed.offeringId) {
+      if (parsed?.version !== 2 || !parsed.providerSlug || !parsed.offeringId) {
         throw new Error("invalid pending order state");
       }
       return parsed;
@@ -420,19 +492,70 @@ STRICT RULES:
     if (!selected) return undefined;
 
     const quantity = Math.min(Math.max(plan.quantity || 1, 1), 20);
+    const [offeringResult, catalogResult] = await Promise.allSettled([
+      this.catalogService.getOffering(
+        selected.context.slug,
+        selected.offering.id,
+        selected.context.locationId,
+      ),
+      this.catalogService.getCatalog(
+        selected.context.slug,
+        selected.context.locationId,
+      ),
+    ]);
+    const offering =
+      offeringResult.status === "fulfilled"
+        ? offeringResult.value
+        : selected.offering;
+    const catalogSchema =
+      catalogResult.status === "fulfilled"
+        ? catalogResult.value.parametersSchema
+        : selected.context.parametersSchema;
+    const fulfillmentMode = String(
+      selected.context.fulfillmentMode || "REMOTE",
+    ).toUpperCase();
+    const declaredRequirements =
+      selected.context.metadata?.interactionRequirements ||
+      selected.context.metadata?.actionRequirements ||
+      {};
+    const deliveryByMode = fulfillmentMode === "DELIVERY";
     const state: PendingConsumerOrder = {
-      version: 1,
-      stage: "awaiting_contact",
+      version: 2,
+      stage: "collecting_requirements",
       providerSlug: selected.context.slug,
       providerName: selected.context.name,
+      providerFulfillmentMode: fulfillmentMode,
       offeringId: selected.offering.id,
       offeringTitle: selected.offering.title,
       quantity,
+      locationId: selected.context.locationId,
+      variants: Array.isArray(offering.variants) ? offering.variants : [],
+      optionGroups: Array.isArray(offering.optionGroups)
+        ? offering.optionGroups
+        : [],
+      parametersSchema: this.mergeParameterSchemas(
+        catalogSchema,
+        offering.parametersSchema,
+      ),
+      selectedOptions: [],
+      resolvedOptionGroupIds: [],
+      parameters: {},
+      fulfillmentType:
+        fulfillmentMode === "HYBRID" ? undefined : fulfillmentMode,
+      requiresPhone:
+        typeof declaredRequirements.phone === "boolean"
+          ? declaredRequirements.phone
+          : deliveryByMode,
+      requiresDestination:
+        typeof declaredRequirements.destination === "boolean"
+          ? declaredRequirements.destination
+          : deliveryByMode,
       customerEmail: userEmail,
       idempotencyKey: `${userId}:${randomUUID()}`,
     };
+    this.applyAutomaticSelections(state);
     await this.savePendingOrder(userId, state);
-    return `**${this.cleanMarkdownText(state.offeringTitle)}** × ${quantity} tanlandi. Aniq yetkazib berish narxini provider orqali hisoblash uchun telefon raqamingiz va yetkazish manzilingizni yozing.`;
+    return this.advanceOrderCollection(userId, state);
   }
 
   private async handlePendingOrder(
@@ -449,55 +572,18 @@ STRICT RULES:
       return "Buyurtma jarayoni bekor qilindi.";
     }
 
-    if (state.stage === "awaiting_contact") {
-      const phoneMatch = prompt.match(
-        /(?:\+?998[\s()-]*\d{2}(?:[\s()-]*\d){7}|\b\d{9}\b)/,
-      );
-      if (phoneMatch) state.phone = this.normalizePhone(phoneMatch[0]);
-
-      const possibleAddress = prompt
-        .replace(phoneMatch?.[0] || "", " ")
-        .replace(/\b(telefon|tel|raqam|manzil|adres)\b\s*[:=-]?/gi, " ")
-        .replace(/[|;,]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-      if (possibleAddress.length >= 5) state.address = possibleAddress;
-
-      if (!state.phone || !state.address) {
-        await this.savePendingOrder(userId, state);
-        if (!state.phone && !state.address) {
-          return "Quote hisoblash uchun telefon raqamingiz va yetkazish manzilingiz kerak.";
-        }
-        return !state.phone
-          ? "Yetkazish manzili saqlandi. Endi telefon raqamingizni yozing."
-          : "Telefon raqami saqlandi. Endi yetkazish manzilingizni yozing.";
+    if (state.stage === "collecting_requirements") {
+      const requirement = this.nextOrderRequirement(state);
+      if (requirement) {
+        const captured = this.captureOrderRequirement(
+          state,
+          requirement,
+          prompt,
+        );
+        if (!captured) return this.formatRequirementPrompt(state, requirement);
       }
-
-      const quote = await this.quotesService.requestQuote({
-        providerSlug: state.providerSlug,
-        items: [
-          {
-            offeringId: state.offeringId,
-            quantity: state.quantity,
-            selectedOptions: [],
-          },
-        ],
-        fulfillmentType: "DELIVERY",
-        destination: { raw: state.address, country: "UZ" },
-      });
-      state.stage = "awaiting_confirmation";
-      state.quote = {
-        id: quote.id,
-        lines: quote.lines,
-        subtotal: quote.subtotal,
-        totalFees: quote.totalFees,
-        totalDiscount: quote.totalDiscount,
-        total: quote.total,
-        currency: quote.currency,
-        expiresAt: quote.expiresAt,
-      };
       await this.savePendingOrder(userId, state);
-      return this.formatQuoteForConfirmation(state);
+      return this.advanceOrderCollection(userId, state);
     }
 
     if (
@@ -517,6 +603,14 @@ STRICT RULES:
     }
 
     const email = state.customerEmail?.trim();
+    const customer = state.phone
+      ? {
+          name: email?.split("@")[0] || "Zayuno mijoz",
+          phone: state.phone,
+          email,
+          externalId: userId,
+        }
+      : undefined;
     const action = await this.actionsService.createAction(
       {
         idempotencyKey: state.idempotencyKey,
@@ -525,18 +619,18 @@ STRICT RULES:
         items: [
           {
             offeringId: state.offeringId,
+            variantId: state.selectedVariantId,
             quantity: state.quantity,
-            selectedOptions: [],
+            selectedOptions: state.selectedOptions,
           },
         ],
-        customer: {
-          name: email?.split("@")[0] || "Zayuno mijoz",
-          phone: state.phone!,
-          email,
-          externalId: userId,
-        },
-        destination: { raw: state.address!, country: "UZ" },
-        fulfillmentType: "DELIVERY",
+        locationId: state.locationId,
+        customer,
+        destination: state.address
+          ? { raw: state.address, country: "UZ" }
+          : undefined,
+        fulfillmentType: state.fulfillmentType,
+        parameters: state.parameters,
         userConfirmed: true,
       },
       userId,
@@ -556,13 +650,512 @@ STRICT RULES:
         // PAYMENT_OPTIONS is optional when ACTION_CREATE already owns handoff.
       }
     }
+    const reference = this.cleanMarkdownText(action.publicId || action.id);
+    await this.redisService.set(
+      this.activeActionStateKey(userId),
+      JSON.stringify({
+        version: 1,
+        actionId: action.id,
+        publicId: reference,
+        providerSlug: state.providerSlug,
+        providerName: state.providerName,
+        paymentUrl,
+        createdAt: new Date().toISOString(),
+      } satisfies ActiveConsumerAction),
+      7 * 24 * 60 * 60,
+    );
     await this.redisService.del(this.orderStateKey(userId));
 
-    const reference = this.cleanMarkdownText(action.publicId || action.id);
     if (paymentUrl) {
       return `Buyurtma providerga yuborildi. Raqam: **${reference}**\n\n[To‘lov qilish](${paymentUrl})`;
     }
     return `Buyurtma providerga yuborildi. Raqam: **${reference}**. Provider hozircha onlayn to‘lov havolasini qaytarmadi.`;
+  }
+
+  private mergeParameterSchemas(catalogSchema: any, offeringSchema: any) {
+    if (!catalogSchema && !offeringSchema) return undefined;
+    return {
+      type: "object",
+      properties: {
+        ...(catalogSchema?.properties || {}),
+        ...(offeringSchema?.properties || {}),
+      },
+      required: Array.from(
+        new Set([
+          ...(catalogSchema?.required || []),
+          ...(offeringSchema?.required || []),
+        ]),
+      ),
+      additionalProperties:
+        offeringSchema?.additionalProperties ??
+        catalogSchema?.additionalProperties ??
+        true,
+    };
+  }
+
+  private applyAutomaticSelections(state: PendingConsumerOrder): void {
+    const availableVariants = state.variants.filter(
+      (variant) => variant?.isAvailable !== false,
+    );
+    if (availableVariants.length === 1) {
+      state.selectedVariantId = availableVariants[0].id;
+    }
+    for (const group of state.optionGroups) {
+      const available = Array.isArray(group?.options)
+        ? group.options.filter((option: any) => option?.isAvailable !== false)
+        : [];
+      const defaults = available
+        .filter((option: any) => option.isDefault)
+        .slice(0, Number(group.maxSelections) || 1);
+      const requiredCount =
+        Number(group.minSelections) || (group.isRequired ? 1 : 0);
+      if (defaults.length > 0 && defaults.length >= requiredCount) {
+        state.selectedOptions.push(
+          ...defaults.map((option: any) => ({
+            groupId: group.id,
+            optionId: option.id,
+            quantity: 1,
+          })),
+        );
+        state.resolvedOptionGroupIds.push(group.id);
+      }
+    }
+    for (const key of state.parametersSchema?.required || []) {
+      const property = state.parametersSchema?.properties?.[key];
+      if (property?.default !== undefined) {
+        state.parameters[key] = property.default;
+      } else if (Array.isArray(property?.enum) && property.enum.length === 1) {
+        state.parameters[key] = property.enum[0];
+      }
+    }
+  }
+
+  private nextOrderRequirement(state: PendingConsumerOrder): any | undefined {
+    if (state.providerFulfillmentMode === "HYBRID" && !state.fulfillmentType) {
+      return {
+        kind: "fulfillment",
+        title: "Xizmatni qanday olasiz?",
+        choices: ["DELIVERY", "PICKUP", "ONSITE", "REMOTE"],
+      };
+    }
+
+    const availableVariants = state.variants.filter(
+      (variant) => variant?.isAvailable !== false,
+    );
+    if (availableVariants.length > 1 && !state.selectedVariantId) {
+      return {
+        kind: "variant",
+        title: "Variantni tanlang",
+        choices: availableVariants,
+      };
+    }
+
+    for (const group of state.optionGroups) {
+      if (state.resolvedOptionGroupIds.includes(group.id)) continue;
+      const requiredCount =
+        Number(group?.minSelections) || (group?.isRequired ? 1 : 0);
+      const selectedCount = state.selectedOptions.filter(
+        (option) => option.groupId === group.id,
+      ).length;
+      if (selectedCount < requiredCount) {
+        return {
+          kind: "option",
+          key: group.id,
+          title: group.name || "Qo‘shimcha tanlov",
+          minSelections: requiredCount,
+          maxSelections: Number(group.maxSelections) || 1,
+          choices: (group.options || []).filter(
+            (option: any) => option?.isAvailable !== false,
+          ),
+        };
+      }
+    }
+
+    for (const key of state.parametersSchema?.required || []) {
+      if (state.parameters[key] !== undefined) continue;
+      const property = state.parametersSchema?.properties?.[key] || {};
+      return {
+        kind: "parameter",
+        key,
+        title: property.title || property.description || key,
+        property,
+        choices: property.enum || [],
+      };
+    }
+
+    if (
+      (state.requiresPhone && !state.phone) ||
+      (state.requiresDestination && !state.address)
+    ) {
+      return {
+        kind: "delivery_contact",
+        title: "Yetkazish ma’lumotlari",
+      };
+    }
+    return undefined;
+  }
+
+  private captureOrderRequirement(
+    state: PendingConsumerOrder,
+    requirement: any,
+    prompt: string,
+  ): boolean {
+    if (requirement.kind === "delivery_contact") {
+      const phoneMatch = prompt.match(
+        /(?:\+?998[\s()-]*\d{2}(?:[\s()-]*\d){7}|\b\d{9}\b)/,
+      );
+      if (phoneMatch) state.phone = this.normalizePhone(phoneMatch[0]);
+      const possibleAddress = prompt
+        .replace(phoneMatch?.[0] || "", " ")
+        .replace(/\b(telefon|tel|raqam|manzil|adres)\b\s*[:=-]?/gi, " ")
+        .replace(/[|;,]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (possibleAddress.length >= 5) state.address = possibleAddress;
+      return (
+        (!state.requiresPhone || Boolean(state.phone)) &&
+        (!state.requiresDestination || Boolean(state.address))
+      );
+    }
+
+    if (requirement.kind === "fulfillment") {
+      const normalized = this.normalizeLookupText(prompt);
+      const value = /yetkaz|delivery/.test(normalized)
+        ? "DELIVERY"
+        : /olib ket|pickup/.test(normalized)
+          ? "PICKUP"
+          : /joyida|onsite/.test(normalized)
+            ? "ONSITE"
+            : /online|remote|masofaviy/.test(normalized)
+              ? "REMOTE"
+              : undefined;
+      if (!value) return false;
+      state.fulfillmentType = value;
+      if (value === "DELIVERY") {
+        state.requiresPhone = true;
+        state.requiresDestination = true;
+      }
+      return true;
+    }
+
+    if (requirement.kind === "variant") {
+      const selected = this.matchDeclaredChoice(prompt, requirement.choices);
+      if (!selected) return false;
+      state.selectedVariantId = selected.id;
+      return true;
+    }
+
+    if (requirement.kind === "option") {
+      const normalized = this.normalizeLookupText(prompt);
+      const numericChoices = new Set(normalized.split(" "));
+      if (
+        requirement.minSelections === 0 &&
+        /^(0|kerak emas|yo['‘’]?q|skip|o['‘’]?tkaz)$/i.test(normalized)
+      ) {
+        state.resolvedOptionGroupIds.push(requirement.key);
+        return true;
+      }
+      const selected = requirement.choices.filter(
+        (choice: any, index: number) =>
+          normalized.includes(
+            this.normalizeLookupText(choice.name || choice.id),
+          ) || numericChoices.has(String(index + 1)),
+      );
+      if (
+        selected.length < requirement.minSelections ||
+        selected.length > requirement.maxSelections
+      ) {
+        return false;
+      }
+      state.selectedOptions = state.selectedOptions.filter(
+        (option) => option.groupId !== requirement.key,
+      );
+      state.selectedOptions.push(
+        ...selected.map((option: any) => ({
+          groupId: requirement.key,
+          optionId: option.id,
+          quantity: 1,
+        })),
+      );
+      state.resolvedOptionGroupIds.push(requirement.key);
+      return true;
+    }
+
+    const property = requirement.property || {};
+    let value: unknown = prompt.trim();
+    if (Array.isArray(property.enum) && property.enum.length > 0) {
+      const selected = this.matchDeclaredChoice(
+        prompt,
+        property.enum.map((item: unknown) => ({
+          id: item,
+          name: String(item),
+        })),
+      );
+      if (!selected) return false;
+      value = selected.id;
+    } else if (property.type === "integer" || property.type === "number") {
+      const number = Number(prompt.replace(/[^\d.-]/g, ""));
+      if (!Number.isFinite(number)) return false;
+      value = property.type === "integer" ? Math.trunc(number) : number;
+    } else if (property.type === "boolean") {
+      if (/^(ha|xa|yes|true)$/i.test(prompt.trim())) value = true;
+      else if (/^(yo['‘’]?q|no|false)$/i.test(prompt.trim())) value = false;
+      else return false;
+    } else if (property.type === "array" || property.type === "object") {
+      try {
+        value = JSON.parse(prompt);
+      } catch {
+        return false;
+      }
+    } else if (property.format === "email" && !/^\S+@\S+\.\S+$/.test(prompt)) {
+      return false;
+    }
+    state.parameters[requirement.key] = value;
+    const validation = validateParametersAgainstDeclaration(
+      { [requirement.key]: value },
+      {
+        type: "object",
+        properties: { [requirement.key]: property },
+        required: [requirement.key],
+        additionalProperties: false,
+      },
+    );
+    if (!validation.success) {
+      delete state.parameters[requirement.key];
+      return false;
+    }
+    if (/address|destination|manzil/i.test(requirement.key)) {
+      state.address = String(value);
+    }
+    return true;
+  }
+
+  private matchDeclaredChoice(prompt: string, choices: any[]): any | undefined {
+    const normalized = this.normalizeLookupText(prompt);
+    const byIndex = Number.parseInt(normalized, 10);
+    if (String(byIndex) === normalized && choices[byIndex - 1]) {
+      return choices[byIndex - 1];
+    }
+    return choices.find((choice) => {
+      const label = this.normalizeLookupText(
+        choice?.name ?? choice?.id ?? choice,
+      );
+      return label && (normalized === label || normalized.includes(label));
+    });
+  }
+
+  private formatRequirementPrompt(
+    state: PendingConsumerOrder,
+    requirement: any,
+  ): string {
+    const prefix = `**${this.cleanMarkdownText(state.offeringTitle)}** × ${state.quantity} tanlandi.`;
+    if (requirement.kind === "delivery_contact") {
+      const missing = [
+        state.requiresPhone && !state.phone ? "telefon raqamingiz" : "",
+        state.requiresDestination && !state.address
+          ? "yetkazish manzilingiz"
+          : "",
+      ].filter(Boolean);
+      return `${prefix} Yakuniy narxni hisoblash uchun ${missing.join(" va ")}ni yozing.`;
+    }
+    const choices = Array.isArray(requirement.choices)
+      ? requirement.choices
+          .map((choice: any, index: number) => {
+            const label = this.cleanMarkdownText(
+              choice?.name ?? choice?.title ?? choice?.id ?? choice,
+            );
+            const delta = Number(choice?.priceDelta || choice?.basePrice || 0);
+            return `${index + 1}. ${label}${delta ? ` (+${delta.toLocaleString("en-US")})` : ""}`;
+          })
+          .join("\n")
+      : "";
+    const skip =
+      requirement.kind === "option" && requirement.minSelections === 0
+        ? "\n0. Kerak emas"
+        : "";
+    return `${prefix}\n\n${this.cleanMarkdownText(requirement.title)}${choices ? `:\n\n${choices}${skip}` : "ni yozing."}`;
+  }
+
+  private async advanceOrderCollection(
+    userId: string,
+    state: PendingConsumerOrder,
+  ): Promise<string> {
+    const requirement = this.nextOrderRequirement(state);
+    if (requirement) {
+      await this.savePendingOrder(userId, state);
+      return this.formatRequirementPrompt(state, requirement);
+    }
+
+    const item = {
+      offeringId: state.offeringId,
+      variantId: state.selectedVariantId,
+      quantity: state.quantity,
+      selectedOptions: state.selectedOptions,
+    };
+    const availability = await this.catalogService.checkAvailability({
+      providerSlug: state.providerSlug,
+      locationId: state.locationId,
+      items: [item],
+      parameters: state.parameters,
+    });
+    if (!availability.isAvailable || availability.unavailableItems?.length) {
+      await this.redisService.del(this.orderStateKey(userId));
+      return "Tanlangan mahsulot hozir mavjud emas. Katalogdan boshqa variantni tanlang.";
+    }
+
+    const quote = await this.quotesService.requestQuote({
+      providerSlug: state.providerSlug,
+      locationId: state.locationId,
+      items: [item],
+      fulfillmentType: state.fulfillmentType,
+      destination: state.address
+        ? { raw: state.address, country: "UZ" }
+        : undefined,
+      parameters: state.parameters,
+    });
+    state.stage = "awaiting_confirmation";
+    state.quote = {
+      id: quote.id,
+      lines: quote.lines,
+      subtotal: quote.subtotal,
+      totalFees: quote.totalFees,
+      totalDiscount: quote.totalDiscount,
+      total: quote.total,
+      currency: quote.currency,
+      expiresAt: quote.expiresAt,
+    };
+    await this.savePendingOrder(userId, state);
+    return this.formatQuoteForConfirmation(state);
+  }
+
+  private async readActiveAction(
+    userId: string,
+  ): Promise<ActiveConsumerAction | null> {
+    const raw = await this.redisService.get(this.activeActionStateKey(userId));
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as ActiveConsumerAction;
+      return parsed?.version === 1 && parsed.actionId ? parsed : null;
+    } catch {
+      await this.redisService.del(this.activeActionStateKey(userId));
+      return null;
+    }
+  }
+
+  private async handleActiveActionFollowUp(
+    userId: string,
+    prompt: string,
+  ): Promise<string | undefined> {
+    const supportRequest =
+      /support|qo['‘’]?llab.?quvvat|kontakt|contact|telefon|bog['‘’]?lan/i.test(
+        prompt,
+      );
+    const statusRequest =
+      /^(to['‘’]?ladim|to['‘’]?lov.*(?:bo['‘’]?ldi|qildim|holat)|buyurtma.*(?:holat|status)|status|qayerda|tekshir)[\s!?.]*$/i.test(
+        prompt.trim(),
+      );
+    if (!supportRequest && !statusRequest) return undefined;
+
+    let active = await this.readActiveAction(userId);
+    if (!active) {
+      const latest = await this.actionsService.listActions({
+        limit: 1,
+        access: { id: userId },
+      });
+      const action = latest[0];
+      if (!action) return undefined;
+      active = {
+        version: 1,
+        actionId: action.id,
+        publicId: action.publicId,
+        providerSlug: action.providerSlug,
+        providerName: action.providerName || action.providerSlug,
+        paymentUrl: this.safeHttpUrl(
+          action.nextAction?.url || action.paymentUrl,
+        ),
+        createdAt: action.createdAt,
+      };
+      await this.redisService.set(
+        this.activeActionStateKey(userId),
+        JSON.stringify(active),
+        7 * 24 * 60 * 60,
+      );
+    }
+
+    if (supportRequest) {
+      const action = await this.actionsService.getAction(
+        { actionId: active.actionId },
+        { id: userId },
+      );
+      return this.formatOfficialSupport(
+        action.providerName || active.providerName,
+        action.supportContact,
+      );
+    }
+    let result: { action: any; providerVerified: boolean };
+    try {
+      result = await this.withTimeout(
+        this.actionsService.getLiveAction(
+          { actionId: active.actionId },
+          { id: userId },
+        ),
+        5_000,
+      );
+    } catch {
+      result = {
+        action: await this.actionsService.getAction(
+          { actionId: active.actionId },
+          { id: userId },
+        ),
+        providerVerified: false,
+      };
+    }
+    return this.formatLiveActionStatus(result.action, result.providerVerified);
+  }
+
+  private formatOfficialSupport(providerName: string, support: any): string {
+    const name = this.cleanMarkdownText(providerName);
+    if (!support) {
+      return `${name} rasmiy support kontaktini Zayunoga taqdim etmagan.`;
+    }
+    const rows: string[] = [];
+    if (support.phone)
+      rows.push(`- Telefon: ${this.cleanMarkdownText(support.phone)}`);
+    if (support.telegram)
+      rows.push(`- Telegram: ${this.cleanMarkdownText(support.telegram)}`);
+    if (support.email)
+      rows.push(`- Email: ${this.cleanMarkdownText(support.email)}`);
+    const supportUrl = this.safeHttpUrl(support.supportUrl);
+    if (supportUrl) rows.push(`- [Support sahifasi](${supportUrl})`);
+    if (support.workingHours)
+      rows.push(`- Ish vaqti: ${this.cleanMarkdownText(support.workingHours)}`);
+    return rows.length
+      ? `${name} provider ro‘yxatdan o‘tkazgan rasmiy support kontaktlari:\n\n${rows.join("\n")}`
+      : `${name} rasmiy support kontaktini Zayunoga taqdim etmagan.`;
+  }
+
+  private formatLiveActionStatus(
+    action: any,
+    providerVerified: boolean,
+  ): string {
+    const reference = this.cleanMarkdownText(action.publicId || action.id);
+    if (!providerVerified) {
+      return `**${reference}** holatini hozir provider orqali tekshirib bo‘lmadi. Oxirgi saqlangan holat: **${this.actionStatusLabel(action.status, action.paymentStatus)}**.`;
+    }
+    return `**${reference}** provider holati: **${this.actionStatusLabel(action.status, action.paymentStatus)}**.`;
+  }
+
+  private actionStatusLabel(status: unknown, paymentStatus: unknown): string {
+    const payment = String(paymentStatus || "").toUpperCase();
+    const action = String(status || "").toUpperCase();
+    if (payment === "PAID") return "to‘lov tasdiqlangan";
+    if (payment === "FAILED") return "to‘lov amalga oshmagan";
+    if (payment === "REFUNDED") return "to‘lov qaytarilgan";
+    if (action === "COMPLETED") return "yakunlangan";
+    if (action === "CANCELLED") return "bekor qilingan";
+    if (action === "PROCESSING" || action === "CONFIRMED")
+      return "provider tomonidan bajarilmoqda";
+    return "to‘lov tasdig‘i kutilmoqda";
   }
 
   private normalizePhone(value: string): string {
@@ -579,11 +1172,26 @@ STRICT RULES:
       const title = this.cleanMarkdownText(
         line.offeringTitle || state.offeringTitle,
       );
-      return `- ${title} × ${line.quantity}: **${Number(line.lineTotal).toLocaleString("en-US")} ${currency}**`;
+      const variant = state.variants.find(
+        (item) => item.id === (line.variantId || state.selectedVariantId),
+      );
+      const options = state.selectedOptions
+        .map((selected) =>
+          state.optionGroups
+            .find((group) => group.id === selected.groupId)
+            ?.options?.find((option: any) => option.id === selected.optionId),
+        )
+        .filter(Boolean)
+        .map((option: any) => this.cleanMarkdownText(option.name));
+      const selections = [
+        variant ? this.cleanMarkdownText(variant.name) : "",
+        ...options,
+      ].filter(Boolean);
+      return `- ${title}${selections.length ? ` (${selections.join(", ")})` : ""} × ${line.quantity}: **${Number(line.lineTotal).toLocaleString("en-US")} ${currency}**`;
     });
     if (quote.totalFees > 0) {
       rows.push(
-        `- Yetkazish va xizmat haqi: **${quote.totalFees.toLocaleString("en-US")} ${currency}**`,
+        `- Qo‘shimcha to‘lovlar: **${quote.totalFees.toLocaleString("en-US")} ${currency}**`,
       );
     }
     if (quote.totalDiscount > 0) {
@@ -591,7 +1199,7 @@ STRICT RULES:
         `- Chegirma: **−${quote.totalDiscount.toLocaleString("en-US")} ${currency}**`,
       );
     }
-    return `Provider hisoblagan aniq quote:\n\n${rows.join("\n")}\n\nJami: **${quote.total.toLocaleString("en-US")} ${currency}**\n\nBuyurtmani tasdiqlash uchun **Tasdiqlayman**, bekor qilish uchun **Bekor** deb yozing.`;
+    return `Buyurtma tafsilotlari:\n\n${rows.join("\n")}\n\nJami: **${quote.total.toLocaleString("en-US")} ${currency}**\n\nBuyurtmani tasdiqlash uchun **Tasdiqlayman**, bekor qilish uchun **Bekor** deb yozing.`;
   }
 
   private async planWithAi(
@@ -655,25 +1263,31 @@ USER=${JSON.stringify(prompt)}`;
               validSlugs.has(String(slug)),
             )
           : [];
+        const explicitlyMentioned = this.findMentionedProviderSlugs(
+          prompt,
+          providers,
+        );
         if (
           parsed.intent === "food_browse" ||
           parsed.intent === "food_selection"
         ) {
-          providerSlugs = Array.from(
-            new Set([
-              ...providerSlugs,
-              ...providers
-                .filter((provider) => this.isFoodProvider(provider))
-                .map((provider) => provider.slug),
-            ]),
-          );
+          providerSlugs = explicitlyMentioned.length
+            ? explicitlyMentioned
+            : Array.from(
+                new Set([
+                  ...providerSlugs,
+                  ...providers
+                    .filter((provider) => this.isFoodProvider(provider))
+                    .map((provider) => provider.slug),
+                ]),
+              );
         }
         const needsCatalog =
           Boolean(parsed.needsCatalog) && providerSlugs.length > 0;
         return {
           intent: parsed.intent,
           needsCatalog,
-          providerScope: "explicit",
+          providerScope: explicitlyMentioned.length > 0 ? "explicit" : "food",
           providerSlugs,
           query: String(parsed.query || "")
             .trim()
@@ -1031,15 +1645,19 @@ USER=${JSON.stringify(prompt)}`;
       return [];
     }
 
+    const foodProviders = providers.filter((provider: any) =>
+      this.isFoodProvider(provider),
+    );
+    const realFoodProviders = foodProviders.filter(
+      (provider: any) => !this.isDemoProvider(provider),
+    );
     const requested =
       plan.providerScope === "food"
-        ? providers
-            .filter((provider: any) => this.isFoodProvider(provider))
-            .sort(
-              (left: any, right: any) =>
-                this.foodProviderScore(left, plan.query) -
-                this.foodProviderScore(right, plan.query),
-            )
+        ? (realFoodProviders.length ? realFoodProviders : foodProviders).sort(
+            (left: any, right: any) =>
+              this.foodProviderScore(left, plan.query) -
+              this.foodProviderScore(right, plan.query),
+          )
         : providers
             .filter((provider: any) =>
               plan.providerSlugs.includes(provider.slug),
@@ -1058,10 +1676,16 @@ USER=${JSON.stringify(prompt)}`;
           category: provider.category || provider.type,
           description: provider.description,
           geography: provider.geography,
+          capabilities: provider.capabilities,
+          fulfillmentMode: provider.fulfillmentMode,
+          supportContact: provider.supportContact,
+          metadata: provider.metadata || {},
         };
 
         try {
           const rawOfferings: any[] = [];
+          let catalogParametersSchema: any;
+          let catalogLocationId: string | undefined;
           const seenIds = new Set<string>();
           const excludedIds = new Set(plan.excludedOfferingIds);
           const capabilities = Array.isArray(provider.capabilities)
@@ -1125,6 +1749,8 @@ USER=${JSON.stringify(prompt)}`;
               const catalog = await this.catalogService.getCatalog(
                 provider.slug,
               );
+              catalogParametersSchema = catalog.parametersSchema;
+              catalogLocationId = catalog.locationId;
               if (Array.isArray(catalog.offerings)) {
                 const catalogOfferings = this.rankCatalogForPlan(
                   catalog.offerings,
@@ -1146,6 +1772,8 @@ USER=${JSON.stringify(prompt)}`;
 
           return {
             ...base,
+            parametersSchema: catalogParametersSchema,
+            locationId: catalogLocationId,
             offeringsCount: rawOfferings.length,
             offerings: rawOfferings
               .filter((item) => item.isAvailable !== false)
@@ -1153,6 +1781,12 @@ USER=${JSON.stringify(prompt)}`;
               .map((item) => ({
                 id: item.id,
                 title: item.title,
+                basePrice: item.basePrice,
+                currency: item.currency,
+                variants: item.variants || [],
+                optionGroups: item.optionGroups || [],
+                parametersSchema: item.parametersSchema,
+                metadata: item.metadata || {},
                 employer:
                   item.metadata?.employerName ||
                   item.description?.match(/Kompaniya:\s*([^\n]+)/)?.[1] ||
@@ -1160,7 +1794,7 @@ USER=${JSON.stringify(prompt)}`;
                 salary: item.metadata?.rawSalary
                   ? this.formatSalary(item.metadata.rawSalary)
                   : item.basePrice > 0
-                    ? `${item.basePrice} ${item.currency}`
+                    ? `${Number(item.basePrice).toLocaleString("en-US")} ${item.currency}`
                     : "Kelishilgan maosh",
                 location:
                   item.description?.match(/Hudud:\s*([^\n]+)/)?.[1] ||
@@ -1210,6 +1844,33 @@ USER=${JSON.stringify(prompt)}`;
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
+  }
+
+  private findMentionedProviderSlugs(
+    prompt: string,
+    providers: any[],
+  ): string[] {
+    const normalizedPrompt = this.normalizeLookupText(prompt);
+    return providers
+      .filter((provider) => {
+        const slug = this.normalizeLookupText(provider?.slug);
+        const name = this.normalizeLookupText(provider?.name);
+        if (
+          (slug && normalizedPrompt.includes(slug)) ||
+          (name && normalizedPrompt.includes(name))
+        ) {
+          return true;
+        }
+        const distinctive = name
+          .split(" ")
+          .filter(
+            (part) =>
+              part.length >= 5 &&
+              !["express", "sandbox", "provider", "uzbekistan"].includes(part),
+          );
+        return distinctive.some((part) => normalizedPrompt.includes(part));
+      })
+      .map((provider) => provider.slug);
   }
 
   private foodProviderScore(provider: any, query: string): number {
@@ -1280,11 +1941,18 @@ USER=${JSON.stringify(prompt)}`;
   ): string | undefined {
     if (!plan.needsCatalog) return undefined;
     const contexts = Array.isArray(liveContext) ? liveContext : [];
-    const offerings = contexts.flatMap((context) =>
+    const allOfferings = contexts.flatMap((context) =>
       Array.isArray(context?.offerings)
         ? context.offerings.map((offering: any) => ({ context, offering }))
         : [],
     );
+    const realOfferings = allOfferings.filter(
+      ({ context }) => !this.isDemoProvider(context),
+    );
+    const offerings =
+      plan.providerScope === "food" && realOfferings.length > 0
+        ? realOfferings
+        : allOfferings;
 
     if (offerings.length === 0) {
       if (plan.intent === "recruitment_search") {
@@ -1323,14 +1991,20 @@ USER=${JSON.stringify(prompt)}`;
       const provider = this.cleanMarkdownText(context?.name);
       return `- **${title}** — ${price}${provider ? ` · ${provider}` : ""}`;
     });
-    const sandbox = displayedOfferings.some(({ context }) =>
+    const sandboxOnly = displayedOfferings.every(({ context }) =>
       this.isDemoProvider(context),
     );
+    const explicitProviderName =
+      plan.providerScope === "explicit" && contexts.length === 1
+        ? this.cleanMarkdownText(contexts[0]?.name)
+        : "";
     const intro =
       plan.intent === "food_selection"
-        ? "Tanlagan mahsulotlaringiz mavjud:"
-        : "Hozir mavjud taom va ichimliklar:";
-    const disclaimer = sandbox
+        ? "Tanlagan mahsulotingiz mavjud:"
+        : explicitProviderName
+          ? `${explicitProviderName} katalogida:`
+          : "Hozir mavjud taom va ichimliklar:";
+    const disclaimer = sandboxOnly
       ? "\n\nBu demo provider: haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi."
       : "";
     return `${intro}\n\n${rows.join("\n")}${disclaimer}`;

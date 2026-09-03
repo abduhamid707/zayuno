@@ -44,11 +44,7 @@ export class ActionsService {
     private redisService: RedisService
   ) {}
 
-  async createAction(
-    input: CreateActionInput,
-    userId?: string,
-    options?: { allowSandboxSimulator?: boolean }
-  ): Promise<NormalizedAction> {
+  async createAction(input: CreateActionInput, userId?: string, options?: { allowSandboxSimulator?: boolean }): Promise<NormalizedAction> {
     if (!input.providerSlug) {
       throw new BadRequestException('providerSlug is required.');
     }
@@ -67,7 +63,9 @@ export class ActionsService {
     }
     const forbiddenKey = findForbiddenParameterKey(input.parameters);
     if (forbiddenKey) {
-      throw new BadRequestException(`Sensitive identity or payment field "${forbiddenKey}" is not allowed in action parameters. Use the provider-owned secure handoff.`);
+      throw new BadRequestException(
+        `Sensitive identity or payment field "${forbiddenKey}" is not allowed in action parameters. Use the provider-owned secure handoff.`
+      );
     }
 
     // A client-supplied idempotency key is only meaningful inside that
@@ -79,196 +77,216 @@ export class ActionsService {
     if (!lockAcquired) {
       const concurrentAction = await prisma.action.findUnique({
         where: { idempotencyKey: scopedIdempotencyKey },
-        include: { provider: true, location: true, timeline: { orderBy: { createdAt: 'asc' } } }
+        include: {
+          provider: true,
+          location: true,
+          timeline: { orderBy: { createdAt: 'asc' } }
+        }
       });
       if (concurrentAction) return this.mapDbActionToNormalized(concurrentAction);
       throw new IdempotencyError();
     }
 
     try {
-
-    // 1. Idempotency Check in Database
-    const existingAction = await prisma.action.findUnique({
-      where: { idempotencyKey: scopedIdempotencyKey },
-      include: { provider: true, location: true, timeline: { orderBy: { createdAt: 'asc' } } }
-    });
-
-    if (existingAction) {
-      this.logger.info(`Idempotent hit: returning existing action ${existingAction.publicId} for key ${input.idempotencyKey}`);
-      return this.mapDbActionToNormalized(existingAction);
-    }
-
-    if (input.quoteId) {
-      const existingQuoteAction = await prisma.action.findFirst({
-        where: { quoteId: input.quoteId, provider: { slug: cleanSlug } },
-        include: { provider: true, location: true, timeline: { orderBy: { createdAt: 'asc' } } }
+      // 1. Idempotency Check in Database
+      const existingAction = await prisma.action.findUnique({
+        where: { idempotencyKey: scopedIdempotencyKey },
+        include: {
+          provider: true,
+          location: true,
+          timeline: { orderBy: { createdAt: 'asc' } }
+        }
       });
-      if (existingQuoteAction) {
-        if (userId) {
-          if (existingQuoteAction.userId === userId) {
-            this.logger.info(`Quote action hit: returning existing action ${existingQuoteAction.publicId} for user ${userId} on quote ${input.quoteId}`);
-            return this.mapDbActionToNormalized(existingQuoteAction);
-          } else {
-            this.logger.warn(`Security violation: user ${userId} attempted to access quote ${input.quoteId} owned by ${existingQuoteAction.userId || 'anonymous'}`);
-            throw new ForbiddenException('This quote has already been utilized by another account. Request a fresh quote.');
-          }
-        } else {
-          // Anonymous caller
-          if (existingQuoteAction.userId) {
-            this.logger.warn(`Security violation: anonymous caller attempted to access quote ${input.quoteId} owned by user ${existingQuoteAction.userId}`);
-            throw new ForbiddenException('This quote has already been utilized by an account. Request a fresh quote.');
-          }
 
-          // Customer phone/name must NEVER be trusted for authentication.
-          // Anonymous callers must supply the original secret idempotencyKey / continuation credential.
-          const hasValidCredential = Boolean(
-            input.idempotencyKey &&
-            existingQuoteAction.idempotencyKey === scopedIdempotencyKey
-          );
+      if (existingAction) {
+        this.logger.info(`Idempotent hit: returning existing action ${existingAction.publicId} for key ${input.idempotencyKey}`);
+        return this.mapDbActionToNormalized(existingAction);
+      }
 
-          if (hasValidCredential) {
-            this.logger.info(`Quote action hit: returning existing action ${existingQuoteAction.publicId} for verified anonymous idempotencyKey on quote ${input.quoteId}`);
-            return this.mapDbActionToNormalized(existingQuoteAction);
+      if (input.quoteId) {
+        const existingQuoteAction = await prisma.action.findFirst({
+          where: { quoteId: input.quoteId, provider: { slug: cleanSlug } },
+          include: {
+            provider: true,
+            location: true,
+            timeline: { orderBy: { createdAt: 'asc' } }
+          }
+        });
+        if (existingQuoteAction) {
+          if (userId) {
+            if (existingQuoteAction.userId === userId) {
+              this.logger.info(`Quote action hit: returning existing action ${existingQuoteAction.publicId} for user ${userId} on quote ${input.quoteId}`);
+              return this.mapDbActionToNormalized(existingQuoteAction);
+            } else {
+              this.logger.warn(
+                `Security violation: user ${userId} attempted to access quote ${input.quoteId} owned by ${existingQuoteAction.userId || 'anonymous'}`
+              );
+              throw new ForbiddenException('This quote has already been utilized by another account. Request a fresh quote.');
+            }
           } else {
-            this.logger.warn(`Security violation: anonymous caller without matching idempotency key attempted to reuse quote ${input.quoteId}`);
-            throw new ConflictException('This quote has already been utilized. To retry an existing action, provide the original idempotency key, or request a fresh quote.');
+            // Anonymous caller
+            if (existingQuoteAction.userId) {
+              this.logger.warn(`Security violation: anonymous caller attempted to access quote ${input.quoteId} owned by user ${existingQuoteAction.userId}`);
+              throw new ForbiddenException('This quote has already been utilized by an account. Request a fresh quote.');
+            }
+
+            // Customer phone/name must NEVER be trusted for authentication.
+            // Anonymous callers must supply the original secret idempotencyKey / continuation credential.
+            const hasValidCredential = Boolean(input.idempotencyKey && existingQuoteAction.idempotencyKey === scopedIdempotencyKey);
+
+            if (hasValidCredential) {
+              this.logger.info(
+                `Quote action hit: returning existing action ${existingQuoteAction.publicId} for verified anonymous idempotencyKey on quote ${input.quoteId}`
+              );
+              return this.mapDbActionToNormalized(existingQuoteAction);
+            } else {
+              this.logger.warn(`Security violation: anonymous caller without matching idempotency key attempted to reuse quote ${input.quoteId}`);
+              throw new ConflictException(
+                'This quote has already been utilized. To retry an existing action, provide the original idempotency key, or request a fresh quote.'
+              );
+            }
           }
         }
       }
-    }
 
-    const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
-    if (!provider) {
-      throw new NotFoundError('Provider', cleanSlug);
-    }
-    const isSandboxSimulator = Boolean(
-      options?.allowSandboxSimulator && cleanSlug === 'sandbox-provider'
-    );
-    if (!isProviderPublished(provider) && !isSandboxSimulator) {
-      throw new BadRequestException('Provider is not published for public actions.');
-    }
-
-    // 2. A persisted quote is mandatory. It must belong to this provider and
-    // remain valid; Core must not delegate this safety check to an adapter.
-    const dbQuote = await prisma.quote.findUnique({ where: { id: input.quoteId } });
-    if (!dbQuote) {
-      throw new BadRequestException('The quoteId is unknown. Request a fresh verified quote before creating an action.');
-    }
-    if (dbQuote.providerId !== provider.id) {
-      throw new BadRequestException('The quoteId does not belong to the requested provider.');
-    }
-    if (new Date() > dbQuote.expiresAt) {
-      throw new QuoteExpiredError(input.quoteId);
-    }
-
-    // 3. Obtain Adapter and Check Capability
-    const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.ACTION_CREATE);
-    if (!adapter.createAction) {
-      throw new BadRequestException(`Provider "${cleanSlug}" does not implement createAction.`);
-    }
-
-    // 4. Call Provider Adapter
-    const providerAction = await adapter.createAction({ ...input, idempotencyKey: scopedIdempotencyKey });
-    // The checkout URL must originate from the provider. Core only normalizes the
-    // preferred nextAction shape and its legacy paymentUrl alias for persistence.
-    const providerPaymentUrl = providerAction.nextAction?.url || providerAction.paymentUrl;
-    this.assertExternalProviderCheckoutUrl(providerPaymentUrl);
-
-    const publicId = generatePublicActionId(cleanSlug);
-
-    // 5. Persist Action in Database
-    // Normalize lines, totals and pricing: external providers often return a lightweight
-    // confirmation payload (order ID + payment URL) while the canonical verified item lines
-    // and pricing are already locked and persisted in dbQuote.
-    const resolvedLines = (providerAction.lines && Array.isArray(providerAction.lines) && providerAction.lines.length > 0)
-      ? providerAction.lines
-      : (dbQuote.lines as any) || [];
-
-    const resolvedSubtotal = providerAction.subtotal !== undefined && providerAction.subtotal !== null
-      ? providerAction.subtotal
-      : Number(dbQuote.subtotal);
-
-    const resolvedFees = providerAction.fees !== undefined && providerAction.fees !== null
-      ? providerAction.fees
-      : (dbQuote.fees !== undefined && dbQuote.fees !== null ? Number(dbQuote.fees) : 0);
-
-    const resolvedDiscount = providerAction.discount !== undefined && providerAction.discount !== null
-      ? providerAction.discount
-      : (dbQuote.discount !== undefined && dbQuote.discount !== null ? Number(dbQuote.discount) : 0);
-
-    const resolvedTotal = providerAction.total !== undefined && providerAction.total !== null
-      ? providerAction.total
-      : Number(dbQuote.total);
-
-    const resolvedCurrency = providerAction.currency || dbQuote.currency || 'UZS';
-
-    const dbAction = await prisma.action.create({
-      data: {
-        publicId,
-        userId,
-        providerId: provider.id,
-        // Prefer the quote's resolved internal location. Older quotes or
-        // provider-only locations intentionally remain null rather than
-        // writing an external provider ID into this foreign-key column.
-        locationId: dbQuote.locationId || undefined,
-        quoteId: input.quoteId,
-        status: this.mapContractStatusToDb(providerAction.status || ActionStatus.AWAITING_PAYMENT),
-        lines: resolvedLines as any,
-        subtotal: resolvedSubtotal,
-        fees: resolvedFees,
-        discount: resolvedDiscount,
-        total: resolvedTotal,
-        currency: resolvedCurrency,
-        customerName: input.customer?.name || 'Customer',
-        customerPhone: input.customer?.phone || '+998900000000',
-        destination: input.destination?.raw,
-        latitude: input.destination?.coordinates?.latitude,
-        longitude: input.destination?.coordinates?.longitude,
-        fulfillmentType: input.fulfillmentType || 'STANDARD',
-        externalActionId: providerAction.externalActionId,
-        paymentMethod: input.paymentMethod || 'PAYME',
-        paymentStatus: (providerAction.paymentStatus || PaymentStatus.PENDING) as DbPaymentStatus,
-        paymentUrl: providerPaymentUrl,
-        idempotencyKey: scopedIdempotencyKey,
-        parameters: (input.parameters as any) || {},
-        metadata: input.locationId ? { providerLocationId: input.locationId } : {}
-      },
-      include: { provider: true, location: true, timeline: true }
-    });
-
-    // 6. Record Initial Timeline Event
-    await prisma.actionEvent.create({
-      data: {
-        actionId: dbAction.id,
-        status: dbAction.status,
-        description: `Action created (${publicId}). Awaiting payment or processing.`,
-        source: 'AI_AGENT',
-        payload: { idempotencyKey: input.idempotencyKey }
+      const provider = await prisma.provider.findUnique({
+        where: { slug: cleanSlug }
+      });
+      if (!provider) {
+        throw new NotFoundError('Provider', cleanSlug);
       }
-    });
+      const isSandboxSimulator = Boolean(options?.allowSandboxSimulator && cleanSlug === 'sandbox-provider');
+      if (!isProviderPublished(provider) && !isSandboxSimulator) {
+        throw new BadRequestException('Provider is not published for public actions.');
+      }
 
-    // 7. Publish Event to Message Bus
-    await this.natsService.publish(ZayunoEventTopic.ACTION_CREATED, {
-      eventId: `evt_${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      actionId: dbAction.id,
-      publicId: dbAction.publicId,
-      providerSlug: cleanSlug,
-      providerId: provider.id,
-      locationId: dbAction.locationId || undefined,
-      userId: dbAction.userId || undefined,
-      status: this.mapDbStatusToContract(dbAction.status),
-      subtotal: Number(dbAction.subtotal),
-      fees: Number(dbAction.fees),
-      discount: Number(dbAction.discount),
-      total: Number(dbAction.total),
-      currency: dbAction.currency as any,
-      fulfillmentType: dbAction.fulfillmentType,
-      customerPhone: dbAction.customerPhone,
-      itemsCount: Array.isArray(dbAction.lines) ? dbAction.lines.length : 1
-    });
+      // 2. A persisted quote is mandatory. It must belong to this provider and
+      // remain valid; Core must not delegate this safety check to an adapter.
+      const dbQuote = await prisma.quote.findUnique({
+        where: { id: input.quoteId }
+      });
+      if (!dbQuote) {
+        throw new BadRequestException('The quoteId is unknown. Request a fresh verified quote before creating an action.');
+      }
+      if (dbQuote.providerId !== provider.id) {
+        throw new BadRequestException('The quoteId does not belong to the requested provider.');
+      }
+      if (new Date() > dbQuote.expiresAt) {
+        throw new QuoteExpiredError(input.quoteId);
+      }
 
-    return this.mapDbActionToNormalized(dbAction);
+      // 3. Obtain Adapter and Check Capability
+      const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.ACTION_CREATE);
+      if (!adapter.createAction) {
+        throw new BadRequestException(`Provider "${cleanSlug}" does not implement createAction.`);
+      }
+
+      // 4. Call Provider Adapter
+      const providerAction = await adapter.createAction({
+        ...input,
+        idempotencyKey: scopedIdempotencyKey
+      });
+      // The checkout URL must originate from the provider. Core only normalizes the
+      // preferred nextAction shape and its legacy paymentUrl alias for persistence.
+      const providerPaymentUrl = providerAction.nextAction?.url || providerAction.paymentUrl;
+      this.assertExternalProviderCheckoutUrl(providerPaymentUrl);
+
+      const publicId = generatePublicActionId(cleanSlug);
+
+      // 5. Persist Action in Database
+      // Normalize lines, totals and pricing: external providers often return a lightweight
+      // confirmation payload (order ID + payment URL) while the canonical verified item lines
+      // and pricing are already locked and persisted in dbQuote.
+      const resolvedLines =
+        providerAction.lines && Array.isArray(providerAction.lines) && providerAction.lines.length > 0 ? providerAction.lines : (dbQuote.lines as any) || [];
+
+      const resolvedSubtotal = providerAction.subtotal !== undefined && providerAction.subtotal !== null ? providerAction.subtotal : Number(dbQuote.subtotal);
+
+      const resolvedFees =
+        providerAction.fees !== undefined && providerAction.fees !== null
+          ? providerAction.fees
+          : dbQuote.fees !== undefined && dbQuote.fees !== null
+            ? Number(dbQuote.fees)
+            : 0;
+
+      const resolvedDiscount =
+        providerAction.discount !== undefined && providerAction.discount !== null
+          ? providerAction.discount
+          : dbQuote.discount !== undefined && dbQuote.discount !== null
+            ? Number(dbQuote.discount)
+            : 0;
+
+      const resolvedTotal = providerAction.total !== undefined && providerAction.total !== null ? providerAction.total : Number(dbQuote.total);
+
+      const resolvedCurrency = providerAction.currency || dbQuote.currency || 'UZS';
+
+      const dbAction = await prisma.action.create({
+        data: {
+          publicId,
+          userId,
+          providerId: provider.id,
+          // Prefer the quote's resolved internal location. Older quotes or
+          // provider-only locations intentionally remain null rather than
+          // writing an external provider ID into this foreign-key column.
+          locationId: dbQuote.locationId || undefined,
+          quoteId: input.quoteId,
+          status: this.mapContractStatusToDb(providerAction.status || ActionStatus.AWAITING_PAYMENT),
+          lines: resolvedLines as any,
+          subtotal: resolvedSubtotal,
+          fees: resolvedFees,
+          discount: resolvedDiscount,
+          total: resolvedTotal,
+          currency: resolvedCurrency,
+          customerName: input.customer?.name || 'Customer',
+          customerPhone: input.customer?.phone || '+998900000000',
+          destination: input.destination?.raw,
+          latitude: input.destination?.coordinates?.latitude,
+          longitude: input.destination?.coordinates?.longitude,
+          fulfillmentType: input.fulfillmentType || 'STANDARD',
+          externalActionId: providerAction.externalActionId,
+          paymentMethod: input.paymentMethod || 'PAYME',
+          paymentStatus: (providerAction.paymentStatus || PaymentStatus.PENDING) as DbPaymentStatus,
+          paymentUrl: providerPaymentUrl,
+          idempotencyKey: scopedIdempotencyKey,
+          parameters: (input.parameters as any) || {},
+          metadata: input.locationId ? { providerLocationId: input.locationId } : {}
+        },
+        include: { provider: true, location: true, timeline: true }
+      });
+
+      // 6. Record Initial Timeline Event
+      await prisma.actionEvent.create({
+        data: {
+          actionId: dbAction.id,
+          status: dbAction.status,
+          description: `Action created (${publicId}). Awaiting payment or processing.`,
+          source: 'AI_AGENT',
+          payload: { idempotencyKey: input.idempotencyKey }
+        }
+      });
+
+      // 7. Publish Event to Message Bus
+      await this.natsService.publish(ZayunoEventTopic.ACTION_CREATED, {
+        eventId: `evt_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        actionId: dbAction.id,
+        publicId: dbAction.publicId,
+        providerSlug: cleanSlug,
+        providerId: provider.id,
+        locationId: dbAction.locationId || undefined,
+        userId: dbAction.userId || undefined,
+        status: this.mapDbStatusToContract(dbAction.status),
+        subtotal: Number(dbAction.subtotal),
+        fees: Number(dbAction.fees),
+        discount: Number(dbAction.discount),
+        total: Number(dbAction.total),
+        currency: dbAction.currency as any,
+        fulfillmentType: dbAction.fulfillmentType,
+        customerPhone: dbAction.customerPhone,
+        itemsCount: Array.isArray(dbAction.lines) ? dbAction.lines.length : 1
+      });
+
+      return this.mapDbActionToNormalized(dbAction);
     } finally {
       await this.redisService.releaseLock(idempotencyLockKey);
     }
@@ -283,9 +301,50 @@ export class ActionsService {
     return this.mapDbActionToNormalized(action);
   }
 
+  async getLiveAction(input: GetActionInput, access?: AccessScope): Promise<{ action: NormalizedAction; providerVerified: boolean }> {
+    const dbAction = await this.findActionByIdOrPublicId(input.actionId);
+    if (!dbAction) {
+      throw new NotFoundError('Action', input.actionId);
+    }
+    this.assertActionAccess(dbAction, access);
+    const stored = this.mapDbActionToNormalized(dbAction);
+
+    try {
+      const adapter = await this.registry.assertAndGetCapability(dbAction.provider.slug, ProviderCapability.ACTION_STATUS);
+      if (!adapter.getAction) {
+        return { action: stored, providerVerified: false };
+      }
+
+      const live = await adapter.getAction({
+        providerSlug: dbAction.provider.slug,
+        actionId: dbAction.externalActionId || dbAction.id
+      });
+      return {
+        providerVerified: true,
+        action: {
+          ...stored,
+          status: live.status,
+          paymentStatus: live.paymentStatus,
+          externalActionId: live.externalActionId || stored.externalActionId,
+          nextAction: live.nextAction || stored.nextAction,
+          paymentUrl: live.paymentUrl || stored.paymentUrl,
+          timeline: live.timeline?.length ? live.timeline : stored.timeline,
+          updatedAt: live.updatedAt || stored.updatedAt,
+          metadata: {
+            ...(stored.metadata || {}),
+            ...(live.metadata || {})
+          }
+        }
+      };
+    } catch (error) {
+      this.logger.warn(`Live action status lookup failed for ${dbAction.publicId}: ${String(error)}`);
+      return { action: stored, providerVerified: false };
+    }
+  }
+
   async cancelAction(input: CancelActionInput, access?: AccessScope): Promise<CancelActionResult> {
     const parsed = CancelActionInputSchema.safeParse(input);
-    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '));
     input = parsed.data;
     const action = await this.findActionByIdOrPublicId(input.actionId);
     if (!action) {
@@ -332,7 +391,10 @@ export class ActionsService {
         status: DbActionStatus.CANCELLED,
         description: `Action cancelled (${input.reasonCode || 'CUSTOMER_CANCELLED'}): ${input.reason || 'Customer requested cancellation'}`,
         source: 'AI_AGENT',
-        payload: { reasonCode: input.reasonCode || 'CUSTOMER_CANCELLED', reason: input.reason }
+        payload: {
+          reasonCode: input.reasonCode || 'CUSTOMER_CANCELLED',
+          reason: input.reason
+        }
       }
     });
 
@@ -373,7 +435,8 @@ export class ActionsService {
     const where: any = {};
     const access = query.access;
     const isAdmin = access?.role === UserRole.SUPER_ADMIN || access?.role === UserRole.ADMIN;
-    const isProviderUser = access?.role === UserRole.PROVIDER_OWNER || access?.role === UserRole.PROVIDER_DEVELOPER || access?.role === UserRole.PROVIDER_ANALYST;
+    const isProviderUser =
+      access?.role === UserRole.PROVIDER_OWNER || access?.role === UserRole.PROVIDER_DEVELOPER || access?.role === UserRole.PROVIDER_ANALYST;
     if (isProviderUser) {
       if (!access?.providerId) throw new ForbiddenException('Provider account is not linked to a provider.');
       where.providerId = access.providerId;
@@ -389,21 +452,26 @@ export class ActionsService {
       where,
       take: query.limit || 50,
       orderBy: { createdAt: 'desc' },
-      include: { provider: true, location: true, timeline: { orderBy: { createdAt: 'asc' } } }
+      include: {
+        provider: true,
+        location: true,
+        timeline: { orderBy: { createdAt: 'asc' } }
+      }
     });
 
-    return actions.map(a => this.mapDbActionToNormalized(a));
+    return actions.map((a) => this.mapDbActionToNormalized(a));
   }
 
   private async findActionByIdOrPublicId(idOrPublicId: string) {
     return prisma.action.findFirst({
       where: {
-        OR: [
-          { id: idOrPublicId },
-          { publicId: idOrPublicId }
-        ]
+        OR: [{ id: idOrPublicId }, { publicId: idOrPublicId }]
       },
-      include: { provider: true, location: true, timeline: { orderBy: { createdAt: 'asc' } } }
+      include: {
+        provider: true,
+        location: true,
+        timeline: { orderBy: { createdAt: 'asc' } }
+      }
     });
   }
 
@@ -434,11 +502,13 @@ export class ActionsService {
       // providers use the provider's location identifier.
       locationId: metadata.providerLocationId || dbAction.location?.providerLocationId || dbAction.locationId || undefined,
       status: this.mapDbStatusToContract(dbAction.status),
-      nextAction: dbAction.paymentUrl ? {
-        type: 'OPEN_URL',
-        url: dbAction.paymentUrl,
-        label: 'Pay now'
-      } : undefined,
+      nextAction: dbAction.paymentUrl
+        ? {
+            type: 'OPEN_URL',
+            url: dbAction.paymentUrl,
+            label: 'Pay now'
+          }
+        : undefined,
       lines: (dbAction.lines as any) || [],
       subtotal: Number(dbAction.subtotal),
       fees: Number(dbAction.fees),

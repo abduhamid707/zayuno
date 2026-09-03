@@ -158,6 +158,7 @@ async function main() {
       ],
     } as any,
     {
+      getOffering: async () => ({ variants: [], optionGroups: [] }),
       searchOfferings: async () => {
         throw new Error(
           "SEARCH must not be called for a catalog-only provider",
@@ -215,6 +216,43 @@ async function main() {
   assert.match(preparedFood.directAnswer, /Maxi Burger/);
   assert.match(preparedFood.directAnswer, /Pepperoni Pizza/);
   assert.doesNotMatch(preparedFood.directAnswer, /Courier Only/);
+  assert.deepEqual(
+    (dynamicFoodChat as any).findMentionedProviderSlugs(
+      "MaxiFood Express da fast-food bormi?",
+      [
+        { slug: "maxifood-express", name: "MaxiFood Express" },
+        { slug: "coffee-time", name: "Coffee Time Sandbox Demo" },
+      ],
+    ),
+    ["maxifood-express"],
+    "an explicitly named provider must be scoped without mixing competitors",
+  );
+
+  const productionFoodAnswer = (
+    dynamicFoodChat as any
+  ).buildGroundedCatalogAnswer(
+    {
+      ...(dynamicFoodChat as any).planLiveContext("fast-food", []),
+      intent: "food_browse",
+      needsCatalog: true,
+      providerScope: "food",
+      limit: 6,
+    },
+    [
+      {
+        slug: "maxifood-express",
+        name: "MaxiFood Express",
+        offerings: [{ title: "Klassik Gamburger", salary: "28000 UZS" }],
+      },
+      {
+        slug: "coffee-time",
+        name: "Coffee Time Sandbox Demo",
+        offerings: [{ title: "Cappuccino", salary: "18000 UZS" }],
+      },
+    ],
+  );
+  assert.match(productionFoodAnswer, /Klassik Gamburger/);
+  assert.doesNotMatch(productionFoodAnswer, /Cappuccino|demo provider/i);
 
   const openCatalogPlan = {
     ...(dynamicFoodChat as any).planLiveContext("burger", []),
@@ -344,12 +382,54 @@ async function main() {
   let actionCalls = 0;
   const orderChat = new ConsumerChatService(
     {} as any,
-    {} as any,
+    {
+      getOffering: async () => ({
+        id: "burger-1",
+        title: "Klassik Gamburger",
+        variants: [
+          { id: "small", name: "Kichik", basePrice: 28_000 },
+          { id: "large", name: "Katta", basePrice: 34_000 },
+        ],
+        optionGroups: [
+          {
+            id: "sauce",
+            name: "Sous",
+            isRequired: true,
+            minSelections: 1,
+            maxSelections: 1,
+            options: [
+              { id: "cheese", name: "Pishloqli", priceDelta: 2_000 },
+              { id: "bbq", name: "BBQ", priceDelta: 1_000 },
+            ],
+          },
+        ],
+        parametersSchema: {
+          type: "object",
+          properties: {
+            spice: {
+              type: "string",
+              title: "Achchiqlik darajasi",
+              enum: ["oddiy", "achchiq"],
+            },
+          },
+          required: ["spice"],
+        },
+      }),
+      getCatalog: async () => ({ offerings: [] }),
+      checkAvailability: async (input: any) => ({
+        isAvailable: true,
+        unavailableItems: [],
+        availableItems: input.items,
+      }),
+    } as any,
     {
       requestQuote: async (input: any) => {
         quoteCalls += 1;
         assert.equal(input.providerSlug, "maxifood-express");
         assert.equal(input.items[0].offeringId, "burger-1");
+        assert.equal(input.items[0].variantId, "large");
+        assert.equal(input.items[0].selectedOptions[0].optionId, "cheese");
+        assert.equal(input.parameters.spice, "achchiq");
         return {
           id: "quote-real-1",
           providerSlug: "maxifood-express",
@@ -391,6 +471,31 @@ async function main() {
         };
       },
       getPaymentOptions: async () => [],
+      getAction: async () => ({
+        id: "action-real-1",
+        publicId: "ZY-MAXI-1",
+        providerName: "MaxiFood Express",
+        status: "CONFIRMED",
+        paymentStatus: "PAID",
+        supportContact: {
+          phone: "+998 71 200-00-00",
+          supportUrl: "https://maxifood.example/support",
+        },
+      }),
+      getLiveAction: async () => ({
+        providerVerified: true,
+        action: {
+          id: "action-real-1",
+          publicId: "ZY-MAXI-1",
+          providerName: "MaxiFood Express",
+          status: "CONFIRMED",
+          paymentStatus: "PAID",
+          supportContact: {
+            phone: "+998 71 200-00-00",
+            supportUrl: "https://maxifood.example/support",
+          },
+        },
+      }),
     } as any,
     orderRedis as any,
   );
@@ -414,13 +519,33 @@ async function main() {
       {
         slug: "maxifood-express",
         name: "MaxiFood Express",
+        fulfillmentMode: "DELIVERY",
         offerings: [{ id: "burger-1", title: "Klassik Gamburger" }],
       },
     ],
   );
-  assert.match(selectionPrompt, /telefon raqamingiz/i);
+  assert.match(selectionPrompt, /Variantni tanlang/i);
   assert.equal(quoteCalls, 0, "selection must not create a quote prematurely");
   assert.equal(actionCalls, 0, "selection must never create an action");
+
+  const optionPrompt = await orderInternals.handlePendingOrder(
+    "order-user",
+    "customer@example.com",
+    "2",
+  );
+  assert.match(optionPrompt, /Sous/i);
+  const parameterPrompt = await orderInternals.handlePendingOrder(
+    "order-user",
+    "customer@example.com",
+    "1",
+  );
+  assert.match(parameterPrompt, /Achchiqlik darajasi/i);
+  const contactPrompt = await orderInternals.handlePendingOrder(
+    "order-user",
+    "customer@example.com",
+    "achchiq",
+  );
+  assert.match(contactPrompt, /telefon raqamingiz/i);
 
   const confirmationPrompt = await orderInternals.handlePendingOrder(
     "order-user",
@@ -451,9 +576,31 @@ async function main() {
     /\[To‘lov qilish\]\(https:\/\/pay\.maxifood\.example\/checkout\/1\)/,
   );
   assert.equal(
-    orderStore.size,
-    0,
-    "completed checkout handoff must clear state",
+    orderStore.has("consumer:chat:pending-order:order-user"),
+    false,
+    "completed checkout handoff must clear pending state",
+  );
+  assert.equal(
+    orderStore.has("consumer:chat:active-action:order-user"),
+    true,
+    "completed checkout handoff must retain active action context",
+  );
+
+  const paidStatus = await orderChat.processMessage({
+    prompt: "to‘ladim",
+    messages: [],
+    userId: "order-user",
+  });
+  assert.match(paidStatus.content, /to‘lov tasdiqlangan/i);
+  const supportAnswer = await orderChat.processMessage({
+    prompt: "supportga bog‘lansam bo‘ladimi",
+    messages: [],
+    userId: "order-user",
+  });
+  assert.match(supportAnswer.content, /\+998 71 200-00-00/);
+  assert.match(
+    supportAnswer.content,
+    /\[Support sahifasi\]\(https:\/\/maxifood\.example\/support\)/,
   );
 
   console.log(

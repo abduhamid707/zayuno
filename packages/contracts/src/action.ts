@@ -38,21 +38,28 @@ export const ActionItemInputSchema = z.object({
   offeringId: z.string().min(1),
   variantId: optionalNullable(z.string()),
   quantity: z.number().int().positive().default(1),
-  selectedOptions: optionalNullable(z.array(z.object({
-    groupId: z.string(),
-    optionId: z.string(),
-    quantity: z.number().int().positive().default(1)
-  })), [])
+  selectedOptions: optionalNullable(
+    z.array(
+      z.object({
+        groupId: z.string(),
+        optionId: z.string(),
+        quantity: z.number().int().positive().default(1)
+      })
+    ),
+    []
+  )
 });
 export type ActionItemInput = z.infer<typeof ActionItemInputSchema>;
 
 export const CreateActionInputSchema = z.object({
-  idempotencyKey: optionalNullable(z.string().min(1)).describe('Unique client-generated idempotency key (UUID or cryptographically random string). Server auto-generates if omitted.'),
+  idempotencyKey: optionalNullable(z.string().min(1)).describe(
+    'Unique client-generated idempotency key (UUID or cryptographically random string). Server auto-generates if omitted.'
+  ),
   providerSlug: z.string().min(1).describe('Target provider slug'),
   quoteId: z.string().min(1).describe('Verified quote ID reviewed and confirmed by the user before submission'),
   locationId: optionalNullable(z.string()),
   items: z.array(ActionItemInputSchema).min(1).describe('Items or services requested in action'),
-  customer: CustomerContactSchema.describe('Customer contact info'),
+  customer: optionalNullable(CustomerContactSchema).describe('Customer contact info when required by the provider or fulfillment flow'),
   destination: optionalNullable(AddressSchema).describe('Optional destination address or fulfillment location'),
   fulfillmentType: optionalNullable(z.string()).describe('e.g. STANDARD, EXPRESS, PICKUP, DIGITAL'),
   paymentMethod: optionalNullable(z.string()).describe('e.g. "payme", "card", "cash", "invoice"'),
@@ -87,7 +94,7 @@ export const NormalizedActionSchema = z.object({
   discount: z.number().nonnegative().default(0),
   total: z.number().nonnegative(),
   currency: CurrencySchema.default('UZS'),
-  customer: CustomerContactSchema,
+  customer: optionalNullable(CustomerContactSchema),
   destination: optionalNullable(AddressSchema),
   fulfillmentType: z.string().default('STANDARD'),
   paymentMethod: optionalNullable(z.string()),

@@ -10,8 +10,13 @@ const inlinePattern =
 
 function normalizeMarkdown(content: string) {
   return content
-    .replace(/\\([*_`[\]()])/g, "$1")
-    .replace(/\[([^\]]+)]\(\[(https?:\/\/[^\]]+)]\(\2\)\)/g, "[$1]($2)")
+    .replace(/\\+([*_`[\]()])/g, "$1")
+    .replace(
+      /\[([^\]]+)]\(\[(https?:\/\/[^\]]+)]\((https?:\/\/[^)]+)\)\)/g,
+      (_match, label, visibleUrl, targetUrl) =>
+        `[${label}](${targetUrl || visibleUrl})`,
+    )
+    .replace(/\[([^\]]+)]\(\s*(https?:\/\/[^)\s]+)\s*\)/g, "[$1]($2)")
     .trim();
 }
 
