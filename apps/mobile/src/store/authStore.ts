@@ -29,9 +29,9 @@ const storage = {
       } catch {}
       return;
     }
-    try {
-      await SecureStore.setItemAsync(key, value);
-    } catch {}
+    // Do not hide native persistence failures. A login must only be reported as
+    // successful after the session is actually stored for the next app launch.
+    await SecureStore.setItemAsync(key, value);
   },
   deleteItem: async (key: string): Promise<void> => {
     if (Platform.OS === "web") {
@@ -98,14 +98,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         storage.getItem(USER_KEY),
       ]);
       const user = userJson ? JSON.parse(userJson) : null;
+      const hasStoredSession = Boolean(accessToken || refreshToken);
       set({
         accessToken,
         refreshToken,
         token: accessToken,
         user,
-        isAuthenticated: Boolean(accessToken),
-        isLoading: false,
+        isAuthenticated: hasStoredSession,
+        isLoading: Boolean(refreshToken),
       });
+      if (refreshToken) {
+        // Refresh on launch so an expired 15-minute access token never sends a
+        // returning customer back through Google sign-in.
+        await get().refreshSession();
+      }
+      set({ isLoading: false });
     } catch {
       await clearStoredSession();
       set({
@@ -120,15 +127,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setSession: async ({ accessToken, refreshToken, user }) => {
+    const persistedRefreshToken = refreshToken || get().refreshToken;
+    const persistedUser = user || get().user;
     await storage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    if (refreshToken)
-      await storage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    if (user) await storage.setItem(USER_KEY, JSON.stringify(user));
+    if (persistedRefreshToken)
+      await storage.setItem(REFRESH_TOKEN_KEY, persistedRefreshToken);
+    if (persistedUser)
+      await storage.setItem(USER_KEY, JSON.stringify(persistedUser));
     set({
       accessToken,
-      refreshToken: refreshToken || null,
+      refreshToken: persistedRefreshToken || null,
       token: accessToken,
-      user: user || null,
+      user: persistedUser || null,
       isAuthenticated: true,
       isLoading: false,
     });
@@ -149,7 +159,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             body: JSON.stringify({ refreshToken }),
           },
         );
-        if (!response.ok) throw new Error("refresh failed");
+        if (!response.ok) {
+          // Only an explicit auth rejection invalidates a persisted session.
+          // Network errors and temporary 5xx responses must not log users out.
+          if ([400, 401, 403].includes(response.status)) {
+            await clearStoredSession();
+            set({
+              accessToken: null,
+              refreshToken: null,
+              token: null,
+              user: null,
+              isAuthenticated: false,
+            });
+          }
+          return false;
+        }
         const session = await response.json();
         await get().setSession({
           accessToken: session.accessToken,
@@ -158,14 +182,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
         return true;
       } catch {
-        await clearStoredSession();
-        set({
-          accessToken: null,
-          refreshToken: null,
-          token: null,
-          user: null,
-          isAuthenticated: false,
-        });
+        // Keep the last known session while offline or while production is
+        // temporarily unavailable. The next authenticated request retries it.
         return false;
       } finally {
         refreshInFlight = null;

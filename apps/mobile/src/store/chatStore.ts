@@ -56,7 +56,9 @@ export const useChatStore = create<ChatState>((set) => ({
       const sessions = raw ? (JSON.parse(raw) as ChatSession[]) : [];
       set({
         sessions,
-        activeSessionId: sessions[0]?.id || null,
+        // Preserve history for the hamburger menu, but every cold app launch
+        // starts from a clean conversation instead of reopening the last chat.
+        activeSessionId: null,
         isHydrated: true,
       });
     } catch {
