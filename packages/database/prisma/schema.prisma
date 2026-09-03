@@ -133,6 +133,26 @@ model User {
   provider     Provider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
   actions      Action[]
   apiKeys      ApiKey[]
+  reports      UserReport[]
+}
+
+model UserReport {
+  id                 String   @id @default(uuid())
+  userId             String?
+  category           String   @default("TECHNICAL")
+  description        String   @db.Text
+  screenshotDataUrl  String?  @db.Text
+  transcript         Json     @default("[]")
+  transcriptMarkdown String   @db.Text
+  metadata           Json     @default("{}")
+  status             String   @default("OPEN")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
 }
 
 model ApiKey {
@@ -302,4 +322,3 @@ model UnmetDemandRecord {
   @@index([reasonCode])
   @@index([createdAt])
 }
-

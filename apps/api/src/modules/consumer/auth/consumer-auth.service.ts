@@ -92,23 +92,6 @@ export class ConsumerAuthService {
     }
   }
 
-  async loginDemoUser() {
-    const email = "habibillojaboruf@gmail.com";
-    const name = "Habibillo Jabborov";
-    const user = await prisma.user.upsert({
-      where: { email },
-      update: { name, isActive: true },
-      create: {
-        email,
-        name,
-        passwordHash: "DEMO_OAUTH_MANAGED",
-        role: UserRole.API_CONSUMER,
-        isActive: true,
-      },
-    });
-    return this.issueSession(user);
-  }
-
   async refreshSession(refreshToken: string) {
     if (!refreshToken)
       throw new UnauthorizedException("Refresh token is required.");

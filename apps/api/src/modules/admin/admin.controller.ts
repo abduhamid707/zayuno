@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Param, Query, Body, UseGuards, BadRequestException, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Param,
+  Query,
+  Body,
+  UseGuards,
+  BadRequestException,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
@@ -16,7 +27,7 @@ import { UserRole } from '@zayuno/database';
 export class AdminController {
   constructor(
     private adminService: AdminService,
-    private providersService: ProvidersService
+    private providersService: ProvidersService,
   ) {}
 
   @Get('dashboard')
@@ -31,8 +42,34 @@ export class AdminController {
     return this.adminService.getActions(limit ? parseInt(limit, 10) : 50);
   }
 
+  @Get('reports')
+  @ApiOperation({
+    summary: 'List consumer reports with screenshots and chat context',
+  })
+  async getReports(
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.adminService.getReports(
+      limit ? parseInt(limit, 10) : 50,
+      status,
+    );
+  }
+
+  @Put('reports/:id/status')
+  @ApiOperation({ summary: 'Update consumer report status' })
+  async updateReportStatus(
+    @Param('id') id: string,
+    @Body() body: { status?: string },
+  ) {
+    return this.adminService.updateReportStatus(id, body?.status);
+  }
+
   @Get('providers')
-  @ApiOperation({ summary: 'List providers for the operations console, including applications under review' })
+  @ApiOperation({
+    summary:
+      'List providers for the operations console, including applications under review',
+  })
   async getProviders(
     @Query('query') query?: string,
     @Query('status') status?: string,
@@ -46,31 +83,55 @@ export class AdminController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('limit') limit?: string,
-    @Query('offset') offset?: string
+    @Query('offset') offset?: string,
   ) {
-    return this.adminService.getProviders({ query, status, reviewStatus, type, capability, category, geography, certified, ownerEmail, from, to, limit, offset });
+    return this.adminService.getProviders({
+      query,
+      status,
+      reviewStatus,
+      type,
+      capability,
+      category,
+      geography,
+      certified,
+      ownerEmail,
+      from,
+      to,
+      limit,
+      offset,
+    });
   }
 
   @Get('logs/integration')
-  @ApiOperation({ summary: 'Get integration call logs with duration and status' })
+  @ApiOperation({
+    summary: 'Get integration call logs with duration and status',
+  })
   async getIntegrationLogs(
     @Query('limit') limit?: string,
-    @Query('traceId') traceId?: string
+    @Query('traceId') traceId?: string,
   ) {
-    return this.adminService.getIntegrationLogs(limit ? parseInt(limit, 10) : 50, traceId);
+    return this.adminService.getIntegrationLogs(
+      limit ? parseInt(limit, 10) : 50,
+      traceId,
+    );
   }
 
   @Get('logs/webhooks')
   @ApiOperation({ summary: 'Get inbound webhook audit logs' })
   async getWebhookLogs(
     @Query('limit') limit?: string,
-    @Query('provider') providerSlug?: string
+    @Query('provider') providerSlug?: string,
   ) {
-    return this.adminService.getWebhookLogs(limit ? parseInt(limit, 10) : 50, providerSlug);
+    return this.adminService.getWebhookLogs(
+      limit ? parseInt(limit, 10) : 50,
+      providerSlug,
+    );
   }
 
   @Get('logs/live-inspector')
-  @ApiOperation({ summary: 'Live unified provider API and webhook payload inspector' })
+  @ApiOperation({
+    summary: 'Live unified provider API and webhook payload inspector',
+  })
   async getLiveInspectorLogs(
     @Query('provider') providerSlug?: string,
     @Query('source') source?: string,
@@ -79,7 +140,7 @@ export class AdminController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('limit') limit?: string,
-    @Query('offset') offset?: string
+    @Query('offset') offset?: string,
   ) {
     return this.adminService.getLiveInspectorLogs({
       providerSlug,
@@ -89,22 +150,27 @@ export class AdminController {
       from,
       to,
       limit: limit ? parseInt(limit, 10) : 50,
-      offset: offset ? parseInt(offset, 10) : 0
+      offset: offset ? parseInt(offset, 10) : 0,
     });
   }
 
   @Get('analytics/unmet-demand')
-  @ApiOperation({ summary: 'Get aggregated analytics on unfulfilled categories, geographies, and search demand' })
+  @ApiOperation({
+    summary:
+      'Get aggregated analytics on unfulfilled categories, geographies, and search demand',
+  })
   async getUnmetDemandAnalytics(
     @Query('category') category?: string,
     @Query('from') from?: string,
-    @Query('to') to?: string
+    @Query('to') to?: string,
   ) {
     return this.adminService.getUnmetDemandAnalytics({ category, from, to });
   }
 
   @Get('logs/events')
-  @ApiOperation({ summary: 'Get redacted integration, webhook, action, and moderation events' })
+  @ApiOperation({
+    summary: 'Get redacted integration, webhook, action, and moderation events',
+  })
   async getOperationalEvents(
     @Query('source') source?: string,
     @Query('provider') provider?: string,
@@ -112,13 +178,23 @@ export class AdminController {
     @Query('query') query?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
-    return this.adminService.getOperationalEvents({ source, provider, actionId, query, from, to, limit });
+    return this.adminService.getOperationalEvents({
+      source,
+      provider,
+      actionId,
+      query,
+      from,
+      to,
+      limit,
+    });
   }
 
   @Get('logs/export')
-  @ApiOperation({ summary: 'Export a redacted operational support bundle as JSON or CSV' })
+  @ApiOperation({
+    summary: 'Export a redacted operational support bundle as JSON or CSV',
+  })
   async exportOperationalEvents(
     @Res({ passthrough: true }) response: Response,
     @Query('format') rawFormat?: string,
@@ -128,13 +204,24 @@ export class AdminController {
     @Query('query') query?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     const format = rawFormat === 'csv' ? 'csv' : 'json';
-    const content = await this.adminService.exportOperationalEvents({ source, provider, actionId, query, from, to, limit }, format);
+    const content = await this.adminService.exportOperationalEvents(
+      { source, provider, actionId, query, from, to, limit },
+      format,
+    );
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    response.setHeader('Content-Type', format === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
-    response.setHeader('Content-Disposition', `attachment; filename="zayuno-support-${timestamp}.${format}"`);
+    response.setHeader(
+      'Content-Type',
+      format === 'csv'
+        ? 'text/csv; charset=utf-8'
+        : 'application/json; charset=utf-8',
+    );
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="zayuno-support-${timestamp}.${format}"`,
+    );
     response.setHeader('Cache-Control', 'no-store');
     return content;
   }
@@ -142,30 +229,46 @@ export class AdminController {
   @Post('providers/:slug/certify')
   @ApiOperation({ summary: 'Run automated provider certification test suite' })
   async certifyProvider(@Param('slug') slug: string) {
-    return this.providersService.runCertification(slug, { role: UserRole.SUPER_ADMIN });
+    return this.providersService.runCertification(slug, {
+      role: UserRole.SUPER_ADMIN,
+    });
   }
 
   @Post('providers/:slug/publish')
-  @ApiOperation({ summary: 'Approve a certified provider application and publish it to discovery' })
+  @ApiOperation({
+    summary:
+      'Approve a certified provider application and publish it to discovery',
+  })
   async publishProvider(@Param('slug') slug: string) {
     return this.providersService.publishProvider(slug);
   }
 
   @Post('providers/:slug/review')
-  @ApiOperation({ summary: 'Request changes, reject, or suspend a provider with a structured and auditable reason' })
-  async reviewProvider(@Param('slug') slug: string, @Body() body: {
-    decision: 'REQUEST_CHANGES' | 'REJECT' | 'SUSPEND';
-    reasonCode: string;
-    reason: string;
-    requiredChanges?: string[];
-    internalNote?: string;
-  }) {
-    if (!['REQUEST_CHANGES', 'REJECT', 'SUSPEND'].includes(body.decision)) throw new BadRequestException('Invalid review decision.');
+  @ApiOperation({
+    summary:
+      'Request changes, reject, or suspend a provider with a structured and auditable reason',
+  })
+  async reviewProvider(
+    @Param('slug') slug: string,
+    @Body()
+    body: {
+      decision: 'REQUEST_CHANGES' | 'REJECT' | 'SUSPEND';
+      reasonCode: string;
+      reason: string;
+      requiredChanges?: string[];
+      internalNote?: string;
+    },
+  ) {
+    if (!['REQUEST_CHANGES', 'REJECT', 'SUSPEND'].includes(body.decision))
+      throw new BadRequestException('Invalid review decision.');
     return this.providersService.reviewProvider(slug, body);
   }
 
   @Post('providers/:slug/reopen')
-  @ApiOperation({ summary: 'Reopen a rejected or suspended provider application for corrections' })
+  @ApiOperation({
+    summary:
+      'Reopen a rejected or suspended provider application for corrections',
+  })
   async reopenProvider(@Param('slug') slug: string) {
     return this.providersService.reopenProvider(slug);
   }
@@ -177,13 +280,17 @@ export class AdminController {
   }
 
   @Post('providers/onboard')
-  @ApiOperation({ summary: 'Create a DRAFT provider application and its provider-owner login' })
+  @ApiOperation({
+    summary: 'Create a DRAFT provider application and its provider-owner login',
+  })
   async onboardProvider(@Body() body: any) {
     return this.providersService.adminOnboardProvider(body);
   }
 
   @Put('providers/:slug')
-  @ApiOperation({ summary: 'Update provider status, credentials, and settings' })
+  @ApiOperation({
+    summary: 'Update provider status, credentials, and settings',
+  })
   async updateProvider(@Param('slug') slug: string, @Body() body: any) {
     return this.providersService.updateProvider(slug, body);
   }

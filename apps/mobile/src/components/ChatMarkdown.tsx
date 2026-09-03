@@ -6,7 +6,86 @@ type ChatMarkdownProps = {
 };
 
 const inlinePattern =
-  /(\*\*[^*\n]+\*\*|\[[^\]\n]+\]\(https?:\/\/[^)\s]+\)|https?:\/\/[^\s]+)/g;
+  /(\*\*[^*\n]+\*\*|\[[^\]\n]+\]\((?:https?:\/\/|mailto:|tel:)[^)\s]+\)|https?:\/\/[^\s]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|@[A-Za-z0-9_]{4,}|\+\d[\d\s()-]{7,}\d|(?:www\.)?[A-Za-z0-9-]+\.(?:uz|com|net|org|io|app)(?:\/[^\s]*)?)/g;
+
+type LinkTarget = {
+  label: string;
+  url: string;
+  accessibilityLabel: string;
+};
+
+function getLinkTarget(value: string, fullText: string): LinkTarget {
+  const markdownLink = value.match(
+    /^\[([^\]]+)]\(((?:https?:\/\/|mailto:|tel:)[^)]+)\)$/,
+  );
+  if (markdownLink) {
+    return {
+      label: markdownLink[1],
+      url: markdownLink[2],
+      accessibilityLabel: `${markdownLink[1]} havolasini ochish`,
+    };
+  }
+
+  const cleanValue = value.replace(/[.,;:!?]+$/, "");
+  if (/^https?:\/\//i.test(cleanValue)) {
+    return {
+      label: cleanValue,
+      url: cleanValue,
+      accessibilityLabel: "Web sahifani ochish",
+    };
+  }
+  if (/^(?:www\.)?[A-Za-z0-9-]+\.(?:uz|com|net|org|io|app)/i.test(cleanValue)) {
+    const url = cleanValue.startsWith("www.")
+      ? `https://${cleanValue}`
+      : `https://${cleanValue}`;
+    return {
+      label: cleanValue,
+      url,
+      accessibilityLabel: "Web sahifani ochish",
+    };
+  }
+  if (/^[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}$/i.test(cleanValue)) {
+    return {
+      label: cleanValue,
+      url: `mailto:${cleanValue}`,
+      accessibilityLabel: `${cleanValue} manziliga xat yozish`,
+    };
+  }
+  if (cleanValue.startsWith("@")) {
+    const username = cleanValue.slice(1);
+    const instagram = /instagram/i.test(fullText);
+    return {
+      label: cleanValue,
+      url: instagram
+        ? `https://instagram.com/${username}`
+        : `https://t.me/${username}`,
+      accessibilityLabel: instagram
+        ? `${cleanValue} Instagram profilini ochish`
+        : `${cleanValue} Telegram profilini ochish`,
+    };
+  }
+
+  const phone = cleanValue.replace(/[^\d+]/g, "");
+  const whatsapp = /whats\s*app/i.test(fullText);
+  return {
+    label: cleanValue,
+    url: whatsapp
+      ? `https://wa.me/${phone.replace(/\D/g, "")}`
+      : `tel:${phone}`,
+    accessibilityLabel: whatsapp
+      ? `${cleanValue} raqamiga WhatsApp orqali yozish`
+      : `${cleanValue} raqamiga qo‘ng‘iroq qilish`,
+  };
+}
+
+async function openLink(url: string) {
+  try {
+    await Linking.openURL(url);
+  } catch {
+    // The operating system owns the final app choice. A missing handler should
+    // not crash or interrupt the conversation.
+  }
+}
 
 function normalizeMarkdown(content: string) {
   return content
@@ -36,17 +115,16 @@ function InlineContent({ text }: { text: string }) {
         </RNText>,
       );
     } else {
-      const markdownLink = value.match(/^\[([^\]]+)]\((https?:\/\/[^)]+)\)$/);
-      const label = markdownLink?.[1] || value.replace(/[.,;:!?]+$/, "");
-      const url = markdownLink?.[2] || label;
+      const target = getLinkTarget(value, text);
       nodes.push(
         <RNText
           key={`${index}-link`}
           accessibilityRole="link"
-          onPress={() => void Linking.openURL(url)}
+          accessibilityLabel={target.accessibilityLabel}
+          onPress={() => void openLink(target.url)}
           style={styles.link}
         >
-          {label}
+          {target.label}
         </RNText>,
       );
     }
@@ -65,6 +143,44 @@ export function ChatMarkdown({ content }: ChatMarkdownProps) {
       {lines.map((rawLine, index) => {
         const line = rawLine.trim();
         if (!line) return <View key={`space-${index}`} style={styles.space} />;
+
+        const address = line.match(/^(Manzil|Address|Lokatsiya)\s*:\s*(.+)$/i);
+        if (address) {
+          const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address[2])}`;
+          return (
+            <RNText key={`address-${index}`} style={styles.text}>
+              {address[1]}:{" "}
+              <RNText
+                accessibilityRole="link"
+                accessibilityLabel={`${address[2]} manzilini xaritada ochish`}
+                onPress={() => void openLink(mapsUrl)}
+                style={styles.link}
+              >
+                {address[2]}
+              </RNText>
+            </RNText>
+          );
+        }
+
+        const labeledPhone = line.match(
+          /^(Telefon|Tel|Call center|WhatsApp)\s*:\s*([+\d][\d\s()-]{6,}\d)$/i,
+        );
+        if (labeledPhone) {
+          const target = getLinkTarget(labeledPhone[2], line);
+          return (
+            <RNText key={`phone-${index}`} style={styles.text}>
+              {labeledPhone[1]}:{" "}
+              <RNText
+                accessibilityRole="link"
+                accessibilityLabel={target.accessibilityLabel}
+                onPress={() => void openLink(target.url)}
+                style={styles.link}
+              >
+                {labeledPhone[2]}
+              </RNText>
+            </RNText>
+          );
+        }
 
         const bullet = line.match(/^[-*•]\s+(.+)$/);
         if (bullet) {

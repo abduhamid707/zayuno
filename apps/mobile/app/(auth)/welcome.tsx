@@ -1,11 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { Image, Linking, Pressable, StyleSheet, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Google from "expo-auth-session/providers/google";
-import { ResponseType } from "expo-auth-session";
 import { Text } from "../../src/components/primitives/Text";
 import { brandAssets } from "../../src/theme/assets";
 import { gradients, theme } from "../../src/theme";
@@ -20,17 +26,25 @@ type SessionResponse = {
   user: { id: string; name?: string; email?: string; avatarUrl?: string };
 };
 
-function GoogleButton({ clientId }: { clientId: string }) {
+function GoogleButton({
+  androidClientId,
+  iosClientId,
+  webClientId,
+}: {
+  androidClientId: string;
+  iosClientId: string;
+  webClientId: string;
+}) {
   const setSession = useAuthStore((state) => state.setSession);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: clientId,
-    webClientId: clientId,
-    responseType: ResponseType.Code,
-    shouldAutoExchangeCode: true,
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    androidClientId,
+    iosClientId,
+    webClientId,
     scopes: ["openid", "profile", "email"],
+    selectAccount: true,
   });
 
   useEffect(() => {
@@ -42,9 +56,7 @@ function GoogleButton({ clientId }: { clientId: string }) {
         return;
       }
       const idToken =
-        response.authentication?.idToken ||
-        response.params.id_token ||
-        response.params.code;
+        response.authentication?.idToken || response.params.id_token;
       if (!idToken) {
         setMessage("Google tasdiqlash kodi olinmadi.");
         return;
@@ -106,10 +118,18 @@ function GoogleButton({ clientId }: { clientId: string }) {
 }
 
 export default function WelcomeScreen() {
-  const clientId =
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() ||
-    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID?.trim() ||
-    "";
+  const webClientId =
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() || "";
+  const androidClientId =
+    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() || "";
+  const iosClientId =
+    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() || "";
+  const clientReady =
+    Platform.OS === "android"
+      ? Boolean(androidClientId && webClientId)
+      : Platform.OS === "ios"
+        ? Boolean(iosClientId && webClientId)
+        : Boolean(webClientId);
 
   return (
     <LinearGradient colors={gradients.night} style={styles.background}>
@@ -147,8 +167,12 @@ export default function WelcomeScreen() {
             Zayuno sizga kerakli xizmatlarni topishda{`\n`}yordam beradi.
           </Text>
 
-          {clientId ? (
-            <GoogleButton clientId={clientId} />
+          {clientReady ? (
+            <GoogleButton
+              androidClientId={androidClientId}
+              iosClientId={iosClientId || webClientId}
+              webClientId={webClientId}
+            />
           ) : (
             <Pressable disabled style={[styles.googleButton, styles.disabled]}>
               <Ionicons name="logo-google" size={24} color="#6B7280" />
@@ -157,48 +181,6 @@ export default function WelcomeScreen() {
               </Text>
             </Pressable>
           )}
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Tezkor Kirish Demo"
-            onPress={async () => {
-              const setSession = useAuthStore.getState().setSession;
-              try {
-                const session = await apiFetch<SessionResponse>(
-                  "/api/v1/consumer/auth/demo",
-                  { method: "POST" },
-                  false,
-                );
-                const accessToken = session.accessToken || session.token;
-                if (accessToken) {
-                  await setSession({
-                    accessToken,
-                    refreshToken: session.refreshToken,
-                    user: session.user,
-                  });
-                  return;
-                }
-              } catch {
-                // local fallback
-              }
-              await setSession({
-                accessToken: "demo_consumer_token_habibillo",
-                refreshToken: "demo_consumer_refresh_token_habibillo",
-                user: {
-                  id: "demo-user-habibillo",
-                  name: "Habibillo Jabborov",
-                  email: "habibillojaboruf@gmail.com",
-                },
-              });
-            }}
-            style={({ pressed }) => [
-              styles.demoButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Ionicons name="flash" size={20} color="#FBBF24" />
-            <Text style={styles.demoText}>⚡ Tezkor Kirish (Demo)</Text>
-          </Pressable>
 
           <View style={styles.legalRow}>
             <Ionicons
@@ -351,19 +333,6 @@ const styles = StyleSheet.create({
   },
   googleText: { color: "#111827", fontSize: 16, fontWeight: "700" },
   googleTextDisabled: { color: "#6B7280" },
-  demoButton: {
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.16)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 12,
-  },
-  demoText: { color: "#F3F4F6", fontSize: 15, fontWeight: "600" },
   pressed: { transform: [{ scale: 0.985 }], opacity: 0.94 },
   disabled: { opacity: 0.72 },
   error: {

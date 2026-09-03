@@ -1,5 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Keyboard,
@@ -8,19 +15,22 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  Switch,
   TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Accelerometer } from "expo-sensors";
+import { captureRef } from "react-native-view-shot";
 import { Text } from "../../src/components/primitives/Text";
 import {
   ChatMessage,
   ChatSession,
   useChatStore,
 } from "../../src/store/chatStore";
-import { streamChat } from "../../src/lib/api";
+import { apiFetch, streamChat } from "../../src/lib/api";
 import { theme } from "../../src/theme";
 import { ChatMarkdown } from "../../src/components/ChatMarkdown";
 
@@ -92,6 +102,15 @@ export default function HomeScreen() {
   const [lastFailed, setLastFailed] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [historyVisible, setHistoryVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportText, setReportText] = useState("");
+  const [reportScreenshot, setReportScreenshot] = useState<string | null>(null);
+  const [includeChat, setIncludeChat] = useState(true);
+  const [reportSending, setReportSending] = useState(false);
+  const [reportSentId, setReportSentId] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const screenRef = useRef<View>(null);
+  const lastShakeRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const {
@@ -203,6 +222,76 @@ export default function HomeScreen() {
     }
   };
 
+  const openReport = useCallback(async () => {
+    if (reportVisible) return;
+    setHistoryVisible(false);
+    setReportSentId(null);
+    setReportError(null);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    try {
+      const dataUrl = await captureRef(screenRef, {
+        format: "jpg",
+        quality: 0.65,
+        result: "data-uri",
+      });
+      setReportScreenshot(dataUrl);
+    } catch {
+      setReportScreenshot(null);
+    }
+    setReportVisible(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
+      () => undefined,
+    );
+  }, [reportVisible]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    Accelerometer.setUpdateInterval(180);
+    const subscription = Accelerometer.addListener(({ x, y, z }) => {
+      const force = Math.sqrt(x * x + y * y + z * z);
+      const now = Date.now();
+      if (force > 2.35 && now - lastShakeRef.current > 1800) {
+        lastShakeRef.current = now;
+        void openReport();
+      }
+    });
+    return () => subscription.remove();
+  }, [openReport]);
+
+  const submitReport = async () => {
+    if (!reportText.trim() && !includeChat) return;
+    setReportSending(true);
+    setReportError(null);
+    try {
+      const report = await apiFetch<{ id: string }>(
+        "/api/v1/consumer/reports",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            description: reportText.trim(),
+            screenshotDataUrl: reportScreenshot || undefined,
+            messages: includeChat ? messages : [],
+            metadata: {
+              platform: Platform.OS,
+              sessionId: activeSessionId || "new",
+              appVersion: "1.0.0",
+              capturedAt: new Date().toISOString(),
+            },
+          }),
+        },
+      );
+      setReportSentId(report.id);
+      setReportText("");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => undefined,
+      );
+    } catch (error: any) {
+      setReportError(error?.message || "Reportni yuborib bo‘lmadi.");
+    } finally {
+      setReportSending(false);
+    }
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const mine = item.role === "user";
     if (mine) {
@@ -281,7 +370,12 @@ export default function HomeScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <SafeAreaView
+      ref={screenRef}
+      collapsable={false}
+      style={styles.safe}
+      edges={["top", "bottom"]}
+    >
       <BrandHeader onOpenHistory={() => setHistoryVisible(true)} />
       <KeyboardAvoidingView
         style={styles.flex}
@@ -461,8 +555,131 @@ export default function HomeScreen() {
                 </View>
               )}
             />
+            <Pressable
+              accessibilityLabel="Joriy chatni supportga yuborish"
+              onPress={() => void openReport()}
+              style={({ pressed }) => [
+                styles.reportEntry,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Ionicons name="bug-outline" size={20} color="#8B7CFF" />
+              <View style={styles.reportEntryText}>
+                <Text style={styles.reportEntryTitle}>Muammo haqida xabar</Text>
+                <Text style={styles.reportEntryCopy}>
+                  Screenshot va chatni supportga yuboring
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#687085" />
+            </Pressable>
           </SafeAreaView>
         </View>
+      </Modal>
+
+      <Modal
+        visible={reportVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setReportVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.reportModalRoot}
+        >
+          <Pressable
+            accessibilityLabel="Report oynasini yopish"
+            onPress={() => setReportVisible(false)}
+            style={styles.reportBackdrop}
+          />
+          <SafeAreaView style={styles.reportSheet} edges={["bottom"]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.reportTitleRow}>
+              <View style={styles.reportIcon}>
+                <Ionicons name="bug-outline" size={22} color="#9B82FF" />
+              </View>
+              <View style={styles.reportHeadingWrap}>
+                <Text style={styles.reportTitle}>Muammo haqida xabar</Text>
+                <Text style={styles.reportSubtitle}>
+                  Tafsilotlar yechimni tez topishimizga yordam beradi.
+                </Text>
+              </View>
+            </View>
+
+            {reportSentId ? (
+              <View style={styles.reportSuccess}>
+                <Ionicons name="checkmark-circle" size={24} color="#46D37B" />
+                <Text style={styles.reportSuccessText}>
+                  Report qabul qilindi: {reportSentId}
+                </Text>
+              </View>
+            ) : (
+              <>
+                <TextInput
+                  value={reportText}
+                  onChangeText={setReportText}
+                  multiline
+                  maxLength={4000}
+                  placeholder="Nima bo‘ldi? Qaysi natijani kutgandingiz?"
+                  placeholderTextColor="#737B95"
+                  style={styles.reportInput}
+                  accessibilityLabel="Muammo tavsifi"
+                />
+                <View style={styles.reportOption}>
+                  <View style={styles.reportOptionText}>
+                    <Text style={styles.reportOptionTitle}>
+                      Chat tarixini biriktirish
+                    </Text>
+                    <Text style={styles.reportOptionCopy}>
+                      Support kontekst va javob vaqtlarini ko‘radi
+                    </Text>
+                  </View>
+                  <Switch
+                    value={includeChat}
+                    onValueChange={setIncludeChat}
+                    trackColor={{ false: "#2A3042", true: "#5B4ED6" }}
+                    thumbColor={includeChat ? "#A997FF" : "#8A91A6"}
+                  />
+                </View>
+                <View style={styles.attachmentRow}>
+                  <Ionicons
+                    name={reportScreenshot ? "image" : "image-outline"}
+                    size={18}
+                    color={reportScreenshot ? "#46D37B" : "#7E86A5"}
+                  />
+                  <Text style={styles.attachmentText}>
+                    {reportScreenshot
+                      ? "Joriy ekran biriktirildi"
+                      : "Screenshot olinmadi"}
+                  </Text>
+                </View>
+                {reportError ? (
+                  <Text style={styles.reportError}>{reportError}</Text>
+                ) : null}
+                <Pressable
+                  disabled={
+                    reportSending || (!reportText.trim() && !includeChat)
+                  }
+                  onPress={() => void submitReport()}
+                  style={({ pressed }) => [
+                    styles.reportButton,
+                    (reportSending || (!reportText.trim() && !includeChat)) &&
+                      styles.reportButtonDisabled,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  {reportSending ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.reportButtonText}>
+                      Supportga yuborish
+                    </Text>
+                  )}
+                </Pressable>
+              </>
+            )}
+          </SafeAreaView>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -705,4 +922,112 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 7,
   },
+  reportEntry: {
+    minHeight: 72,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 15,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "rgba(126,134,165,0.22)",
+    backgroundColor: "rgba(107,87,255,0.08)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  reportEntryText: { flex: 1 },
+  reportEntryTitle: { color: "#F1F2F7", fontSize: 13, fontWeight: "600" },
+  reportEntryCopy: { color: "#838BA3", fontSize: 11, marginTop: 3 },
+  reportModalRoot: { flex: 1, justifyContent: "flex-end" },
+  reportBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0,2,10,0.72)",
+  },
+  reportSheet: {
+    paddingHorizontal: 22,
+    paddingTop: 10,
+    paddingBottom: 18,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: "rgba(126,134,165,0.24)",
+    backgroundColor: "#0B0F1C",
+  },
+  sheetHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 20,
+    backgroundColor: "#687085",
+  },
+  reportTitleRow: { flexDirection: "row", alignItems: "flex-start", gap: 13 },
+  reportIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(107,87,255,0.14)",
+  },
+  reportHeadingWrap: { flex: 1 },
+  reportTitle: { color: "#F5F6FA", fontSize: 19, fontWeight: "700" },
+  reportSubtitle: {
+    color: "#8D95AA",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 5,
+  },
+  reportInput: {
+    minHeight: 118,
+    maxHeight: 210,
+    marginTop: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(126,134,165,0.3)",
+    backgroundColor: "#111625",
+    color: "#F1F2F7",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: "top",
+  },
+  reportOption: {
+    minHeight: 68,
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  reportOptionText: { flex: 1, paddingRight: 12 },
+  reportOptionTitle: { color: "#E9EAF1", fontSize: 13, fontWeight: "600" },
+  reportOptionCopy: { color: "#7E86A5", fontSize: 11, marginTop: 4 },
+  attachmentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+  attachmentText: { color: "#8D95AA", fontSize: 11 },
+  reportError: { color: "#FF7A90", fontSize: 12, marginBottom: 12 },
+  reportButton: {
+    height: 54,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#5368F7",
+  },
+  reportButtonDisabled: { opacity: 0.45 },
+  reportButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+  reportSuccess: {
+    minHeight: 110,
+    marginTop: 20,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: "rgba(70,211,123,0.08)",
+  },
+  reportSuccessText: { color: "#D9FBE6", fontSize: 13, textAlign: "center" },
 });

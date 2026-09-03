@@ -8,6 +8,8 @@ import { ConsumerAuthController } from "./auth/consumer-auth.controller";
 import { ConsumerAuthService } from "./auth/consumer-auth.service";
 import { ConsumerChatController } from "./chat/consumer-chat.controller";
 import { ConsumerChatService } from "./chat/consumer-chat.service";
+import { ConsumerReportsController } from "./reports/consumer-reports.controller";
+import { ConsumerReportsService } from "./reports/consumer-reports.service";
 
 @Module({
   imports: [
@@ -17,8 +19,12 @@ import { ConsumerChatService } from "./chat/consumer-chat.service";
     ActionsModule,
     AuthModule,
   ],
-  controllers: [ConsumerAuthController, ConsumerChatController],
-  providers: [ConsumerAuthService, ConsumerChatService],
+  controllers: [
+    ConsumerAuthController,
+    ConsumerChatController,
+    ConsumerReportsController,
+  ],
+  providers: [ConsumerAuthService, ConsumerChatService, ConsumerReportsService],
   exports: [ConsumerAuthService, ConsumerChatService],
 })
 export class ConsumerModule {}

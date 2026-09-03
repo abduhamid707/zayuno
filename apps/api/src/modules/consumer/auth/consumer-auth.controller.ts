@@ -24,13 +24,6 @@ export class ConsumerAuthController {
     return this.authService.verifyGoogleToken(body.idToken);
   }
 
-  @Post("demo")
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Demo login for consumer application testing" })
-  async loginDemo() {
-    return this.authService.loginDemoUser();
-  }
-
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
