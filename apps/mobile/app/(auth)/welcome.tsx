@@ -26,7 +26,31 @@ type SessionResponse = {
   user: { id: string; name?: string; email?: string; avatarUrl?: string };
 };
 
-function GoogleButton({
+async function createConsumerSession(
+  idToken: string,
+  setSession: ReturnType<typeof useAuthStore.getState>["setSession"],
+) {
+  const session = await apiFetch<SessionResponse>(
+    "/api/v1/consumer/auth/google",
+    {
+      method: "POST",
+      body: JSON.stringify({ idToken }),
+    },
+    false,
+  );
+  const accessToken = session.accessToken || session.token;
+  if (!accessToken) throw new Error("Session token missing");
+  await setSession({
+    accessToken,
+    refreshToken: session.refreshToken,
+    user: session.user,
+  });
+  Haptics.notificationAsync(
+    Haptics.NotificationFeedbackType.Success,
+  ).catch(() => undefined);
+}
+
+function BrowserGoogleButton({
   androidClientId,
   iosClientId,
   webClientId,
@@ -64,24 +88,7 @@ function GoogleButton({
       setBusy(true);
       setMessage(null);
       try {
-        const session = await apiFetch<SessionResponse>(
-          "/api/v1/consumer/auth/google",
-          {
-            method: "POST",
-            body: JSON.stringify({ idToken }),
-          },
-          false,
-        );
-        const accessToken = session.accessToken || session.token;
-        if (!accessToken) throw new Error("Session token missing");
-        await setSession({
-          accessToken,
-          refreshToken: session.refreshToken,
-          user: session.user,
-        });
-        Haptics.notificationAsync(
-          Haptics.NotificationFeedbackType.Success,
-        ).catch(() => undefined);
+        await createConsumerSession(idToken, setSession);
       } catch (error: any) {
         setMessage(
           error?.message ||
@@ -106,6 +113,91 @@ function GoogleButton({
           styles.googleButton,
           pressed && styles.pressed,
           (!request || busy) && styles.disabled,
+        ]}
+      >
+        <Ionicons name="logo-google" size={24} color="#2563EB" />
+        <Text style={styles.googleText}>
+          {busy ? "Kirilmoqda…" : "Google bilan davom etish"}
+        </Text>
+      </Pressable>
+    </>
+  );
+}
+
+function NativeGoogleButton({ webClientId }: { webClientId: string }) {
+  const setSession = useAuthStore((state) => state.setSession);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    import("react-native-nitro-google-signin")
+      .then(({ GoogleOneTapSignIn }) => {
+        GoogleOneTapSignIn.configure({
+          webClientId,
+          offlineAccess: false,
+          autoSelectOnSignIn: false,
+        });
+        if (active) setReady(true);
+      })
+      .catch(() => {
+        if (active) {
+          setMessage("Google kirish moduli yuklanmadi. Ilovani yangilang.");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [webClientId]);
+
+  const signIn = async () => {
+    if (!ready || busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const {
+        GoogleOneTapSignIn,
+        isCancelledResponse,
+        isSuccessResponse,
+      } = await import("react-native-nitro-google-signin");
+      await GoogleOneTapSignIn.checkPlayServices(true);
+      const response = await GoogleOneTapSignIn.presentExplicitSignIn();
+      if (isCancelledResponse(response)) return;
+      if (!isSuccessResponse(response) || !response.data.idToken) {
+        throw new Error("Google tasdiqlash tokeni olinmadi.");
+      }
+      await createConsumerSession(response.data.idToken, setSession);
+    } catch (error: any) {
+      const code = typeof error?.code === "string" ? error.code : "";
+      if (code === "SIGN_IN_CANCELLED") return;
+      if (code === "PLAY_SERVICES_NOT_AVAILABLE") {
+        setMessage("Google Play Services’ni yangilang va qayta urinib ko‘ring.");
+      } else if (code === "DEVELOPER_ERROR") {
+        setMessage("Google OAuth sozlamasi APK imzosi bilan mos emas.");
+      } else {
+        setMessage(
+          error?.message ||
+            "Google orqali kirib bo‘lmadi. Qayta urinib ko‘ring.",
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      {message ? <Text style={styles.error}>{message}</Text> : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Google bilan davom etish"
+        disabled={!ready || busy}
+        onPress={signIn}
+        style={({ pressed }) => [
+          styles.googleButton,
+          pressed && styles.pressed,
+          (!ready || busy) && styles.disabled,
         ]}
       >
         <Ionicons name="logo-google" size={24} color="#2563EB" />
@@ -168,11 +260,15 @@ export default function WelcomeScreen() {
           </Text>
 
           {clientReady ? (
-            <GoogleButton
-              androidClientId={androidClientId}
-              iosClientId={iosClientId || webClientId}
-              webClientId={webClientId}
-            />
+            Platform.OS === "android" ? (
+              <NativeGoogleButton webClientId={webClientId} />
+            ) : (
+              <BrowserGoogleButton
+                androidClientId={androidClientId}
+                iosClientId={iosClientId || webClientId}
+                webClientId={webClientId}
+              />
+            )
           ) : (
             <Pressable disabled style={[styles.googleButton, styles.disabled]}>
               <Ionicons name="logo-google" size={24} color="#6B7280" />
