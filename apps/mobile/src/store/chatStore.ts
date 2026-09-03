@@ -30,7 +30,7 @@ interface ChatState {
   deleteSession: (id: string) => Promise<void>;
   addMessage: (
     message: Pick<ChatMessage, "role" | "content"> & { latencyMs?: number },
-  ) => void;
+  ) => string;
   setLoading: (loading: boolean) => void;
 }
 
@@ -93,6 +93,7 @@ export const useChatStore = create<ChatState>((set) => ({
       createdAt: now,
       latencyMs,
     };
+    let resolvedSessionId = "";
     set((state) => {
       const active = state.sessions.find(
         (session) => session.id === state.activeSessionId,
@@ -133,8 +134,10 @@ export const useChatStore = create<ChatState>((set) => ({
       }
 
       saveSessions(sessions);
+      resolvedSessionId = activeSessionId || "";
       return { sessions, activeSessionId };
     });
+    return resolvedSessionId;
   },
 
   setLoading: (isLoading) => set({ isLoading }),

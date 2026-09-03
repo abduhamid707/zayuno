@@ -182,7 +182,7 @@ export default function HomeScreen() {
     setLastFailed(null);
     setStreamingText("");
     Keyboard.dismiss();
-    addMessage({ role: "user", content: prompt });
+    const conversationId = addMessage({ role: "user", content: prompt });
     setLoading(true);
     const startTime = Date.now();
     streamStartRef.current = startTime;
@@ -196,6 +196,7 @@ export default function HomeScreen() {
       const content = await streamChat(
         prompt,
         conversation,
+        conversationId,
         (delta) => setStreamingText((current) => current + delta),
         controller.signal,
       );

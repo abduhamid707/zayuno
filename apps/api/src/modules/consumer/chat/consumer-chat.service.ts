@@ -22,6 +22,7 @@ type ChatRequest = {
   messages?: ConversationMessage[];
   userId: string;
   userEmail?: string;
+  conversationId?: string;
 };
 
 type PendingOrderItem = {
@@ -258,6 +259,7 @@ STRICT RULES:
       input.userId,
       input.userEmail,
       prompt,
+      input.conversationId,
     );
     if (pendingOrderAnswer) {
       return {
@@ -271,6 +273,7 @@ STRICT RULES:
     const activeActionAnswer = await this.handleActiveActionFollowUp(
       input.userId,
       prompt,
+      input.conversationId,
     );
     if (activeActionAnswer) {
       return {
@@ -333,6 +336,7 @@ STRICT RULES:
       input.userEmail,
       plan,
       liveContext,
+      input.conversationId,
     );
     if (orderAnswer) {
       return {
@@ -439,18 +443,32 @@ STRICT RULES:
     };
   }
 
-  private orderStateKey(userId: string): string {
-    return `consumer:chat:pending-order:${userId}`;
+  private conversationScope(conversationId?: string): string {
+    const normalized = String(conversationId || "")
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, "")
+      .slice(0, 100);
+    return normalized || "legacy";
   }
 
-  private activeActionStateKey(userId: string): string {
-    return `consumer:chat:active-action:${userId}`;
+  private orderStateKey(userId: string, conversationId?: string): string {
+    return `consumer:chat:pending-order:${userId}:${this.conversationScope(conversationId)}`;
+  }
+
+  private activeActionStateKey(
+    userId: string,
+    conversationId?: string,
+  ): string {
+    return `consumer:chat:active-action:${userId}:${this.conversationScope(conversationId)}`;
   }
 
   private async readPendingOrder(
     userId: string,
+    conversationId?: string,
   ): Promise<PendingConsumerOrder | null> {
-    const raw = await this.redisService.get(this.orderStateKey(userId));
+    const raw = await this.redisService.get(
+      this.orderStateKey(userId, conversationId),
+    );
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw) as PendingConsumerOrder;
@@ -464,7 +482,7 @@ STRICT RULES:
       }
       return parsed;
     } catch {
-      await this.redisService.del(this.orderStateKey(userId));
+      await this.redisService.del(this.orderStateKey(userId, conversationId));
       return null;
     }
   }
@@ -472,6 +490,7 @@ STRICT RULES:
   private async savePendingOrder(
     userId: string,
     state: PendingConsumerOrder,
+    conversationId?: string,
   ): Promise<void> {
     const quoteExpiry = state.quote
       ? Math.floor(
@@ -480,7 +499,7 @@ STRICT RULES:
       : 15 * 60;
     const ttlSeconds = Math.min(Math.max(quoteExpiry, 30), 30 * 60);
     await this.redisService.set(
-      this.orderStateKey(userId),
+      this.orderStateKey(userId, conversationId),
       JSON.stringify(state),
       ttlSeconds,
     );
@@ -491,6 +510,7 @@ STRICT RULES:
     userEmail: string | undefined,
     plan: LiveContextPlan,
     liveContext: any[],
+    conversationId?: string,
   ): Promise<string | undefined> {
     if (plan.intent !== "food_selection") return undefined;
     const candidates = liveContext
@@ -613,8 +633,8 @@ STRICT RULES:
       idempotencyKey: `${userId}:${randomUUID()}`,
     };
     for (const item of state.items) this.applyAutomaticSelections(item, state);
-    await this.savePendingOrder(userId, state);
-    return this.advanceOrderCollection(userId, state);
+    await this.savePendingOrder(userId, state, conversationId);
+    return this.advanceOrderCollection(userId, state, conversationId);
   }
 
   private textSimilarity(left: unknown, right: unknown): number {
@@ -637,8 +657,9 @@ STRICT RULES:
     userId: string,
     userEmail: string | undefined,
     prompt: string,
+    conversationId?: string,
   ): Promise<string | undefined> {
-    const state = await this.readPendingOrder(userId);
+    const state = await this.readPendingOrder(userId, conversationId);
     if (!state) return undefined;
     state.customerEmail ||= userEmail;
 
@@ -654,7 +675,7 @@ STRICT RULES:
     }
 
     if (turn.intent === "cancel") {
-      await this.redisService.del(this.orderStateKey(userId));
+      await this.redisService.del(this.orderStateKey(userId, conversationId));
       return "Buyurtma jarayoni bekor qilindi.";
     }
 
@@ -663,15 +684,15 @@ STRICT RULES:
         const captured = this.applyPendingTurn(state, requirement, turn);
         if (!captured) return this.formatRequirementPrompt(state, requirement);
       }
-      await this.savePendingOrder(userId, state);
-      return this.advanceOrderCollection(userId, state);
+      await this.savePendingOrder(userId, state, conversationId);
+      return this.advanceOrderCollection(userId, state, conversationId);
     }
 
     if (
       !state.quote ||
       new Date(state.quote.expiresAt).getTime() <= Date.now()
     ) {
-      await this.redisService.del(this.orderStateKey(userId));
+      await this.redisService.del(this.orderStateKey(userId, conversationId));
       return "Quote muddati tugagan. Mahsulotni qayta tanlang, men yangi narx hisoblayman.";
     }
 
@@ -727,7 +748,7 @@ STRICT RULES:
     }
     const reference = this.cleanMarkdownText(action.publicId || action.id);
     await this.redisService.set(
-      this.activeActionStateKey(userId),
+      this.activeActionStateKey(userId, conversationId),
       JSON.stringify({
         version: 1,
         actionId: action.id,
@@ -739,7 +760,7 @@ STRICT RULES:
       } satisfies ActiveConsumerAction),
       7 * 24 * 60 * 60,
     );
-    await this.redisService.del(this.orderStateKey(userId));
+    await this.redisService.del(this.orderStateKey(userId, conversationId));
 
     if (paymentUrl) {
       return `Buyurtma providerga yuborildi. Raqam: **${reference}**\n\n[To‘lov qilish](${paymentUrl})`;
@@ -1072,10 +1093,11 @@ USER=${JSON.stringify(prompt)}`;
   private async advanceOrderCollection(
     userId: string,
     state: PendingConsumerOrder,
+    conversationId?: string,
   ): Promise<string> {
     const requirement = this.nextOrderRequirement(state);
     if (requirement) {
-      await this.savePendingOrder(userId, state);
+      await this.savePendingOrder(userId, state, conversationId);
       return this.formatRequirementPrompt(state, requirement);
     }
 
@@ -1092,7 +1114,7 @@ USER=${JSON.stringify(prompt)}`;
       parameters: state.parameters,
     });
     if (!availability.isAvailable || availability.unavailableItems?.length) {
-      await this.redisService.del(this.orderStateKey(userId));
+      await this.redisService.del(this.orderStateKey(userId, conversationId));
       return "Tanlangan mahsulot hozir mavjud emas. Katalogdan boshqa variantni tanlang.";
     }
 
@@ -1117,20 +1139,25 @@ USER=${JSON.stringify(prompt)}`;
       currency: quote.currency,
       expiresAt: quote.expiresAt,
     };
-    await this.savePendingOrder(userId, state);
+    await this.savePendingOrder(userId, state, conversationId);
     return this.formatQuoteForConfirmation(state);
   }
 
   private async readActiveAction(
     userId: string,
+    conversationId?: string,
   ): Promise<ActiveConsumerAction | null> {
-    const raw = await this.redisService.get(this.activeActionStateKey(userId));
+    const raw = await this.redisService.get(
+      this.activeActionStateKey(userId, conversationId),
+    );
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw) as ActiveConsumerAction;
       return parsed?.version === 1 && parsed.actionId ? parsed : null;
     } catch {
-      await this.redisService.del(this.activeActionStateKey(userId));
+      await this.redisService.del(
+        this.activeActionStateKey(userId, conversationId),
+      );
       return null;
     }
   }
@@ -1138,8 +1165,9 @@ USER=${JSON.stringify(prompt)}`;
   private async handleActiveActionFollowUp(
     userId: string,
     prompt: string,
+    conversationId?: string,
   ): Promise<string | undefined> {
-    const active = await this.readActiveAction(userId);
+    const active = await this.readActiveAction(userId, conversationId);
     if (!active) return undefined;
     const followUpIntent = await this.interpretActiveActionTurn(prompt);
     if (followUpIntent === "other") return undefined;
@@ -2130,6 +2158,7 @@ USER=${JSON.stringify(prompt)}`;
   private chatRequestKey(input: ChatRequest): string {
     const normalized = JSON.stringify({
       userId: input.userId,
+      conversationId: this.conversationScope(input.conversationId),
       prompt: String(input.prompt || "").trim(),
       history: this.normalizeHistory(input.messages).slice(-6),
     });

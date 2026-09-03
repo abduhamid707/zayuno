@@ -67,6 +67,7 @@ function abortError() {
 function executeChatStream(
   prompt: string,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
+  conversationId: string,
   onDelta: (content: string) => void,
   signal?: AbortSignal,
 ): Promise<string> {
@@ -152,18 +153,25 @@ function executeChatStream(
       signal?.removeEventListener("abort", handleAbort);
       reject(abortError());
     };
-    xhr.send(JSON.stringify({ prompt, messages }));
+    xhr.send(JSON.stringify({ prompt, messages, conversationId }));
   });
 }
 
 export async function streamChat(
   prompt: string,
   messages: Array<{ role: "user" | "assistant"; content: string }>,
+  conversationId: string,
   onDelta: (content: string) => void,
   signal?: AbortSignal,
 ): Promise<string> {
   try {
-    return await executeChatStream(prompt, messages, onDelta, signal);
+    return await executeChatStream(
+      prompt,
+      messages,
+      conversationId,
+      onDelta,
+      signal,
+    );
   } catch (error) {
     if (
       error instanceof ApiError &&
@@ -172,7 +180,13 @@ export async function streamChat(
     ) {
       const refreshed = await useAuthStore.getState().refreshSession();
       if (refreshed) {
-        return executeChatStream(prompt, messages, onDelta, signal);
+        return executeChatStream(
+          prompt,
+          messages,
+          conversationId,
+          onDelta,
+          signal,
+        );
       }
     }
     throw error;
