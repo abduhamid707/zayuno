@@ -328,6 +328,63 @@ export default function App() {
     link.click();
     URL.revokeObjectURL(url);
   };
+  const downloadCombinedReports = (format: 'json' | 'md') => {
+    const reports = Array.isArray(reportsData) ? reportsData : [];
+    if (!reports.length) return;
+    const exportedAt = new Date().toISOString();
+    const normalized = reports.map((report: any) => ({
+      id: report.id,
+      status: report.status,
+      description: report.description,
+      user: report.user,
+      transcript: report.transcript,
+      metadata: report.metadata,
+      createdAt: report.createdAt,
+    }));
+    const content =
+      format === 'json'
+        ? JSON.stringify(
+            {
+              exportedAt,
+              statusFilter: reportStatus,
+              count: normalized.length,
+              reports: normalized,
+            },
+            null,
+            2,
+          )
+        : [
+            '# Zayuno consumer reports',
+            '',
+            `- Exported: ${exportedAt}`,
+            `- Status filter: ${reportStatus}`,
+            `- Reports: ${reports.length}`,
+            '',
+            ...reports.flatMap((report: any, index: number) => [
+              index ? '\n---\n' : '',
+              `## Report ${index + 1}: ${report.id}`,
+              '',
+              `- Status: ${report.status}`,
+              `- Created: ${report.createdAt}`,
+              `- Description: ${report.description || 'Izoh kiritilmagan'}`,
+              '',
+              report.transcriptMarkdown || 'Chat tarixi mavjud emas.',
+            ]),
+          ].join('\n');
+    const url = URL.createObjectURL(
+      new Blob([content], {
+        type:
+          format === 'json'
+            ? 'application/json;charset=utf-8'
+            : 'text/markdown;charset=utf-8',
+      }),
+    );
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `zayuno-reports-${reportStatus.toLowerCase()}-${exportedAt.replace(/[:.]/g, '-')}.${format}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Run certification mutation
   const certifyMutation = useMutation({
@@ -2038,16 +2095,34 @@ export default function App() {
                     Screenshot, chat transcript, latency va qurilma konteksti
                   </p>
                 </div>
-                <select
-                  value={reportStatus}
-                  onChange={(event) => setReportStatus(event.target.value)}
-                  className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs"
-                >
-                  <option value="ALL">Barcha statuslar</option>
-                  <option value="OPEN">Open</option>
-                  <option value="INVESTIGATING">Investigating</option>
-                  <option value="RESOLVED">Resolved</option>
-                </select>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {reportsData?.length > 0 && (
+                    <>
+                      <button
+                        onClick={() => downloadCombinedReports('md')}
+                        className="rounded-lg border border-violet-500/50 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-200 hover:bg-violet-500/20"
+                      >
+                        {reportsData.length} tasini bitta Markdown
+                      </button>
+                      <button
+                        onClick={() => downloadCombinedReports('json')}
+                        className="rounded-lg border border-violet-500/50 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-200 hover:bg-violet-500/20"
+                      >
+                        {reportsData.length} tasini bitta JSON
+                      </button>
+                    </>
+                  )}
+                  <select
+                    value={reportStatus}
+                    onChange={(event) => setReportStatus(event.target.value)}
+                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs"
+                  >
+                    <option value="ALL">Barcha statuslar</option>
+                    <option value="OPEN">Open</option>
+                    <option value="INVESTIGATING">Investigating</option>
+                    <option value="RESOLVED">Resolved</option>
+                  </select>
+                </div>
               </div>
               {reportsLoading ? (
                 <div className="py-16 text-center text-sm text-slate-500">

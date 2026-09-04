@@ -9,6 +9,7 @@ import {
   ProviderStatus,
   ProviderType,
   type CreateActionInput,
+  type CheckAvailabilityInput,
   type NormalizedAction,
   type NormalizedQuote,
   type Offering,
@@ -165,7 +166,7 @@ export function createMockEvosApp(): Express {
     status: 'HEALTHY', latencyMs: 1, message: DISCLAIMER, timestamp: new Date().toISOString()
   }));
 
-  app.use(['/provider-info', '/locations', '/catalog', '/offerings', '/search', '/quote', '/actions'], providerAuth);
+  app.use(['/provider-info', '/locations', '/catalog', '/offerings', '/search', '/availability', '/quote', '/actions'], providerAuth);
 
   app.get('/provider-info', (_req, res) => {
     const currentSlug = getProviderSlug();
@@ -218,6 +219,50 @@ export function createMockEvosApp(): Express {
     res.json(MOCK_EVOS_OFFERINGS.filter(item =>
       item.title.toLowerCase().includes(query) || item.description?.toLowerCase().includes(query) || item.tags?.some(tag => tag.includes(query))
     ).slice(0, limit));
+  });
+
+  app.post('/availability', (req, res) => {
+    const input = req.body as CheckAvailabilityInput;
+    const availableItems: Array<{
+      offeringId: string;
+      variantId?: string;
+      requestedQuantity: number;
+      unitPrice: number;
+      currency: 'UZS';
+    }> = [];
+    const unavailableItems: Array<{ offeringId: string; reason: string }> = [];
+
+    for (const item of input.items || []) {
+      const offering = MOCK_EVOS_OFFERINGS.find(candidate =>
+        candidate.id === item.offeringId || candidate.offeringCode === item.offeringId
+      );
+      const variant = item.variantId
+        ? offering?.variants?.find(candidate => candidate.id === item.variantId && candidate.isAvailable !== false)
+        : undefined;
+      if (!offering?.isAvailable) {
+        unavailableItems.push({ offeringId: item.offeringId, reason: 'Mahsulot hozir mavjud emas.' });
+        continue;
+      }
+      if (item.variantId && !variant) {
+        unavailableItems.push({ offeringId: item.offeringId, reason: 'Tanlangan variant hozir mavjud emas.' });
+        continue;
+      }
+      availableItems.push({
+        offeringId: offering.id,
+        variantId: variant?.id,
+        requestedQuantity: item.quantity,
+        unitPrice: variant?.basePrice ?? offering.basePrice,
+        currency: 'UZS'
+      });
+    }
+
+    res.json({
+      isAvailable: unavailableItems.length === 0,
+      unavailableItems,
+      availableItems,
+      checkedAt: new Date().toISOString(),
+      parameters: input.parameters || {}
+    });
   });
 
   app.post('/quote', (req, res) => {

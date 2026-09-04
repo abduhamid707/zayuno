@@ -226,6 +226,29 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
         method: 'POST',
         body: JSON.stringify(input)
       });
+      // A few early contract-v1 providers returned `available` instead of the
+      // finalized `isAvailable`. Normalize that one known legacy shape while
+      // keeping all other response validation strict.
+      if (
+        value &&
+        typeof value === 'object' &&
+        !('isAvailable' in value) &&
+        typeof (value as any).available === 'boolean'
+      ) {
+        const legacy = value as any;
+        return validateProviderResponse(
+          '/availability',
+          'contract-availability',
+          AvailabilityResultSchema,
+          {
+            ...legacy,
+            isAvailable: legacy.available,
+            unavailableItems: legacy.unavailableItems || [],
+            availableItems: legacy.availableItems || [],
+            checkedAt: legacy.checkedAt || new Date().toISOString()
+          }
+        );
+      }
       return validateProviderResponse('/availability', 'contract-availability', AvailabilityResultSchema, value);
     } catch (error) {
       // `/availability` predates some otherwise valid Provider Contract v1

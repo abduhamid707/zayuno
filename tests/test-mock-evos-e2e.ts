@@ -46,6 +46,19 @@ async function main() {
     assert(catalog.providerSlug === 'mock-evos', 'Unexpected provider slug.');
     assert(catalog.offerings.length >= 3, 'Mock catalog is incomplete.');
 
+    const availabilityResponse = await fetch(`${providerBase}/availability`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        providerSlug: 'mock-evos',
+        locationId: 'mock-evos-chilonzor',
+        items: [{ offeringId: 'mock_burger_double', quantity: 1 }]
+      })
+    });
+    assert(availabilityResponse.ok, 'Availability request failed.');
+    const availability: any = await availabilityResponse.json();
+    assert(availability.isAvailable === true, 'Available product was rejected.');
+    assert(availability.availableItems[0]?.offeringId === 'mock_burger_double', 'Availability response lost the product.');
+
     const quoteResponse = await fetch(`${providerBase}/quote`, {
       method: 'POST', headers,
       body: JSON.stringify({
@@ -150,7 +163,7 @@ async function main() {
     assert(certReport.isCertified, `Mock EVOS certification failed: ${certReport.tests.filter(t => !t.passed).map(t => t.error).join('; ')}`);
     assert(certReport.failedCount === 0, 'Mock EVOS must have 0 failed certification tests.');
 
-    console.log('Mock EVOS E2E passed: catalog, quote, confirmation, idempotency, provider checkout, HMAC webhook, payment status, terminal-state protection, and automated capability certification.');
+    console.log('Mock EVOS E2E passed: catalog, availability, quote, confirmation, idempotency, provider checkout, HMAC webhook, payment status, terminal-state protection, and automated capability certification.');
   } finally {
     await Promise.all([
       new Promise<void>(resolve => providerServer.close(() => resolve())),
