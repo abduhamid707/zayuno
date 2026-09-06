@@ -22122,9 +22122,11 @@ const server = http.createServer((req, res) => {
         fees: feeAmount,
         discount: 0,
         total,
-        currency: 'UZS',
-        customer: (body && body.customer) || { name: 'Hurmatli Mijoz' },
-        destination: (body && body.destination) || null,
+        customer: {
+          name: (body && body.customer && body.customer.name) || 'Hurmatli Mijoz',
+          phone: (body && body.customer && body.customer.phone) || '+998901234567',
+          email: (body && body.customer && body.customer.email) || undefined
+        },
         parameters: (body && body.parameters) || {},
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
