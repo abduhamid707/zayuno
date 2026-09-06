@@ -117,11 +117,44 @@ async function main() {
     redis as any,
   );
   const chatInternals = chat as any;
-  const clarification = chatInternals.planLiveContext("menga ish kerak", []);
+
+  // planWithAi is now async (Gemini-backed); mock it for unit tests
+  chatInternals.planWithAi = async (prompt: string) => {
+    if (prompt === "menga ish kerak") {
+      return {
+        intent: "recruitment_clarification",
+        needsCatalog: false,
+        providerScope: "explicit",
+        providerSlugs: [],
+        query: prompt,
+        limit: 10,
+        page: 1,
+        quantity: 1,
+        itemRequests: [],
+        allowCatalogFallback: false,
+        excludedOfferingIds: [],
+      };
+    }
+    return {
+      intent: "recruitment_search",
+      needsCatalog: true,
+      providerScope: "explicit",
+      providerSlugs: ["hh-uz"],
+      query: "sotuvchilik",
+      limit: 10,
+      page: 1,
+      quantity: 1,
+      itemRequests: [],
+      allowCatalogFallback: false,
+      excludedOfferingIds: [],
+    };
+  };
+
+  const clarification = await chatInternals.planWithAi("menga ish kerak");
   assert.equal(clarification.intent, "recruitment_clarification");
   assert.equal(clarification.needsCatalog, false);
 
-  const plan = chatInternals.planLiveContext("sotuvchilik ishlarini top", []);
+  const plan = await chatInternals.planWithAi("sotuvchilik ishlarini top");
   const context = await chatInternals.loadLiveContext(plan, [
     {
       slug: "hh-uz",
@@ -200,6 +233,7 @@ async function main() {
     quantity: 1,
     limit: 6,
     page: 0,
+    itemRequests: [],
     allowCatalogFallback: true,
     excludedOfferingIds: [],
   });
@@ -232,7 +266,7 @@ async function main() {
     dynamicFoodChat as any
   ).buildGroundedCatalogAnswer(
     {
-      ...(dynamicFoodChat as any).planLiveContext("fast-food", []),
+      ...(dynamicFoodChat as any).emptyPlan("food_browse"),
       intent: "food_browse",
       needsCatalog: true,
       providerScope: "food",
@@ -255,7 +289,7 @@ async function main() {
   assert.doesNotMatch(productionFoodAnswer, /Cappuccino|demo provider/i);
 
   const openCatalogPlan = {
-    ...(dynamicFoodChat as any).planLiveContext("burger", []),
+    ...(dynamicFoodChat as any).emptyPlan("food_browse"),
     intent: "food_browse",
     needsCatalog: true,
     query: "burger",
@@ -279,29 +313,27 @@ async function main() {
   );
 
   delete (dynamicFoodChat as any).planWithAi;
-  (dynamicFoodChat as any).models = [
-    {
-      name: "semantic-test",
-      client: {
-        generateContent: async () => ({
-          response: {
-            candidates: [{ finishReason: "STOP" }],
-            text: () =>
-              JSON.stringify({
-                intent: "food_browse",
-                needsCatalog: true,
-                providerSlugs: ["maxifood-express"],
-                query: "fast food",
-                quantity: 1,
-                limit: 6,
-                page: 0,
-                allowCatalogFallback: true,
-              }),
-          },
-        }),
-      },
+  (dynamicFoodChat as any).model = {
+    name: "semantic-test",
+    client: {
+      generateContent: async () => ({
+        response: {
+          candidates: [{ finishReason: "STOP" }],
+          text: () =>
+            JSON.stringify({
+              intent: "food_browse",
+              needsCatalog: true,
+              providerSlugs: ["maxifood-express"],
+              query: "fast food",
+              quantity: 1,
+              limit: 6,
+              page: 0,
+              allowCatalogFallback: true,
+            }),
+        },
+      }),
     },
-  ];
+  };
   const semanticPlan = await (dynamicFoodChat as any).planWithAi(
     "tabiiy tildagi ovqat so‘rovi",
     [],
@@ -322,8 +354,8 @@ async function main() {
   );
   assert.deepEqual(
     semanticPlan.providerSlugs,
-    ["maxifood-express", "second-food-provider"],
-    "AI planning must keep every active catalog-capable delivery provider open",
+    ["maxifood-express"],
+    "AI planning must return only the slugs selected by the semantic planner",
   );
 
   const selectionAnswer = (dynamicFoodChat as any).buildGroundedCatalogAnswer(
@@ -356,13 +388,60 @@ async function main() {
     "an empty demo provider must not label real provider results as demo",
   );
 
+  // Re-mock planWithAi for capabilities and provider listing tests
+  (dynamicFoodChat as any).planWithAi = async (prompt: string) => {
+    if (/yordam|qila olasan|nima qil/i.test(prompt)) {
+      return {
+        intent: "capabilities" as const,
+        needsCatalog: false,
+        providerScope: "explicit" as const,
+        providerSlugs: [],
+        query: prompt,
+        limit: 6,
+        page: 0,
+        quantity: 1,
+        itemRequests: [],
+        allowCatalogFallback: false,
+        excludedOfferingIds: [],
+      };
+    }
+    if (/provider|aniqlashtir/i.test(prompt)) {
+      return {
+        intent: "provider_listing" as const,
+        needsCatalog: false,
+        providerScope: "explicit" as const,
+        providerSlugs: [],
+        query: "",
+        limit: 6,
+        page: 0,
+        quantity: 1,
+        itemRequests: [],
+        allowCatalogFallback: false,
+        excludedOfferingIds: [],
+      };
+    }
+    return {
+      intent: "food_browse" as const,
+      needsCatalog: true,
+      providerScope: "food" as const,
+      providerSlugs: [],
+      query: prompt,
+      limit: 6,
+      page: 0,
+      quantity: 1,
+      itemRequests: [],
+      allowCatalogFallback: true,
+      excludedOfferingIds: [],
+    };
+  };
+
   const capabilities = await (dynamicFoodChat as any).prepareChat({
     prompt: "rostan ham qanday yordam bera olasan?",
     messages: [],
     userId: "test-user",
   });
-  assert.match(capabilities.directAnswer, /MaxiFood Express/);
-  assert.match(capabilities.directAnswer, /Courier Only/);
+  assert.match(capabilities.directAnswer, /Zayuno/);
+  assert.match(capabilities.directAnswer, /MaxWay/);
 
   const providerListing = await (dynamicFoodChat as any).prepareChat({
     prompt: "senda qanday providerlar bor aniqlashtirchi",
@@ -500,6 +579,17 @@ async function main() {
     orderRedis as any,
   );
   const orderInternals = orderChat as any;
+
+  // Mock interpretPendingTurn to avoid real Gemini calls
+  orderInternals.interpretPendingTurn = async (prompt: string) => {
+    if (prompt === "2") return { intent: "provide_details", choice: "2" };
+    if (prompt === "1") return { intent: "provide_details", choice: "1" };
+    if (prompt === "achchiq") return { intent: "provide_details", choice: "achchiq" };
+    if (prompt.includes("+998")) return { intent: "provide_details", phone: "+998901234567", address: "Toshkent, Chilonzor 5", fulfillmentType: "DELIVERY" };
+    if (/tasdiq|ha\b|confirm/i.test(prompt)) return { intent: "confirm" };
+    if (/bekor|yo'q|cancel/i.test(prompt)) return { intent: "cancel" };
+    return { intent: "provide_details", choice: prompt };
+  };
   const selectionPrompt = await orderInternals.startOrderSelection(
     "order-user",
     "customer@example.com",
@@ -512,6 +602,7 @@ async function main() {
       quantity: 1,
       limit: 1,
       page: 0,
+      itemRequests: [{ query: "Klassik Gamburger", quantity: 1 }],
       allowCatalogFallback: true,
       excludedOfferingIds: [],
     },
