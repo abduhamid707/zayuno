@@ -2367,7 +2367,7 @@ USER=${JSON.stringify(prompt)}`;
       .filter((term) => term.length >= 3);
     if (terms.length === 0) return offerings;
 
-    const scored = offerings
+    return offerings
       .map((item, index) => {
         const searchable = [
           item?.title,
@@ -2388,19 +2388,8 @@ USER=${JSON.stringify(prompt)}`;
       })
       .sort(
         (left, right) => right.score - left.score || left.index - right.index,
-      );
-
-    const maxScore = scored[0]?.score || 0;
-    if (maxScore > 0) {
-      const threshold = terms.length >= 2 ? maxScore : 1;
-      const filtered = scored.filter((entry) => entry.score >= threshold);
-      if (filtered.length > 0) {
-        return filtered.map(({ item }) => item);
-      }
-      return scored.filter((entry) => entry.score > 0).map(({ item }) => item);
-    }
-
-    return scored.map(({ item }) => item);
+      )
+      .map(({ item }) => item);
   }
 
   private normalizeLookupText(value: unknown): string {
