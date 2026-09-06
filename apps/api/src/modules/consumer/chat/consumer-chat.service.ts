@@ -107,7 +107,7 @@ type ChatIntent =
 type LiveContextPlan = {
   intent: ChatIntent;
   needsCatalog: boolean;
-  providerScope: "explicit" | "food";
+  providerScope: "explicit" | "food" | "selected";
   providerSlugs: string[];
   query: string;
   limit: number;
@@ -249,6 +249,52 @@ STRICT RULES:
     }
   }
 
+  private matchFastIntentAnswer(
+    prompt: string,
+    history: ConversationMessage[],
+  ): string | undefined {
+    const raw = prompt.toLowerCase().trim();
+    // 1. Capabilities / "What can you do?"
+    if (
+      /^(nima|nimalar)\s*(qila|qila\s*ola|qilas|qila\s*olasiz|qilaolasan|qilaolasiz|qilsa\s*bo['`]?ladi|bilasiz|mumkin)/i.test(raw) ||
+      /qanday\s*(xizmat|servis|imkoniyat|yordam)/i.test(raw) ||
+      /imkoniyatlaring\s*(nima|qanday)/i.test(raw) ||
+      /qanaqa\s*(xizmat|servis)/i.test(raw) ||
+      /nima\s*ish\s*(qilas|qilasan)/i.test(raw) ||
+      /yordam\s*berchi/i.test(raw)
+    ) {
+      return `Assalomu alaykum! Zayuno — kundalik ehtiyoj va murakkab xizmatlarni bir zumda hal qiluvchi sun’iy intellekt platformasi.
+
+Men sizga quyidagi barcha yo‘nalishlar bo‘yicha to‘liq xizmat ko‘rsata olaman:
+
+• 🚆 **Poyezd va samolyot chiptalari**: Uzrailways (Afrosiyob, Sharq poyezdlari) va Uzbekistan Airways orqali ichki va xalqaro chiptalar xarid qilish;
+• 🏥 **Tibbiy klinikalar**: Nova Eye (ko‘z mikroxirurgiyasi), Dental One (stomatologiya), Medline (MRT, diagnostika, laboratoriya), Cardio Life (kardiologiya) qabuliga yozilish;
+• ✈️ **Sayohat va ziyorat**: Safar Umrah (Umra va Haj turlari), DubaiGo (Dubay, Antaliya sayohatlari), Silk Road Tours (tarixiy shaharlar);
+• 🚗 **Avtomobil ijarasi**: RentCar Express orqali Onix, Tracker, Malibu va Tahoe avtomobillarini ijaraga olish;
+• 🍔 **Taomlar va fast-food**: MaxWay, Chopar Pizza, Oqtepa Lavash, FeedUp, Coffee Time dan yetkazib berish;
+• 🎁 **Xaridlar va sovg‘alar**: FlowerLab (gullar va sovg‘alar), Bookly (badiiy va biznes kitoblar), SmartGadget (iPhone va aqlli gadjetlar);
+• 💼 **Biznes va maishiy xizmatlar**: BizReg (MChJ ro‘yxatdan o‘tkazish), Notarius Express (notarius va rasmiy tarjima), CleanPro (tozalash va klining), Fitness Hub (sport zali va trenajyor).
+
+Qaysi xizmat yoki mahsulot kerak bo‘lsa, yozing — darhol topib, buyurtmani rasmiylashtirib beraman!`;
+    }
+
+    // 2. Simple greetings (only at the beginning of conversation)
+    if (
+      history.length === 0 &&
+      /^(salom|assalomu\s*alaykum|assalom\s*aleykum|qalesan|qalaysiz|salom\s*zayuno)[\s!.]*$/i.test(
+        raw,
+      )
+    ) {
+      return `Assalomu alaykum! Zayuno platformasiga xush kelibsiz.
+
+Men orqali poyezd yoki samolyot chiptalarini band qilishingiz, shifokor qabuliga yozilishingiz, avtomobil ijaraga olishingiz yoki sevimli taom va xizmatlarni buyurtma qilishingiz mumkin.
+
+Sizga qaysi soha bo‘yicha yordam kerak?`;
+    }
+
+    return undefined;
+  }
+
   private async prepareChat(input: ChatRequest): Promise<PreparedChat> {
     const prompt = String(input.prompt || "").trim();
     if (!prompt || prompt.length > 1200) {
@@ -287,6 +333,17 @@ STRICT RULES:
     }
 
     const history = this.normalizeHistory(input.messages);
+    const fastAnswer = this.matchFastIntentAnswer(prompt, history);
+    if (fastAnswer) {
+      return {
+        prompt,
+        history,
+        plan: this.emptyPlan("capabilities"),
+        liveContext: [],
+        directAnswer: fastAnswer,
+      };
+    }
+
     const providers = (await this.providersService.listProviders()).sort(
       (left: any, right: any) =>
         this.providerPriority(left.slug) - this.providerPriority(right.slug),
@@ -300,11 +357,9 @@ STRICT RULES:
     const explicitlyMentionedProviders = this.findMentionedProviderSlugs(
       prompt,
       providers,
+      history,
     );
-    if (
-      explicitlyMentionedProviders.length > 0 &&
-      (plan.intent === "food_browse" || plan.intent === "food_selection")
-    ) {
+    if (explicitlyMentionedProviders.length > 0) {
       plan.providerScope = "explicit";
       plan.providerSlugs = explicitlyMentionedProviders;
       plan.needsCatalog = true;
@@ -465,7 +520,6 @@ STRICT RULES:
 
   private providerPriority(slug: string) {
     if (slug === "hh-uz" || slug === "hh-recruitment") return 0;
-    if (slug === "coffee-time") return 1;
     return 10;
   }
 
@@ -554,7 +608,7 @@ STRICT RULES:
     liveContext: any[],
     conversationId?: string,
   ): Promise<string | undefined> {
-    if (plan.intent !== "food_selection") return undefined;
+    if (plan.intent !== "food_selection" && plan.itemRequests.length === 0) return undefined;
     const candidates = liveContext
       .flatMap((context) =>
         Array.isArray(context?.offerings)
@@ -585,7 +639,7 @@ STRICT RULES:
         }))
         .sort((left, right) => right.score - left.score);
       const best = ranked[0];
-      if (!best || (best.score <= 0 && selected.length > 0)) {
+      if (!best || best.score <= 0) {
         unmatched.push(request.query);
         continue;
       }
@@ -597,12 +651,10 @@ STRICT RULES:
         quantity: Math.min(Math.max(request.quantity || 1, 1), 20),
       });
     }
-    if (!selected.length) {
-      selected.push({ ...candidates[0], quantity: plan.quantity || 1 });
+    if (unmatched.length && !selected.length) {
+      return `Quyidagi mahsulot yoki xizmatni katalogdan aniq topa olmadim: **${unmatched.map((item) => this.cleanMarkdownText(item)).join(", ")}**. Nomini katalogdagidek aniqlashtirib yozing.`;
     }
-    if (unmatched.length) {
-      return `Quyidagi mahsulotni katalogdan aniq topa olmadim: **${unmatched.map((item) => this.cleanMarkdownText(item)).join(", ")}**. Nomini katalogdagidek aniqlashtirib yozing.`;
-    }
+    if (!selected.length) return undefined;
 
     const primary = selected[0];
     const [catalogResult, ...offeringResults] = await Promise.allSettled([
@@ -723,7 +775,7 @@ STRICT RULES:
 
     if (state.stage === "collecting_requirements") {
       if (requirement) {
-        const captured = this.applyPendingTurn(state, requirement, turn);
+        const captured = this.applyPendingTurn(state, requirement, turn, prompt);
         if (!captured) return this.formatRequirementPrompt(state, requirement);
       }
       await this.savePendingOrder(userId, state, conversationId);
@@ -777,16 +829,17 @@ STRICT RULES:
     let paymentUrl = this.safeHttpUrl(
       action.nextAction?.url || action.paymentUrl,
     );
-    if (!paymentUrl) {
-      try {
-        const options = await this.actionsService.getPaymentOptions(action.id, {
-          id: userId,
-        });
-        const option = Array.isArray(options) ? options[0] : undefined;
+    let paymentOptions: any[] = [];
+    try {
+      paymentOptions = await this.actionsService.getPaymentOptions(action.id, {
+        id: userId,
+      });
+      if (!paymentUrl && Array.isArray(paymentOptions) && paymentOptions.length > 0) {
+        const option = paymentOptions.find((o: any) => o?.checkoutUrl) || paymentOptions[0];
         paymentUrl = this.safeHttpUrl(option?.checkoutUrl);
-      } catch {
-        // PAYMENT_OPTIONS is optional when ACTION_CREATE already owns handoff.
       }
+    } catch {
+      // PAYMENT_OPTIONS is optional when ACTION_CREATE already owns handoff.
     }
     const reference = this.cleanMarkdownText(action.publicId || action.id);
     await this.redisService.set(
@@ -804,10 +857,26 @@ STRICT RULES:
     );
     await this.redisService.del(this.orderStateKey(userId, conversationId));
 
+    const paymentLinks: string[] = [];
+    if (Array.isArray(paymentOptions) && paymentOptions.length > 0) {
+      for (const opt of paymentOptions) {
+        const optUrl = this.safeHttpUrl(opt.checkoutUrl);
+        if (optUrl) {
+          paymentLinks.push(`💳 [${this.cleanMarkdownText(opt.name)}](${optUrl})`);
+        } else if (opt.type === "CASH_ON_DELIVERY") {
+          paymentLinks.push(`💵 ${this.cleanMarkdownText(opt.name)}`);
+        }
+      }
+    }
+
+    if (paymentLinks.length > 0) {
+      return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga muvaffaqiyatli yuborildi! Raqam: **${reference}**\n\nTo‘lov usullari:\n${paymentLinks.join("\n")}`;
+    }
+
     if (paymentUrl) {
       return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga yuborildi. Raqam: **${reference}**\n\n[To‘lovni davom ettirish](${paymentUrl})`;
     }
-    return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga yuborildi. Raqam: **${reference}**. Hozircha onlayn to‘lov havolasi kelmadi.`;
+    return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga yuborildi. Raqam: **${reference}**.`;
   }
 
   private async interpretPendingTurn(
@@ -885,6 +954,7 @@ USER=${JSON.stringify(prompt)}`;
     state: PendingConsumerOrder,
     requirement: any,
     turn: PendingTurnInterpretation,
+    prompt?: string,
   ): boolean {
     if (turn.phone) state.phone = this.normalizePhone(turn.phone);
     if (turn.address && turn.address.length >= 5) state.address = turn.address;
@@ -935,8 +1005,14 @@ USER=${JSON.stringify(prompt)}`;
       return true;
     }
     if (requirement.kind === "parameter") {
-      const value = turn.choice;
-      if (!value) return false;
+      let value: any = turn.choice;
+      if ((value === undefined || value === "") && prompt) {
+        const trimmed = prompt.trim();
+        if (trimmed && !["ha", "yo'q", "tasdiqlayman"].includes(trimmed.toLowerCase())) {
+          value = trimmed;
+        }
+      }
+      if (value === undefined || value === null || value === "") return false;
       state.parameters[requirement.key] = value;
       return true;
     }
@@ -1417,16 +1493,16 @@ Return one compact JSON object only, without markdown:
 {"intent":"greeting|capabilities|provider_listing|recruitment_search|recruitment_clarification|food_clarification|food_browse|food_selection|general","needsCatalog":boolean,"providerSlugs":["slug"],"query":"concise provider search query","quantity":number,"itemRequests":[{"query":"exact requested item name","quantity":number}],"limit":number,"page":number,"allowCatalogFallback":boolean,"answer":"natural answer for non-catalog turns only"}
 
 Rules:
-- If the user wants food or says they want to order but has not chosen a restaurant/provider in the current conversation, use food_clarification with needsCatalog=false. Do not dump a mixed menu. If a restaurant/provider was established in recent history, keep using it naturally.
-- A request to browse a chosen restaurant is food_browse. A request for one or more specific products from a chosen restaurant is food_selection. Select only semantically matching food providers from their name, category and description.
-- Job requests are recruitment_search. If profession/field is missing, use recruitment_clarification with needsCatalog=false.
-- For catalog-only providers, keep them selected and set allowCatalogFallback=true.
+- You support all domains in PROVIDERS: Food & Dining (MaxWay, Chopar, Oqtepa, FeedUp, Coffee Time), Clinics & Doctors (Nova Eye, Dental One, Medline, Cardio Life, DermaCare), Travel & Tourism (Umrah, DubaiGo, Silk Road Tours), Transport & Tickets (Uzrailways train tickets, Uzbekistan Airways flight tickets, FastBus), Car Rental (RentCar Express), Retail (FlowerLab flowers, Bookly books, SmartGadget electronics), Local & Business services (CleanPro, Notarius Express, BizReg, Fitness Hub).
+- If the user asks about clinics, doctors, tickets, trains, flights, flowers, books, cars, or food, choose the matching provider's slug in providerSlugs!
+- If a provider or domain was discussed or suggested in recent HISTORY (e.g. user choosing "Tish doktori" after Dental One was suggested, or user picking "Kelinchak guldastasi" after FlowerLab bouquets were displayed), keep using that provider's slug in providerSlugs!
+- A request to browse a provider's catalog or services is food_browse. A request for a specific product, ticket, service, appointment, or package is food_selection.
+- Set needsCatalog=true whenever browsing or ordering from a provider.
 - Put the most relevant provider slug first. The query must express the user's actual need, without conversational filler.
-- For food_selection, extract every distinct requested product into itemRequests. Never turn two different products into quantity=2. Keep quantity as the first item's quantity for backward compatibility; otherwise quantity=1.
-- Use limit=6 unless the user explicitly requests a different result count.
+- For food_selection, extract the requested item name into itemRequests: [{"query": "exact product or service name", "quantity": 1}].
 - General conversation uses general and needsCatalog=false.
-- A greeting uses greeting. A question about what Zayuno can do uses capabilities and must not request catalog data. Use provider_listing only when the user explicitly asks which providers are connected.
-- For greeting, capabilities, recruitment_clarification, food_clarification and general intents, write a fluent concise Uzbek answer in answer. Never include listings unless explicitly requested. For catalog intents, answer must be empty.
+- A greeting uses greeting. A question about what Zayuno can do uses capabilities and must not request catalog data.
+- For greeting, capabilities, recruitment_clarification, food_clarification and general intents, write a fluent concise Uzbek answer in answer. For catalog intents, answer must be empty.
 
 PROVIDERS=${JSON.stringify(directory)}
 HISTORY=${JSON.stringify(recentHistory)}
@@ -1470,28 +1546,17 @@ USER=${JSON.stringify(prompt)}`;
       const explicitlyMentioned = this.findMentionedProviderSlugs(
         prompt,
         providers,
+        history,
       );
-      if (
-        parsed.intent === "food_browse" ||
-        parsed.intent === "food_selection"
-      ) {
-        providerSlugs = explicitlyMentioned.length
-          ? explicitlyMentioned
-          : Array.from(
-              new Set([
-                ...providerSlugs,
-                ...providers
-                  .filter((provider) => this.isFoodProvider(provider))
-                  .map((provider) => provider.slug),
-              ]),
-            );
+      if (explicitlyMentioned.length > 0) {
+        providerSlugs = explicitlyMentioned;
       }
       const needsCatalog =
         Boolean(parsed.needsCatalog) && providerSlugs.length > 0;
       return {
         intent: parsed.intent,
         needsCatalog,
-        providerScope: explicitlyMentioned.length > 0 ? "explicit" : "food",
+        providerScope: explicitlyMentioned.length > 0 ? "explicit" : "selected",
         providerSlugs,
         query: String(parsed.query || "")
           .trim()
@@ -1792,13 +1857,8 @@ USER=${JSON.stringify(prompt)}`;
       (provider: any) => !this.isDemoProvider(provider),
     );
     const requested =
-      plan.providerScope === "food"
-        ? (realFoodProviders.length ? realFoodProviders : foodProviders).sort(
-            (left: any, right: any) =>
-              this.foodProviderScore(left, plan.query) -
-              this.foodProviderScore(right, plan.query),
-          )
-        : providers
+      plan.providerSlugs.length > 0
+        ? providers
             .filter((provider: any) =>
               plan.providerSlugs.includes(provider.slug),
             )
@@ -1806,7 +1866,12 @@ USER=${JSON.stringify(prompt)}`;
               (left: any, right: any) =>
                 plan.providerSlugs.indexOf(left.slug) -
                 plan.providerSlugs.indexOf(right.slug),
-            );
+            )
+        : (realFoodProviders.length ? realFoodProviders : foodProviders).sort(
+            (left: any, right: any) =>
+              this.foodProviderScore(left, plan.query) -
+              this.foodProviderScore(right, plan.query),
+          );
 
     return Promise.all(
       requested.map(async (provider: any) => {
@@ -1997,9 +2062,53 @@ USER=${JSON.stringify(prompt)}`;
   private findMentionedProviderSlugs(
     prompt: string,
     providers: any[],
+    history?: ConversationMessage[],
   ): string[] {
     const normalizedPrompt = this.normalizeLookupText(prompt);
-    return providers
+
+    // 1. Direct vertical semantic keywords mapping for 25 providers
+    const KEYWORD_MAP: Array<{ regex: RegExp; slug: string }> = [
+      { regex: /\b(tish|stomatolog|dental|plomba|breket|implant|tishlar)\b/i, slug: "dental-one" },
+      { regex: /\b(ko‘z|ko`z|koz|oftalmolog|glaz|linza|katarakta|lasik|nova\s*eye|nova\s*clinic)\b/i, slug: "nova-clinic" },
+      { regex: /\b(yurak|kardiolog|ekg|holter|qon\s*bosim|cardio)\b/i, slug: "cardio-life" },
+      { regex: /\b(tahlil|analiz|diagnostika|mrt|kt|uzi|medline|laboratoriya)\b/i, slug: "medline" },
+      { regex: /\b(teri|dermatolog|kosmetolog|derma|prp|botoks)\b/i, slug: "derma-care" },
+      { regex: /\b(gul|gullar|guldasta|atirgul|lola|kelinchak|flowerlab)\b/i, slug: "flowerlab" },
+      { regex: /\b(kitob|kitoblar|roman|badiiy|bookly|adabiyot)\b/i, slug: "bookly" },
+      { regex: /\b(telefon|smartfon|iphone|samsung|macbook|ipad|airpods|dyson|smartgadget)\b/i, slug: "smart-gadget" },
+      { regex: /\b(poyezd|poezd|afrosiyob|sharq|plaskart|kupe|temir\s*yo‘l|temir\s*yol|uzrailways)\b/i, slug: "uzrailways" },
+      { regex: /\b(samolyot|avia|reys|parvoz|aviachipta|havo\s*yo‘li|airways)\b/i, slug: "uzbekistan-airways" },
+      { regex: /\b(avtobus|fastbus|marshrutka)\b/i, slug: "fastbus" },
+      { regex: /\b(yuk\s*tashish|kargo|cargo|fura|gazel|citycargo)\b/i, slug: "city-cargo" },
+      { regex: /\b(ijara|arenda|prokat|rentcar|onix|tracker|malibu|tahoe|mashina\s*ijara)\b/i, slug: "rentcar-express" },
+      { regex: /\b(umra|haj|ziyorat|makka|madina|safar\s*umrah)\b/i, slug: "umrah-travel" },
+      { regex: /\b(dubay|dubai|antaliya|misr|sharm|dubaigo)\b/i, slug: "dubaigo" },
+      { regex: /\b(ekskursiya|tarixiy|samarqand\s*sayohat|buxoro\s*sayohat|silk\s*road)\b/i, slug: "silk-road-tours" },
+      { regex: /\b(mchj|firma\s*ochish|biznes|bizreg|buxgalteriya)\b/i, slug: "bizreg" },
+      { regex: /\b(notarius|apostil|ishonchnoma|tarjima\s*markazi|notarius\s*express)\b/i, slug: "notarius-express" },
+      { regex: /\b(klining|tozalash|uborka|cleanpro)\b/i, slug: "cleanpro" },
+      { regex: /\b(sport\s*zali|trenajyor|fitnes|fitness|basseyn|abonement)\b/i, slug: "fitness-hub" },
+      { regex: /\b(lavash|shaurma|oqtepa)\b/i, slug: "oqtepa-lavash" },
+      { regex: /\b(burger|chizburger|maxway)\b/i, slug: "maxway" },
+      { regex: /\b(pitsa|pizza|chopar)\b/i, slug: "chopar-pizza" },
+      { regex: /\b(tovuq|qarsildoq|strips|qanot|feedup)\b/i, slug: "feedup" },
+      { regex: /\b(qahva|kofe|cappuccino|latte|americano|coffee\s*time)\b/i, slug: "coffee-time" },
+    ];
+
+    const matchedFromKeywords: string[] = [];
+    for (const item of KEYWORD_MAP) {
+      if (item.regex.test(prompt)) {
+        if (providers.some((p) => p.slug === item.slug)) {
+          matchedFromKeywords.push(item.slug);
+        }
+      }
+    }
+    if (matchedFromKeywords.length > 0) {
+      return matchedFromKeywords;
+    }
+
+    // 2. Direct slug or brand name in prompt
+    const directMatches = providers
       .filter((provider) => {
         const slug = this.normalizeLookupText(provider?.slug);
         const name = this.normalizeLookupText(provider?.name);
@@ -2013,12 +2122,29 @@ USER=${JSON.stringify(prompt)}`;
           .split(" ")
           .filter(
             (part) =>
-              part.length >= 5 &&
+              part.length >= 4 &&
               !["express", "sandbox", "provider", "uzbekistan"].includes(part),
           );
         return distinctive.some((part) => normalizedPrompt.includes(part));
       })
       .map((provider) => provider.slug);
+
+    if (directMatches.length > 0) return directMatches;
+
+    // 3. Match from recent history if assistant suggested specific providers
+    if (history && history.length > 0) {
+      const lastAssistant = [...history].reverse().find((m) => m.role === "assistant");
+      if (lastAssistant) {
+        const assistantText = lastAssistant.content.toLowerCase();
+        for (const item of KEYWORD_MAP) {
+          if (item.regex.test(prompt) && assistantText.includes(item.slug.replace(/-/g, " "))) {
+            return [item.slug];
+          }
+        }
+      }
+    }
+
+    return [];
   }
 
   private foodProviderScore(provider: any, query: string): number {
@@ -2136,7 +2262,7 @@ USER=${JSON.stringify(prompt)}`;
     const grouped = new Map<string, typeof displayedOfferings>();
     for (const entry of displayedOfferings) {
       const providerName = this.cleanMarkdownText(
-        entry.context?.name || "Hamkor restoran",
+        entry.context?.name || "Hamkor servis",
       );
       grouped.set(providerName, [...(grouped.get(providerName) || []), entry]);
     }
@@ -2150,10 +2276,29 @@ USER=${JSON.stringify(prompt)}`;
         return `**${providerName}**\n\n${rows.join("\n")}`;
       },
     );
-    const intro =
-      plan.intent === "food_selection"
-        ? "Tanlagan mahsulotingiz shu yerda mavjud:"
-        : "Tanlangan joydagi hozir mavjud taom va ichimliklar:";
+    const intro = (() => {
+      if (plan.intent === "food_selection") {
+        return "Tanlagan mahsulotingiz/xizmatingiz shu yerda mavjud:";
+      }
+      const firstContext = displayedOfferings[0]?.context;
+      const category = String(firstContext?.category || "").toLowerCase();
+      if (/health|medical|clinic/i.test(category)) {
+        return "Tanlangan tibbiy markazdagi mavjud xizmatlar va shifokor qabullari:";
+      }
+      if (/transport|ticket|rail|avia|bus/i.test(category)) {
+        return "Mavjud chiptalar va qatnov yo‘nalishlari:";
+      }
+      if (/travel|tour/i.test(category)) {
+        return "Mavjud sayohat va tur paketlari:";
+      }
+      if (/retail|flower|book|gadget/i.test(category)) {
+        return "Mavjud mahsulotlar va buyumlar:";
+      }
+      if (/service|clean|legal|notary|fitness/i.test(category)) {
+        return "Mavjud professional xizmatlar:";
+      }
+      return "Tanlangan joydagi hozir mavjud xizmat va takliflar:";
+    })();
     return `${intro}\n\n${sections.join("\n\n")}`;
   }
 
