@@ -158,6 +158,11 @@ try {
   assert.ok(trips.length >= 1);
   assert.equal(trips[0].metadata.destinationId, 'guliston');
 
+  // Multi-word destination search check: "Toshkent j. Guliston" must only return Guliston
+  const textFilteredTrips = await json(`/search?q=${encodeURIComponent('Toshkent j. Guliston')}`);
+  assert.ok(textFilteredTrips.length >= 1, 'Search for Toshkent j. Guliston must find trips.');
+  assert.ok(textFilteredTrips.every((t: any) => t.metadata.destinationId === 'guliston'), 'Search must only return Guliston trips, never Samarqand or Buxoro.');
+
   const offering = trips[0];
   const kupe = offering.variants.find((variant: any) => variant.metadata.carClass === 'KUPE');
   assert.ok(kupe, 'Search result must contain a KUPE variant.');
@@ -187,6 +192,12 @@ try {
   const quoteB = await json('/quote', { method: 'POST', body: JSON.stringify(quoteRequest) });
   assert.ok(quoteA.total > kupe.basePrice);
   assert.equal(quoteA.parameters.selectedSeatNumbers[0], selectedSeat);
+
+  const uzRailQuote = await json('/quote', {
+    method: 'POST',
+    body: JSON.stringify({ ...quoteRequest, providerSlug: 'uzrailways' })
+  });
+  assert.equal(uzRailQuote.providerSlug, 'uzrailways', 'Quote must accept custom provider slug like uzrailways');
 
   const piiRejected = await json('/quote', {
     method: 'POST',

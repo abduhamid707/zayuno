@@ -32,7 +32,7 @@ import {
 
 type SandboxState = 'AWAITING_PASSENGER_DETAILS' | 'AWAITING_PAYMENT' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
 type SeatLock = { actionId: string; state: 'HELD' | 'SOLD'; expiresAt: number };
-type PendingWebhook = { eventId: string; raw: string; attempts: number; nextAttemptAt: number };
+type PendingWebhook = { eventId: string; raw: string; slug?: string; attempts: number; nextAttemptAt: number };
 type StoredQuote = NormalizedQuote & { createdAtMs: number; consumedByActionId?: string };
 type StoredAction = NormalizedAction & {
   sandboxState: SandboxState;
@@ -243,10 +243,11 @@ export function createPoyezSandboxApp(): Express {
   const cleanupTimer = setInterval(expireHolds, 15_000);
   cleanupTimer.unref();
 
-  async function deliverWebhook(raw: string): Promise<{ ok: boolean; status?: number }> {
+  async function deliverWebhook(raw: string, slug = SLUG): Promise<{ ok: boolean; status?: number }> {
     const signature = crypto.createHmac('sha256', webhookSecret).update(raw).digest('hex');
+    const webhookSlug = slug || SLUG;
     try {
-      const response = await fetch(`${zayunoApi}/api/v1/webhooks/${SLUG}`, {
+      const response = await fetch(`${zayunoApi}/api/v1/webhooks/${webhookSlug}`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-provider-signature': signature }, body: raw,
         signal: AbortSignal.timeout(5000), redirect: 'error'
       });
@@ -265,7 +266,7 @@ export function createPoyezSandboxApp(): Express {
     const now = Date.now();
     for (const [eventId, pending] of pendingWebhooks) {
       if (pending.nextAttemptAt > now) continue;
-      const delivery = await deliverWebhook(pending.raw);
+      const delivery = await deliverWebhook(pending.raw, pending.slug);
       if (delivery.ok) {
         pendingWebhooks.delete(eventId);
         continue;
@@ -302,22 +303,38 @@ export function createPoyezSandboxApp(): Express {
     if (String(context.origin || '').trim().toLocaleLowerCase('uz') === String(context.destination || '').trim().toLocaleLowerCase('uz') && context.origin) {
       throw new Error('Origin and destination must be different stations.');
     }
-    const words = query.toLocaleLowerCase('uz');
-    return POYEZ_TRIPS.filter(trip => {
-      if (!trip.runsOnDays.includes(dayOfWeek(date))) return false;
-      if (originIds.length && !originIds.includes(trip.originId)) return false;
-      if (destinationIds.length && !destinationIds.includes(trip.destinationId)) return false;
-      if (!originIds.length && !destinationIds.length && words) {
-        const haystack = `${trip.trainNumber} ${trip.serviceLabel} ${stationName(trip.originId)} ${stationName(trip.destinationId)}`.toLocaleLowerCase('uz');
-        if (!words.split(/\s+/).filter(Boolean).some(word => haystack.includes(word))) return false;
-      }
+    const cleanWords = query
+      .toLocaleLowerCase('uz')
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 3);
+
+    const scored = POYEZ_TRIPS.map(trip => {
+      if (!trip.runsOnDays.includes(dayOfWeek(date))) return null;
+      if (originIds.length && !originIds.includes(trip.originId)) return null;
+      if (destinationIds.length && !destinationIds.includes(trip.destinationId)) return null;
+
       const period = String(context.preferences?.departurePeriod || '').toUpperCase();
       const hour = Number(trip.departureTime.slice(0, 2));
-      if (period === 'MORNING' && hour >= 12) return false;
-      if (period === 'AFTERNOON' && (hour < 12 || hour >= 18)) return false;
-      if ((period === 'EVENING' || period === 'NIGHT') && hour < 18) return false;
-      return true;
-    }).map(trip => ({ trip, date }));
+      if (period === 'MORNING' && hour >= 12) return null;
+      if (period === 'AFTERNOON' && (hour < 12 || hour >= 18)) return null;
+      if ((period === 'EVENING' || period === 'NIGHT') && hour < 18) return null;
+
+      if (!originIds.length && !destinationIds.length && cleanWords.length > 0) {
+        const haystack = `${trip.trainNumber} ${trip.serviceLabel} ${stationName(trip.originId)} ${stationName(trip.destinationId)}`.toLocaleLowerCase('uz');
+        const score = cleanWords.reduce((acc, word) => acc + (haystack.includes(word) ? 1 : 0), 0);
+        if (score === 0) return null;
+        return { trip, date, score };
+      }
+      return { trip, date, score: 1 };
+    }).filter((item): item is { trip: RailTripTemplate; date: string; score: number } => item !== null);
+
+    if (!originIds.length && !destinationIds.length && cleanWords.length > 0 && scored.length > 0) {
+      const maxScore = Math.max(...scored.map(item => item.score));
+      return scored.filter(item => item.score === maxScore).map(item => ({ trip: item.trip, date: item.date }));
+    }
+
+    return scored.map(item => ({ trip: item.trip, date: item.date }));
   }
 
   function enrichedOffering(trip: RailTripTemplate, date: string) {
@@ -391,14 +408,15 @@ export function createPoyezSandboxApp(): Express {
   async function sendWebhook(action: StoredAction, eventType: string): Promise<{ ok: boolean; status?: number }> {
     if (!webhookSecret) return { ok: false };
     const eventId = makeId('ps_evt');
+    const slug = action.providerSlug || SLUG;
     const payload = {
-      eventId, eventType, providerSlug: SLUG, externalActionId: action.externalActionId,
+      eventId, eventType, providerSlug: slug, externalActionId: action.externalActionId,
       newStatus: action.status, newPaymentStatus: action.paymentStatus, timestamp: new Date().toISOString(),
       payload: { sandboxState: action.sandboxState, holdExpiresAt: action.holdExpiresAt }
     };
     const raw = JSON.stringify(payload);
-    const delivery = await deliverWebhook(raw);
-    if (!delivery.ok) pendingWebhooks.set(eventId, { eventId, raw, attempts: 1, nextAttemptAt: Date.now() + 2_000 });
+    const delivery = await deliverWebhook(raw, slug);
+    if (!delivery.ok) pendingWebhooks.set(eventId, { eventId, raw, slug, attempts: 1, nextAttemptAt: Date.now() + 2_000 });
     return delivery;
   }
 
@@ -485,17 +503,14 @@ export function createPoyezSandboxApp(): Express {
   app.post('/quote', (req, res) => {
     try {
       const input = req.body as RequestQuoteInput;
-      const expectedSlug = process.env.PROVIDER_SLUG || SLUG;
-      if (input.providerSlug && input.providerSlug !== expectedSlug && input.providerSlug !== 'poyez' && input.providerSlug !== 'poyez-sandbox') {
-        return res.status(400).json({ message: `providerSlug must be "${expectedSlug}".` });
-      }
+      const targetSlug = input.providerSlug || process.env.PROVIDER_SLUG || SLUG;
       if (!Array.isArray(input.items) || input.items.length !== 1) return res.status(400).json({ message: 'Sandbox rail quotes support exactly one trip per booking.' });
       const parameters = parseObject(input.parameters);
       if (containsSensitiveIdentityData(parameters)) return res.status(400).json({ message: 'Identity-document and card data must only be entered on the secure provider checkout page.' });
       const priced = quoteLine(input.items[0], parameters);
       const subtotal = priced.line.lineTotal;
       const quote: StoredQuote = {
-        id: makeId('ps_quote'), providerSlug: expectedSlug, locationId: input.locationId, lines: [priced.line], subtotal,
+        id: makeId('ps_quote'), providerSlug: targetSlug, locationId: input.locationId, lines: [priced.line], subtotal,
         fees: [], totalFees: 0, discounts: priced.discount ? [{ description: 'Sandbox child fare discount', amount: priced.discount }] : [],
         totalDiscount: priced.discount, total: subtotal - priced.discount, currency: 'UZS',
         expiresAt: new Date(Date.now() + QUOTE_TTL_MS).toISOString(), estimatedDurationMinutes: priced.context.durationMinutes,
@@ -514,14 +529,11 @@ export function createPoyezSandboxApp(): Express {
       if (!key || key.length > 200 || input.userConfirmed !== true || !input.quoteId) return res.status(400).json({ message: 'A valid idempotency key, quoteId, and explicit user confirmation are required.' });
       const previousId = idempotency.get(key);
       if (previousId) return res.json(actions.get(previousId));
-      const expectedSlug = process.env.PROVIDER_SLUG || SLUG;
-      if (input.providerSlug && input.providerSlug !== expectedSlug && input.providerSlug !== 'poyez' && input.providerSlug !== 'poyez-sandbox') {
-        return res.status(400).json({ message: `providerSlug must be "${expectedSlug}".` });
-      }
-      if (containsSensitiveIdentityData(input.parameters)) return res.status(400).json({ message: 'Do not send passport or bank-card data through AI/MCP. Use the secure provider handoff.' });
       const quote = quotes.get(input.quoteId);
       if (!quote || Date.parse(quote.expiresAt) <= Date.now()) return res.status(409).json({ message: 'Quote expired. Search availability and request a fresh quote.' });
       if (quote.consumedByActionId) return res.status(409).json({ message: 'Quote was already consumed by another action. Request a fresh quote.' });
+      const targetSlug = input.providerSlug || quote.providerSlug || process.env.PROVIDER_SLUG || SLUG;
+      if (containsSensitiveIdentityData(input.parameters)) return res.status(400).json({ message: 'Do not send passport or bank-card data through AI/MCP. Use the secure provider handoff.' });
       const context = quote.parameters || {};
       const resolved = POYEZ_TRIPS.find(value => value.id === context.tripId);
       const car = resolved?.cars.find(value => value.id === context.carId);
@@ -536,7 +548,7 @@ export function createPoyezSandboxApp(): Express {
       for (const seat of keys) seats.set(seat, { actionId: id, state: 'HELD', expiresAt: Date.parse(holdExpiresAt) });
       const checkoutUrl = `${publicBase}/pay/${encodeURIComponent(externalActionId)}`;
       const action: StoredAction = {
-        id, publicId: `ZY-RAIL-${crypto.randomInt(10000, 99999)}`, providerSlug: SLUG, providerName: PROVIDER_NAME,
+        id, publicId: `ZY-RAIL-${crypto.randomInt(10000, 99999)}`, providerSlug: targetSlug, providerName: PROVIDER_NAME,
         externalActionId, quoteId: quote.id, locationId: input.locationId, status: ActionStatus.CREATED,
         sandboxState: 'AWAITING_PASSENGER_DETAILS', holdExpiresAt, seatKeys: keys, selectedSeats,
         nextAction: { type: 'OPEN_URL', url: checkoutUrl, label: 'Yo‘lovchi ma’lumotlari va sandbox to‘lov', expiresAt: holdExpiresAt },

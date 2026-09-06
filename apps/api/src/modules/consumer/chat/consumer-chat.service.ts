@@ -916,6 +916,13 @@ Qaysi shifokor yoki tahlil zarurligini yozing, darhol qabulga yozib beraman.`;
       if (requirement) {
         const captured = this.applyPendingTurn(state, requirement, turn, prompt);
         if (!captured) return this.formatRequirementPrompt(state, requirement);
+      } else if (
+        turn.intent === "ask_support" ||
+        turn.intent === "ask_status" ||
+        turn.intent === "other"
+      ) {
+        await this.clearPendingOrder(userId, conversationId);
+        return undefined;
       }
       await this.savePendingOrder(userId, state, conversationId);
       return this.advanceOrderCollection(userId, state, conversationId);
@@ -1395,16 +1402,26 @@ USER=${JSON.stringify(prompt)}`;
       );
     }
 
-    const quote = await this.quotesService.requestQuote({
-      providerSlug: state.providerSlug,
-      locationId: state.locationId,
-      items,
-      fulfillmentType: state.fulfillmentType,
-      destination: state.address
-        ? { raw: state.address, country: "UZ" }
-        : undefined,
-      parameters: state.parameters,
-    });
+    let quote;
+    try {
+      quote = await this.quotesService.requestQuote({
+        providerSlug: state.providerSlug,
+        locationId: state.locationId,
+        items,
+        fulfillmentType: state.fulfillmentType,
+        destination: state.address
+          ? { raw: state.address, country: "UZ" }
+          : undefined,
+        parameters: state.parameters,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to request quote for provider ${state.providerSlug}: ${String(error)}`,
+      );
+      await this.clearPendingOrder(userId, conversationId);
+      const msg = error instanceof Error ? error.message : String(error);
+      return `Kechirasiz, provayderdan narx hisoblashda uzilish yuz berdi (${msg}). Iltimos, qayta urinib ko‘ring yoki boshqa variantni tanlang.`;
+    }
     state.stage = "awaiting_confirmation";
     state.quote = {
       id: quote.id,
@@ -2350,7 +2367,7 @@ USER=${JSON.stringify(prompt)}`;
       .filter((term) => term.length >= 3);
     if (terms.length === 0) return offerings;
 
-    return offerings
+    const scored = offerings
       .map((item, index) => {
         const searchable = [
           item?.title,
@@ -2371,8 +2388,19 @@ USER=${JSON.stringify(prompt)}`;
       })
       .sort(
         (left, right) => right.score - left.score || left.index - right.index,
-      )
-      .map(({ item }) => item);
+      );
+
+    const maxScore = scored[0]?.score || 0;
+    if (maxScore > 0) {
+      const threshold = terms.length >= 2 ? maxScore : 1;
+      const filtered = scored.filter((entry) => entry.score >= threshold);
+      if (filtered.length > 0) {
+        return filtered.map(({ item }) => item);
+      }
+      return scored.filter((entry) => entry.score > 0).map(({ item }) => item);
+    }
+
+    return scored.map(({ item }) => item);
   }
 
   private normalizeLookupText(value: unknown): string {
