@@ -1,0 +1,1 @@
+SELECT slug, "baseUrl", status, metadata->'healthStatus' as health, metadata->'healthMonitoring'->'state' as state, metadata->'isTemporarilyUnavailable' as unavail FROM "Provider" WHERE slug = 'maxway';

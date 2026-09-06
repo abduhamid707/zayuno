@@ -44,7 +44,15 @@ function resolveProvider(req, parsedUrl, body, pathSlug) {
     if (found) return found;
   }
 
-  // 1. API key header: {slug}_secret_live_2026
+  // 1. Explicit Header First
+  const explicitSlug = req.headers['x-provider-slug'];
+  if (explicitSlug) {
+    const cleanSlug = String(explicitSlug).toLowerCase().trim();
+    const found = ALL_PROVIDERS.find(c => c.slug === cleanSlug);
+    if (found) return found;
+  }
+
+  // 2. API key header: {slug}_secret_live_2026
   const apiKey = req.headers['x-provider-api-key'] || req.headers['authorization'] || '';
   const keyMatch = String(apiKey).match(/^([a-z0-9-]+)_secret/i);
   if (keyMatch) {
@@ -52,8 +60,8 @@ function resolveProvider(req, parsedUrl, body, pathSlug) {
     if (found) return found;
   }
 
-  // 2. Query param or body
-  const slug = parsedUrl.query.providerSlug || parsedUrl.query.provider || (body && body.providerSlug) || req.headers['x-provider-slug'];
+  // 3. Query param or body
+  const slug = parsedUrl.query.providerSlug || parsedUrl.query.provider || (body && body.providerSlug);
   if (slug) {
     const cleanSlug = String(slug).toLowerCase().trim();
     const found = ALL_PROVIDERS.find(c => c.slug === cleanSlug);

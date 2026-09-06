@@ -365,7 +365,7 @@ Sizga qaysi soha bo‘yicha yordam kerak?`;
       plan.needsCatalog = true;
     }
 
-    const providerAnswer = this.buildProviderAnswer(plan.intent, providers);
+    const providerAnswer = this.buildProviderAnswer(plan, providers);
     if (providerAnswer) {
       return {
         prompt,
@@ -435,39 +435,64 @@ Sizga qaysi soha bo‘yicha yordam kerak?`;
   }
 
   private buildProviderAnswer(
-    intent: ChatIntent,
+    plan: LiveContextPlan,
     providers: any[],
   ): string | undefined {
-    if (intent !== "provider_listing") {
+    if (plan.intent !== "provider_listing") {
       return undefined;
     }
 
-    const productionProviders = providers.filter(
+    let candidateProviders = providers.filter(
       (provider) => !this.isDemoProvider(provider),
     );
-    const visible = [
-      ...(productionProviders.length ? productionProviders : providers),
-    ]
-      .sort((left, right) => {
+    if (!candidateProviders.length) candidateProviders = providers;
+
+    let isSortedByRelevance = false;
+
+    if (plan.providerSlugs.length > 0) {
+      candidateProviders = candidateProviders.filter((p) =>
+        plan.providerSlugs.includes(p.slug)
+      );
+    } else if (plan.query) {
+      const queryTerms = this.normalizeLookupText(plan.query).split(/\s+/).filter((t) => t.length >= 3);
+      if (queryTerms.length > 0) {
+        candidateProviders = candidateProviders
+          .map((p) => {
+            const identity = this.normalizeLookupText(this.providerIdentity(p));
+            const score = queryTerms.reduce((sum, term) => sum + (identity.includes(term) ? 1 : 0), 0);
+            return { p, score };
+          })
+          .filter((x) => x.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .map((x) => x.p);
+        isSortedByRelevance = true;
+      }
+    }
+
+    if (!isSortedByRelevance) {
+      candidateProviders.sort((left, right) => {
         const demoDifference =
           Number(this.isDemoProvider(left)) -
           Number(this.isDemoProvider(right));
         return (
           demoDifference || String(left.name).localeCompare(String(right.name))
         );
-      })
-      .slice(0, 8);
+      });
+    }
+
+    const visible = candidateProviders.slice(0, 8);
 
     if (visible.length === 0) {
-      return "Hozir AI qidiruvi uchun tayyor faol provider topilmadi.";
+      return "Hozir so‘rovingiz bo‘yicha mos provider topilmadi.";
     }
 
     const rows = visible.map(
       (provider) =>
         `- **${this.cleanMarkdownText(provider.name)}** — ${this.describeProvider(provider)}`,
     );
-    if (intent === "provider_listing") {
-      return `Hozir AI qidiruvida mavjud providerlar:\n\n${rows.join("\n")}`;
+    
+    if (plan.query || plan.providerSlugs.length > 0) {
+      return `Sizning so‘rovingiz bo‘yicha topilgan xizmatlar:\n\n${rows.join("\n")}\n\nQaysi biridan foydalanmoqchisiz? Batafsil ma'lumot olishingiz mumkin.`;
     }
     return `Men real providerlardan jonli ma’lumot olib yordam beraman. Hozir masalan:\n\n${rows.join("\n")}\n\nKerakli xizmat yoki mahsulotni yozsangiz, mos provider katalogini tekshiraman.`;
   }
@@ -2067,12 +2092,13 @@ USER=${JSON.stringify(prompt)}`;
     const normalizedPrompt = this.normalizeLookupText(prompt);
 
     // 1. Direct vertical semantic keywords mapping for 25 providers
-    const KEYWORD_MAP: Array<{ regex: RegExp; slug: string }> = [
+    const KEYWORD_MAP: Array<{ regex: RegExp; slug: string | string[] }> = [
       { regex: /\b(tish|stomatolog|dental|plomba|breket|implant|tishlar)\b/i, slug: "dental-one" },
       { regex: /\b(ko‘z|ko`z|koz|oftalmolog|glaz|linza|katarakta|lasik|nova\s*eye|nova\s*clinic)\b/i, slug: "nova-clinic" },
       { regex: /\b(yurak|kardiolog|ekg|holter|qon\s*bosim|cardio)\b/i, slug: "cardio-life" },
       { regex: /\b(tahlil|analiz|diagnostika|mrt|kt|uzi|medline|laboratoriya)\b/i, slug: "medline" },
       { regex: /\b(teri|dermatolog|kosmetolog|derma|prp|botoks)\b/i, slug: "derma-care" },
+      { regex: /\b(shifokor|shifoxona|klinika|kasalxona|doktor|vrach|sog‘liq|salomatlik|medisina|tibbiyot)\b/i, slug: ["dental-one", "nova-clinic", "cardio-life", "medline", "derma-care"] },
       { regex: /\b(gul|gullar|guldasta|atirgul|lola|kelinchak|flowerlab)\b/i, slug: "flowerlab" },
       { regex: /\b(kitob|kitoblar|roman|badiiy|bookly|adabiyot)\b/i, slug: "bookly" },
       { regex: /\b(telefon|smartfon|iphone|samsung|macbook|ipad|airpods|dyson|smartgadget)\b/i, slug: "smart-gadget" },
@@ -2098,8 +2124,11 @@ USER=${JSON.stringify(prompt)}`;
     const matchedFromKeywords: string[] = [];
     for (const item of KEYWORD_MAP) {
       if (item.regex.test(prompt)) {
-        if (providers.some((p) => p.slug === item.slug)) {
-          matchedFromKeywords.push(item.slug);
+        const slugs = Array.isArray(item.slug) ? item.slug : [item.slug];
+        for (const s of slugs) {
+          if (providers.some((p) => p.slug === s)) {
+            matchedFromKeywords.push(s);
+          }
         }
       }
     }
@@ -2137,8 +2166,13 @@ USER=${JSON.stringify(prompt)}`;
       if (lastAssistant) {
         const assistantText = lastAssistant.content.toLowerCase();
         for (const item of KEYWORD_MAP) {
-          if (item.regex.test(prompt) && assistantText.includes(item.slug.replace(/-/g, " "))) {
-            return [item.slug];
+          if (item.regex.test(prompt)) {
+            const slugs = Array.isArray(item.slug) ? item.slug : [item.slug];
+            for (const s of slugs) {
+              if (assistantText.includes(s.replace(/-/g, " "))) {
+                return [s];
+              }
+            }
           }
         }
       }

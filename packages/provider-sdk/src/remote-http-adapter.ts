@@ -129,6 +129,7 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'x-provider-slug': this.providerSlug,
       ...(options.headers as any || {})
     };
 
