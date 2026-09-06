@@ -91,21 +91,76 @@ export class AdminService {
     }));
   }
 
-  async getReports(limit = 50, status?: string) {
+  async getReports(filters?: {
+    limit?: number;
+    status?: string;
+    search?: string;
+    from?: string;
+    to?: string;
+  }) {
+    const limit = Math.min(Math.max(filters?.limit || 100, 1), 500);
+    const where: any = {};
+    if (filters?.status && filters.status !== 'ALL') {
+      where.status = filters.status;
+    }
+    if (filters?.search && filters.search.trim()) {
+      const q = filters.search.trim();
+      where.OR = [
+        { id: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+        { transcriptMarkdown: { contains: q, mode: 'insensitive' } },
+        { user: { name: { contains: q, mode: 'insensitive' } } },
+        { user: { email: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+    if (filters?.from || filters?.to) {
+      where.createdAt = {};
+      if (filters.from) where.createdAt.gte = new Date(filters.from);
+      if (filters.to) where.createdAt.lte = new Date(filters.to);
+    }
     return prisma.userReport.findMany({
-      where: status && status !== 'ALL' ? { status } : undefined,
+      where,
       include: { user: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: 'desc' },
-      take: Math.min(Math.max(limit, 1), 100),
+      take: limit,
     });
   }
 
   async updateReportStatus(id: string, rawStatus?: string) {
     const status = String(rawStatus || '').toUpperCase();
-    if (!['OPEN', 'INVESTIGATING', 'RESOLVED'].includes(status)) {
+    if (!['OPEN', 'INVESTIGATING', 'RESOLVED', 'REJECTED'].includes(status)) {
       throw new BadRequestException('Invalid report status.');
     }
     return prisma.userReport.update({ where: { id }, data: { status } });
+  }
+
+  async deleteReport(id: string) {
+    return prisma.userReport.delete({ where: { id } });
+  }
+
+  async batchDeleteReports(ids: string[]) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException('Kamida bitta report ID kiritilishi kerak.');
+    }
+    const result = await prisma.userReport.deleteMany({
+      where: { id: { in: ids } },
+    });
+    return { deletedCount: result.count };
+  }
+
+  async batchUpdateReportStatus(ids: string[], rawStatus: string) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestException('Kamida bitta report ID kiritilishi kerak.');
+    }
+    const status = String(rawStatus || '').toUpperCase();
+    if (!['OPEN', 'INVESTIGATING', 'RESOLVED', 'REJECTED'].includes(status)) {
+      throw new BadRequestException('Yaroqsiz report statusi.');
+    }
+    const result = await prisma.userReport.updateMany({
+      where: { id: { in: ids } },
+      data: { status },
+    });
+    return { updatedCount: result.count };
   }
 
   async getProviders(filters?: {

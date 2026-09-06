@@ -21,6 +21,20 @@ import {
   Cpu,
   LogOut,
   Bug,
+  Trash2,
+  Download,
+  Copy,
+  Check,
+  CheckSquare,
+  Square,
+  ZoomIn,
+  X,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  Filter,
+  Calendar,
+  AlertTriangle,
 } from 'lucide-react';
 
 const API_BASE =
@@ -78,6 +92,21 @@ export default function App() {
     'dashboard' | 'actions' | 'providers' | 'reports' | 'logs'
   >('dashboard');
   const [reportStatus, setReportStatus] = useState('ALL');
+  const [reportSearch, setReportSearch] = useState('');
+  const [reportDateRange, setReportDateRange] = useState<'ALL' | 'TODAY' | '7DAYS' | '30DAYS'>('ALL');
+  const [reportSort, setReportSort] = useState<'NEWEST' | 'OLDEST'>('NEWEST');
+  const [selectedReportIds, setSelectedReportIds] = useState<string[]>([]);
+  const [copiedReportId, setCopiedReportId] = useState<string | null>(null);
+  const [zoomedImage, setZoomedImage] = useState<{ url: string; title: string } | null>(null);
+  const [expandedTranscripts, setExpandedTranscripts] = useState<Record<string, boolean>>({});
+  const [reportConfirmModal, setReportConfirmModal] = useState<{
+    title: string;
+    message: string;
+    action: () => void;
+    isDanger?: boolean;
+    buttonText?: string;
+  } | null>(null);
+  const [batchStatusTarget, setBatchStatusTarget] = useState<string>('RESOLVED');
   const [selectedAction, setSelectedAction] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showProviderForm, setShowProviderForm] = useState(false);
@@ -202,16 +231,39 @@ export default function App() {
     enabled: !!token,
   });
 
-  const { data: reportsData, isLoading: reportsLoading } = useQuery({
-    queryKey: ['admin-reports', reportStatus],
+  const {
+    data: reportsData,
+    isLoading: reportsLoading,
+    refetch: refetchReports,
+  } = useQuery({
+    queryKey: ['admin-reports', reportStatus, reportSearch, reportDateRange],
     queryFn: async () => {
-      const params = new URLSearchParams({ limit: '50' });
+      const params = new URLSearchParams({ limit: '200' });
       if (reportStatus !== 'ALL') params.set('status', reportStatus);
+      if (reportSearch.trim()) params.set('search', reportSearch.trim());
+
+      const now = new Date();
+      if (reportDateRange === 'TODAY') {
+        const startOfDay = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+        );
+        params.set('from', startOfDay.toISOString());
+      } else if (reportDateRange === '7DAYS') {
+        const past7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        params.set('from', past7.toISOString());
+      } else if (reportDateRange === '30DAYS') {
+        const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        params.set('from', past30.toISOString());
+      }
+
       const res = await apiFetch(`/api/v1/admin/reports?${params.toString()}`);
       return res.json();
     },
     enabled: !!token,
   });
+
   const updateReportMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) =>
       (
@@ -223,6 +275,49 @@ export default function App() {
       ).json(),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ['admin-reports'] }),
+  });
+
+  const deleteReportMutation = useMutation({
+    mutationFn: async (id: string) =>
+      (
+        await apiFetch(`/api/v1/admin/reports/${id}`, {
+          method: 'DELETE',
+        })
+      ).json(),
+    onSuccess: (_, id) => {
+      setSelectedReportIds((prev) => prev.filter((item) => item !== id));
+      queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
+    },
+  });
+
+  const batchDeleteReportsMutation = useMutation({
+    mutationFn: async (ids: string[]) =>
+      (
+        await apiFetch(`/api/v1/admin/reports/batch-delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        })
+      ).json(),
+    onSuccess: () => {
+      setSelectedReportIds([]);
+      queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
+    },
+  });
+
+  const batchUpdateStatusMutation = useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) =>
+      (
+        await apiFetch(`/api/v1/admin/reports/batch-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids, status }),
+        })
+      ).json(),
+    onSuccess: () => {
+      setSelectedReportIds([]);
+      queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
+    },
   });
 
   const { data: providersData, isLoading: providersLoading } = useQuery({
@@ -298,92 +393,168 @@ export default function App() {
     link.click();
     URL.revokeObjectURL(url);
   };
-  const downloadReport = (report: any, format: 'json' | 'md') => {
-    const content =
-      format === 'json'
-        ? JSON.stringify(
-            {
-              id: report.id,
-              status: report.status,
-              description: report.description,
-              transcript: report.transcript,
-              metadata: report.metadata,
-              createdAt: report.createdAt,
-            },
-            null,
-            2,
-          )
-        : report.transcriptMarkdown;
-    const url = URL.createObjectURL(
-      new Blob([content], {
-        type:
-          format === 'json'
-            ? 'application/json;charset=utf-8'
-            : 'text/markdown;charset=utf-8',
-      }),
-    );
+  const exportReports = (
+    reportsToExport: any[],
+    format: 'json' | 'md',
+    customLabel?: string,
+  ) => {
+    if (!reportsToExport || !reportsToExport.length) return;
+    const exportedAt = new Date().toISOString();
+
+    let content = '';
+    if (format === 'json') {
+      const normalized = reportsToExport.map((report: any) => ({
+        id: report.id,
+        status: report.status,
+        category: report.category,
+        description: report.description,
+        user: report.user,
+        metadata: report.metadata,
+        transcript: report.transcript,
+        transcriptMarkdown: report.transcriptMarkdown,
+        createdAt: report.createdAt,
+        updatedAt: report.updatedAt,
+      }));
+      content = JSON.stringify(
+        {
+          exportedAt,
+          exportLabel: customLabel || 'Zayuno Consumer Reports',
+          filterStatus: reportStatus,
+          count: normalized.length,
+          reports: normalized,
+        },
+        null,
+        2,
+      );
+    } else {
+      // Clean, structured Markdown for human & AI reading
+      const toc = reportsToExport
+        .map((r, i) => {
+          const title = r.description || `Report ${r.id.slice(0, 8)}`;
+          const user = r.user?.name || r.user?.email || 'Foydalanuvchi';
+          return `${i + 1}. [**${r.id.slice(0, 8)}...**] (${r.status} / ${user}) — *${new Date(r.createdAt).toLocaleString()}* — "${title.slice(0, 50)}"`;
+        })
+        .join('\n');
+
+      const body = reportsToExport
+        .map((report: any, index: number) => {
+          const metadataStr = JSON.stringify(report.metadata || {}, null, 2);
+          return [
+            `# ${index + 1}. Report: \`${report.id}\``,
+            '',
+            `| Parametr | Qiymat |`,
+            `|---|---|`,
+            `| **Status** | \`${report.status}\` |`,
+            `| **Kategoriya** | \`${report.category || 'TECHNICAL'}\` |`,
+            `| **Vaqt** | ${new Date(report.createdAt).toLocaleString()} |`,
+            `| **Foydalanuvchi** | ${report.user?.name || 'Noma‘lum'} (${report.user?.email || 'email yo‘q'}) |`,
+            `| **Foydalanuvchi ID** | \`${report.userId || 'yo‘q'}\` |`,
+            '',
+            `### 📝 Foydalanuvchi izohi / Muammo:`,
+            `> ${report.description || 'Izoh kiritilmagan'}`,
+            '',
+            `### 📱 Qurilma & Ilova konteksti (Metadata):`,
+            '```json',
+            metadataStr,
+            '```',
+            '',
+            report.screenshotDataUrl
+              ? `### 📸 Screenshot:\n*(Screenshot mavjud — admin panelda ko‘rish mumkin)*`
+              : `### 📸 Screenshot:\n*Screenshot biriktirilmagan*`,
+            '',
+            `### 💬 Chat Tarixi (Full Transcript):`,
+            report.transcriptMarkdown || 'Chat tarixi mavjud emas.',
+          ].join('\n');
+        })
+        .join('\n\n---\n\n');
+
+      content = [
+        `# 📊 Zayuno Consumer Reports to'plami`,
+        `- **Eksport vaqti:** \`${exportedAt}\``,
+        `- **Reportlar soni:** ${reportsToExport.length} ta`,
+        `- **Filtr statusi:** ${reportStatus}`,
+        customLabel ? `- **Tavsif:** ${customLabel}` : '',
+        '',
+        `## 📑 Mundarija:`,
+        toc,
+        '',
+        '---',
+        '',
+        body,
+      ]
+        .filter(Boolean)
+        .join('\n');
+    }
+
+    const blob = new Blob([content], {
+      type:
+        format === 'json'
+          ? 'application/json;charset=utf-8'
+          : 'text/markdown;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `zayuno-report-${report.id}.${format}`;
+    const cleanDate = exportedAt.slice(0, 10);
+    const prefix =
+      reportsToExport.length === 1
+        ? `report-${reportsToExport[0].id.slice(0, 8)}`
+        : `reports-${reportsToExport.length}-items`;
+    link.download = `zayuno-${prefix}-${cleanDate}.${format}`;
     link.click();
     URL.revokeObjectURL(url);
   };
-  const downloadCombinedReports = (format: 'json' | 'md') => {
-    const reports = Array.isArray(reportsData) ? reportsData : [];
-    if (!reports.length) return;
-    const exportedAt = new Date().toISOString();
-    const normalized = reports.map((report: any) => ({
-      id: report.id,
-      status: report.status,
-      description: report.description,
-      user: report.user,
-      transcript: report.transcript,
-      metadata: report.metadata,
-      createdAt: report.createdAt,
-    }));
-    const content =
-      format === 'json'
-        ? JSON.stringify(
-            {
-              exportedAt,
-              statusFilter: reportStatus,
-              count: normalized.length,
-              reports: normalized,
-            },
-            null,
-            2,
-          )
-        : [
-            '# Zayuno consumer reports',
-            '',
-            `- Exported: ${exportedAt}`,
-            `- Status filter: ${reportStatus}`,
-            `- Reports: ${reports.length}`,
-            '',
-            ...reports.flatMap((report: any, index: number) => [
-              index ? '\n---\n' : '',
-              `## Report ${index + 1}: ${report.id}`,
-              '',
-              `- Status: ${report.status}`,
-              `- Created: ${report.createdAt}`,
-              `- Description: ${report.description || 'Izoh kiritilmagan'}`,
-              '',
-              report.transcriptMarkdown || 'Chat tarixi mavjud emas.',
-            ]),
-          ].join('\n');
-    const url = URL.createObjectURL(
-      new Blob([content], {
-        type:
-          format === 'json'
-            ? 'application/json;charset=utf-8'
-            : 'text/markdown;charset=utf-8',
-      }),
+
+  const copyReportMarkdown = (report: any) => {
+    const metadataStr = JSON.stringify(report.metadata || {}, null, 2);
+    const markdown = [
+      `# Report: \`${report.id}\``,
+      `- **Status:** \`${report.status}\``,
+      `- **Vaqt:** ${new Date(report.createdAt).toLocaleString()}`,
+      `- **Foydalanuvchi:** ${report.user?.name || 'Noma‘lum'} (${report.user?.email || 'email yo‘q'})`,
+      '',
+      `### 📝 Foydalanuvchi izohi:`,
+      `> ${report.description || 'Izoh kiritilmagan'}`,
+      '',
+      `### 📱 Metadata:`,
+      '```json',
+      metadataStr,
+      '```',
+      '',
+      `### 💬 Chat Tarixi:`,
+      report.transcriptMarkdown || 'Chat tarixi mavjud emas.',
+    ].join('\n');
+
+    navigator.clipboard.writeText(markdown);
+    setCopiedReportId(report.id);
+    setTimeout(() => setCopiedReportId(null), 2000);
+  };
+
+  const toggleSelectReport = (id: string) => {
+    setSelectedReportIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `zayuno-reports-${reportStatus.toLowerCase()}-${exportedAt.replace(/[:.]/g, '-')}.${format}`;
-    link.click();
-    URL.revokeObjectURL(url);
+  };
+
+  const toggleSelectAll = (visibleReports: any[]) => {
+    const visibleIds = visibleReports.map((r) => r.id);
+    const allSelected = visibleIds.every((id) =>
+      selectedReportIds.includes(id),
+    );
+    if (allSelected) {
+      setSelectedReportIds((prev) =>
+        prev.filter((id) => !visibleIds.includes(id)),
+      );
+    } else {
+      setSelectedReportIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const toggleExpandTranscript = (id: string) => {
+    setExpandedTranscripts((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
   };
 
   // Run certification mutation
@@ -2083,126 +2254,666 @@ export default function App() {
             </div>
           )}
 
-          {/* 4. LOGS TAB */}
-          {activeTab === 'reports' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-bold text-white">
-                    Consumer reports
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    Screenshot, chat transcript, latency va qurilma konteksti
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  {reportsData?.length > 0 && (
-                    <>
-                      <button
-                        onClick={() => downloadCombinedReports('md')}
-                        className="rounded-lg border border-violet-500/50 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-200 hover:bg-violet-500/20"
-                      >
-                        {reportsData.length} tasini bitta Markdown
-                      </button>
-                      <button
-                        onClick={() => downloadCombinedReports('json')}
-                        className="rounded-lg border border-violet-500/50 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-200 hover:bg-violet-500/20"
-                      >
-                        {reportsData.length} tasini bitta JSON
-                      </button>
-                    </>
-                  )}
-                  <select
-                    value={reportStatus}
-                    onChange={(event) => setReportStatus(event.target.value)}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs"
-                  >
-                    <option value="ALL">Barcha statuslar</option>
-                    <option value="OPEN">Open</option>
-                    <option value="INVESTIGATING">Investigating</option>
-                    <option value="RESOLVED">Resolved</option>
-                  </select>
-                </div>
-              </div>
-              {reportsLoading ? (
-                <div className="py-16 text-center text-sm text-slate-500">
-                  Reportlar yuklanmoqda…
-                </div>
-              ) : reportsData?.length ? (
-                reportsData.map((report: any) => (
-                  <article
-                    key={report.id}
-                    className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80"
-                  >
-                    <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-5">
+          {/* 4. REPORTS TAB */}
+          {activeTab === 'reports' && (() => {
+            const rawReports: any[] = Array.isArray(reportsData) ? reportsData : [];
+            const sortedReports = [...rawReports].sort((a, b) => {
+              if (reportSort === 'OLDEST') {
+                return (
+                  new Date(a.createdAt).getTime() -
+                  new Date(b.createdAt).getTime()
+                );
+              }
+              return (
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime()
+              );
+            });
+
+            const counts = {
+              all: rawReports.length,
+              open: rawReports.filter((r) => r.status === 'OPEN').length,
+              investigating: rawReports.filter(
+                (r) => r.status === 'INVESTIGATING',
+              ).length,
+              resolved: rawReports.filter((r) => r.status === 'RESOLVED').length,
+              rejected: rawReports.filter((r) => r.status === 'REJECTED').length,
+            };
+
+            const selectedReportsList = sortedReports.filter((r) =>
+              selectedReportIds.includes(r.id),
+            );
+            const isAllSelected =
+              sortedReports.length > 0 &&
+              sortedReports.every((r) => selectedReportIds.includes(r.id));
+
+            return (
+              <div className="space-y-6">
+                {/* 1. Header & Live Stats */}
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-400 border border-violet-500/30">
+                        <Bug className="h-5 w-5" />
+                      </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-violet-300">
-                            {report.id}
+                        <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                          Consumer Reports
+                          <span className="rounded-full bg-violet-500/20 px-2.5 py-0.5 text-xs font-bold text-violet-300 border border-violet-500/30">
+                            {counts.all} ta
                           </span>
-                          <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-bold text-slate-300">
-                            {report.status}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-100">
-                          {report.description || 'Izoh kiritilmagan'}
-                        </p>
-                        <p className="mt-2 text-[11px] text-slate-500">
-                          {report.user?.name ||
-                            report.user?.email ||
-                            'Noma’lum foydalanuvchi'}{' '}
-                          · {new Date(report.createdAt).toLocaleString()}
+                        </h2>
+                        <p className="text-xs text-slate-400">
+                          Foydalanuvchi muammolari, to‘liq chat tarixi, screenshotlar va qurilma diagnostikasi
                         </p>
                       </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => downloadReport(report, 'md')} className="rounded-lg border border-slate-700 px-2.5 py-2 text-xs text-slate-300 hover:bg-slate-800">Markdown</button>
-                      <button onClick={() => downloadReport(report, 'json')} className="rounded-lg border border-slate-700 px-2.5 py-2 text-xs text-slate-300 hover:bg-slate-800">JSON</button>
-                      <select
-                        value={report.status}
-                        onChange={(event) =>
-                          updateReportMutation.mutate({
-                            id: report.id,
-                            status: event.target.value,
-                          })
-                        }
-                        className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs"
-                      >
-                        <option value="OPEN">Open</option>
-                        <option value="INVESTIGATING">Investigating</option>
-                        <option value="RESOLVED">Resolved</option>
-                      </select>
                     </div>
-                    </div>
-                    <div className="grid gap-5 p-5 lg:grid-cols-[280px_1fr]">
-                      <div className="space-y-3">
-                        {report.screenshotDataUrl ? (
-                          <img
-                            src={report.screenshotDataUrl}
-                            alt="Consumer report screenshot"
-                            className="max-h-[520px] w-full rounded-xl border border-slate-700 object-contain bg-black"
-                          />
-                        ) : (
-                          <div className="rounded-xl border border-dashed border-slate-700 p-8 text-center text-xs text-slate-500">
-                            Screenshot yo‘q
-                          </div>
-                        )}
-                        <pre className="overflow-x-auto rounded-xl bg-slate-950 p-3 text-[10px] leading-5 text-slate-400">
-                          {JSON.stringify(report.metadata || {}, null, 2)}
-                        </pre>
-                      </div>
-                      <pre className="max-h-[620px] overflow-auto whitespace-pre-wrap rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs leading-6 text-slate-300">
-                        {report.transcriptMarkdown}
-                      </pre>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-800 py-16 text-center text-sm text-slate-500">
-                  Hozircha report yo‘q.
+                  </div>
+
+                  {/* Status Pills */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setReportStatus('ALL')}
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition border ${
+                        reportStatus === 'ALL'
+                          ? 'bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-900/30'
+                          : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <span>Barchasi</span>
+                      <span className="rounded-full bg-slate-950/60 px-1.5 py-0.2 text-[10px] font-mono">
+                        {counts.all}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setReportStatus('OPEN')}
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition border ${
+                        reportStatus === 'OPEN'
+                          ? 'bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-900/30'
+                          : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-rose-400 hover:border-rose-900/50'
+                      }`}
+                    >
+                      <span className="h-2 w-2 rounded-full bg-rose-500" />
+                      <span>Ochiq</span>
+                      <span className="rounded-full bg-slate-950/60 px-1.5 py-0.2 text-[10px] font-mono">
+                        {counts.open}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setReportStatus('INVESTIGATING')}
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition border ${
+                        reportStatus === 'INVESTIGATING'
+                          ? 'bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-900/30'
+                          : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-amber-400 hover:border-amber-900/50'
+                      }`}
+                    >
+                      <span className="h-2 w-2 rounded-full bg-amber-500" />
+                      <span>Tekshirilmoqda</span>
+                      <span className="rounded-full bg-slate-950/60 px-1.5 py-0.2 text-[10px] font-mono">
+                        {counts.investigating}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setReportStatus('RESOLVED')}
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition border ${
+                        reportStatus === 'RESOLVED'
+                          ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-900/30'
+                          : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-emerald-400 hover:border-emerald-900/50'
+                      }`}
+                    >
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      <span>Hal qilingan</span>
+                      <span className="rounded-full bg-slate-950/60 px-1.5 py-0.2 text-[10px] font-mono">
+                        {counts.resolved}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setReportStatus('REJECTED')}
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition border ${
+                        reportStatus === 'REJECTED'
+                          ? 'bg-slate-700 text-white border-slate-600 shadow-md'
+                          : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-300 hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="h-2 w-2 rounded-full bg-slate-500" />
+                      <span>Bekor qilingan</span>
+                      <span className="rounded-full bg-slate-950/60 px-1.5 py-0.2 text-[10px] font-mono">
+                        {counts.rejected}
+                      </span>
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+
+                {/* 2. Search & Filters Bar */}
+                <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-xl lg:grid-cols-12 items-center">
+                  <div className="relative lg:col-span-5">
+                    <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      value={reportSearch}
+                      onChange={(e) => setReportSearch(e.target.value)}
+                      placeholder="Foydalanuvchi, izoh, xabar matni yoki ID bo‘yicha qidirish..."
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-10 pr-9 text-xs text-slate-200 placeholder-slate-500 focus:border-violet-500 focus:outline-none"
+                    />
+                    {reportSearch && (
+                      <button
+                        onClick={() => setReportSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 lg:col-span-3">
+                    <Calendar className="h-4 w-4 text-slate-500 shrink-0" />
+                    <select
+                      value={reportDateRange}
+                      onChange={(e) => setReportDateRange(e.target.value as any)}
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
+                    >
+                      <option value="ALL">Barcha vaqt</option>
+                      <option value="TODAY">Bugun (Oxirgi 24 soat)</option>
+                      <option value="7DAYS">Oxirgi 7 kun</option>
+                      <option value="30DAYS">Oxirgi 30 kun</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 lg:col-span-3">
+                    <Filter className="h-4 w-4 text-slate-500 shrink-0" />
+                    <select
+                      value={reportSort}
+                      onChange={(e) => setReportSort(e.target.value as any)}
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
+                    >
+                      <option value="NEWEST">Eng yangilari oldinda</option>
+                      <option value="OLDEST">Eng eskilari oldinda</option>
+                    </select>
+                  </div>
+
+                  <div className="flex justify-end lg:col-span-1">
+                    <button
+                      onClick={() => refetchReports()}
+                      title="Qayta yuklash"
+                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700 hover:text-white transition"
+                    >
+                      <RefreshCw
+                        className={`h-4 w-4 ${
+                          reportsLoading ? 'animate-spin text-violet-400' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Selection & Batch Operations Bar */}
+                <div className="rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900/90 via-slate-900 to-slate-950 p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => toggleSelectAll(sortedReports)}
+                      className="flex items-center gap-2 rounded-lg bg-slate-800/80 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
+                    >
+                      {isAllSelected ? (
+                        <CheckSquare className="h-4 w-4 text-violet-400" />
+                      ) : (
+                        <Square className="h-4 w-4 text-slate-500" />
+                      )}
+                      <span>
+                        {isAllSelected ? 'Tanlovni bekor qilish' : 'Hamsini tanlash'} (
+                        {sortedReports.length})
+                      </span>
+                    </button>
+
+                    {selectedReportIds.length > 0 && (
+                      <span className="flex items-center gap-1.5 rounded-lg bg-violet-500/20 px-3 py-1.5 text-xs font-bold text-violet-300 border border-violet-500/40">
+                        ✨ {selectedReportIds.length} ta report tanlandi
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions depending on selection */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedReportIds.length > 0 ? (
+                      <>
+                        {/* Download Selected as Markdown */}
+                        <button
+                          onClick={() =>
+                            exportReports(
+                              selectedReportsList,
+                              'md',
+                              `Tanlangan ${selectedReportsList.length} ta report to‘plami`,
+                            )
+                          }
+                          className="flex items-center gap-1.5 rounded-xl border border-violet-500/60 bg-violet-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-violet-900/30 hover:bg-violet-500 transition"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          <span>
+                            Tanlangan {selectedReportsList.length} tasini bitta
+                            Markdown (.md)
+                          </span>
+                        </button>
+
+                        {/* Download Selected as JSON */}
+                        <button
+                          onClick={() =>
+                            exportReports(
+                              selectedReportsList,
+                              'json',
+                              `Tanlangan ${selectedReportsList.length} ta report to‘plami`,
+                            )
+                          }
+                          className="flex items-center gap-1.5 rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/20 transition"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          <span>JSON ({selectedReportsList.length})</span>
+                        </button>
+
+                        {/* Batch status change */}
+                        <div className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-2 py-1">
+                          <select
+                            value={batchStatusTarget}
+                            onChange={(e) => setBatchStatusTarget(e.target.value)}
+                            className="bg-transparent text-xs font-semibold text-slate-300 focus:outline-none pr-1"
+                          >
+                            <option value="OPEN">Open</option>
+                            <option value="INVESTIGATING">Investigating</option>
+                            <option value="RESOLVED">Resolved</option>
+                            <option value="REJECTED">Rejected</option>
+                          </select>
+                          <button
+                            onClick={() =>
+                              batchUpdateStatusMutation.mutate({
+                                ids: selectedReportIds,
+                                status: batchStatusTarget,
+                              })
+                            }
+                            className="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-bold text-slate-200 hover:bg-slate-700 transition"
+                          >
+                            O‘zgartirish
+                          </button>
+                        </div>
+
+                        {/* Batch Delete Selected */}
+                        <button
+                          onClick={() =>
+                            setReportConfirmModal({
+                              title: `Tanlangan ${selectedReportIds.length} ta reportni o‘chirish`,
+                              message: `Haqiqatan ham tanlangan ${selectedReportIds.length} ta reportni o‘chirib yubormoqchimisiz? Bu amalni ortga qaytarib bo‘lmaydi.`,
+                              isDanger: true,
+                              buttonText: "O'chirish",
+                              action: () =>
+                                batchDeleteReportsMutation.mutate(
+                                  selectedReportIds,
+                                ),
+                            })
+                          }
+                          className="flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Tanlanganlarni o‘chirish</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {/* Export all filtered as Markdown */}
+                        {sortedReports.length > 0 && (
+                          <>
+                            <button
+                              onClick={() =>
+                                exportReports(
+                                  sortedReports,
+                                  'md',
+                                  `Filterlangan ${sortedReports.length} ta report to‘plami`,
+                                )
+                              }
+                              className="flex items-center gap-1.5 rounded-xl border border-violet-500/40 bg-violet-500/10 px-3.5 py-2 text-xs font-bold text-violet-200 hover:bg-violet-500/20 transition"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              <span>
+                                Filterlangan barcha {sortedReports.length} tasini bitta
+                                Markdown
+                              </span>
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                exportReports(
+                                  sortedReports,
+                                  'json',
+                                  `Filterlangan ${sortedReports.length} ta report to‘plami`,
+                                )
+                              }
+                              className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              <span>JSON ({sortedReports.length})</span>
+                            </button>
+
+                            <button
+                              onClick={() =>
+                                setReportConfirmModal({
+                                  title: `Filterlangan ${sortedReports.length} ta reportni o‘chirish`,
+                                  message: `Hozirgi filtr bo‘yicha ko‘rinib turgan barcha ${sortedReports.length} ta reportni butunlay o‘chirib yubormoqchimisiz?`,
+                                  isDanger: true,
+                                  buttonText: "Barchasini o'chirish",
+                                  action: () =>
+                                    batchDeleteReportsMutation.mutate(
+                                      sortedReports.map((r) => r.id),
+                                    ),
+                                })
+                              }
+                              className="flex items-center gap-1.5 rounded-xl border border-rose-900/50 bg-rose-950/30 px-3 py-2 text-xs font-bold text-rose-400 hover:bg-rose-900/40 transition"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span>Filterlanganlarni o‘chirish</span>
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. Reports List */}
+                {reportsLoading ? (
+                  <div className="py-20 text-center">
+                    <RefreshCw className="mx-auto h-8 w-8 animate-spin text-violet-500 mb-3" />
+                    <p className="text-sm font-semibold text-slate-400">
+                      Reportlar yuklanmoqda…
+                    </p>
+                  </div>
+                ) : sortedReports.length === 0 ? (
+                  <div className="rounded-3xl border border-dashed border-slate-800 bg-slate-900/40 py-20 text-center">
+                    <Bug className="mx-auto h-12 w-12 text-slate-700 mb-3" />
+                    <h3 className="text-base font-bold text-slate-300">
+                      Hech qanday report topilmadi
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
+                      Qidiruv so‘rovi yoki status filtrini o‘zgartirib ko‘ring.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {sortedReports.map((report: any, idx: number) => {
+                      const isSelected = selectedReportIds.includes(report.id);
+                      const isExpanded = !!expandedTranscripts[report.id];
+                      const isCopied = copiedReportId === report.id;
+
+                      const statusColors: Record<string, string> = {
+                        OPEN: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+                        INVESTIGATING:
+                          'bg-amber-500/10 text-amber-400 border-amber-500/30',
+                        RESOLVED:
+                          'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+                        REJECTED:
+                          'bg-slate-700/20 text-slate-400 border-slate-700',
+                      };
+
+                      return (
+                        <article
+                          key={report.id}
+                          className={`overflow-hidden rounded-2xl border transition-all duration-200 ${
+                            isSelected
+                              ? 'border-violet-500/80 bg-slate-900 shadow-xl shadow-violet-950/20 ring-1 ring-violet-500/50'
+                              : 'border-slate-800 bg-slate-900/80 hover:border-slate-700'
+                          }`}
+                        >
+                          {/* Card Header */}
+                          <div className="flex flex-col gap-3 border-b border-slate-800 p-5 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex items-start gap-3">
+                              {/* Selection Checkbox */}
+                              <button
+                                type="button"
+                                onClick={() => toggleSelectReport(report.id)}
+                                className="mt-1 rounded-lg text-slate-400 hover:text-violet-400 transition"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="h-5 w-5 text-violet-400" />
+                                ) : (
+                                  <Square className="h-5 w-5 text-slate-600" />
+                                )}
+                              </button>
+
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-mono text-xs font-bold text-violet-300">
+                                    #{idx + 1} · {report.id}
+                                  </span>
+                                  <span
+                                    className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                                      statusColors[report.status] ||
+                                      'bg-slate-800 text-slate-400 border-slate-700'
+                                    }`}
+                                  >
+                                    {report.status}
+                                  </span>
+                                  <span className="rounded-md bg-slate-800 px-2 py-0.5 text-[10px] font-mono text-slate-400">
+                                    {report.category || 'TECHNICAL'}
+                                  </span>
+                                </div>
+
+                                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                                  <span className="font-semibold text-slate-200">
+                                    👤{' '}
+                                    {report.user?.name ||
+                                      report.user?.email ||
+                                      'Noma’lum foydalanuvchi'}
+                                  </span>
+                                  {report.user?.email && (
+                                    <span className="text-slate-500">
+                                      ({report.user.email})
+                                    </span>
+                                  )}
+                                  <span className="text-slate-600">·</span>
+                                  <span className="text-slate-400">
+                                    🕒 {new Date(report.createdAt).toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Card Header Action Buttons */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* 1-Click Copy Markdown Button */}
+                              <button
+                                onClick={() => copyReportMarkdown(report)}
+                                className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
+                                  isCopied
+                                    ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
+                                    : 'border-slate-700 bg-slate-800/80 text-slate-300 hover:border-slate-600 hover:text-white'
+                                }`}
+                                title="AI ga tashlash uchun Markdown formatda nusxalash"
+                              >
+                                {isCopied ? (
+                                  <>
+                                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                                    <span>Nusxalandi!</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="h-3.5 w-3.5" />
+                                    <span>Nusxa olish</span>
+                                  </>
+                                )}
+                              </button>
+
+                              {/* Single Export Markdown */}
+                              <button
+                                onClick={() => exportReports([report], 'md')}
+                                className="rounded-xl border border-slate-700 bg-slate-800/80 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
+                                title="Faqat shu reportni Markdown qilib yuklash"
+                              >
+                                MD
+                              </button>
+
+                              {/* Single Export JSON */}
+                              <button
+                                onClick={() => exportReports([report], 'json')}
+                                className="rounded-xl border border-slate-700 bg-slate-800/80 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 transition"
+                                title="Faqat shu reportni JSON qilib yuklash"
+                              >
+                                JSON
+                              </button>
+
+                              {/* Status Select */}
+                              <select
+                                value={report.status}
+                                onChange={(event) =>
+                                  updateReportMutation.mutate({
+                                    id: report.id,
+                                    status: event.target.value,
+                                  })
+                                }
+                                className="rounded-xl border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-slate-200 focus:border-violet-500 focus:outline-none"
+                              >
+                                <option value="OPEN">Open</option>
+                                <option value="INVESTIGATING">Investigating</option>
+                                <option value="RESOLVED">Resolved</option>
+                                <option value="REJECTED">Rejected</option>
+                              </select>
+
+                              {/* Delete Report Button */}
+                              <button
+                                onClick={() =>
+                                  setReportConfirmModal({
+                                    title: 'Reportni o‘chirish',
+                                    message: `Ushbu reportni (#${report.id.slice(0, 8)}) o‘chirmoqchimisiz?`,
+                                    isDanger: true,
+                                    buttonText: "O'chirish",
+                                    action: () =>
+                                      deleteReportMutation.mutate(report.id),
+                                  })
+                                }
+                                title="Reportni o‘chirish"
+                                className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 text-slate-500 hover:border-rose-900 hover:bg-rose-950/40 hover:text-rose-400 transition"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* User Note Banner */}
+                          <div className="border-b border-slate-800/60 bg-slate-950/40 px-5 py-3">
+                            <div className="flex items-start gap-2">
+                              <span className="text-xs font-bold text-violet-400 shrink-0">
+                                💬 Izoh / Muammo:
+                              </span>
+                              <p className="text-xs leading-relaxed text-slate-200 font-medium">
+                                {report.description || 'Foydalanuvchi izoh qoldirmagan.'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Card Content Grid */}
+                          <div className="grid gap-5 p-5 lg:grid-cols-[300px_1fr]">
+                            {/* Left: Screenshot & Metadata */}
+                            <div className="space-y-4">
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                    📸 Screenshot
+                                  </span>
+                                  {report.screenshotDataUrl && (
+                                    <button
+                                      onClick={() =>
+                                        setZoomedImage({
+                                          url: report.screenshotDataUrl,
+                                          title: `Screenshot — Report ${report.id.slice(0, 8)}`,
+                                        })
+                                      }
+                                      className="flex items-center gap-1 text-[11px] text-violet-400 hover:text-violet-300 font-semibold"
+                                    >
+                                      <ZoomIn className="h-3 w-3" />
+                                      <span>Kattalashtirish</span>
+                                    </button>
+                                  )}
+                                </div>
+
+                                {report.screenshotDataUrl ? (
+                                  <div
+                                    onClick={() =>
+                                      setZoomedImage({
+                                        url: report.screenshotDataUrl,
+                                        title: `Screenshot — Report ${report.id.slice(0, 8)}`,
+                                      })
+                                    }
+                                    className="group relative cursor-pointer overflow-hidden rounded-xl border border-slate-700 bg-black"
+                                  >
+                                    <img
+                                      src={report.screenshotDataUrl}
+                                      alt="Consumer report screenshot"
+                                      className="max-h-[380px] w-full object-contain transition group-hover:scale-105"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                      <div className="flex items-center gap-1.5 rounded-lg bg-slate-900/90 px-3 py-1.5 text-xs font-bold text-white border border-slate-700">
+                                        <ZoomIn className="h-4 w-4 text-violet-400" />
+                                        <span>Ko‘rish</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="rounded-xl border border-dashed border-slate-800 bg-slate-950/40 p-8 text-center text-xs text-slate-500">
+                                    Screenshot biriktirilmagan
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Metadata */}
+                              <div>
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                                  📱 Qurilma konteksti (Metadata)
+                                </span>
+                                <pre className="max-h-48 overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-3 text-[10px] leading-5 text-slate-400 font-mono">
+                                  {JSON.stringify(report.metadata || {}, null, 2)}
+                                </pre>
+                              </div>
+                            </div>
+
+                            {/* Right: Chat Transcript */}
+                            <div className="flex flex-col">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                  <FileText className="h-3.5 w-3.5 text-violet-400" />
+                                  Chat Tarixi & AI Jarayoni (Transcript)
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    toggleExpandTranscript(report.id)
+                                  }
+                                  className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white font-semibold"
+                                >
+                                  {isExpanded ? (
+                                    <>
+                                      <ChevronUp className="h-3.5 w-3.5" />
+                                      <span>Ixchamlashtirish</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ChevronDown className="h-3.5 w-3.5" />
+                                      <span>To‘liq ko‘rish</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+
+                              <pre
+                                className={`overflow-auto whitespace-pre-wrap rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs leading-6 text-slate-300 font-mono transition-all duration-300 ${
+                                  isExpanded ? 'max-h-[850px]' : 'max-h-[420px]'
+                                }`}
+                              >
+                                {report.transcriptMarkdown ||
+                                  'Chat tarixi mavjud emas.'}
+                              </pre>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {activeTab === 'logs' && (
             <div className="space-y-4">
@@ -2659,6 +3370,105 @@ export default function App() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Screenshot Zoom Modal */}
+      {zoomedImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
+          onClick={() => setZoomedImage(null)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-2xl max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+              <span className="font-semibold text-sm text-slate-200 truncate max-w-lg">
+                {zoomedImage.title || 'Report Screenshot'}
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={zoomedImage.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition"
+                >
+                  <Download className="w-3.5 h-3.5" /> Full Size
+                </a>
+                <button
+                  onClick={() => setZoomedImage(null)}
+                  className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-2 overflow-auto flex items-center justify-center bg-black/40">
+              <img
+                src={zoomedImage.url}
+                alt={zoomedImage.title}
+                className="max-h-[75vh] w-auto object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Confirmation Modal (Delete / Batch Delete / Batch Status) */}
+      {reportConfirmModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setReportConfirmModal(null)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`p-3 rounded-xl flex-shrink-0 ${
+                  reportConfirmModal.isDanger
+                    ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                }`}
+              >
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-base text-white">
+                  {reportConfirmModal.title}
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {reportConfirmModal.message}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setReportConfirmModal(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  reportConfirmModal.action();
+                  setReportConfirmModal(null);
+                }}
+                className={`px-4 py-2 font-bold text-xs rounded-xl shadow-lg transition flex items-center gap-2 ${
+                  reportConfirmModal.isDanger
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/30'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30'
+                }`}
+              >
+                {reportConfirmModal.buttonText || 'Confirm'}
+              </button>
             </div>
           </div>
         </div>

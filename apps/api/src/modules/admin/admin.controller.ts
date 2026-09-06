@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Param,
   Query,
   Body,
@@ -44,16 +45,22 @@ export class AdminController {
 
   @Get('reports')
   @ApiOperation({
-    summary: 'List consumer reports with screenshots and chat context',
+    summary: 'List consumer reports with screenshots, filtering and chat context',
   })
   async getReports(
     @Query('limit') limit?: string,
     @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.adminService.getReports(
-      limit ? parseInt(limit, 10) : 50,
+    return this.adminService.getReports({
+      limit: limit ? parseInt(limit, 10) : 100,
       status,
-    );
+      search,
+      from,
+      to,
+    });
   }
 
   @Put('reports/:id/status')
@@ -63,6 +70,26 @@ export class AdminController {
     @Body() body: { status?: string },
   ) {
     return this.adminService.updateReportStatus(id, body?.status);
+  }
+
+  @Delete('reports/:id')
+  @ApiOperation({ summary: 'Delete consumer report' })
+  async deleteReport(@Param('id') id: string) {
+    return this.adminService.deleteReport(id);
+  }
+
+  @Post('reports/batch-delete')
+  @ApiOperation({ summary: 'Batch delete consumer reports by IDs' })
+  async batchDeleteReports(@Body() body: { ids: string[] }) {
+    return this.adminService.batchDeleteReports(body?.ids || []);
+  }
+
+  @Post('reports/batch-status')
+  @ApiOperation({ summary: 'Batch update status of consumer reports' })
+  async batchUpdateReportStatus(
+    @Body() body: { ids: string[]; status: string },
+  ) {
+    return this.adminService.batchUpdateReportStatus(body?.ids || [], body?.status);
   }
 
   @Get('providers')
