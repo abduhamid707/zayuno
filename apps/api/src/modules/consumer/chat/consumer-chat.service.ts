@@ -564,23 +564,29 @@ Sizga qaysi soha bo‘yicha yordam kerak?`;
     };
   }
 
-  private conversationScope(conversationId?: string): string {
+  private conversationScope(conversationId?: string): string | undefined {
     const normalized = String(conversationId || "")
       .trim()
       .replace(/[^a-zA-Z0-9_-]/g, "")
       .slice(0, 100);
-    return normalized || "legacy";
+    return normalized || undefined;
   }
 
   private orderStateKey(userId: string, conversationId?: string): string {
-    return `consumer:chat:pending-order:${userId}:${this.conversationScope(conversationId)}`;
+    const scope = this.conversationScope(conversationId);
+    return scope
+      ? `consumer:chat:pending-order:${userId}:${scope}`
+      : `consumer:chat:pending-order:${userId}`;
   }
 
   private activeActionStateKey(
     userId: string,
     conversationId?: string,
   ): string {
-    return `consumer:chat:active-action:${userId}:${this.conversationScope(conversationId)}`;
+    const scope = this.conversationScope(conversationId);
+    return scope
+      ? `consumer:chat:active-action:${userId}:${scope}`
+      : `consumer:chat:active-action:${userId}`;
   }
 
   private async readPendingOrder(
@@ -899,7 +905,7 @@ Sizga qaysi soha bo‘yicha yordam kerak?`;
     }
 
     if (paymentUrl) {
-      return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga yuborildi. Raqam: **${reference}**\n\n[To‘lovni davom ettirish](${paymentUrl})`;
+      return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga yuborildi. Raqam: **${reference}**\n\n[To‘lov qilish](${paymentUrl})`;
     }
     return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga yuborildi. Raqam: **${reference}**.`;
   }
@@ -999,6 +1005,18 @@ USER=${JSON.stringify(prompt)}`;
     if (requirement.kind === "fulfillment") {
       return Boolean(state.fulfillmentType);
     }
+    if (requirement.kind === "parameter") {
+      let value: any = turn.choice;
+      if ((value === undefined || value === "") && prompt) {
+        const trimmed = prompt.trim();
+        if (trimmed && !["ha", "yo'q", "tasdiqlayman"].includes(trimmed.toLowerCase())) {
+          value = trimmed;
+        }
+      }
+      if (value === undefined || value === null || value === "") return false;
+      state.parameters[requirement.key] = value;
+      return true;
+    }
     const item = state.items[requirement.itemIndex];
     if (!item) return false;
     if (requirement.kind === "variant") {
@@ -1027,18 +1045,6 @@ USER=${JSON.stringify(prompt)}`;
         });
       }
       item.resolvedOptionGroupIds.push(requirement.key);
-      return true;
-    }
-    if (requirement.kind === "parameter") {
-      let value: any = turn.choice;
-      if ((value === undefined || value === "") && prompt) {
-        const trimmed = prompt.trim();
-        if (trimmed && !["ha", "yo'q", "tasdiqlayman"].includes(trimmed.toLowerCase())) {
-          value = trimmed;
-        }
-      }
-      if (value === undefined || value === null || value === "") return false;
-      state.parameters[requirement.key] = value;
       return true;
     }
     return false;
@@ -1411,6 +1417,13 @@ USER=${JSON.stringify(prompt)}`;
   private async interpretActiveActionTurn(
     prompt: string,
   ): Promise<"status" | "support" | "other"> {
+    const normalized = prompt.toLowerCase().trim();
+    if (/to[‘'`]?ladi|to[‘'`]?lov|holat|status|yetib|kelyapti|qayerda|buyurtma.*nima/i.test(normalized)) {
+      return "status";
+    }
+    if (/support|yordam|telefon|aloqa|bog[‘'`]?lanish/i.test(normalized)) {
+      return "support";
+    }
     if (!this.model) return "other";
     const instruction = `Classify the user's latest message about a recent Zayuno order. Understand Uzbek, Russian, English, slang, synonyms and spelling mistakes. Return JSON only: {"intent":"status|support|other"}. "status" includes payment completed/checked, arrival time, delivery progress and order state. "support" includes requests for official contact details or help from the provider. USER=${JSON.stringify(prompt)}`;
     try {
@@ -1493,7 +1506,7 @@ USER=${JSON.stringify(prompt)}`;
         `- Chegirma: **−${quote.totalDiscount.toLocaleString("en-US")} ${currency}**`,
       );
     }
-    return `**${this.cleanMarkdownText(state.providerName)} — buyurtma tafsilotlari**\n\n${rows.join("\n")}\n\nMahsulotlar: **${quote.subtotal.toLocaleString("en-US")} ${currency}**\nJami: **${quote.total.toLocaleString("en-US")} ${currency}**\n\nHammasi to‘g‘ri bo‘lsa, tabiiy yozishingiz mumkin: masalan, “ha, yuboring”.`;
+    return `**${this.cleanMarkdownText(state.providerName)} — buyurtma tafsilotlari**\n\n${rows.join("\n")}\n\nMahsulotlar: **${quote.subtotal.toLocaleString("en-US")} ${currency}**\nJami: **${quote.total.toLocaleString("en-US")} ${currency}**\n\nHammasi to‘g‘ri bo‘lsa, “tasdiqlayman” yoki tabiiy yozishingiz mumkin: masalan, “ha, yuboring”.`;
   }
 
   private async planWithAi(
