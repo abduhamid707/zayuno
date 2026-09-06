@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { prisma, UserRole } from '@zayuno/database';
 import { generateApiKey, hashApiKey } from '@zayuno/shared';
 import { EmailVerificationService } from './email-verification.service';

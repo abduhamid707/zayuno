@@ -19,11 +19,10 @@
     "@prisma/client": "^6.1.0",
     "@zayuno/contracts": "workspace:*",
     "@zayuno/shared": "workspace:*",
-    "bcrypt": "^5.1.1",
     "dotenv": "^16.4.7"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.10.2",
     "prisma": "^6.1.0",
     "rimraf": "^6.0.1",

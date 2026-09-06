@@ -52,7 +52,7 @@ import {
   WelcomeInfo
 } from '@zayuno/contracts';
 import { ProviderCertificationRunner, CertificationReport } from '@zayuno/provider-sdk';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { randomUUID, randomBytes } from 'crypto';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
