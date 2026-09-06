@@ -53,7 +53,7 @@ services:
     container_name: zayuno-mock-evos
     restart: always
     ports:
-      - "127.0.0.1:4101:4001"
+      - "127.0.0.1:4119:4001"
     environment:
       - NODE_ENV=production
       - PORT=4001

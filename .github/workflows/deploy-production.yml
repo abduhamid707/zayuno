@@ -157,7 +157,7 @@ jobs:
           $SSH_CMD "docker image prune -f >/dev/null 2>&1 || true; journalctl --vacuum-size=100M >/dev/null 2>&1 || true"
 
           echo "Ensuring deploy directories on server..."
-          $SSH_CMD "mkdir -p /root/zayuno/deploy"
+          $SSH_CMD "mkdir -p /root/zayuno/deploy /root/zayuno/scripts"
 
           echo "Copying docker-compose.prod.yml..."
           $SCP_CMD docker-compose.prod.yml "${PROD_USER}@${PROD_HOST}:/root/zayuno/docker-compose.prod.yml"
@@ -166,6 +166,7 @@ jobs:
           $SCP_CMD deploy/health-check.sh "${PROD_USER}@${PROD_HOST}:/root/zayuno/deploy/health-check.sh"
           $SCP_CMD deploy/deploy-server.sh "${PROD_USER}@${PROD_HOST}:/root/zayuno/deploy/deploy-server.sh"
           $SCP_CMD deploy/nginx-zayuno.conf "${PROD_USER}@${PROD_HOST}:/root/zayuno/deploy/nginx-zayuno.conf"
+          $SCP_CMD scripts/ecosystem-server.js "${PROD_USER}@${PROD_HOST}:/root/zayuno/scripts/ecosystem-server.js"
 
           $SSH_CMD "chmod +x /root/zayuno/deploy/*.sh"
 

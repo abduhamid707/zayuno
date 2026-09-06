@@ -203,6 +203,12 @@ if [ -n "$SERVICES" ]; then
   if [[ " $SERVICES " =~ " hh-recruitment " ]]; then
     docker network connect --alias hh-recruitment zayuno_zayuno_net zayuno-hh-recruitment 2>/dev/null || true
   fi
+
+  # Reload PM2 ecosystem provider server
+  if command -v pm2 >/dev/null 2>&1; then
+    log_info "Reloading Zayuno 25-provider ecosystem server in PM2..."
+    pm2 reload zayuno-ecosystem 2>/dev/null || pm2 restart zayuno-ecosystem 2>/dev/null || true
+  fi
 else
   log_info "No runtime service changed; skipping container recreation."
 fi
