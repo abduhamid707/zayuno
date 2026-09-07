@@ -1081,7 +1081,7 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
           const result = stripSensitiveSecrets(rawResult);
           const customerText = typeof result === 'string'
             ? result
-            : result?.customerMessage || JSON.stringify(result, null, 2);
+            : JSON.stringify(result, null, 2);
           return {
             structuredContent: typeof result === 'string' ? { customerMessage: result } : result,
             content: [

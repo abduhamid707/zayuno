@@ -464,6 +464,8 @@ async function main() {
       assert.ok(httpBody.result?.content?.[0]?.text, `Tool ${tool.name} missing content text in JSON-RPC result`);
 
       const parsedPayload = JSON.parse(httpBody.result.content[0].text);
+      assert.deepEqual(httpBody.result.structuredContent, parsedPayload,
+        `Tool ${tool.name}: widget data must match the backward-compatible JSON text payload`);
       assert.equal(typeof parsedPayload.customerMessage, 'string', `Tool ${tool.name} missing customerMessage in HTTP payload`);
       assert.ok(parsedPayload.customerMessage.length > 0);
 
@@ -496,6 +498,7 @@ async function main() {
       if (tool.name === 'get_welcome_message') {
         // get_welcome_message intentionally features graceful fallback to always welcome customer
         const welcomeContent = JSON.parse(httpErrBody.result.content[0].text);
+        assert.deepEqual(httpErrBody.result.structuredContent, welcomeContent);
         assert.equal(typeof welcomeContent.customerMessage, 'string');
         assert.ok(welcomeContent.customerMessage.length > 0);
         assertNoSecretLeakage(welcomeContent, tool.name);

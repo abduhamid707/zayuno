@@ -335,7 +335,7 @@ export function runHttpSseServer(port = 4002): Express {
         const result = stripSensitiveSecrets(rawResult);
         const customerText = typeof result === 'string'
           ? result
-          : result?.customerMessage || JSON.stringify(result, null, 2);
+          : JSON.stringify(result, null, 2);
 
         return {
           response: {
