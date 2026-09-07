@@ -731,3 +731,85 @@ Hatto Zayuno’ning katta consumer vision’i men uchun shunday:
 Lekin hozir uni **provider networkdan oldin asosiy productga aylantirma**. Mobile app Zayuno’ning networkini ishlatadigan eng yaxshi interface bo‘lsin, networkning o‘rnini bosmasin.
 
 Agar xohlasang, keyingi qadamda men senga **Zayuno Mobile v0 uchun 5–6 screenli juda kuchli UX flow**ni chizib beraman.
+
+---
+
+## Strategik Yondashuv: No-Code & AI Ecosystem (ChatGPT / Claude / Telegram)
+
+**Bu butun platformaning eng asosiy va eng muhim biznes savoli!**
+
+O‘zbekistondagi (va butun dunyodagi) bizneslarning **95% ida dasturchi yo‘q**, ular API, JSON, Webhook yoki server nimaligini umuman bilmaydi va bilishi ham shart emas. Agar biz ularga *"Zayunoga ulanish uchun API yozib kel"* desak, 99% biznes chetga chiqib ketadi.
+
+Uzum Market, Express24, Yandex Eats yoki Booking.com kabi gigantlar qanday qilib oddiy oshxona yoki mehmonxonani o‘ziga ulaydi? Ular biznesga API yozdirmaydi, aksincha, **No-Code (Dasturlashsiz)** tayyor vositalar beradi.
+
+Zayuno bu bizneslar uchun quyidagi **4 ta oson yechim**ni taqdim etadi:
+
+---
+
+### 1. Telegram Business Bot orqali buyurtma qabul qilish (O‘zbekiston uchun №1 yechim)
+
+Biznes egasi (yoki uning ma’muri, kassa xodimi) uchun hech qanday yangi ilova yoki server shart emas. Ular har kuni ishlatadigan **Telegram** kifoya:
+
+1. **AI buyurtma oladi**: ChatGPT, Claude yoki Zayuno chatida mijoz: *"Menga 2 ta somsa va choy kerak"* deb buyurtma beradi.
+2. **Telegramga xabar boradi**: Sompaz yoki restoranning Telegram botiga darhol xabar tushadi:
+   ```text
+   🔔 YANGI BUYURTMA #ZY-4819
+   👤 Mijoz: Abduxamid (+998 99 555 77 44)
+   📍 Manzil: Chilonzor 9-mavze
+   🍽 Buyurtma:
+      • Tandir somsa (go‘shtli) × 2 — 30 000 so‘m
+      • Ko‘k choy (limonli) × 1 — 10 000 so‘m
+   💰 To‘lov: To‘langan (Click / 40 000 so‘m)
+
+   [ ✅ Qabul qilish (15 daqiqada tayyor) ]   [ ❌ Rad etish ]
+   ```
+3. Xodim shunchaki bitta tugmani bosadi: `[ ✅ Qabul qilish ]`.
+4. ChatGPT mijozga: *"Buyurtmangiz oshxona tomonidan qabul qilindi, 15 daqiqada tayyor bo‘ladi!"* deb javob beradi.
+
+**Natija:** Biznes egasi bitta ham kod yozmadi, API nimaligini bilmadi, lekin ChatGPT orqali to‘g‘ridan-to‘g‘ri savdo qildi!
+
+---
+
+### 2. Zayuno No-Code Hamkor Kabineti (`partners.zayuno.uz`)
+
+Xuddi Uzum Market yoki Instagramga rasm joylagandek oddiy veb-kabinet:
+- **Xizmat yoki taom qo‘shish**: Nomi, narxi, rasmi, tavsifi va telefon raqami.
+- Yoki tayyor **Excel (jadval)** faylini yuklash.
+- Zayuno bu ma’lumotlarni o‘zi avtomatik tarzda AI tushunadigan API va Katalog formatiga o‘tkazib, ChatGPT va Claude'ga ulaydi.
+- Biznes server sotib olmaydi — **Zayunoning o‘zi ularning virtual serveri bo‘lib xizmat qiladi**.
+
+---
+
+### 3. Tayyor POS / CRM tizimlariga 1 bosishda ulanish
+
+O‘zbekistondagi ko‘plab kafe va do‘konlar allaqachon tayyor tizimlardan foydalanadi:
+- Restoran va kafelar: **iiko, Jowi, Poster POS, R-Keeper**.
+- Do‘konlar va savdo: **1C:Predpriyatiye, MoySklad**.
+
+Zayunoda ushbu tizimlar uchun **tayyor ulagichlar (integratsiyalar)** bo‘ladi:
+- Biznes egasi shunchaki o‘zining Jowi yoki Poster tizimidagi login/parolini kiritadi.
+- Zayuno ularning menyusi va qoldiqlarini avtomatik tortib oladi.
+- ChatGPT orqali tushgan buyurtma to‘g‘ridan-to‘g‘ri ularning kassa apparatidan (cheki) chiqib keladi!
+
+---
+
+### 4. "AI Onboarding" — Rasm yoki PDF orqali menyu kiritish
+
+Hatto veb-kabinetga kirib matn yozishni istamaydigan yoki erinadigan tadbirkorlar uchun:
+- Biznes egasi o‘zining kafe menyusi, sayohat paketi flayeri yoki xizmatlar narxnomasi rasmini (yoki PDF faylini) Zayunoga yuboradi.
+- Zayunoning ichki sun’iy intellekti (OCR + Vision) rasmdagi barcha taomlar, xizmatlar va narxlarni bir necha soniyada tanib oladi.
+- Biznes egasiga tasdiqlash uchun yuboradi:
+  > *"Sizning menyungizdan 24 ta taom va narxlar tanib olindi. Barchasi to‘g‘rimi?"*  
+  > Tadbirkor: *"Ha, to‘g‘ri"* deydi — tamom, uning biznesi ChatGPT va AI ekotizimiga ulandi!
+
+---
+
+### 💰 Biznesga taklif qilinadigan eng kuchli "Offer" (Taklif)
+
+Biznes egalariga Zayunoni tushuntirish tili juda oddiy:
+> **"Sizdan 1 so‘m ham oylik to‘lov olinmaydi. Dasturchi yollashingiz shart emas. Biz sizga ChatGPT va sun’iy intellekt orqali yangi to‘lovga layoqatli mijozlarni olib kelamiz. Savdo bo‘lgandagina kichik komissiya (masalan, 3-5%) to‘laysiz. Savdo bo‘lmasa — xarajat nol!"**
+
+Bu taklifga har qanday biznes rozi bo‘ladi, chunki ular uchun risk yo‘q, faqat tayyor savdo va yangi mijozlar keladi.
+
+Zayuno aynan mana shunday **oddiy tadbirkor bilan zamonaviy sun’iy intellekt (ChatGPT, Claude, Gemini) o‘rtasidagi ko‘prik** vazifasini bajaradi!
+
