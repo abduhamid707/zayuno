@@ -1,0 +1,191 @@
+{
+  "savedAt": "2026-09-07T14:53:00.000Z",
+  "providerSlug": "maxway",
+  "source": "production-zayuno-postgres",
+  "metadata": {
+    "tier": "STANDARD",
+    "rating": 4.9,
+    "category": "food_dining",
+    "geography": [
+      "UZ",
+      "Tashkent"
+    ],
+    "offerings": [
+      {
+        "id": "mw-01",
+        "price": 34000,
+        "title": "Katta mol go‘shtli lavash (Klassik)",
+        "category": "lavash",
+        "description": "Yupqa xamir, shirali mol go‘shti, barra bodring, pomidor, maxsus sous."
+      },
+      {
+        "id": "mw-02",
+        "price": 38000,
+        "title": "Pishloqli katta lavash (Cheese Lavash)",
+        "category": "lavash",
+        "description": "Eritilgan golland pishlog‘i va shirali mol go‘shti bilan."
+      },
+      {
+        "id": "mw-03",
+        "price": 28000,
+        "title": "Mini lavash mol go‘shtli",
+        "category": "lavash",
+        "description": "Ixcham va to‘yimli o‘lchamdagi lavash."
+      },
+      {
+        "id": "mw-04",
+        "price": 36000,
+        "title": "Achchiq lavash (Spicy Jalapeno Lavash)",
+        "category": "lavash",
+        "description": "Xalapenyo qalampiri va o‘tkir sousli lavash ixlosmandlari uchun."
+      },
+      {
+        "id": "mw-05",
+        "price": 32000,
+        "title": "Tovuqli katta lavash (Chicken Lavash)",
+        "category": "lavash",
+        "description": "Yengil va mazali qovurilgan tovuq go‘shti bilan."
+      },
+      {
+        "id": "mw-06",
+        "price": 26000,
+        "title": "Gamburger mol go‘shtli",
+        "category": "burgers",
+        "description": "Yumshoq bulochka, shirali kotlet, aysberg salati, sous."
+      },
+      {
+        "id": "mw-07",
+        "price": 29000,
+        "title": "Chizburger (Pishloqli burger)",
+        "category": "burgers",
+        "description": "Haqiqiy cheddor pishlog‘i qo‘shilgan mazali burger."
+      },
+      {
+        "id": "mw-08",
+        "price": 38000,
+        "title": "Dablburger (Ikkita go‘shtli kotlet bilan)",
+        "category": "burgers",
+        "description": "Katta ishtaha egalari uchun ikki karra shirali go‘sht."
+      },
+      {
+        "id": "mw-09",
+        "price": 44000,
+        "title": "Big Burger MaxWay Maxsus",
+        "category": "burgers",
+        "description": "Uch qavatli bulochka, maxsus sous, qo‘shaloq go‘sht va pishloq."
+      },
+      {
+        "id": "mw-10",
+        "price": 34000,
+        "title": "Klabb sendvich kuritsa bilan",
+        "category": "sandwiches",
+        "description": "Toster noni, tovuq filesi, tuxum, pishloq, kartoshka fri bilan birga."
+      },
+      {
+        "id": "mw-11",
+        "price": 18000,
+        "title": "Klassik hot-dog",
+        "category": "hotdogs",
+        "description": "Sutli sosiska, qarsildoq piyoz, xantal va ketchub sousi."
+      },
+      {
+        "id": "mw-12",
+        "price": 24000,
+        "title": "Pishloqli qirollik hot-dogi",
+        "category": "hotdogs",
+        "description": "Katta dudlangan sosiska va eritilgan mo‘l pishloq."
+      },
+      {
+        "id": "mw-13",
+        "price": 32000,
+        "title": "Shaurma nonida mol go‘shtli",
+        "category": "shawarma",
+        "description": "Qalinroq pishirilgan xushbo‘y arabcha non ichida go‘sht va sabzavotlar."
+      },
+      {
+        "id": "mw-14",
+        "price": 18000,
+        "title": "Kartoshka fri (Katta porsiya)",
+        "category": "sides",
+        "description": "Qarsildoq tilla rangda qovurilgan kartoshka somonchalari."
+      },
+      {
+        "id": "mw-15",
+        "price": 20000,
+        "title": "Qishloqcha kartoshka (Kartofel po-derevenski)",
+        "category": "sides",
+        "description": "Ziravorlar va sarimsoq bilan qovurilgan yirik bo‘lakli kartoshka."
+      },
+      {
+        "id": "mw-16",
+        "price": 21000,
+        "title": "Tovuqli qarsildoq naggets (6 dona)",
+        "category": "sides",
+        "description": "Oltinrang suxarida qovurilgan nozik tovuq filesi."
+      },
+      {
+        "id": "mw-17",
+        "price": 24000,
+        "title": "Pishloqli tayoqchalar (Mozzarella sticks 4 dona)",
+        "category": "sides",
+        "description": "Cho‘ziluvchan mazali mozarella pishlog‘i."
+      },
+      {
+        "id": "mw-18",
+        "price": 9000,
+        "title": "Coca-Cola 0.5L (Muzdek)",
+        "category": "drinks",
+        "description": "Gazlangan tetiklashtiruvchi klassik ichimlik."
+      },
+      {
+        "id": "mw-19",
+        "price": 16000,
+        "title": "Coca-Cola 1.5L",
+        "category": "drinks",
+        "description": "Katta oila va do‘stlar davrasi uchun."
+      },
+      {
+        "id": "mw-20",
+        "price": 9000,
+        "title": "Fanta 0.5L apelsin ta’mli",
+        "category": "drinks",
+        "description": "Yorqin apelsin ta’miga ega tetiklantiruvchi ichimlik."
+      },
+      {
+        "id": "mw-21",
+        "price": 16000,
+        "title": "Moxito klassik muzli ichimlik 0.4L",
+        "category": "drinks",
+        "description": "Laym, barra yalpiz va muz bo‘laklari bilan tayyorlangan tetiklik."
+      },
+      {
+        "id": "mw-22",
+        "price": 14000,
+        "title": "Shokoladli donat (Poncik)",
+        "category": "desserts",
+        "description": "Ustiga shokolad va rangli sepma sepilgan nozik shirinlik."
+      }
+    ],
+    "description": "Toshkent bo‘ylab tezkor va mazali fast-food, lavash, burger va ichimliklar yetkazib berish xizmati.",
+    "isCertified": true,
+    "isPublished": true,
+    "healthStatus": "HEALTHY",
+    "reviewStatus": "APPROVED",
+    "catalogSummary": {
+      "totalCount": 22,
+      "availableCount": 22
+    },
+    "supportContact": {
+      "phone": "+998712005555",
+      "workingHours": "09:00 - 03:00"
+    },
+    "fulfillmentMode": "DELIVERY",
+    "healthMonitoring": {
+      "state": "HEALTHY",
+      "lastLatencyMs": 23,
+      "lastCheckedAt": "2026-09-06T03:50:03.017Z"
+    },
+    "activeLocationsCount": 3,
+    "isTemporarilyUnavailable": false
+  }
+}

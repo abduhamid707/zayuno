@@ -33,6 +33,26 @@ async function bootstrap() {
   if (process.env.NODE_ENV === "production" && configuredOrigins.length === 0) {
     throw new Error("CORS_ORIGINS is required in production.");
   }
+  // Public static asset CORS and preflight bypass
+  app.use((req: any, res: any, next: any) => {
+    if (
+      req.path.startsWith('/assets/') ||
+      req.path === '/favicon.ico' ||
+      req.path === '/site.webmanifest' ||
+      req.path.startsWith('/.well-known/')
+    ) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+      }
+      return next();
+    }
+    next();
+  });
+
   app.use(
     cors({
       origin: (origin, callback) => {
@@ -42,6 +62,9 @@ async function bootstrap() {
           (process.env.NODE_ENV !== "production" &&
             configuredOrigins.length === 0) ||
           configuredOrigins.includes(origin) ||
+          origin.endsWith(".chatgpt.com") ||
+          origin.endsWith(".openai.com") ||
+          origin.endsWith(".oaistatic.com") ||
           origin.endsWith(".exp.direct") ||
           origin.includes("localhost") ||
           origin.includes("127.0.0.1") ||
@@ -51,7 +74,7 @@ async function bootstrap() {
         ) {
           return callback(null, true);
         }
-        return callback(new Error("CORS origin is not allowed."));
+        return callback(null, false);
       },
       credentials: true,
     }),

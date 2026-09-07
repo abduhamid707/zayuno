@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url';
 // The URI is a host cache key. Bump it whenever the bundled UI changes.
 export const ZAYUNO_CATALOG_WIDGET_URI = 'ui://zayuno/catalog-v2.html';
 export const ZAYUNO_CATALOG_WIDGET_MIME = 'text/html;profile=mcp-app';
-export const ZAYUNO_UI_VERSION = '2.0.0';
+export const ZAYUNO_UI_VERSION = '2.0.1';
 
 function imageOrigins(): string[] {
-  return [...new Set(['https://mcp.zayuno.uz', ...(process.env.MCP_WIDGET_IMAGE_ORIGINS || '').split(',')]
+  return [...new Set(['https://mcp.zayuno.uz', 'https://api.zayuno.uz', ...(process.env.MCP_WIDGET_IMAGE_ORIGINS || '').split(',')]
     .map(value => value.trim()).filter(Boolean).map(value => {
       const url = new URL(value);
       if (url.protocol !== 'https:' || url.username || url.password || url.origin !== value) {

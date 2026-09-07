@@ -65,12 +65,17 @@ export class CatalogService {
       if (!adapter.getCatalog) {
         throw new BadRequestException(`Provider "${cleanSlug}" does not implement getCatalog.`);
       }
-      return adapter.getCatalog({
+      const rawCatalog = await adapter.getCatalog({
         providerSlug: cleanSlug,
         locationId,
         categorySlug,
         parameters
       });
+      const metaOfferings = await this.getProviderMetadataOfferings(cleanSlug);
+      return {
+        ...rawCatalog,
+        offerings: this.overlayMediaFromMetadata(rawCatalog.offerings, metaOfferings)
+      };
     });
   }
 
@@ -96,12 +101,15 @@ export class CatalogService {
       if (!adapter.getOffering) {
         throw new BadRequestException(`Provider "${cleanSlug}" does not implement getOffering.`);
       }
-      return adapter.getOffering({
+      const rawOffering = await adapter.getOffering({
         providerSlug: cleanSlug,
         offeringId,
         locationId,
         parameters
       });
+      const metaOfferings = await this.getProviderMetadataOfferings(cleanSlug);
+      const [overlayed] = this.overlayMediaFromMetadata([rawOffering], metaOfferings);
+      return overlayed || rawOffering;
     });
   }
 
@@ -129,7 +137,7 @@ export class CatalogService {
       if (!adapter.searchOfferings) {
         throw new BadRequestException(`Provider "${cleanSlug}" does not implement searchOfferings.`);
       }
-      return adapter.searchOfferings({
+      const rawOfferings = await adapter.searchOfferings({
         providerSlug: cleanSlug,
         query: normalizedQuery,
         categorySlug,
@@ -137,6 +145,66 @@ export class CatalogService {
         limit,
         parameters
       });
+      const metaOfferings = await this.getProviderMetadataOfferings(cleanSlug);
+      return this.overlayMediaFromMetadata(rawOfferings, metaOfferings);
+    });
+  }
+
+  private async getProviderMetadataOfferings(cleanSlug: string): Promise<any[]> {
+    try {
+      const provider = await this.providersService.getProviderBySlug(cleanSlug);
+      return Array.isArray(provider?.metadata?.offerings) ? provider.metadata.offerings : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private overlayMediaFromMetadata(offerings: Offering[], metaOfferings?: any[]): Offering[] {
+    if (!offerings || !Array.isArray(offerings) || offerings.length === 0) {
+      return offerings;
+    }
+    if (!metaOfferings || !Array.isArray(metaOfferings) || metaOfferings.length === 0) {
+      return offerings;
+    }
+
+    const metaMap = new Map<string, { imageUrl?: string | null; media?: any[] | null }>();
+    for (const item of metaOfferings) {
+      if (item && item.id && (item.imageUrl || (Array.isArray(item.media) && item.media.length > 0))) {
+        metaMap.set(String(item.id).trim().toLowerCase(), {
+          imageUrl: item.imageUrl || null,
+          media: Array.isArray(item.media) ? item.media : null
+        });
+      }
+    }
+    if (metaMap.size === 0) return offerings;
+
+    return offerings.map((offering) => {
+      const meta =
+        metaMap.get(String(offering.id).trim().toLowerCase()) ||
+        (offering.offeringCode ? metaMap.get(String(offering.offeringCode).trim().toLowerCase()) : undefined);
+
+      if (!meta) return offering;
+
+      // Overlay ONLY media and imageUrl. Never alter basePrice, title, currency, variants, optionGroups, availability, etc.
+      const hasExistingMedia = Array.isArray(offering.media) && offering.media.length > 0;
+      const updatedMedia = hasExistingMedia
+        ? offering.media
+        : (meta.media && meta.media.length > 0)
+          ? meta.media
+          : meta.imageUrl
+            ? [{ url: meta.imageUrl, altText: offering.title, order: 0 }]
+            : offering.media;
+
+      const updatedImageUrl =
+        offering.imageUrl ||
+        meta.imageUrl ||
+        (Array.isArray(updatedMedia) && updatedMedia.length > 0 ? updatedMedia[0].url : null);
+
+      return {
+        ...offering,
+        ...(updatedImageUrl ? { imageUrl: updatedImageUrl } : {}),
+        ...(updatedMedia ? { media: updatedMedia } : {})
+      };
     });
   }
 

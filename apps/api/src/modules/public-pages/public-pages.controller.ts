@@ -26,8 +26,36 @@ export class PublicPagesController {
       else if (safeName.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
       else if (safeName.endsWith('.ico')) res.setHeader('Content-Type', 'image/x-icon');
       else if (safeName.endsWith('.webp')) res.setHeader('Content-Type', 'image/webp');
+      else if (safeName.endsWith('.jpg') || safeName.endsWith('.jpeg')) res.setHeader('Content-Type', 'image/jpeg');
       else if (safeName.endsWith('.webmanifest') || safeName.endsWith('.json')) res.setHeader('Content-Type', 'application/manifest+json');
       
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+      return res.sendFile(assetPath);
+    }
+    return res.status(404).send('Asset not found');
+  }
+
+  // 2.1. Static Gift Images Serving: /assets/gifts/:filename
+  @Get('assets/gifts/:filename')
+  @ApiExcludeEndpoint()
+  serveGiftAsset(@Param('filename') filename: string, @Res() res: Response) {
+    const safeName = path.basename(filename);
+    const assetPath = path.join(process.cwd(), 'apps/api/public/assets/gifts', safeName);
+
+    if (fs.existsSync(assetPath)) {
+      if (safeName.endsWith('.png')) res.setHeader('Content-Type', 'image/png');
+      else if (safeName.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml');
+      else if (safeName.endsWith('.ico')) res.setHeader('Content-Type', 'image/x-icon');
+      else if (safeName.endsWith('.webp')) res.setHeader('Content-Type', 'image/webp');
+      else if (safeName.endsWith('.jpg') || safeName.endsWith('.jpeg')) res.setHeader('Content-Type', 'image/jpeg');
+      else if (safeName.endsWith('.webmanifest') || safeName.endsWith('.json')) res.setHeader('Content-Type', 'application/manifest+json');
+
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
       return res.sendFile(assetPath);
     }
