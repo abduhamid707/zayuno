@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-// The URI is a host cache key. Bump it whenever the bundled UI changes.
-export const ZAYUNO_CATALOG_WIDGET_URI = 'ui://zayuno/catalog-v2.html';
+// The URI is a host cache key. Bump it when the UI contract changes so ChatGPT
+// cannot keep serving an older resource or output-shape combination.
+export const ZAYUNO_CATALOG_WIDGET_URI = 'ui://zayuno/catalog-v3.html';
 export const ZAYUNO_CATALOG_WIDGET_MIME = 'text/html;profile=mcp-app';
-export const ZAYUNO_UI_VERSION = '2.0.1';
+export const ZAYUNO_UI_VERSION = '3.0.0';
 
 function imageOrigins(): string[] {
   return [...new Set(['https://mcp.zayuno.uz', 'https://api.zayuno.uz', ...(process.env.MCP_WIDGET_IMAGE_ORIGINS || '').split(',')]

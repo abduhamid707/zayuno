@@ -33,6 +33,45 @@ function catalogOffering(offering: any) {
   return { ...offering, name: offering.name ?? offering.title, price: offering.price ?? offering.basePrice };
 }
 
+const catalogMediaItemOutputProperties = {
+  url: { type: 'string' },
+  altText: { type: ['string', 'null'] },
+  order: { type: 'number' },
+  thumbnailUrl: { type: ['string', 'null'] },
+  aspectRatio: { type: ['string', 'null'] }
+};
+
+// Keep the UI-facing catalog contract explicit. The MCP host validates and may
+// project structuredContent according to outputSchema, so image fields that
+// are absent here never reach the iframe even when the API returned them.
+const catalogOfferingOutputProperties = {
+  id: { type: 'string' },
+  providerId: { type: 'string' },
+  offeringCode: { type: 'string' },
+  title: { type: 'string' },
+  name: { type: 'string' },
+  description: { type: ['string', 'null'] },
+  categorySlug: { type: ['string', 'null'] },
+  categoryTitle: { type: ['string', 'null'] },
+  imageUrl: { type: ['string', 'null'] },
+  media: { type: ['array', 'null'], items: { type: 'object', properties: catalogMediaItemOutputProperties } },
+  basePrice: { type: 'number' },
+  price: { type: 'number' },
+  currency: { type: 'string' },
+  isAvailable: { type: 'boolean' },
+  variants: { type: 'array', items: { type: 'object' } },
+  optionGroups: { type: 'array', items: { type: 'object' } },
+  tags: { type: 'array', items: { type: 'string' } },
+  parametersSchema: { type: ['object', 'null'] },
+  metadata: { type: 'object' }
+};
+
+const catalogOfferingOutputSchema = {
+  type: 'object',
+  properties: catalogOfferingOutputProperties,
+  required: ['id', 'name', 'price']
+};
+
 export interface McpToolDefinition {
   name: string;
   description: string;
@@ -407,18 +446,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         customerMessage: { type: 'string', description: 'Pre-formatted catalog offerings for customer' },
         offerings: {
           type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              name: { type: 'string' },
-              description: { type: 'string' },
-              price: { type: 'number' },
-              currency: { type: 'string' },
-              isAvailable: { type: 'boolean' }
-            },
-            required: ['id', 'name', 'price']
-          }
+          items: catalogOfferingOutputSchema
         },
         categories: { type: 'array', items: { type: 'object' } }
       },
@@ -481,17 +509,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         customerMessage: { type: 'string', description: 'Pre-formatted search results for customer' },
         offerings: {
           type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              name: { type: 'string' },
-              description: { type: 'string' },
-              price: { type: 'number' },
-              currency: { type: 'string' }
-            },
-            required: ['id', 'name', 'price']
-          }
+          items: catalogOfferingOutputSchema
         },
         total: { type: 'number' }
       },
@@ -544,13 +562,8 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       type: 'object',
       properties: {
         customerMessage: { type: 'string', description: 'Pre-formatted offering details for customer' },
-        id: { type: 'string' },
-        name: { type: 'string' },
-        description: { type: 'string' },
-        price: { type: 'number' },
-        currency: { type: 'string' },
-        isAvailable: { type: 'boolean' },
-        optionGroups: { type: 'array', items: { type: 'object' } }
+        ...catalogOfferingOutputProperties,
+        providerSlug: { type: 'string' }
       },
       required: ['customerMessage', 'id', 'name', 'price']
     },

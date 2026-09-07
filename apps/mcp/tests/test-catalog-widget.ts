@@ -39,7 +39,12 @@ async function main() {
           params: { result: { structuredContent: {
             customerMessage: 'Katalog tayyor', providerSlug: 'maxway', locationId: 'tashkent',
             categories: [{ slug: 'lavash', title: 'Lavash' }],
-            offerings: [{ id: 'lavash-1', title: 'Katta mol go‘shtli lavash', basePrice: 34000, currency: 'UZS', categorySlug: 'lavash', isAvailable: true, optionGroups: [] }]
+            offerings: [{
+              id: 'lavash-1', title: 'Katta mol go‘shtli lavash', basePrice: 34000, currency: 'UZS',
+              categorySlug: 'lavash', isAvailable: true, optionGroups: [],
+              imageUrl: 'https://api.zayuno.uz/assets/gifts/gift-07.jpg',
+              media: [{ url: 'https://api.zayuno.uz/assets/gifts/gift-07.jpg', order: 0, altText: 'Katta mol go‘shtli lavash' }]
+            }]
           } } }
         });
         return;
@@ -72,6 +77,7 @@ async function main() {
 
   const select = childWindow.document.querySelector<HTMLButtonElement>('[data-item="lavash-1"]');
   assert.ok(select, 'catalog item must be rendered');
+  assert.equal(childWindow.document.querySelector<HTMLImageElement>('.catalog-grid img')?.src, 'https://api.zayuno.uz/assets/gifts/gift-07.jpg', 'catalog image must be rendered from media/imageUrl');
   select.click();
   const add = childWindow.document.querySelector<HTMLButtonElement>('[data-action="add"]');
   assert.ok(add, 'detail dialog must have add button');

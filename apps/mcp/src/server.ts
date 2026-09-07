@@ -501,7 +501,7 @@ export function runHttpSseServer(port = 4002): Express {
   // Local preview endpoint for provider and integration QA. ChatGPT and MCP
   // clients use the ui:// resource above; this route makes the same artifact
   // easy to inspect in a browser during development.
-  app.get('/ui/catalog-v2.html', (_req: Request, res: Response) => {
+  app.get('/ui/catalog-v3.html', (_req: Request, res: Response) => {
     res.type('html').send(getCatalogWidgetHtml());
   });
 
