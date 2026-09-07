@@ -1,5 +1,17 @@
 # Deferred tasks
 
+## Founder reminder — overthinking nazorati
+
+> Bu loyiha quruvchisi sifatida yangi feature, universal platforma va katta
+> strategiyalarni o‘ylab, mavjud asosiy ishni tugatmasdan chuqurlashib ketishi
+> mumkin. Har safar yangi katta g‘oya paydo bo‘lsa, avval so‘ra:
+> **“Bu hozirgi sprintdagi eng muhim natijaga xizmat qiladimi?”**
+> Agar javob yo‘q yoki noaniq bo‘lsa, uni Tasks.md’ga future idea sifatida yozib,
+> hozirgi ishga qayt. Quraverishdan oldin real provider, real user yoki real
+> business signal borligini tekshir. Hozirgi maqsad: scope’ni kengaytirish emas,
+> tanlangan asosiy oqimni ishlaydigan va isbotlangan holatga olib kelish.
+
+
 ## Before the next production deploy
 
 - [ ] Fix the Mock EVOS sandbox checkout state machine so a cancelled order can

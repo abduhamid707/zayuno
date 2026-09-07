@@ -748,76 +748,70 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  // One consistent path for providers. The individual tools remain available,
+  // but the product should always explain what comes before and after the
+  // current screen.
+  const integrationJourney = [
+    { id: 'start', label: 'Get started', short: 'Start', detail: 'Account & verification', tab: 'onboarding' as const, step: 1 },
+    { id: 'profile', label: 'Business setup', short: 'Profile', detail: 'Business, support & category', tab: 'onboarding' as const, step: 3 },
+    { id: 'connect', label: 'Connect API', short: 'Connect', detail: 'Endpoint, auth & capabilities', tab: 'onboarding' as const, step: 4 },
+    { id: 'sandbox', label: 'Test in sandbox', short: 'Test', detail: 'Run a safe end-to-end request', tab: 'sandbox' as const },
+    { id: 'certify', label: 'Certify', short: 'Certify', detail: 'Contract and security checks', tab: 'certification' as const },
+    { id: 'publish', label: 'Review & publish', short: 'Publish', detail: 'Submit for approval and go live', tab: 'onboarding' as const, step: 6 }
+  ];
+  const journeyIndex = activeTab === 'overview' ? 0
+    : activeTab === 'onboarding' ? Math.max(0, Math.min(5, initialOnboardingStep - 1))
+    : activeTab === 'apps' ? 5
+    : activeTab === 'sandbox' ? 3
+    : activeTab === 'certification' ? 4
+    : activeTab === 'inspector' ? 4
+    : 0;
+  const openJourneyStep = (item: typeof integrationJourney[number], index: number) => {
+    if (!token && index > 0) {
+      setActiveTab('onboarding');
+      setInitialOnboardingStep(1);
+      return;
+    }
+    if (item.step) setInitialOnboardingStep(item.step);
+    setActiveTab(item.tab);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
-      {/* Top Navbar */}
-      <header className="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-xl px-6 py-3.5 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-700 flex items-center justify-center text-xl font-bold shadow-lg shadow-indigo-950/50">
-            ⚡
-          </div>
+      {/* Product shell */}
+      <header className="product-header sticky top-0 z-50">
+        <div className="flex items-center gap-3 min-w-max">
+          <img src="/logo.svg" alt="Zayuno" className="brand-mark" />
           <div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-lg tracking-tight text-white">ZAYUNO</span>
-              <span className="text-xs bg-indigo-500/20 text-indigo-300 font-mono px-2 py-0.5 rounded-full border border-indigo-500/30">
-                DEVELOPERS
-              </span>
+              <span className="product-badge">DEVELOPERS</span>
             </div>
-            <p className="text-[11px] text-slate-400">Public Action Infrastructure for AI Agents</p>
+            <p className="text-[11px] text-slate-500">Provider integration workspace</p>
           </div>
         </div>
 
-        {/* Center Tabs */}
-        <nav className="flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-              activeTab === 'overview' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
+        <nav className="workflow-nav" aria-label="Developer workspace navigation">
+          <div className="nav-group-label">Workspace</div>
+          <button onClick={() => setActiveTab('overview')} className={`workflow-link ${activeTab === 'overview' ? 'is-active' : ''}`}>
             <Zap className="w-3.5 h-3.5" /> Overview
           </button>
-          <button
-            onClick={() => setActiveTab('docs')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-              activeTab === 'docs' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" /> Documentation
+          <button onClick={() => setActiveTab('apps')} className={`workflow-link ${activeTab === 'apps' ? 'is-active' : ''}`}>
+            <LayoutDashboard className="w-3.5 h-3.5" /> Provider {token && <span className="nav-status-dot" />}
           </button>
-          <button
-            onClick={() => setActiveTab('apps')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-              activeTab === 'apps' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <LayoutDashboard className="w-3.5 h-3.5" /> Apps & Dashboard {!token && <Lock className="w-3 h-3 text-slate-500" />}
+          <span className="nav-divider" />
+          <div className="nav-group-label">Build & verify</div>
+          <button onClick={() => setActiveTab('docs')} className={`workflow-link ${activeTab === 'docs' ? 'is-active' : ''}`}>
+            <BookOpen className="w-3.5 h-3.5" /> Docs
           </button>
-          {SHOW_LOCAL_SIMULATOR && (
-            <button
-              onClick={() => setActiveTab('sandbox')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-                activeTab === 'sandbox' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Sliders className="w-3.5 h-3.5" /> Sandbox Simulator
-            </button>
-          )}
-          <button
-            onClick={() => setActiveTab('certification')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-              activeTab === 'certification' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5" /> Certification {!token && <Lock className="w-3 h-3 text-slate-500" />}
+          {SHOW_LOCAL_SIMULATOR && <button onClick={() => setActiveTab('sandbox')} className={`workflow-link ${activeTab === 'sandbox' ? 'is-active' : ''}`}>
+            <Sliders className="w-3.5 h-3.5" /> Sandbox
+          </button>}
+          <button onClick={() => setActiveTab('certification')} className={`workflow-link ${activeTab === 'certification' ? 'is-active' : ''}`}>
+            <ShieldCheck className="w-3.5 h-3.5" /> Certify {!token && <Lock className="w-3 h-3 text-slate-600" />}
           </button>
-          <button
-            onClick={() => setActiveTab('inspector')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-              activeTab === 'inspector' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" /> Live Inspector {!token && <Lock className="w-3 h-3 text-slate-500" />}
+          <button onClick={() => setActiveTab('inspector')} className={`workflow-link ${activeTab === 'inspector' ? 'is-active' : ''}`}>
+            <Activity className="w-3.5 h-3.5" /> Inspector {!token && <Lock className="w-3 h-3 text-slate-600" />}
           </button>
         </nav>
 
@@ -867,6 +861,37 @@ export default function App() {
           )}
         </div>
       </header>
+
+      {/* Persistent journey: prevents the developer from losing the mental model
+          when moving between docs, tools and protected provider screens. */}
+      {activeTab !== 'auth' && (
+        <div className="journey-strip">
+          <div className="journey-heading">
+            <span className="journey-kicker">INTEGRATION JOURNEY</span>
+            <span className="journey-caption">Your path from API to live provider</span>
+          </div>
+          <div className="journey-steps">
+            {integrationJourney.map((item, index) => {
+              const completed = Boolean(token) && index < journeyIndex;
+              const current = index === journeyIndex;
+              return (
+                <React.Fragment key={item.id}>
+                  {index > 0 && <span className={`journey-connector ${completed ? 'is-complete' : ''}`} />}
+                  <button
+                    type="button"
+                    title={item.detail}
+                    onClick={() => openJourneyStep(item, index)}
+                    className={`journey-step ${current ? 'is-current' : ''} ${completed ? 'is-complete' : ''}`}
+                  >
+                    <span className="journey-number">{completed ? <Check className="w-3 h-3" /> : index + 1}</span>
+                    <span className="journey-label"><b>{item.short}</b><small>{item.detail}</small></span>
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 p-6 max-w-7xl mx-auto w-full">

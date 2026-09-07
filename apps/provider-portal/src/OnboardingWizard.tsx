@@ -1074,14 +1074,12 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
   ];
 
   return (
-    <div className="max-w-4xl mx-auto my-8 bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl animate-fadeIn space-y-8 relative">
+    <div className="max-w-6xl mx-auto my-8 bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl animate-fadeIn space-y-8 relative">
       {/* Stepper Header */}
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-700 flex items-center justify-center text-xl font-bold text-white shadow-lg shadow-indigo-950/50">
-              ⚡
-            </div>
+            <img src="/logo.svg" alt="Zayuno" className="brand-mark" />
             <div>
               <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-semibold">
                 Self-Service Onboarding
