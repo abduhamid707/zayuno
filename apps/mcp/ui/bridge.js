@@ -85,6 +85,7 @@
       return;
     }
     if (message.method === 'ui/notifications/tool-result') {
+      emit('tool-metadata', (message.params?.result ?? message.params)?._meta || {});
       try { emit('tool-output', decode(message.params?.result ?? message.params)); }
       catch (error) { emit('error', error); }
       return;
@@ -106,9 +107,10 @@
     }
   };
 
-  const readOpenAiGlobals = () => {
-    const globals = window.openai;
+  const readOpenAiGlobals = (event) => {
+    const globals = event?.detail?.globals ? { ...window.openai, ...event.detail.globals } : window.openai;
     if (!globals) return;
+    if (globals.toolResponseMetadata) emit('tool-metadata', globals.toolResponseMetadata);
     if (globals.toolInput) emit('tool-input', globals.toolInput);
     if (globals.toolOutput) {
       try { emit('tool-output', decode(globals.toolOutput)); } catch (error) { emit('error', error); }
@@ -132,8 +134,8 @@
     }
     initialization = request('ui/initialize', {
       protocolVersion: PROTOCOL_VERSION,
-      appInfo: { name: 'Zayuno Catalog', version: window.ZAYUNO_UI_CONFIG?.version || '2.0.0' },
-      appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] }
+      appInfo: { name: window.ZAYUNO_UI_CONFIG?.appName || 'Zayuno Catalog', version: window.ZAYUNO_UI_CONFIG?.version || '2.0.0' },
+      appCapabilities: { availableDisplayModes: window.ZAYUNO_UI_CONFIG?.displayModes || ['inline', 'fullscreen'] }
     }, 8000).then((result) => {
       const response = result || {};
       hostContext = response.hostContext || {};
@@ -182,6 +184,9 @@
 
   const sendMessage = async (text) => {
     if (!text) return;
+    // Prefer the portable bridge once initialized. Do not wait for a legacy
+    // host's handshake timeout when its compatible messaging API is ready.
+    if (initialized && window.parent !== window) return request('ui/message', { role: 'user', content: [{ type: 'text', text: String(text) }] });
     if (typeof window.openai?.sendFollowUpMessage === 'function') return window.openai.sendFollowUpMessage({ prompt: text });
     await start();
     if (!initialized) throw new Error('Host message bridge is unavailable');
@@ -195,7 +200,7 @@
   };
 
   const setHeight = (height) => {
-    const value = Math.max(120, Math.min(1400, Math.ceil(Number(height) || 0)));
+    const value = Math.max(window.ZAYUNO_UI_CONFIG?.minHeight || 120, Math.min(1400, Math.ceil(Number(height) || 0)));
     if (initialized) post({ method: 'ui/notifications/size-changed', params: { height: value } });
     else if (typeof window.openai?.notifyIntrinsicHeight === 'function') window.openai.notifyIntrinsicHeight(value);
   };

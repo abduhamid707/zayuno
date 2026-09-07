@@ -47,7 +47,8 @@ const testSuites = [
   'tests/test-production-health-and-lease-real-e2e.ts',
   'tests/test-provider-cache-and-consumer-chat.ts',
   'tests/test-openai-plugin-mcp-contract.ts',
-  'apps/mcp/tests/test-catalog-widget.ts'
+  'apps/mcp/tests/test-catalog-widget.ts',
+  'apps/mcp/tests/test-quick-replies.ts'
 ];
 
 async function main() {

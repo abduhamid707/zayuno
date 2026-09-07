@@ -21,8 +21,9 @@ import {
   stripSensitiveSecrets
 } from '@zayuno/shared';
 
-import { getToolUiMeta } from './catalog-ui.js';
-export { ZAYUNO_CATALOG_WIDGET_URI, getToolUiMeta } from './catalog-ui.js';
+import { getQuickRepliesToolMeta as getToolUiMeta, getQuickRepliesResultMeta, QUICK_REPLIES_ENABLED } from './quick-replies.js';
+export { ZAYUNO_CATALOG_WIDGET_URI } from './catalog-ui.js';
+export { getQuickRepliesToolMeta as getToolUiMeta } from './quick-replies.js';
 
 // Discovery should return enough to select a provider, never its embedded catalog/config.
 function providerSummary(provider: any) {
@@ -440,7 +441,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 6. get_catalog
   {
     name: 'get_catalog',
-    description: 'Use this when the user wants to OPEN a provider menu or compact catalog in the chat. Call with a verified providerSlug; find_providers and list_providers do NOT open the catalog. Returns numbered products with optional Markdown images for native chat hosts; users select by number and quantity. Can be filtered by category or location.',
+    description: 'Use this when the user wants to OPEN a provider menu or choose products. Call with a verified providerSlug; discovery does not open the catalog. Returns products and a small inline choice-button resource in compatible hosts. A clicked choice sends a follow-up message, not an order. Can be filtered by category or location. Keep the reply brief; do not claim buttons are visible based only on tool success.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -483,10 +484,12 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     handler: async (args, client) => {
       const catalog = await client.getCatalog(args.providerSlug, args.locationId, args.category, args.parameters);
       const offerings = catalog?.offerings || (Array.isArray(catalog) ? catalog : []);
-      const customerMessage = formatNativeCatalog(offerings, args.providerSlug);
+      const customerMessage = QUICK_REPLIES_ENABLED
+        ? `${args.providerSlug}: ${offerings.length} ta mahsulot topildi. Tanlash buyurtma yaratmaydi.`
+        : formatNativeCatalog(offerings, args.providerSlug);
       return {
-        customerMessage,
         ...(Array.isArray(catalog) ? {} : catalog), providerSlug: args.providerSlug, locationId: catalog?.locationId ?? args.locationId,
+        customerMessage,
         offerings: offerings.map(catalogOffering)
       };
     }
@@ -1120,7 +1123,7 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
                 text: customerText
               }
             ],
-            ...(getToolUiMeta(tool.name) ? { _meta: getToolUiMeta(tool.name) } : {})
+            ...(getToolUiMeta(tool.name) ? { _meta: getQuickRepliesResultMeta(tool.name, args, result) } : {})
           };
         } catch (err: any) {
           const friendlyMessage = formatCustomerError(err);

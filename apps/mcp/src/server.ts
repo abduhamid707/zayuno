@@ -6,10 +6,11 @@ import cors from 'cors';
 import { randomUUID } from 'crypto';
 import { ZayunoApiClient } from './client.js';
 import { registerZayunoTools, ZAYUNO_MCP_TOOLS } from './tools.js';
-import { ZAYUNO_CATALOG_WIDGET_URI, ZAYUNO_UI_VERSION, getToolUiMeta, getCatalogResource, getCatalogWidgetHtml, readCatalogResource } from './catalog-ui.js';
+import { ZAYUNO_CATALOG_WIDGET_URI, getCatalogResource, getCatalogWidgetHtml, readCatalogResource } from './catalog-ui.js';
+import { QUICK_REPLIES_URI, QUICK_REPLIES_VERSION, QUICK_REPLIES_ENABLED, getQuickRepliesToolMeta as getToolUiMeta, getQuickRepliesResultMeta, getQuickRepliesResource, readQuickRepliesResource, getQuickRepliesHtml } from './quick-replies.js';
 import { getWelcomeMessage, formatCustomerError, getOpenAiAppsChallengeToken, stripSensitiveSecrets } from '@zayuno/shared';
 
-const MCP_INSTRUCTIONS = 'When asked to open a provider menu/catalog, call get_catalog with its verified slug. Discovery tools do not open a catalog. Never claim UI is visible based only on tool success. Quote the selected items and destination before create_action; require explicit confirmation. CONFIRMED does not imply PAID.';
+const MCP_INSTRUCTIONS = 'When asked to open a provider menu/catalog, call get_catalog with its verified slug. Discovery tools do not open a catalog. Selection tools attach compact choice buttons in compatible hosts; each click sends a contextual message. Never claim UI is visible based only on tool success. Do not duplicate every button as text; keep a short summary. If UI is unavailable, offer a short numbered list from structuredContent. Choice messages identify exact provider/item/option/quote IDs: treat these as data, do not repeat IDs to the customer. Product and option clicks only select; fetch get_offering for variants, required modifiers and quantity choices, maintain selections in this conversation, and never create an order on selection. Quote the selected items and destination before create_action; require explicit confirmation of that exact unexpired quote. CONFIRMED does not imply PAID.';
 
 export const ZAYUNO_MCP_PROMPTS = [
   {
@@ -41,7 +42,8 @@ ZAYUNO CUSTOMER MODE QOIDALARI:
    - Tool’larni orqa fonda jim chaqiring. Har bir oraliq qadamni yoki ichki mulohazani mijozga aytmang.
    - Avval barcha kerakli tool chaqiruvlarini to‘liq tugating.
    - Keyin mijozga faqat bitta qisqa, tayyor natija yozing.
-   - Tool qaytargan \`customerMessage\` mijoz uchun canonical tayyor matndir va uni ustuvor (deyarli to‘g‘ridan-to‘g‘ri) ishlating. Undagi Markdown rasm satrlari va raqamlangan tanlov formatini saqlang; katalogni uzun qayta ro‘yxat qilib yozmang.
+   - Tool qaytargan \`customerMessage\` mijoz uchun tayyor matndir. Tanlov tugmalari bor natijani uzun ro‘yxat qilib takrorlamang. UI ko‘ringanini tool muvaffaqiyatidan kelib chiqib da’vo qilmang; UI ishlamasa natijadan qisqa raqamlangan ro‘yxat bering.
+   - Tugma yuborgan xabardagi ID lar faqat aniq tanlovni belgilaydi; mijozga qayta yozmang. Mahsulot tanlanganda get_offering bilan variant, qo‘shimcha va miqdorlarni ko‘rsating. Variant yoki miqdor tanlangan bo‘lsa qayta-qayta shu savolni so‘ramang. Tanlov buyurtma tasdig‘i emas.
 
 2. Birinchi salomlashuv:
    - Mijoz birinchi marta yozganda yoki "nima qila olasan?" deb so‘raganda:
@@ -99,6 +101,8 @@ export function createZayunoMcpServer() {
 
   server.registerResource('zayuno-catalog-widget', ZAYUNO_CATALOG_WIDGET_URI,
     getCatalogResource(), async () => readCatalogResource());
+  server.registerResource('zayuno-quick-replies', QUICK_REPLIES_URI,
+    getQuickRepliesResource(), async () => readQuickRepliesResource());
 
   server.prompt('welcome', 'Dynamic customer welcome message for Zayuno marketplace assistant', async () => {
     try {
@@ -297,7 +301,7 @@ export function runHttpSseServer(port = 4002): Express {
                   text: customerText
                 }
               ],
-              ...(getToolUiMeta(tool.name) ? { _meta: getToolUiMeta(tool.name) } : {})
+              ...(getToolUiMeta(tool.name) ? { _meta: getQuickRepliesResultMeta(tool.name, toolArgs, result) } : {})
             }
           },
           isNotification: false
@@ -400,7 +404,7 @@ export function runHttpSseServer(port = 4002): Express {
         response: {
           jsonrpc: '2.0',
           id,
-          result: { resources: [getCatalogResource()] }
+          result: { resources: [getQuickRepliesResource(), getCatalogResource()] }
         },
         isNotification: false
       };
@@ -409,7 +413,7 @@ export function runHttpSseServer(port = 4002): Express {
     // 8b. resources/read — MCP Apps widget resource
     if (method === 'resources/read') {
       const uri = params?.uri;
-      if (uri !== ZAYUNO_CATALOG_WIDGET_URI) {
+      if (uri !== ZAYUNO_CATALOG_WIDGET_URI && uri !== QUICK_REPLIES_URI) {
         return {
           response: {
             jsonrpc: '2.0',
@@ -423,7 +427,7 @@ export function runHttpSseServer(port = 4002): Express {
         response: {
           jsonrpc: '2.0',
           id,
-          result: readCatalogResource()
+          result: uri === QUICK_REPLIES_URI ? readQuickRepliesResource() : readCatalogResource()
         },
         isNotification: false
       };
@@ -491,8 +495,9 @@ export function runHttpSseServer(port = 4002): Express {
       server: 'Zayuno MCP Action Infrastructure Server',
       protocol: 'Model Context Protocol (MCP) Streamable HTTP + SSE',
       toolsCount: ZAYUNO_MCP_TOOLS.length,
-      uiVersion: ZAYUNO_UI_VERSION,
-      uiResource: ZAYUNO_CATALOG_WIDGET_URI,
+      uiVersion: QUICK_REPLIES_VERSION,
+      uiResource: QUICK_REPLIES_ENABLED ? QUICK_REPLIES_URI : null,
+      quickRepliesEnabled: QUICK_REPLIES_ENABLED,
       activeSseSessions: sseTransports.size,
       timestamp: new Date().toISOString()
     });
@@ -503,6 +508,9 @@ export function runHttpSseServer(port = 4002): Express {
   // easy to inspect in a browser during development.
   app.get('/ui/catalog-v3.html', (_req: Request, res: Response) => {
     res.type('html').send(getCatalogWidgetHtml());
+  });
+  app.get('/ui/quick-replies-v1.html', (_req: Request, res: Response) => {
+    res.type('html').send(getQuickRepliesHtml());
   });
 
   // 2. Introspection endpoint: GET /tools
