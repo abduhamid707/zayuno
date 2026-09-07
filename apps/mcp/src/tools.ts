@@ -20,30 +20,17 @@ import {
   stripSensitiveSecrets
 } from '@zayuno/shared';
 
-export const ZAYUNO_CATALOG_WIDGET_URI = 'ui://zayuno/catalog-v1.html';
+import { getToolUiMeta } from './catalog-ui.js';
+export { ZAYUNO_CATALOG_WIDGET_URI, getToolUiMeta } from './catalog-ui.js';
 
-const CATALOG_UI_TOOLS = new Set([
-  'get_catalog',
-  'get_offering',
-  'search_catalog',
-  'request_quote',
-  'create_action',
-  'get_action',
-  'get_payment_options'
-]);
+// Discovery should return enough to select a provider, never its embedded catalog/config.
+function providerSummary(provider: any) {
+  const keys = ['id', 'slug', 'name', 'description', 'status', 'type', 'category', 'geography', 'capabilities', 'fulfillmentMode'];
+  return Object.fromEntries(keys.filter(key => provider[key] !== undefined).map(key => [key, provider[key]]));
+}
 
-export function getToolUiMeta(toolName: string) {
-  if (!CATALOG_UI_TOOLS.has(toolName)) return undefined;
-  return {
-    ui: {
-      resourceUri: ZAYUNO_CATALOG_WIDGET_URI,
-      prefersBorder: true,
-      csp: { connectDomains: [], resourceDomains: [] }
-    },
-    'openai/outputTemplate': ZAYUNO_CATALOG_WIDGET_URI,
-    'openai/widgetPrefersBorder': true,
-    'openai/widgetDescription': 'Zayuno interactive catalog, cart, quote and action flow.'
-  };
+function catalogOffering(offering: any) {
+  return { ...offering, name: offering.name ?? offering.title, price: offering.price ?? offering.basePrice };
 }
 
 export interface McpToolDefinition {
@@ -136,7 +123,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       properties: {
         category: {
           type: 'string',
-          description: 'Filter by provider category or industry (e.g. "food_delivery", "logistics", "general_services").'
+          description: 'Filter by provider category or industry (restaurants use food_dining; food_delivery is accepted as an alias; e.g. "food_delivery", "logistics", "general_services").'
         },
         capability: {
           type: 'string',
@@ -183,12 +170,12 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['customerMessage', 'providers']
     },
     handler: async (args, client) => {
-      const result = await client.findProviders(args);
+      const result = await client.findProviders({ ...args, category: args.category === 'food_delivery' ? 'food_dining' : args.category });
       const list = Array.isArray(result) ? result : result?.providers || [];
       const customerMessage = formatCustomerProviders(list);
       return {
         customerMessage,
-        ...(Array.isArray(result) ? { providers: result, total: result.length } : result)
+        providers: list.map(providerSummary), total: result?.total ?? list.length
       };
     }
   },
@@ -241,7 +228,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       const customerMessage = formatCustomerProviders(list);
       return {
         customerMessage,
-        ...(Array.isArray(result) ? { providers: result, total: result.length } : result)
+        providers: list.map(providerSummary), total: result?.total ?? list.length
       };
     }
   },
@@ -386,7 +373,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 6. get_catalog
   {
     name: 'get_catalog',
-    description: 'Retrieve the full structured catalog, categories, offerings, base pricing, and option groups from a provider. Can be filtered by category or location.',
+    description: 'Use this when the user wants to OPEN a provider menu or visual catalog with selection buttons and a cart. Call with a verified providerSlug; find_providers and list_providers do NOT open the catalog. Returns an interactive UI in compatible hosts and catalog data for text-only agents. Missing images do not prevent the UI. Can be filtered by category or location.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -443,7 +430,8 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       const customerMessage = formatCustomerOfferings(offerings, args.providerSlug);
       return {
         customerMessage,
-        ...(Array.isArray(catalog) ? { offerings: catalog } : catalog)
+        ...(Array.isArray(catalog) ? {} : catalog), providerSlug: args.providerSlug, locationId: catalog?.locationId ?? args.locationId,
+        offerings: offerings.map(catalogOffering)
       };
     }
   },
@@ -515,7 +503,8 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       const customerMessage = formatCustomerOfferings(offerings, args.providerSlug);
       return {
         customerMessage,
-        ...(Array.isArray(result) ? { offerings: result, total: result.length } : result)
+        ...(Array.isArray(result) ? { total: result.length } : result), providerSlug: args.providerSlug,
+        offerings: offerings.map(catalogOffering)
       };
     }
   },
@@ -570,7 +559,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       const customerMessage = formatCustomerOffering(offering);
       return {
         customerMessage,
-        ...offering
+        ...catalogOffering(offering), providerSlug: args.providerSlug
       };
     }
   },

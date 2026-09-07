@@ -4,35 +4,12 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express, { Request, Response, Express } from 'express';
 import cors from 'cors';
 import { randomUUID } from 'crypto';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import path from 'path';
 import { ZayunoApiClient } from './client.js';
-import { registerZayunoTools, ZAYUNO_MCP_TOOLS, ZAYUNO_CATALOG_WIDGET_URI, getToolUiMeta } from './tools.js';
+import { registerZayunoTools, ZAYUNO_MCP_TOOLS } from './tools.js';
+import { ZAYUNO_CATALOG_WIDGET_URI, ZAYUNO_UI_VERSION, getToolUiMeta, getCatalogResource, getCatalogWidgetHtml, readCatalogResource } from './catalog-ui.js';
 import { getWelcomeMessage, formatCustomerError, getOpenAiAppsChallengeToken, stripSensitiveSecrets } from '@zayuno/shared';
 
-const ZAYUNO_CATALOG_WIDGET_MIME = 'text/html;profile=mcp-app';
-const catalogWidgetPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../ui/catalog-widget.html');
-
-function getCatalogWidgetHtml(): string {
-  return readFileSync(catalogWidgetPath, 'utf8');
-}
-
-const ZAYUNO_CATALOG_RESOURCE = {
-  uri: ZAYUNO_CATALOG_WIDGET_URI,
-  name: 'Zayuno Catalog & Checkout UI',
-  title: 'Zayuno interactive catalog',
-  description: 'Visual catalog, cart, quote confirmation and provider checkout widget.',
-  mimeType: ZAYUNO_CATALOG_WIDGET_MIME,
-  _meta: {
-    ui: {
-      prefersBorder: true,
-      csp: { connectDomains: [], resourceDomains: [] }
-    },
-    'openai/widgetPrefersBorder': true,
-    'openai/widgetDescription': 'Browse offerings, configure options, build a cart, verify a quote, and continue to provider checkout.'
-  }
-};
+const MCP_INSTRUCTIONS = 'When asked to open a provider menu/catalog, call get_catalog with its verified slug. Discovery tools do not open a catalog. Never claim UI is visible based only on tool success. Quote the selected items and destination before create_action; require explicit confirmation. CONFIRMED does not imply PAID.';
 
 export const ZAYUNO_MCP_PROMPTS = [
   {
@@ -114,44 +91,14 @@ Men ovqat buyurtma qilish, poyez yoki aviachipta topish, turli xizmatlarni qidir
 export function createZayunoMcpServer() {
   const server = new McpServer({
     name: 'zayuno-action-server',
-    version: '1.0.0'
-  });
+    version: '1.1.0'
+  }, { instructions: MCP_INSTRUCTIONS });
 
   const apiClient = new ZayunoApiClient();
   registerZayunoTools(server, apiClient);
 
-  server.registerResource(
-    'zayuno-catalog-widget',
-    ZAYUNO_CATALOG_WIDGET_URI,
-    {
-      title: 'Zayuno interactive catalog',
-      description: 'Visual catalog, cart, quote confirmation and provider checkout widget.',
-      mimeType: ZAYUNO_CATALOG_WIDGET_MIME,
-      _meta: {
-        ui: {
-          prefersBorder: true,
-          csp: { connectDomains: [], resourceDomains: [] }
-        },
-        'openai/widgetPrefersBorder': true,
-        'openai/widgetDescription': 'Browse offerings, configure options, build a cart, verify a quote, and continue to provider checkout.'
-      }
-    },
-    async (uri) => ({
-      contents: [{
-        uri: uri.href,
-        mimeType: ZAYUNO_CATALOG_WIDGET_MIME,
-        text: getCatalogWidgetHtml(),
-        _meta: {
-          ui: {
-            prefersBorder: true,
-            csp: { connectDomains: [], resourceDomains: [] }
-          },
-          'openai/widgetPrefersBorder': true,
-          'openai/widgetDescription': 'Browse offerings, configure options, build a cart, verify a quote, and continue to provider checkout.'
-        }
-      }]
-    })
-  );
+  server.registerResource('zayuno-catalog-widget', ZAYUNO_CATALOG_WIDGET_URI,
+    getCatalogResource(), async () => readCatalogResource());
 
   server.prompt('welcome', 'Dynamic customer welcome message for Zayuno marketplace assistant', async () => {
     try {
@@ -259,6 +206,7 @@ export function runHttpSseServer(port = 4002): Express {
           id,
           result: {
             protocolVersion: requestedVersion,
+            instructions: MCP_INSTRUCTIONS,
             capabilities: {
               tools: { listChanged: false },
               prompts: { listChanged: false },
@@ -452,7 +400,7 @@ export function runHttpSseServer(port = 4002): Express {
         response: {
           jsonrpc: '2.0',
           id,
-          result: { resources: [ZAYUNO_CATALOG_RESOURCE] }
+          result: { resources: [getCatalogResource()] }
         },
         isNotification: false
       };
@@ -475,13 +423,7 @@ export function runHttpSseServer(port = 4002): Express {
         response: {
           jsonrpc: '2.0',
           id,
-          result: {
-            contents: [{
-              uri: ZAYUNO_CATALOG_WIDGET_URI,
-              mimeType: ZAYUNO_CATALOG_WIDGET_MIME,
-              text: getCatalogWidgetHtml()
-            }]
-          }
+          result: readCatalogResource()
         },
         isNotification: false
       };
@@ -549,6 +491,8 @@ export function runHttpSseServer(port = 4002): Express {
       server: 'Zayuno MCP Action Infrastructure Server',
       protocol: 'Model Context Protocol (MCP) Streamable HTTP + SSE',
       toolsCount: ZAYUNO_MCP_TOOLS.length,
+      uiVersion: ZAYUNO_UI_VERSION,
+      uiResource: ZAYUNO_CATALOG_WIDGET_URI,
       activeSseSessions: sseTransports.size,
       timestamp: new Date().toISOString()
     });
@@ -557,7 +501,7 @@ export function runHttpSseServer(port = 4002): Express {
   // Local preview endpoint for provider and integration QA. ChatGPT and MCP
   // clients use the ui:// resource above; this route makes the same artifact
   // easy to inspect in a browser during development.
-  app.get('/ui/catalog-v1.html', (_req: Request, res: Response) => {
+  app.get('/ui/catalog-v2.html', (_req: Request, res: Response) => {
     res.type('html').send(getCatalogWidgetHtml());
   });
 
@@ -749,7 +693,8 @@ export function runHttpSseServer(port = 4002): Express {
     res.send(html);
   });
 
-  app.listen(port, () => {
+  // Port zero is used by tests which attach their own ephemeral listener.
+  if (port !== 0) app.listen(port, () => {
     console.log(`🤖 Zayuno MCP Server listening on http://localhost:${port}`);
     console.log(`🌐 Streamable HTTP: http://localhost:${port}/mcp`);
     console.log(`📡 SSE Endpoint: http://localhost:${port}/sse`);
