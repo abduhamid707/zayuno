@@ -120,7 +120,7 @@ export function createZayunoMcpServer() {
   const apiClient = new ZayunoApiClient();
   registerZayunoTools(server, apiClient);
 
-  server.resource(
+  server.registerResource(
     'zayuno-catalog-widget',
     ZAYUNO_CATALOG_WIDGET_URI,
     {
@@ -140,7 +140,15 @@ export function createZayunoMcpServer() {
       contents: [{
         uri: uri.href,
         mimeType: ZAYUNO_CATALOG_WIDGET_MIME,
-        text: getCatalogWidgetHtml()
+        text: getCatalogWidgetHtml(),
+        _meta: {
+          ui: {
+            prefersBorder: true,
+            csp: { connectDomains: [], resourceDomains: [] }
+          },
+          'openai/widgetPrefersBorder': true,
+          'openai/widgetDescription': 'Browse offerings, configure options, build a cart, verify a quote, and continue to provider checkout.'
+        }
       }]
     })
   );

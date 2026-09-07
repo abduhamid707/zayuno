@@ -139,6 +139,11 @@
         applyOutput(openai?.toolOutput);
       };
       const saveState = () => { try { host()?.setWidgetState?.({ cart: state.cart, providerSlug: state.providerSlug, locationId: state.locationId, form: state.form }); } catch {} };
+      const initializeUi = () => {
+        try {
+          window.parent.postMessage({ jsonrpc:'2.0', id:'zayuno-ui-init', method:'ui/initialize', params:{ appInfo:{name:'zayuno-catalog',version:'1.0.0'}, appCapabilities:{}, protocolVersion:'2025-06-18' } }, '*');
+        } catch {}
+      };
       const callTool = async (name, args) => {
         state.busy = true; state.error = ''; render();
         try {
@@ -161,6 +166,7 @@
         } finally { state.busy = false; render(); }
       };
       window.addEventListener('message', (event) => {
+        if (event.source !== window.parent) return;
         const message = event.data || {};
         if (message.id && pending.has(message.id)) return pending.get(message.id).resolve(message.result || message);
         if (message.method === 'ui/notifications/tool-result') return applyOutput(message.params?.result || message.params);
@@ -171,6 +177,7 @@
           render();
         }
       });
+      initializeUi();
       const visibleItems = () => state.offerings.filter((item) => {
         const category = state.category === 'ALL' || itemCategory(item) === state.category;
         const query = state.search.trim().toLowerCase();

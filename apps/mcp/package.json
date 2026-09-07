@@ -14,7 +14,7 @@
     "lint": "echo 'No lint specified for mcp'"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.6.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@zayuno/contracts": "workspace:*",
     "@zayuno/shared": "workspace:*",
     "cors": "^2.8.5",

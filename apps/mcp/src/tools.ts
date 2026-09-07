@@ -1066,10 +1066,15 @@ function jsonSchemaToZodShape(properties: Record<string, any> = {}, requiredList
 export function registerZayunoTools(server: any, client: ZayunoApiClient) {
   for (const tool of ZAYUNO_MCP_TOOLS) {
     const zodShape = jsonSchemaToZodShape(tool.inputSchema.properties || {}, tool.inputSchema.required || []);
-    server.tool(
+    server.registerTool(
       tool.name,
-      tool.description,
-      zodShape,
+      {
+        title: tool.name,
+        description: tool.description,
+        inputSchema: zodShape,
+        annotations: tool.annotations,
+        ...(getToolUiMeta(tool.name) ? { _meta: getToolUiMeta(tool.name) } : {})
+      },
       async (args: any) => {
         try {
           const rawResult = await tool.handler(args, client);
