@@ -28,6 +28,8 @@
     idempotencyKey: null,
     lastFocus: null
   };
+  let heightFrame = 0;
+  let searchFrame = 0;
 
   const app = () => document.getElementById('app');
   const cssEscape = (value) => globalThis.CSS?.escape ? globalThis.CSS.escape(String(value)) : String(value).replace(/(["\\])/g, '\\$1');
@@ -509,7 +511,12 @@
     app().innerHTML = `<div class="topbar"><div class="brand-row"><span class="brand-logo">${logo()}</span><div class="brand-copy"><div class="eyebrow">Zayuno commerce</div><div class="brand-name">Interaktiv katalog va checkout</div></div></div><div class="topbar-actions"><span class="connection ${state.connection ? 'is-live' : ''}"><i class="connection-dot"></i>${state.connection ? 'Host bilan ulangan' : 'Katalog rejimi'}</span><button class="button-ghost" data-action="refresh" ${state.busy ? 'disabled' : ''}>${icon('refresh')} Yangilash</button></div></div><section class="hero"><div><div class="eyebrow">Provider katalogi</div><h1>Kerakli mahsulotni tanlang, quote’ni tekshiring va buyurtmani tasdiqlang.</h1><p>Rasm, variant, qo‘shimcha, miqdor va yetkazish ma’lumotlari bir joyda. Narx buyurtma berishdan oldin provider’dan real-time qayta olinadi.</p></div><div class="hero-actions"><button class="button-primary" data-action="open-cart">${icon('cart')} Savat <span class="badge">${count}</span></button></div></section><div class="workspace-toolbar"><label class="search-box">${icon('search')}<input data-input="search" value="${esc(state.search)}" placeholder="Mahsulot yoki xizmat qidiring…" aria-label="Katalogdan qidirish" /></label><button class="cart-button" data-action="open-cart">${icon('cart')} Savat <span class="badge">${count}</span></button></div><div class="filter-row">${cats.map((category) => `<button class="filter ${state.category === category ? 'active' : ''}" data-category="${esc(category)}">${esc(category === 'ALL' ? 'Barchasi' : category)}</button>`).join('')}</div><div class="section-head"><h2>${esc(state.providerSlug || 'Katalog')}</h2><span>${items.length} ta variant</span></div>${items.length ? `<div class="catalog-grid">${items.map(cardHtml).join('')}</div>` : emptyText}${state.error && !state.modal ? `<div class="error-notice">${esc(state.error)}</div>` : ''}${state.busy && !state.modal ? '<div class="notice"><span class="spinner"></span>Provider bilan xavfsiz bog‘lanilmoqda…</div>' : ''}${modalHtml()}`;
     bind();
     restoreFocus();
-    window.requestAnimationFrame(() => bridge?.setHeight?.(document.documentElement.scrollHeight));
+    if (!heightFrame) {
+      heightFrame = window.requestAnimationFrame(() => {
+        heightFrame = 0;
+        bridge?.setHeight?.(document.documentElement.scrollHeight);
+      });
+    }
   }
 
   function setFormValue(name, value) {
@@ -553,14 +560,19 @@
     }));
     document.querySelectorAll('[data-cart]').forEach((element) => element.addEventListener('click', () => changeCart(element.dataset.cart, Number(element.dataset.delta))));
     const search = document.querySelector('[data-input="search"]');
-    if (search) search.addEventListener('input', (event) => { state.search = event.target.value; render(); });
+    if (search) search.addEventListener('input', (event) => {
+      state.search = event.target.value;
+      if (searchFrame) window.cancelAnimationFrame(searchFrame);
+      searchFrame = window.requestAnimationFrame(() => {
+        searchFrame = 0;
+        render();
+      });
+    });
     document.querySelectorAll('[data-form]').forEach((element) => element.addEventListener('input', (event) => {
       setFormValue(element.dataset.form, event.target.value);
-      render();
     }));
     document.querySelectorAll('[data-param]').forEach((element) => element.addEventListener('input', (event) => {
       updateParameter(element.dataset.param, event.target.value, element.dataset.paramJson === 'true');
-      render();
     }));
     document.querySelectorAll('[data-payment-url]').forEach((element) => element.addEventListener('click', async () => {
       try { await bridge.openLink(element.dataset.paymentUrl); } catch { state.error = 'To‘lov sahifasini ochib bo‘lmadi.'; render(); }
