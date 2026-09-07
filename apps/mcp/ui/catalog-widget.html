@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zayuno Catalog</title>
+  <style>
+    :root { color-scheme: dark; --ink:#f8fafc; --muted:#94a3b8; --subtle:#64748b; --line:#24314a; --panel:#10182c; --panel-2:#0b1222; --brand:#6658f6; --brand-2:#9c6bff; --mint:#42d6a3; --warn:#fbbf24; }
+    * { box-sizing:border-box; }
+    body { margin:0; background: radial-gradient(circle at 12% -10%, rgba(101,88,246,.28), transparent 32rem), linear-gradient(180deg,#080d1c 0%,#070b16 100%); color:var(--ink); font:14px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    button,input,select { font:inherit; }
+    button { cursor:pointer; border:0; color:inherit; }
+    button:disabled { cursor:not-allowed; opacity:.48; }
+    .app { max-width:1120px; margin:0 auto; padding:22px; }
+    .top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; }
+    .brand { display:flex; align-items:center; gap:11px; }
+    .mark { display:grid; place-items:center; width:38px; height:38px; border-radius:13px; background:linear-gradient(135deg,#4f46e5,#9c6bff); box-shadow:0 9px 28px rgba(99,102,241,.35); font-weight:900; font-size:19px; }
+    .eyebrow { color:#a5b4fc; font-size:10px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; }
+    h1,h2,h3,p { margin:0; }
+    h1 { margin-top:3px; font-size:22px; letter-spacing:-.03em; }
+    .status { display:flex; align-items:center; gap:7px; color:#a7f3d0; border:1px solid rgba(52,211,153,.26); background:rgba(6,78,59,.26); border-radius:999px; padding:7px 10px; font-size:11px; white-space:nowrap; }
+    .dot { width:7px; height:7px; border-radius:50%; background:#34d399; box-shadow:0 0 9px #34d399; }
+    .hero { display:grid; grid-template-columns:1fr auto; align-items:end; gap:20px; padding:24px; border:1px solid rgba(129,140,248,.26); border-radius:23px; background:linear-gradient(120deg,rgba(35,30,91,.72),rgba(15,24,45,.9) 65%); box-shadow:0 24px 55px rgba(0,0,0,.2); }
+    .hero h2 { max-width:650px; margin-top:7px; font-size:clamp(22px,4vw,35px); line-height:1.08; letter-spacing:-.05em; }
+    .hero p { max-width:650px; margin-top:10px; color:#b9c4d8; }
+    .hero-actions { display:flex; align-items:center; gap:9px; }
+    .primary,.secondary,.ghost { border-radius:12px; padding:11px 14px; font-weight:750; font-size:12px; transition:transform .18s,background .18s,box-shadow .18s; }
+    .primary { background:linear-gradient(135deg,var(--brand),var(--brand-2)); box-shadow:0 10px 25px rgba(99,102,241,.3); }
+    .primary:hover { transform:translateY(-1px); box-shadow:0 14px 30px rgba(99,102,241,.42); }
+    .secondary { background:rgba(30,41,59,.8); border:1px solid #334155; }
+    .ghost { background:transparent; border:1px solid var(--line); color:#cbd5e1; }
+    .toolbar { display:flex; align-items:center; gap:10px; margin:22px 0 14px; }
+    .search { flex:1; display:flex; align-items:center; gap:9px; padding:11px 13px; border:1px solid var(--line); border-radius:13px; background:rgba(7,12,27,.7); color:var(--muted); }
+    .search input { width:100%; border:0; outline:0; color:var(--ink); background:transparent; }
+    .search input::placeholder { color:#64748b; }
+    .cart-button { position:relative; display:flex; align-items:center; gap:8px; padding:11px 14px; border:1px solid rgba(129,140,248,.35); border-radius:13px; background:rgba(79,70,229,.18); font-weight:750; }
+    .badge { display:grid; place-items:center; min-width:20px; height:20px; padding:0 5px; border-radius:99px; background:#f8fafc; color:#4f46e5; font-size:11px; }
+    .filters { display:flex; gap:8px; overflow:auto; padding-bottom:4px; }
+    .filter { padding:8px 11px; border:1px solid var(--line); border-radius:99px; color:var(--muted); background:rgba(15,23,42,.55); white-space:nowrap; font-size:11px; }
+    .filter.active { color:#fff; border-color:rgba(129,140,248,.6); background:rgba(79,70,229,.35); }
+    .section-head { display:flex; align-items:end; justify-content:space-between; gap:10px; margin:21px 0 11px; }
+    .section-head h3 { font-size:16px; letter-spacing:-.02em; }
+    .section-head span { color:var(--subtle); font-size:11px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:13px; }
+    .card { overflow:hidden; border:1px solid var(--line); border-radius:17px; background:linear-gradient(180deg,rgba(16,24,44,.96),rgba(10,16,30,.96)); transition:transform .2s,border-color .2s,box-shadow .2s; }
+    .card:hover { transform:translateY(-3px); border-color:rgba(129,140,248,.58); box-shadow:0 18px 33px rgba(0,0,0,.24); }
+    .visual { position:relative; display:grid; place-items:center; height:142px; overflow:hidden; background:linear-gradient(135deg,#20276b,#182338); }
+    .visual:after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,transparent 45%,rgba(0,0,0,.35)); pointer-events:none; }
+    .visual img { width:100%; height:100%; object-fit:cover; }
+    .visual .fallback { font-size:47px; filter:drop-shadow(0 9px 14px rgba(0,0,0,.25)); }
+    .availability { position:absolute; top:10px; left:10px; z-index:1; border-radius:99px; padding:5px 8px; color:#bbf7d0; border:1px solid rgba(74,222,128,.28); background:rgba(5,46,22,.74); font-size:10px; font-weight:800; }
+    .card-body { padding:14px; }
+    .card-body h3 { font-size:14px; }
+    .description { height:39px; overflow:hidden; margin-top:5px; color:var(--muted); font-size:11px; }
+    .card-footer { display:flex; align-items:center; justify-content:space-between; gap:9px; margin-top:13px; }
+    .price { color:#e0e7ff; font-size:15px; font-weight:850; }
+    .add { padding:8px 11px; border-radius:10px; color:#e0e7ff; background:rgba(79,70,229,.28); border:1px solid rgba(129,140,248,.35); font-size:11px; font-weight:800; }
+    .add:hover { background:rgba(99,102,241,.52); }
+    .empty { padding:44px 20px; border:1px dashed #334155; border-radius:17px; color:var(--muted); text-align:center; }
+    .backdrop { position:fixed; inset:0; z-index:4; display:grid; place-items:center; padding:16px; background:rgba(2,6,23,.72); backdrop-filter:blur(13px); }
+    .drawer { width:min(560px,100%); max-height:90vh; overflow:auto; border:1px solid #334155; border-radius:22px; background:#0d1528; box-shadow:0 28px 80px rgba(0,0,0,.5); }
+    .drawer.wide { width:min(760px,100%); }
+    .drawer-head { display:flex; align-items:start; justify-content:space-between; gap:14px; padding:19px 20px; border-bottom:1px solid var(--line); }
+    .drawer-head h2 { font-size:19px; letter-spacing:-.04em; }
+    .close { width:30px; height:30px; border-radius:9px; background:#172238; color:#94a3b8; font-size:18px; }
+    .drawer-body { padding:20px; }
+    .detail-image { width:100%; height:220px; overflow:hidden; border-radius:16px; background:#20276b; }
+    .detail-image img { width:100%; height:100%; object-fit:cover; }
+    .detail-image .fallback { display:grid; place-items:center; height:100%; font-size:72px; }
+    .option-group { margin-top:19px; }
+    .option-group h4 { margin-bottom:9px; font-size:12px; }
+    .option-list { display:flex; flex-wrap:wrap; gap:8px; }
+    .option { padding:8px 10px; border:1px solid var(--line); border-radius:10px; background:#111c32; color:#cbd5e1; font-size:11px; }
+    .option.selected { border-color:#818cf8; background:rgba(79,70,229,.3); color:#fff; }
+    .qty { display:flex; align-items:center; gap:12px; margin-top:18px; }
+    .qty button { width:30px; height:30px; border-radius:9px; background:#1e293b; font-size:18px; }
+    .drawer-actions { display:flex; gap:9px; margin-top:20px; }
+    .drawer-actions > * { flex:1; }
+    .cart-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 0; border-bottom:1px solid rgba(51,65,85,.7); }
+    .cart-row strong { display:block; font-size:12px; }
+    .cart-row small { color:var(--muted); font-size:10px; }
+    .cart-qty { display:flex; align-items:center; gap:8px; }
+    .cart-qty button { width:25px; height:25px; border-radius:7px; background:#1e293b; }
+    .summary { display:grid; gap:9px; margin-top:18px; padding-top:14px; border-top:1px solid var(--line); }
+    .summary-row { display:flex; justify-content:space-between; color:var(--muted); font-size:12px; }
+    .summary-row.total { color:#fff; font-size:16px; font-weight:850; }
+    .form { display:grid; gap:10px; margin-top:15px; }
+    .field { display:grid; gap:5px; }
+    .field label { color:#cbd5e1; font-size:11px; font-weight:700; }
+    .field input,.field select { width:100%; padding:11px 12px; outline:0; border:1px solid var(--line); border-radius:10px; color:#fff; background:#091124; }
+    .field input:focus,.field select:focus { border-color:#818cf8; box-shadow:0 0 0 3px rgba(99,102,241,.13); }
+    .note { margin-top:13px; padding:11px 12px; border-radius:11px; color:#cbd5e1; background:rgba(30,41,59,.58); border:1px solid var(--line); font-size:11px; }
+    .success { padding:20px; text-align:center; }
+    .success-icon { display:grid; place-items:center; width:54px; height:54px; margin:0 auto 12px; border-radius:18px; color:#6ee7b7; background:rgba(6,78,59,.5); font-size:25px; }
+    .error { margin-top:12px; padding:10px 12px; border-radius:10px; color:#fecaca; background:rgba(127,29,29,.33); border:1px solid rgba(248,113,113,.3); font-size:11px; }
+    .spin { display:inline-block; width:13px; height:13px; margin-right:6px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-2px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    @media(max-width:680px) { .app{padding:15px}.hero{grid-template-columns:1fr}.hero-actions{justify-content:flex-start}.toolbar{align-items:stretch;flex-direction:column}.cart-button{justify-content:center}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.visual{height:118px}.card-body{padding:11px}.description{font-size:10px}.price{font-size:13px}.add{padding:7px 8px} }
+    @media(max-width:430px) { .grid{grid-template-columns:1fr}.visual{height:155px} }
+  </style>
+</head>
+<body>
+  <main class="app" id="app"></main>
+  <script>
+    (() => {
+      const state = { offerings: [], categories: [], providerSlug: '', locationId: '', category: 'ALL', search: '', cart: [], selected: null, selectedOptions: {}, quantity: 1, modal: null, quote: null, action: null, busy: false, error: '', form: { name: '', phone: '', address: '', fulfillmentType: 'STANDARD' } };
+      const pending = new Map();
+      let requestId = 0;
+      const host = () => window.openai || undefined;
+      const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+      const money = (value, currency = 'UZS') => `${Number(value || 0).toLocaleString('uz-UZ')} ${currency === 'UZS' ? 'so‘m' : esc(currency)}`;
+      const icon = (name) => ({search:'⌕',cart:'🛒',close:'×',check:'✓',arrow:'→',plus:'+',minus:'−',spark:'✦',clock:'◷'}[name] || '•');
+      const itemTitle = (item) => item?.title || item?.name || 'Nomsiz taklif';
+      const itemPrice = (item) => Number(item?.price ?? item?.basePrice ?? 0);
+      const itemCategory = (item) => item?.categorySlug || item?.category || 'ALL';
+      const outputValue = (raw) => {
+        if (!raw) return {};
+        if (raw.structuredContent) return raw.structuredContent;
+        if (raw.result?.structuredContent) return raw.result.structuredContent;
+        if (raw.toolOutput) return outputValue(raw.toolOutput);
+        if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return { customerMessage: raw }; } }
+        return raw;
+      };
+      const applyOutput = (raw) => {
+        const data = outputValue(raw);
+        if (Array.isArray(data.offerings)) state.offerings = data.offerings;
+        if (Array.isArray(data.categories)) state.categories = data.categories;
+        if (data.providerSlug) state.providerSlug = data.providerSlug;
+        if (data.locationId) state.locationId = data.locationId;
+        if (data.lines || data.total !== undefined) state.quote = data;
+        if (data.actionId || data.publicId || data.checkoutUrl || data.nextAction) state.action = data;
+        render();
+        saveState();
+      };
+      const getInitial = () => {
+        const openai = host();
+        if (openai?.widgetState) Object.assign(state, openai.widgetState);
+        if (openai?.toolInput) Object.assign(state, { providerSlug: openai.toolInput.providerSlug || state.providerSlug, locationId: openai.toolInput.locationId || state.locationId });
+        applyOutput(openai?.toolOutput);
+      };
+      const saveState = () => { try { host()?.setWidgetState?.({ cart: state.cart, providerSlug: state.providerSlug, locationId: state.locationId, form: state.form }); } catch {} };
+      const callTool = async (name, args) => {
+        state.busy = true; state.error = ''; render();
+        try {
+          if (host()?.callTool) {
+            const result = await host().callTool(name, args);
+            applyOutput(result);
+            return outputValue(result);
+          }
+          const id = `zayuno-${++requestId}`;
+          const result = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => { pending.delete(id); reject(new Error('Tool call timed out')); }, 30000);
+            pending.set(id, { resolve: (value) => { clearTimeout(timeout); pending.delete(id); resolve(value); }, reject });
+            window.parent.postMessage({ jsonrpc:'2.0', id, method:'tools/call', params:{ name, arguments:args } }, '*');
+          });
+          applyOutput(result);
+          return outputValue(result);
+        } catch (error) {
+          state.error = 'Hozir bu amalni yakunlab bo‘lmadi. Qayta urinib ko‘ring.';
+          render(); throw error;
+        } finally { state.busy = false; render(); }
+      };
+      window.addEventListener('message', (event) => {
+        const message = event.data || {};
+        if (message.id && pending.has(message.id)) return pending.get(message.id).resolve(message.result || message);
+        if (message.method === 'ui/notifications/tool-result') return applyOutput(message.params?.result || message.params);
+        if (message.method === 'ui/notifications/tool-input') {
+          const input = message.params?.arguments || message.params?.toolInput || {};
+          if (input.providerSlug) state.providerSlug = input.providerSlug;
+          if (input.locationId) state.locationId = input.locationId;
+          render();
+        }
+      });
+      const visibleItems = () => state.offerings.filter((item) => {
+        const category = state.category === 'ALL' || itemCategory(item) === state.category;
+        const query = state.search.trim().toLowerCase();
+        return category && (!query || `${itemTitle(item)} ${item.description || ''}`.toLowerCase().includes(query));
+      });
+      const itemImage = (item, large = false) => {
+        const media = Array.isArray(item.media) ? item.media.slice().sort((a,b) => (a.order ?? a.sortOrder ?? 0) - (b.order ?? b.sortOrder ?? 0))[0] : null;
+        const url = media?.url || item.imageUrl;
+        return url ? `<img src="${esc(url)}" alt="${esc(media?.altText || itemTitle(item))}" loading="lazy" />` : `<div class="fallback">${esc(item.emoji || '✦')}</div>`;
+      };
+      const openItem = (item) => { state.selected=item; state.selectedOptions={}; state.quantity=1; state.modal='detail'; render(); };
+      const addItem = () => {
+        const item = state.selected; if (!item) return;
+        const selectedOptions = Object.values(state.selectedOptions).filter(Boolean).map((option) => ({ groupId: option.groupId, optionId: option.id, quantity: 1 }));
+        const key = `${item.id}:${selectedOptions.map((x) => x.optionId).join(',')}`;
+        const existing = state.cart.find((line) => line.key === key);
+        if (existing) existing.quantity += state.quantity;
+        else state.cart.push({ key, offeringId:item.id, title:itemTitle(item), unitPrice:itemPrice(item), currency:item.currency || 'UZS', quantity:state.quantity, selectedOptions });
+        state.modal='cart'; state.selected=null; saveState(); render();
+      };
+      const changeCart = (key, delta) => { const item=state.cart.find((line)=>line.key===key); if (!item) return; item.quantity+=delta; if(item.quantity<=0) state.cart=state.cart.filter((line)=>line.key!==key); saveState(); render(); };
+      const quote = async () => {
+        if (!state.cart.length) return;
+        await callTool('request_quote', { providerSlug:state.providerSlug, locationId:state.locationId || undefined, items:state.cart.map((line)=>({ offeringId:line.offeringId, quantity:line.quantity, selectedOptions:line.selectedOptions })), fulfillmentType:state.form.fulfillmentType, destination:state.form.address ? {raw:state.form.address} : undefined });
+        state.modal='quote'; render();
+      };
+      const createAction = async () => {
+        if (!state.quote?.id && !state.quote?.quoteId) { state.error='Avval yakuniy quote oling.'; render(); return; }
+        if (!state.form.name.trim() || !state.form.phone.trim()) { state.error='Ism va telefon raqamingizni kiriting.'; render(); return; }
+        await callTool('create_action', { providerSlug:state.providerSlug, quoteId:state.quote.id || state.quote.quoteId, locationId:state.locationId || undefined, items:state.cart.map((line)=>({ offeringId:line.offeringId, quantity:line.quantity, selectedOptions:line.selectedOptions })), customer:{name:state.form.name.trim(), phone:state.form.phone.trim()}, destination:state.form.address ? {raw:state.form.address} : undefined, fulfillmentType:state.form.fulfillmentType, userConfirmed:true });
+        state.modal='success'; saveState(); render();
+      };
+      const checkout = () => {
+        const url = state.action?.checkoutUrl || state.action?.nextAction?.url;
+        if (!url) return;
+        if (host()?.openExternal) host().openExternal({href:url}); else window.open(url,'_blank','noopener,noreferrer');
+      };
+      const render = () => {
+        const items=visibleItems(); const cats=['ALL',...state.categories.map((c)=>c.slug||c.id||c.name).filter(Boolean)]; const cartCount=state.cart.reduce((n,i)=>n+i.quantity,0); const subtotal=state.cart.reduce((n,i)=>n+i.quantity*i.unitPrice,0);
+        document.getElementById('app').innerHTML = `<div class="top"><div class="brand"><div class="mark">Z</div><div><div class="eyebrow">Zayuno commerce</div><h1>Tanlang, savatga qo‘shing va buyurtma bering</h1></div></div><div class="status"><span class="dot"></span>Live catalog</div></div>
+          <section class="hero"><div><div class="eyebrow">AI agent uchun interaktiv xarid</div><h2>Kerakli xizmat yoki mahsulotni bir necha bosishda tanlang.</h2><p>Rasmlar, variantlar, qo‘shimchalar, yakuniy quote va provider checkout — hammasi shu oynada.</p></div><div class="hero-actions"><button class="secondary" data-action="refresh">${icon('spark')} Yangilash</button><button class="primary" data-action="open-cart">${icon('cart')} Savat <span class="badge">${cartCount}</span></button></div></section>
+          <div class="toolbar"><label class="search">${icon('search')}<input data-input="search" value="${esc(state.search)}" placeholder="Mahsulot yoki xizmat qidiring…" /></label><button class="cart-button" data-action="open-cart">${icon('cart')} Savat <span class="badge">${cartCount}</span></button></div>
+          <div class="filters">${cats.map((cat)=>`<button class="filter ${state.category===cat?'active':''}" data-category="${esc(cat)}">${esc(cat==='ALL'?'Barchasi':cat)}</button>`).join('')}</div>
+          <div class="section-head"><h3>Katalog</h3><span>${items.length} ta variant</span></div>
+          ${items.length ? `<div class="grid">${items.map((item)=>`<article class="card"><button class="visual" data-item="${esc(item.id)}" aria-label="${esc(itemTitle(item))}">${item.isAvailable===false?'':'<span class="availability">Mavjud</span>'}${itemImage(item)}</button><div class="card-body"><h3>${esc(itemTitle(item))}</h3><p class="description">${esc(item.description || 'Provider katalogidagi xizmat yoki mahsulot.')}</p><div class="card-footer"><span class="price">${money(itemPrice(item),item.currency)}</span><button class="add" data-item="${esc(item.id)}">Tanlash ${icon('arrow')}</button></div></div></article>`).join('')}</div>` : `<div class="empty">Katalog hozircha bo‘sh yoki qidiruv bo‘yicha natija topilmadi.</div>`}
+          ${state.error ? `<div class="error">${esc(state.error)}</div>` : ''}
+          ${state.busy ? `<div class="note"><span class="spin"></span> Provider bilan xavfsiz bog‘lanilmoqda…</div>` : ''}
+          ${state.modal ? modalHtml(subtotal) : ''}`;
+        bind();
+      };
+      const modalHtml = (subtotal) => {
+        if (state.modal==='detail' && state.selected) { const item=state.selected; const groups=Array.isArray(item.optionGroups)?item.optionGroups:[]; return `<div class="backdrop" data-action="close"><section class="drawer wide" onclick="event.stopPropagation()"><div class="drawer-head"><div><div class="eyebrow">Tanlovni sozlash</div><h2>${esc(itemTitle(item))}</h2></div><button class="close" data-action="close">${icon('close')}</button></div><div class="drawer-body"><div class="detail-image">${itemImage(item,true)}</div><p class="description" style="height:auto;margin-top:13px">${esc(item.description||'')}</p>${groups.map((group)=>`<div class="option-group"><h4>${esc(group.name||'Variant')}</h4><div class="option-list">${(group.options||[]).filter((o)=>o.isAvailable!==false).map((option)=>`<button class="option ${state.selectedOptions[group.id]?.id===option.id?'selected':''}" data-option-group="${esc(group.id)}" data-option="${esc(option.id)}">${esc(option.name)}${option.priceDelta?` · +${money(option.priceDelta,item.currency)}`:''}</button>`).join('')}</div></div>`).join('')}<div class="qty"><b>Miqdor</b><button data-action="qty-minus">−</button><strong>${state.quantity}</strong><button data-action="qty-plus">+</button><span style="margin-left:auto" class="price">${money(itemPrice(item)*state.quantity,item.currency)}</span></div><div class="drawer-actions"><button class="ghost" data-action="close">Bekor qilish</button><button class="primary" data-action="add">Savatga qo‘shish ${icon('cart')}</button></div></div></section></div>`; }
+        if (state.modal==='cart' || state.modal==='quote') { const quoteMode=state.modal==='quote'; return `<div class="backdrop" data-action="close"><section class="drawer" onclick="event.stopPropagation()"><div class="drawer-head"><div><div class="eyebrow">${quoteMode?'Yakuniy quote':'Sizning savatingiz'}</div><h2>${quoteMode?'Buyurtmani tekshiring':'Savat'}</h2></div><button class="close" data-action="close">${icon('close')}</button></div><div class="drawer-body">${!state.cart.length?'<div class="empty">Savat bo‘sh.</div>':state.cart.map((line)=>`<div class="cart-row"><div><strong>${esc(line.title)}</strong><small>${money(line.unitPrice,line.currency)} · ${line.selectedOptions.length?'Qo‘shimchalar tanlangan':''}</small></div><div class="cart-qty"><button data-cart="${esc(line.key)}" data-delta="-1">−</button><b>${line.quantity}</b><button data-cart="${esc(line.key)}" data-delta="1">+</button></div></div>`).join('')}<div class="summary"><div class="summary-row"><span>Mahsulotlar</span><b>${money(quoteMode?(state.quote?.subtotal||subtotal):subtotal)}</b></div>${quoteMode?`<div class="summary-row"><span>Yetkazish va fee</span><b>${money((state.quote?.totalFees||0)-(state.quote?.totalDiscount||0))}</b></div><div class="summary-row total"><span>Jami</span><b>${money(state.quote?.total,state.quote?.currency)}</b></div>`:`<div class="summary-row total"><span>Taxminiy jami</span><b>${money(subtotal)}</b></div>`}</div>${quoteMode?customerForm():`<button class="primary" style="width:100%;margin-top:17px" data-action="quote" ${state.busy?'disabled':''}>${state.busy?'<span class="spin"></span>Hisoblanmoqda…':'Yetkazib berishni hisoblash →'}</button>`}${state.error?`<div class="error">${esc(state.error)}</div>`:''}</div></section></div>`; }
+        if (state.modal==='success') { const paid=String(state.action?.paymentStatus||'').toUpperCase()==='PAID'; return `<div class="backdrop"><section class="drawer"><div class="success"><div class="success-icon">${icon('check')}</div><div class="eyebrow">Buyurtma yaratildi</div><h2 style="margin:7px 0 9px">${paid?'To‘lov qabul qilindi':'To‘lov kutilmoqda'}</h2><p style="color:var(--muted)">${paid?'Provider buyurtmangizni tasdiqladi.':'Buyurtma providerga yuborildi. To‘lovni faqat provider checkout sahifasida yakunlang.'}</p>${state.action?.checkoutUrl||state.action?.nextAction?.url?`<button class="primary" style="width:100%;margin-top:18px" data-action="checkout">To‘lov sahifasini ochish ${icon('arrow')}</button>`:''}<button class="ghost" style="width:100%;margin-top:9px" data-action="close">Katalogga qaytish</button></div></section></div>`; }
+        return '';
+      };
+      const customerForm = () => `<div class="form"><div class="field"><label>Ismingiz *</label><input data-form="name" value="${esc(state.form.name)}" placeholder="Masalan, Abduhamid" /></div><div class="field"><label>Telefon raqamingiz *</label><input data-form="phone" value="${esc(state.form.phone)}" placeholder="+998 90 123 45 67" /></div><div class="field"><label>Yetkazish manzili</label><input data-form="address" value="${esc(state.form.address)}" placeholder="Toshkent City Park…" /></div><div class="field"><label>Olish usuli</label><select data-form="fulfillmentType"><option value="STANDARD" ${state.form.fulfillmentType==='STANDARD'?'selected':''}>Yetkazib berish</option><option value="PICKUP" ${state.form.fulfillmentType==='PICKUP'?'selected':''}>O‘zim olib ketaman</option></select></div><button class="primary" style="width:100%;margin-top:7px" data-action="create" ${state.busy?'disabled':''}>${state.busy?'<span class="spin"></span>Yuborilmoqda…':'Buyurtmani tasdiqlash'}</button><div class="note">Narx provider’dan real-time quote orqali olindi. Zayuno karta ma’lumotlarini saqlamaydi.</div></div>`;
+      const bind = () => { document.querySelectorAll('[data-category]').forEach((el)=>el.onclick=()=>{state.category=el.dataset.category;render();}); document.querySelectorAll('[data-item]').forEach((el)=>el.onclick=()=>{const item=state.offerings.find((x)=>x.id===el.dataset.item);if(item)openItem(item);}); document.querySelectorAll('[data-action]').forEach((el)=>el.onclick=()=>{const a=el.dataset.action;if(a==='close')state.modal=null;if(a==='open-cart')state.modal='cart';if(a==='refresh')callTool('get_catalog',{providerSlug:state.providerSlug,locationId:state.locationId||undefined});if(a==='add')addItem();if(a==='qty-minus')state.quantity=Math.max(1,state.quantity-1);if(a==='qty-plus')state.quantity++;if(a==='quote')quote();if(a==='create')createAction();if(a==='checkout')checkout();render();}); document.querySelectorAll('[data-option]').forEach((el)=>el.onclick=()=>{const group=el.dataset.optionGroup;const item=state.selected;const option=(item?.optionGroups||[]).flatMap((g)=>g.options||[]).find((x)=>x.id===el.dataset.option);if(option)state.selectedOptions[group]={...option,groupId:group};render();}); document.querySelectorAll('[data-cart]').forEach((el)=>el.onclick=()=>changeCart(el.dataset.cart,Number(el.dataset.delta))); const search=document.querySelector('[data-input="search"]');if(search)search.oninput=(e)=>{state.search=e.target.value;render();}; document.querySelectorAll('[data-form]').forEach((el)=>el.oninput=(e)=>{state.form[el.dataset.form]=e.target.value;saveState();}); };
+      getInitial(); render();
+    })();
+  </script>
+</body>
+</html>

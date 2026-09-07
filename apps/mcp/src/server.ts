@@ -4,9 +4,35 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express, { Request, Response, Express } from 'express';
 import cors from 'cors';
 import { randomUUID } from 'crypto';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
 import { ZayunoApiClient } from './client.js';
-import { registerZayunoTools, ZAYUNO_MCP_TOOLS } from './tools.js';
+import { registerZayunoTools, ZAYUNO_MCP_TOOLS, ZAYUNO_CATALOG_WIDGET_URI, getToolUiMeta } from './tools.js';
 import { getWelcomeMessage, formatCustomerError, getOpenAiAppsChallengeToken, stripSensitiveSecrets } from '@zayuno/shared';
+
+const ZAYUNO_CATALOG_WIDGET_MIME = 'text/html;profile=mcp-app';
+const catalogWidgetPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../ui/catalog-widget.html');
+
+function getCatalogWidgetHtml(): string {
+  return readFileSync(catalogWidgetPath, 'utf8');
+}
+
+const ZAYUNO_CATALOG_RESOURCE = {
+  uri: ZAYUNO_CATALOG_WIDGET_URI,
+  name: 'Zayuno Catalog & Checkout UI',
+  title: 'Zayuno interactive catalog',
+  description: 'Visual catalog, cart, quote confirmation and provider checkout widget.',
+  mimeType: ZAYUNO_CATALOG_WIDGET_MIME,
+  _meta: {
+    ui: {
+      prefersBorder: true,
+      csp: { connectDomains: [], resourceDomains: [] }
+    },
+    'openai/widgetPrefersBorder': true,
+    'openai/widgetDescription': 'Browse offerings, configure options, build a cart, verify a quote, and continue to provider checkout.'
+  }
+};
 
 export const ZAYUNO_MCP_PROMPTS = [
   {
@@ -93,6 +119,31 @@ export function createZayunoMcpServer() {
 
   const apiClient = new ZayunoApiClient();
   registerZayunoTools(server, apiClient);
+
+  server.resource(
+    'zayuno-catalog-widget',
+    ZAYUNO_CATALOG_WIDGET_URI,
+    {
+      title: 'Zayuno interactive catalog',
+      description: 'Visual catalog, cart, quote confirmation and provider checkout widget.',
+      mimeType: ZAYUNO_CATALOG_WIDGET_MIME,
+      _meta: {
+        ui: {
+          prefersBorder: true,
+          csp: { connectDomains: [], resourceDomains: [] }
+        },
+        'openai/widgetPrefersBorder': true,
+        'openai/widgetDescription': 'Browse offerings, configure options, build a cart, verify a quote, and continue to provider checkout.'
+      }
+    },
+    async (uri) => ({
+      contents: [{
+        uri: uri.href,
+        mimeType: ZAYUNO_CATALOG_WIDGET_MIME,
+        text: getCatalogWidgetHtml()
+      }]
+    })
+  );
 
   server.prompt('welcome', 'Dynamic customer welcome message for Zayuno marketplace assistant', async () => {
     try {
@@ -244,7 +295,8 @@ export function runHttpSseServer(port = 4002): Express {
               description: t.description,
               inputSchema: t.inputSchema,
               outputSchema: t.outputSchema,
-              annotations: t.annotations
+              annotations: t.annotations,
+              ...(getToolUiMeta(t.name) ? { _meta: getToolUiMeta(t.name) } : {})
             }))
           }
         },
@@ -273,18 +325,23 @@ export function runHttpSseServer(port = 4002): Express {
         const apiClient = new ZayunoApiClient();
         const rawResult = await tool.handler(toolArgs, apiClient);
         const result = stripSensitiveSecrets(rawResult);
+        const customerText = typeof result === 'string'
+          ? result
+          : result?.customerMessage || JSON.stringify(result, null, 2);
 
         return {
           response: {
             jsonrpc: '2.0',
             id,
             result: {
+              structuredContent: typeof result === 'string' ? { customerMessage: result } : result,
               content: [
                 {
                   type: 'text',
-                  text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+                  text: customerText
                 }
-              ]
+              ],
+              ...(getToolUiMeta(tool.name) ? { _meta: getToolUiMeta(tool.name) } : {})
             }
           },
           isNotification: false
@@ -387,7 +444,36 @@ export function runHttpSseServer(port = 4002): Express {
         response: {
           jsonrpc: '2.0',
           id,
-          result: { resources: [] }
+          result: { resources: [ZAYUNO_CATALOG_RESOURCE] }
+        },
+        isNotification: false
+      };
+    }
+
+    // 8b. resources/read — MCP Apps widget resource
+    if (method === 'resources/read') {
+      const uri = params?.uri;
+      if (uri !== ZAYUNO_CATALOG_WIDGET_URI) {
+        return {
+          response: {
+            jsonrpc: '2.0',
+            id,
+            error: { code: -32002, message: `Resource not found: ${uri}` }
+          },
+          isNotification: false
+        };
+      }
+      return {
+        response: {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            contents: [{
+              uri: ZAYUNO_CATALOG_WIDGET_URI,
+              mimeType: ZAYUNO_CATALOG_WIDGET_MIME,
+              text: getCatalogWidgetHtml()
+            }]
+          }
         },
         isNotification: false
       };
@@ -460,16 +546,24 @@ export function runHttpSseServer(port = 4002): Express {
     });
   });
 
+  // Local preview endpoint for provider and integration QA. ChatGPT and MCP
+  // clients use the ui:// resource above; this route makes the same artifact
+  // easy to inspect in a browser during development.
+  app.get('/ui/catalog-v1.html', (_req: Request, res: Response) => {
+    res.type('html').send(getCatalogWidgetHtml());
+  });
+
   // 2. Introspection endpoint: GET /tools
   app.get('/tools', (req: Request, res: Response) => {
     res.json({
       tools: ZAYUNO_MCP_TOOLS.map(tool => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        outputSchema: tool.outputSchema,
-        annotations: tool.annotations
-      }))
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      outputSchema: tool.outputSchema,
+      annotations: tool.annotations,
+      ...(getToolUiMeta(tool.name) ? { _meta: getToolUiMeta(tool.name) } : {})
+    }))
     });
   });
 

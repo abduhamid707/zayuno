@@ -326,8 +326,11 @@ export function formatCustomerActionStatus(action: any, providerInfo?: any): str
     return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga boshqa taklif topib beraman.';
   }
 
-  // 2. Paid / Confirmed
-  if (paymentStatus === 'PAID' || status === 'CONFIRMED' || sandboxState === 'CONFIRMED') {
+  // 2. Paid
+  // `CONFIRMED` describes the provider/order lifecycle, not payment settlement.
+  // A provider can confirm or accept an order while its payment is still
+  // pending, so never turn an action status into a payment claim.
+  if (paymentStatus === 'PAID') {
     if (isTicket) {
       return 'Zo‘r, to‘lov qabul qilindi. Chiptangiz tasdiqlandi.';
     }
@@ -482,4 +485,3 @@ export function formatCustomerError(error?: unknown): string {
 export function formatCustomerGeneralHelp(): string {
   return 'Men qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman. Nimadan boshlaymiz?';
 }
-

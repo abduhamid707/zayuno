@@ -20,6 +20,32 @@ import {
   stripSensitiveSecrets
 } from '@zayuno/shared';
 
+export const ZAYUNO_CATALOG_WIDGET_URI = 'ui://zayuno/catalog-v1.html';
+
+const CATALOG_UI_TOOLS = new Set([
+  'get_catalog',
+  'get_offering',
+  'search_catalog',
+  'request_quote',
+  'create_action',
+  'get_action',
+  'get_payment_options'
+]);
+
+export function getToolUiMeta(toolName: string) {
+  if (!CATALOG_UI_TOOLS.has(toolName)) return undefined;
+  return {
+    ui: {
+      resourceUri: ZAYUNO_CATALOG_WIDGET_URI,
+      prefersBorder: true,
+      csp: { connectDomains: [], resourceDomains: [] }
+    },
+    'openai/outputTemplate': ZAYUNO_CATALOG_WIDGET_URI,
+    'openai/widgetPrefersBorder': true,
+    'openai/widgetDescription': 'Zayuno interactive catalog, cart, quote and action flow.'
+  };
+}
+
 export interface McpToolDefinition {
   name: string;
   description: string;
@@ -1048,13 +1074,18 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
         try {
           const rawResult = await tool.handler(args, client);
           const result = stripSensitiveSecrets(rawResult);
+          const customerText = typeof result === 'string'
+            ? result
+            : result?.customerMessage || JSON.stringify(result, null, 2);
           return {
+            structuredContent: typeof result === 'string' ? { customerMessage: result } : result,
             content: [
               {
                 type: 'text',
-                text: typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+                text: customerText
               }
-            ]
+            ],
+            ...(getToolUiMeta(tool.name) ? { _meta: getToolUiMeta(tool.name) } : {})
           };
         } catch (err: any) {
           const friendlyMessage = formatCustomerError(err);

@@ -235,6 +235,17 @@ async function main() {
 
   // 11. cancelled customer copy
   {
+    const confirmedButUnpaid = {
+      id: 'act_confirmed_unpaid',
+      fulfillmentType: 'DELIVERY',
+      status: 'CONFIRMED',
+      paymentStatus: 'PENDING',
+      paymentUrl: 'https://checkout.example.test/pay/confirmed-unpaid'
+    };
+    const confirmedButUnpaidCopy = formatCustomerActionStatus(confirmedButUnpaid);
+    assert.match(confirmedButUnpaidCopy, /^Buyurtmangiz qabul qilingan, lekin to‘lov hali qilinmagan\./);
+    assert.match(confirmedButUnpaidCopy, /\[To‘lovni yakunlash\]\(https:\/\/checkout\.example\.test\/pay\/confirmed-unpaid\)/);
+
     const cancelledTicket = {
       id: 'act_ticket_canc',
       fulfillmentType: 'DIGITAL_TICKET',
@@ -461,4 +472,3 @@ main().catch(err => {
   console.error('❌ Test failed:', err);
   process.exit(1);
 });
-
