@@ -12,6 +12,7 @@ import {
   formatCustomerCapabilities,
   formatCustomerLocations,
   formatCustomerOfferings,
+  formatUzbekCurrency,
   formatCustomerOffering,
   formatCustomerPaymentOptions,
   formatCustomerError,
@@ -31,6 +32,33 @@ function providerSummary(provider: any) {
 
 function catalogOffering(offering: any) {
   return { ...offering, name: offering.name ?? offering.title, price: offering.price ?? offering.basePrice };
+}
+
+function catalogImageForChat(offering: any): string | null {
+  const media = Array.isArray(offering?.media)
+    ? [...offering.media].sort((a, b) => (a.order || 0) - (b.order || 0))[0]
+    : null;
+  const candidate = media?.thumbnailUrl || media?.url || offering?.imageUrl;
+  if (!candidate) return null;
+  try {
+    const url = new URL(String(candidate));
+    if (url.protocol !== 'https:' || !['api.zayuno.uz', 'mcp.zayuno.uz'].includes(url.hostname)) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function formatNativeCatalog(offerings: any[], providerName?: string): string {
+  if (!Array.isArray(offerings) || offerings.length === 0) return 'Kechirasiz, hech qanday mahsulot topilmadi.';
+  const items = offerings.slice(0, 8).map((offering, index) => {
+    const title = offering.title || offering.name || 'Mahsulot';
+    const price = offering.basePrice ?? offering.price;
+    const image = catalogImageForChat(offering);
+    const imageLine = image ? `![${title}](${image})\n` : '';
+    return `${imageLine}**${index + 1}. ${title}** — **${formatUzbekCurrency(price || 0, offering.currency || 'UZS')}**`;
+  });
+  return `**${providerName || 'Katalog'}**\n\n${items.join('\n\n')}\n\nRaqam bilan tanlang — masalan: **1-ni tanlayman, 2 ta**.`;
 }
 
 const catalogMediaItemOutputProperties = {
@@ -412,7 +440,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 6. get_catalog
   {
     name: 'get_catalog',
-    description: 'Use this when the user wants to OPEN a provider menu or visual catalog with selection buttons and a cart. Call with a verified providerSlug; find_providers and list_providers do NOT open the catalog. Returns an interactive UI in compatible hosts and catalog data for text-only agents. Missing images do not prevent the UI. Can be filtered by category or location.',
+    description: 'Use this when the user wants to OPEN a provider menu or compact catalog in the chat. Call with a verified providerSlug; find_providers and list_providers do NOT open the catalog. Returns numbered products with optional Markdown images for native chat hosts; users select by number and quantity. Can be filtered by category or location.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -455,7 +483,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     handler: async (args, client) => {
       const catalog = await client.getCatalog(args.providerSlug, args.locationId, args.category, args.parameters);
       const offerings = catalog?.offerings || (Array.isArray(catalog) ? catalog : []);
-      const customerMessage = formatCustomerOfferings(offerings, args.providerSlug);
+      const customerMessage = formatNativeCatalog(offerings, args.providerSlug);
       return {
         customerMessage,
         ...(Array.isArray(catalog) ? {} : catalog), providerSlug: args.providerSlug, locationId: catalog?.locationId ?? args.locationId,

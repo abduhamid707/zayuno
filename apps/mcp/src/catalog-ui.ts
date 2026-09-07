@@ -7,6 +7,11 @@ export const ZAYUNO_CATALOG_WIDGET_URI = 'ui://zayuno/catalog-v3.html';
 export const ZAYUNO_CATALOG_WIDGET_MIME = 'text/html;profile=mcp-app';
 export const ZAYUNO_UI_VERSION = '3.0.0';
 
+// Native ChatGPT chat is the default customer experience. Keep the iframe
+// available for developer previews, but do not attach it to customer tools
+// unless it is explicitly enabled in the deployment environment.
+export const ZAYUNO_CATALOG_WIDGET_ENABLED = process.env.ZAYUNO_CATALOG_WIDGET_ENABLED === 'true';
+
 function imageOrigins(): string[] {
   return [...new Set(['https://mcp.zayuno.uz', 'https://api.zayuno.uz', ...(process.env.MCP_WIDGET_IMAGE_ORIGINS || '').split(',')]
     .map(value => value.trim()).filter(Boolean).map(value => {
@@ -50,7 +55,7 @@ export function readCatalogResource() {
 
 const APP_TOOLS = new Set(['get_catalog', 'get_offering', 'search_catalog', 'request_quote', 'create_action', 'get_action', 'get_payment_options', 'check_availability']);
 export function getToolUiMeta(name: string) {
-  if (!APP_TOOLS.has(name)) return undefined;
+  if (!ZAYUNO_CATALOG_WIDGET_ENABLED || !APP_TOOLS.has(name)) return undefined;
   // Only opening a catalog mounts the UI. Quote/status calls update that instance.
   const renders = name === 'get_catalog';
   return {
