@@ -15,3 +15,4 @@ coverage
 *.tsbuildinfo
 artifacts/
 openai-apps-sdk-examples-main/
+*.apk
