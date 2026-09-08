@@ -658,13 +658,27 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
   }
 
   private async enforceFoodScope(
-    _input: ChatRequest,
-    _prompt: string,
-    _history: ConversationMessage[],
-    _providers: any[],
+    input: ChatRequest,
+    prompt: string,
+    history: ConversationMessage[],
+    providers: any[],
   ): Promise<string | undefined> {
-    // Cheklovlar to‘liq olib tashlandi: foydalanuvchi xohlagancha yozishi mumkin, suhbat aslo bloklanmaydi
-    return undefined;
+    if (this.isFoodScopePrompt(prompt, history, providers, input.selections)) {
+      await this.resetOffTopicAttempts(input.userId, input.conversationId);
+      return undefined;
+    }
+
+    const attempts = await this.incrementOffTopicAttempts(
+      input.userId,
+      input.conversationId,
+    );
+    if (attempts >= 4) {
+      return "Bu chat faqat restoran, menyu va ovqat buyurtmasi uchun ishlaydi.";
+    }
+    if (attempts === 1) {
+      return "Hozir Zayuno faqat restoran va fast-food buyurtmalariga yordam beradi. Taom, restoran yoki budjetingizni yozing.";
+    }
+    return "Bu savol food buyurtmasiga tegishli emas. Restoran, taom, ichimlik, yetkazib berish yoki buyurtma holati haqida so‘rashingiz mumkin.";
   }
 
   private isFoodScopePrompt(
@@ -714,7 +728,7 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       return true;
     }
 
-    if (/\b(zayuno|ilova|mobil\s*ilova|support|yordam|muammo|ishlamay)\b/i.test(raw)) {
+    if (/\b(zayuno|ilova|mobil\s*ilova|support|yordam|muammo|ishlamay|bila|blya|kot|ahmoq|jinni)\b/i.test(raw)) {
       return true;
     }
 
