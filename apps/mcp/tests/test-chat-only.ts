@@ -4,6 +4,7 @@ import { ZayunoApiClient } from '../src/client.ts';
 import { registerZayunoTools } from '../src/tools.ts';
 
 async function main() {
+  process.env.ZAYUNO_TEXT_CHOICES_ENABLED = 'false';
   // Old deployment flags must not accidentally restore the removed widgets.
   process.env.ZAYUNO_QUICK_REPLIES_ENABLED = 'true';
   process.env.ZAYUNO_CATALOG_WIDGET_ENABLED = 'true';

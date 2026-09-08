@@ -7,8 +7,9 @@ import { randomUUID } from 'crypto';
 import { ZayunoApiClient } from './client.js';
 import { registerZayunoTools, ZAYUNO_MCP_TOOLS } from './tools.js';
 import { getWelcomeMessage, formatCustomerError, getOpenAiAppsChallengeToken, stripSensitiveSecrets } from '@zayuno/shared';
+import { CHOICES_URI, choicesEnabled, choiceToolMeta, choiceResultMeta, choiceResource, readChoiceResource } from './choices.js';
 
-const MCP_INSTRUCTIONS = 'Use ordinary, concise chat replies in the customer language. For a provider menu call get_catalog with its verified slug and show a short numbered list of product names and prices. No widgets, iframes, quick-reply buttons, image galleries or claims that an interactive catalog opened. Keep catalog and cart selections in the conversation; ask only for missing choices. Fetch get_offering when variants or required modifiers need clarification. Quote the selected items and destination before create_action; require explicit confirmation of that exact unexpired quote. Selecting a product is not order confirmation. CONFIRMED does not imply PAID.';
+const MCP_INSTRUCTIONS = 'Use concise chat replies in the customer language. Discover verified restaurants with find_providers or list_providers. For a provider menu call get_catalog with its verified slug. These tools may display compact clickable text choices in supported clients; avoid repeating the entire displayed list. When UI is unavailable, show a short numbered list with prices using customerMessage. Never claim a choice was clicked or a message was sent without evidence. Keep catalog and cart selections in the conversation; ask only for missing choices. Fetch get_offering when variants or required modifiers need clarification. Quote the selected items and destination before create_action; require explicit confirmation of that exact unexpired quote. Selecting a product is not order confirmation. CONFIRMED does not imply PAID.';
 
 export const ZAYUNO_MCP_PROMPTS = [
   {
@@ -44,7 +45,7 @@ ZAYUNO CUSTOMER MODE QOIDALARI:
    - Tool’larni orqa fonda jim chaqiring. Har bir oraliq qadamni yoki ichki mulohazani mijozga aytmang.
    - Avval barcha kerakli tool chaqiruvlarini to‘liq tugating.
    - Keyin mijozga faqat bitta qisqa, tayyor natija yozing.
-   - Oddiy chiroyli chat: \`customerMessage\` asosida qisqa matn, mahsulot nomi va narxlarini raqamlangan ro‘yxatda bering. Tugma, iframe, rasm galereyasi yoki interaktiv panel taklif qilmang.
+   - Servis va menyu toollari ixcham bosiladigan tanlov ko‘rsatishi mumkin. Ko‘rsatilgan ro‘yxatni takrorlamang. Interfeys qo‘llanmasa, \`customerMessage\` asosida mahsulot nomi va narxlarini raqamlangan ro‘yxatda bering.
    - Tanlovlarni shu suhbatda saqlang; faqat yetishmayotgan miqdor, variant yoki qo‘shimchani so‘rang. Tanlov buyurtma tasdig‘i emas.
 
 2. Birinchi salomlashuv:
@@ -100,6 +101,7 @@ export function createZayunoMcpServer() {
   }, { instructions: MCP_INSTRUCTIONS });
 
   const apiClient = new ZayunoApiClient();
+  if (choicesEnabled()) server.registerResource('zayuno-text-choices', CHOICES_URI, { mimeType: choiceResource.mimeType }, async () => readChoiceResource());
   registerZayunoTools(server, apiClient);
 
   server.prompt('welcome', 'Dynamic customer welcome message for Zayuno marketplace assistant', async () => {
@@ -253,7 +255,8 @@ export function runHttpSseServer(port = 4002): Express {
               description: t.description,
               inputSchema: t.inputSchema,
               outputSchema: t.outputSchema,
-              annotations: t.annotations
+              annotations: t.annotations,
+              ...(choiceToolMeta(t.name) ? { _meta: choiceToolMeta(t.name) } : {})
             }))
           }
         },
@@ -291,6 +294,7 @@ export function runHttpSseServer(port = 4002): Express {
             jsonrpc: '2.0',
             id,
             result: {
+              ...(choiceResultMeta(toolName, toolArgs, result) ? { _meta: choiceResultMeta(toolName, toolArgs, result) } : {}),
               structuredContent: typeof result === 'string' ? { customerMessage: result } : result,
               content: [
                 {
@@ -400,15 +404,18 @@ export function runHttpSseServer(port = 4002): Express {
         response: {
           jsonrpc: '2.0',
           id,
-          result: { resources: [] }
+          result: { resources: choicesEnabled() ? [choiceResource] : [] }
         },
         isNotification: false
       };
     }
 
-    // Chat-only: old cached UI resource requests must not return an iframe.
+    // Only the versioned text-choice resource is supported; old widgets stay removed.
     if (method === 'resources/read') {
       const uri = params?.uri;
+      if (choicesEnabled() && uri === CHOICES_URI) {
+        return { response: { jsonrpc: '2.0', id, result: readChoiceResource() }, isNotification: false };
+      }
       return {
         response: {
           jsonrpc: '2.0',
@@ -481,9 +488,9 @@ export function runHttpSseServer(port = 4002): Express {
       server: 'Zayuno MCP Action Infrastructure Server',
       protocol: 'Model Context Protocol (MCP) Streamable HTTP + SSE',
       toolsCount: ZAYUNO_MCP_TOOLS.length,
-      uiMode: 'chat-only',
-      uiResource: null,
-      quickRepliesEnabled: false,
+      uiMode: choicesEnabled() ? 'text-choices' : 'chat-only',
+      uiResource: choicesEnabled() ? CHOICES_URI : null,
+      quickRepliesEnabled: choicesEnabled(),
       activeSseSessions: sseTransports.size,
       timestamp: new Date().toISOString()
     });
@@ -497,7 +504,8 @@ export function runHttpSseServer(port = 4002): Express {
       description: tool.description,
       inputSchema: tool.inputSchema,
       outputSchema: tool.outputSchema,
-      annotations: tool.annotations
+      annotations: tool.annotations,
+      ...(choiceToolMeta(tool.name) ? { _meta: choiceToolMeta(tool.name) } : {})
     }))
     });
   });
