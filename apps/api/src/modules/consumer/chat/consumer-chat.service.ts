@@ -402,8 +402,8 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     // 3. Restaurant / Fast-food listing questions or requests
     const norm = this.normalizeLookupText(prompt);
     if (
-      /^(r[ae]st[ao]r[a-z]*|fast\s*food[a-z]*|kafe[a-z]*|brend[a-z]*)(\s+.*)?$/i.test(norm) ||
-      /(r[ae]st[ao]r[a-z]*|fast\s*food|fastfood|kafe|pitsa|pizza|lavash|burger|sushi|donar|menyu|katalog)/i.test(norm) &&
+      /^(r[ae]st[ao]r[a-z]*|fast\s*food[a-z]*|kafe[a-z]*|brend[a-z]*|oshxona[a-z]*|food[a-z]*|ovqat[a-z]*|taom[a-z]*)(\s+.*)?$/i.test(norm) ||
+      /(r[ae]st[ao]r[a-z]*|fast\s*food|fastfood|kafe|oshxona|food|ovqat|taom|pitsa|pizza|lavash|burger|sushi|donar|menyu|katalog)/i.test(norm) &&
       /(ko['‘’`]?rsat|chiqar|bor|bormi|qanday|qaysi|qayerda|ro['‘’`]?yxat|mavjud|buyurtma|zakaz|tanlash|och)/i.test(norm)
     ) {
       return `Quyidagi mashhur restoran va fast-food tarmoqlaridan buyurtma berishingiz mumkin. Menyu va narxlarni ko‘rish uchun birortasini tanlang 👇`;
@@ -461,21 +461,6 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         (left: any, right: any) =>
           this.providerPriority(left.slug) - this.providerPriority(right.slug),
       );
-    const scopeAnswer = await this.enforceFoodScope(
-      input,
-      prompt,
-      history,
-      providers,
-    );
-    if (scopeAnswer) {
-      return {
-        prompt,
-        history,
-        plan: this.emptyPlan("general"),
-        liveContext: [],
-        directAnswer: scopeAnswer,
-      };
-    }
     const fastAnswer = this.matchFastIntentAnswer(prompt, history);
     if (fastAnswer) {
       return {
@@ -487,6 +472,7 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         interaction: this.buildProviderInteraction(providers),
       };
     }
+
     // Direct provider selection (e.g. user clicked brand card or typed brand name)
     const directProvider = this.findDirectProvider(prompt, providers);
     if (directProvider) {
@@ -514,6 +500,22 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       };
     }
 
+    const scopeAnswer = await this.enforceFoodScope(
+      input,
+      prompt,
+      history,
+      providers,
+    );
+    if (scopeAnswer) {
+      return {
+        prompt,
+        history,
+        plan: this.emptyPlan("general"),
+        liveContext: [],
+        directAnswer: scopeAnswer,
+      };
+    }
+
     const aiPlan = await this.planWithAi(prompt, history, providers);
     let plan: LiveContextPlan;
     if (aiPlan) {
@@ -522,12 +524,35 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       this.logger.warn(
         `AI planner returned null, activating resilient fallback for: "${prompt}"`,
       );
+      const rawParts = prompt.split(/[,;\n]+/).map((s) => s.trim()).filter((s) => s.length >= 2);
+      const isMultiItem = rawParts.length >= 2;
       const mentionedSlugs = this.findMentionedProviderSlugs(
         prompt,
         providers,
         history,
       );
-      if (mentionedSlugs.length > 0) {
+      const effectiveSlugs =
+        mentionedSlugs.length > 0
+          ? mentionedSlugs
+          : providers.length > 0
+            ? [providers[0].slug]
+            : [];
+
+      if (isMultiItem) {
+        plan = {
+          intent: "food_selection",
+          needsCatalog: true,
+          providerScope: "explicit",
+          providerSlugs: effectiveSlugs,
+          query: prompt,
+          quantity: 1,
+          itemRequests: rawParts.map((part) => ({ query: part, quantity: 1 })),
+          limit: 30,
+          page: 1,
+          allowCatalogFallback: true,
+          excludedOfferingIds: [],
+        };
+      } else if (mentionedSlugs.length > 0) {
         plan = {
           intent: "food_browse",
           needsCatalog: true,
@@ -681,6 +706,14 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     return "Bu savol food buyurtmasiga tegishli emas. Restoran, taom, ichimlik, yetkazib berish yoki buyurtma holati haqida so‘rashingiz mumkin.";
   }
 
+  private isExplicitOffTopicPrompt(prompt: string): boolean {
+    const raw = this.normalizeLookupText(prompt);
+    if (!raw) return false;
+    return /\b(kod|dastur|programma|python|javascript|typescript|c\+\+|java|html|css|sql|php|react|nodejs|bug|algoritm|funksiya|repo|git|commit|ob\s*havo|weather|prognoz|insho|referat|she['‘’`]?r|hikoya|maqola|matematika|tarix|fizika|kimyo|biologiya|geografiya|astronomiya|siyosat|prezident|parlament|urush|dollar\s*kursi|valyuta\s*kursi|yangilik|news)/i.test(
+      raw,
+    );
+  }
+
   private isFoodScopePrompt(
     prompt: string,
     history: ConversationMessage[],
@@ -689,61 +722,14 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
   ): boolean {
     const raw = this.normalizeLookupText(prompt);
     if (!raw) return false;
-    if (
-      this.isGeneralGreeting(prompt) ||
-      this.isCapabilityRequest(prompt) ||
-      this.isProviderListingQuestion(prompt)
-    ) {
-      return true;
-    }
-    if (Array.isArray(selections) && selections.length > 0) return true;
 
-    const providerMentioned = providers.some((provider) => {
-      const slug = this.normalizeLookupText(provider?.slug);
-      const name = this.normalizeLookupText(provider?.name);
-      return Boolean(
-        (slug && raw.includes(slug)) ||
-          (name && raw.includes(name)) ||
-          name
-            .split(/\s+/)
-            .filter((part) => part.length >= 4)
-            .some((part) => raw.includes(part)),
-      );
-    });
-    if (providerMentioned) return true;
-
-    if (
-      /\b(ovqat|taom|yegim|yegingiz|yemoq|yeyish|qorin|ochman|restoran|restaurant|fast\s*food|fastfood|kafe|cafe|menyu|menu|katalog|lavash|burger|gamburger|chizburger|pizza|pitsa|sushi|roll|set|combo|kombo|donar|doner|shaurma|shawarma|hot\s*dog|sendvich|sendwich|tovuq|go['‘’`]?sht|steak|osh|palov|somsa|manti|lag['‘’`]?mon|salat|desert|shirinlik|ichimlik|cola|kola|pepsi|choy|qahva|coffee|sous|fri|nuggets?)\b/i.test(
-        raw,
-      )
-    ) {
-      return true;
+    // 1. Explicit off-topic questions (coding, essays, weather, politics, math, etc.)
+    if (this.isExplicitOffTopicPrompt(prompt)) {
+      return false;
     }
 
-    if (
-      /\b(buyurtma|zakaz|yetkaz|delivery|dostavka|olib\s*ket|pickup|savat|narx|qancha|chegirma|promo|promokod|tolov|to['‘’`]?lov|kuryer|manzil|telefon|status|bekor|tasdiq)\b/i.test(
-        raw,
-      )
-    ) {
-      return true;
-    }
-
-    if (/\b(zayuno|ilova|mobil\s*ilova|support|yordam|muammo|ishlamay|bila|blya|kot|ahmoq|jinni)\b/i.test(raw)) {
-      return true;
-    }
-
-    const vagueContinuation =
-      this.isContinuation(prompt) ||
-      /^(ha|xa|yo['‘’`]?q|birinchi|ikkinchi|uchinchi|\d+|shu|shuni|buni|o['‘’`]?sha|oddiy|katta|kichik|achchiq|achchiqsiz)(\s+.*)?$/i.test(
-        raw,
-      );
-    if (!vagueContinuation) return false;
-
-    return history.slice(-6).some((message) =>
-      /\b(ovqat|taom|restoran|fast\s*food|menyu|lavash|burger|pizza|pitsa|sushi|buyurtma|yetkaz|ichimlik|cola)\b/i.test(
-        this.normalizeLookupText(message.content),
-      ),
-    );
+    // 2. Everything else inside the food ordering chat is valid in-scope conversation
+    return true;
   }
 
   private async incrementOffTopicAttempts(
@@ -2899,12 +2885,21 @@ USER=${JSON.stringify(prompt)}`;
   private findDirectProvider(prompt: string, providers: any[]): any | null {
     const raw = this.normalizeLookupText(prompt);
     if (!raw || raw.length > 80) return null;
+    const genericWords = new Set([
+      "food", "fast", "fast food", "restoran", "restaurant", "kafe", "cafe",
+      "menu", "menyu", "pizza", "pitsa", "lavash", "burger", "oshxona",
+      "market", "shop", "store", "dostavka", "yetkazish", "zakaz", "buyurtma",
+    ]);
+    if (genericWords.has(raw)) return null;
+
     for (const p of providers) {
       const slug = this.normalizeLookupText(p.slug);
       const name = this.normalizeLookupText(p.name);
       if (raw === slug || raw === name) return p;
       if (raw.startsWith(slug) || raw.startsWith(name)) return p;
-      const parts = name.split(" ").filter((part: string) => part.length >= 4);
+      const parts = name
+        .split(" ")
+        .filter((part: string) => part.length >= 4 && !genericWords.has(part));
       if (parts.some((part: string) => raw === part)) return p;
     }
     return null;
