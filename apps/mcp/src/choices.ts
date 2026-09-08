@@ -13,7 +13,7 @@ export function readChoiceResource() {
   return { contents: [{ ...choiceResource,
     text: readFileSync(new URL('../dist/ui/text-choices.html', import.meta.url), 'utf8'),
     _meta: {
-      ui: { prefersBorder: false, csp: { connectDomains: [], resourceDomains: ['https:'] } },
+      ui: { prefersBorder: false, csp: { connectDomains: [], resourceDomains: [] } },
       'openai/widgetPrefersBorder': false,
       'openai/widgetDescription': 'Compact restaurant and food text choices. Each choice sends a follow-up message. Selection is not order confirmation. Avoid repeating the displayed list.',
     },
@@ -29,12 +29,10 @@ export function choiceResultMeta(name: string, args: any, result: any) {
   const items = providers
     ? providers.filter((p: any) => p.slug && p.name).map((p: any) => ({
       id: p.slug, label: p.name,
-      imageUrl: p.logoUrl || p.imageUrl || p.coverUrl || undefined,
       prompt: `${p.name} katalogini ko‘rsat (servis: ${p.slug}).`,
     }))
     : offerings.filter((p: any) => p.id && (p.title || p.name)).map((p: any) => ({
       id: p.id, label: p.title || p.name,
-      imageUrl: p.imageUrl || p.photoUrl || p.image || undefined,
       price: typeof p.price === 'number' ? p.price : p.basePrice,
       currency: p.currency || 'UZS', category: p.categoryTitle || p.categorySlug || '',
       disabled: p.isAvailable === false,
