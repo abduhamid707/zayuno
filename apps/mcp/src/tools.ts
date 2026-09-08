@@ -21,10 +21,6 @@ import {
   stripSensitiveSecrets
 } from '@zayuno/shared';
 
-import { getQuickRepliesToolMeta as getToolUiMeta, getQuickRepliesResultMeta, QUICK_REPLIES_ENABLED } from './quick-replies.js';
-export { ZAYUNO_CATALOG_WIDGET_URI } from './catalog-ui.js';
-export { getQuickRepliesToolMeta as getToolUiMeta } from './quick-replies.js';
-
 // Discovery should return enough to select a provider, never its embedded catalog/config.
 function providerSummary(provider: any) {
   const keys = ['id', 'slug', 'name', 'description', 'status', 'type', 'category', 'geography', 'capabilities', 'fulfillmentMode'];
@@ -35,31 +31,17 @@ function catalogOffering(offering: any) {
   return { ...offering, name: offering.name ?? offering.title, price: offering.price ?? offering.basePrice };
 }
 
-function catalogImageForChat(offering: any): string | null {
-  const media = Array.isArray(offering?.media)
-    ? [...offering.media].sort((a, b) => (a.order || 0) - (b.order || 0))[0]
-    : null;
-  const candidate = media?.thumbnailUrl || media?.url || offering?.imageUrl;
-  if (!candidate) return null;
-  try {
-    const url = new URL(String(candidate));
-    if (url.protocol !== 'https:' || !['api.zayuno.uz', 'mcp.zayuno.uz'].includes(url.hostname)) return null;
-    return url.href;
-  } catch {
-    return null;
-  }
-}
-
 function formatNativeCatalog(offerings: any[], providerName?: string): string {
   if (!Array.isArray(offerings) || offerings.length === 0) return 'Kechirasiz, hech qanday mahsulot topilmadi.';
   const items = offerings.slice(0, 8).map((offering, index) => {
     const title = offering.title || offering.name || 'Mahsulot';
     const price = offering.basePrice ?? offering.price;
-    const image = catalogImageForChat(offering);
-    const imageLine = image ? `![${title}](${image})\n` : '';
-    return `${imageLine}**${index + 1}. ${title}** — **${formatUzbekCurrency(price || 0, offering.currency || 'UZS')}**`;
+    const priceText = typeof price === 'number' && Number.isFinite(price)
+      ? formatUzbekCurrency(price, offering.currency || 'UZS') : 'Narxi aniqlashtiriladi';
+    return `${index + 1}. **${title}** — ${priceText}${offering.isAvailable === false ? ' (hozir mavjud emas)' : ''}`;
   });
-  return `**${providerName || 'Katalog'}**\n\n${items.join('\n\n')}\n\nRaqam bilan tanlang — masalan: **1-ni tanlayman, 2 ta**.`;
+  const more = offerings.length > 8 ? ` Yana ${offerings.length - 8} ta mahsulot bor.` : '';
+  return `**${providerName || 'Katalog'}**\n\n${items.join('\n')}\n\nQaysi birini tanlaysiz?${more}`;
 }
 
 const catalogMediaItemOutputProperties = {
@@ -70,9 +52,7 @@ const catalogMediaItemOutputProperties = {
   aspectRatio: { type: ['string', 'null'] }
 };
 
-// Keep the UI-facing catalog contract explicit. The MCP host validates and may
-// project structuredContent according to outputSchema, so image fields that
-// are absent here never reach the iframe even when the API returned them.
+// Preserve catalog data for agents even though customer replies are text-only.
 const catalogOfferingOutputProperties = {
   id: { type: 'string' },
   providerId: { type: 'string' },
@@ -441,7 +421,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 6. get_catalog
   {
     name: 'get_catalog',
-    description: 'Use this when the user wants to OPEN a provider menu or choose products. Call with a verified providerSlug; discovery does not open the catalog. Returns products and a small inline choice-button resource in compatible hosts. A clicked choice sends a follow-up message, not an order. Can be filtered by category or location. Keep the reply brief; do not claim buttons are visible based only on tool success.',
+    description: 'Use this when the user wants to see a provider menu or choose products. Call with a verified providerSlug; discovery does not return the menu. Returns products and a concise numbered customerMessage with names and prices for ordinary chat. Can be filtered by category or location. Show text only, not buttons or embedded UI. Selecting a product does not confirm an order.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -484,9 +464,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     handler: async (args, client) => {
       const catalog = await client.getCatalog(args.providerSlug, args.locationId, args.category, args.parameters);
       const offerings = catalog?.offerings || (Array.isArray(catalog) ? catalog : []);
-      const customerMessage = QUICK_REPLIES_ENABLED
-        ? `${args.providerSlug}: ${offerings.length} ta mahsulot topildi. Tanlash buyurtma yaratmaydi.`
-        : formatNativeCatalog(offerings, args.providerSlug);
+      const customerMessage = formatNativeCatalog(offerings, args.providerSlug);
       return {
         ...(Array.isArray(catalog) ? {} : catalog), providerSlug: args.providerSlug, locationId: catalog?.locationId ?? args.locationId,
         customerMessage,
@@ -1105,8 +1083,7 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
         title: tool.name,
         description: tool.description,
         inputSchema: zodShape,
-        annotations: tool.annotations,
-        ...(getToolUiMeta(tool.name) ? { _meta: getToolUiMeta(tool.name) } : {})
+        annotations: tool.annotations
       },
       async (args: any) => {
         try {
@@ -1122,8 +1099,7 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
                 type: 'text',
                 text: customerText
               }
-            ],
-            ...(getToolUiMeta(tool.name) ? { _meta: getQuickRepliesResultMeta(tool.name, args, result) } : {})
+            ]
           };
         } catch (err: any) {
           const friendlyMessage = formatCustomerError(err);

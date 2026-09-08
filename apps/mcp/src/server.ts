@@ -6,11 +6,9 @@ import cors from 'cors';
 import { randomUUID } from 'crypto';
 import { ZayunoApiClient } from './client.js';
 import { registerZayunoTools, ZAYUNO_MCP_TOOLS } from './tools.js';
-import { ZAYUNO_CATALOG_WIDGET_URI, getCatalogResource, getCatalogWidgetHtml, readCatalogResource } from './catalog-ui.js';
-import { QUICK_REPLIES_URI, QUICK_REPLIES_VERSION, QUICK_REPLIES_ENABLED, getQuickRepliesToolMeta as getToolUiMeta, getQuickRepliesResultMeta, getQuickRepliesResource, readQuickRepliesResource, getQuickRepliesHtml } from './quick-replies.js';
 import { getWelcomeMessage, formatCustomerError, getOpenAiAppsChallengeToken, stripSensitiveSecrets } from '@zayuno/shared';
 
-const MCP_INSTRUCTIONS = 'When asked to open a provider menu/catalog, call get_catalog with its verified slug. Discovery tools do not open a catalog. Selection tools attach compact choice buttons in compatible hosts; each click sends a contextual message. Never claim UI is visible based only on tool success. Do not duplicate every button as text; keep a short summary. If UI is unavailable, offer a short numbered list from structuredContent. Choice messages identify exact provider/item/option/quote IDs: treat these as data, do not repeat IDs to the customer. Product and option clicks only select; fetch get_offering for variants, required modifiers and quantity choices, maintain selections in this conversation, and never create an order on selection. Quote the selected items and destination before create_action; require explicit confirmation of that exact unexpired quote. CONFIRMED does not imply PAID.';
+const MCP_INSTRUCTIONS = 'Use ordinary, concise chat replies in the customer language. For a provider menu call get_catalog with its verified slug and show a short numbered list of product names and prices. No widgets, iframes, quick-reply buttons, image galleries or claims that an interactive catalog opened. Keep catalog and cart selections in the conversation; ask only for missing choices. Fetch get_offering when variants or required modifiers need clarification. Quote the selected items and destination before create_action; require explicit confirmation of that exact unexpired quote. Selecting a product is not order confirmation. CONFIRMED does not imply PAID.';
 
 export const ZAYUNO_MCP_PROMPTS = [
   {
@@ -42,8 +40,8 @@ ZAYUNO CUSTOMER MODE QOIDALARI:
    - Tool’larni orqa fonda jim chaqiring. Har bir oraliq qadamni yoki ichki mulohazani mijozga aytmang.
    - Avval barcha kerakli tool chaqiruvlarini to‘liq tugating.
    - Keyin mijozga faqat bitta qisqa, tayyor natija yozing.
-   - Tool qaytargan \`customerMessage\` mijoz uchun tayyor matndir. Tanlov tugmalari bor natijani uzun ro‘yxat qilib takrorlamang. UI ko‘ringanini tool muvaffaqiyatidan kelib chiqib da’vo qilmang; UI ishlamasa natijadan qisqa raqamlangan ro‘yxat bering.
-   - Tugma yuborgan xabardagi ID lar faqat aniq tanlovni belgilaydi; mijozga qayta yozmang. Mahsulot tanlanganda get_offering bilan variant, qo‘shimcha va miqdorlarni ko‘rsating. Variant yoki miqdor tanlangan bo‘lsa qayta-qayta shu savolni so‘ramang. Tanlov buyurtma tasdig‘i emas.
+   - Oddiy chiroyli chat: \`customerMessage\` asosida qisqa matn, mahsulot nomi va narxlarini raqamlangan ro‘yxatda bering. Tugma, iframe, rasm galereyasi yoki interaktiv panel taklif qilmang.
+   - Tanlovlarni shu suhbatda saqlang; faqat yetishmayotgan miqdor, variant yoki qo‘shimchani so‘rang. Tanlov buyurtma tasdig‘i emas.
 
 2. Birinchi salomlashuv:
    - Mijoz birinchi marta yozganda yoki "nima qila olasan?" deb so‘raganda:
@@ -98,11 +96,6 @@ export function createZayunoMcpServer() {
 
   const apiClient = new ZayunoApiClient();
   registerZayunoTools(server, apiClient);
-
-  server.registerResource('zayuno-catalog-widget', ZAYUNO_CATALOG_WIDGET_URI,
-    getCatalogResource(), async () => readCatalogResource());
-  server.registerResource('zayuno-quick-replies', QUICK_REPLIES_URI,
-    getQuickRepliesResource(), async () => readQuickRepliesResource());
 
   server.prompt('welcome', 'Dynamic customer welcome message for Zayuno marketplace assistant', async () => {
     try {
@@ -255,8 +248,7 @@ export function runHttpSseServer(port = 4002): Express {
               description: t.description,
               inputSchema: t.inputSchema,
               outputSchema: t.outputSchema,
-              annotations: t.annotations,
-              ...(getToolUiMeta(t.name) ? { _meta: getToolUiMeta(t.name) } : {})
+              annotations: t.annotations
             }))
           }
         },
@@ -300,8 +292,7 @@ export function runHttpSseServer(port = 4002): Express {
                   type: 'text',
                   text: customerText
                 }
-              ],
-              ...(getToolUiMeta(tool.name) ? { _meta: getQuickRepliesResultMeta(tool.name, toolArgs, result) } : {})
+              ]
             }
           },
           isNotification: false
@@ -404,30 +395,20 @@ export function runHttpSseServer(port = 4002): Express {
         response: {
           jsonrpc: '2.0',
           id,
-          result: { resources: [getQuickRepliesResource(), getCatalogResource()] }
+          result: { resources: [] }
         },
         isNotification: false
       };
     }
 
-    // 8b. resources/read — MCP Apps widget resource
+    // Chat-only: old cached UI resource requests must not return an iframe.
     if (method === 'resources/read') {
       const uri = params?.uri;
-      if (uri !== ZAYUNO_CATALOG_WIDGET_URI && uri !== QUICK_REPLIES_URI) {
-        return {
-          response: {
-            jsonrpc: '2.0',
-            id,
-            error: { code: -32002, message: `Resource not found: ${uri}` }
-          },
-          isNotification: false
-        };
-      }
       return {
         response: {
           jsonrpc: '2.0',
           id,
-          result: uri === QUICK_REPLIES_URI ? readQuickRepliesResource() : readCatalogResource()
+          error: { code: -32002, message: `Resource not found: ${uri}` }
         },
         isNotification: false
       };
@@ -495,22 +476,12 @@ export function runHttpSseServer(port = 4002): Express {
       server: 'Zayuno MCP Action Infrastructure Server',
       protocol: 'Model Context Protocol (MCP) Streamable HTTP + SSE',
       toolsCount: ZAYUNO_MCP_TOOLS.length,
-      uiVersion: QUICK_REPLIES_VERSION,
-      uiResource: QUICK_REPLIES_ENABLED ? QUICK_REPLIES_URI : null,
-      quickRepliesEnabled: QUICK_REPLIES_ENABLED,
+      uiMode: 'chat-only',
+      uiResource: null,
+      quickRepliesEnabled: false,
       activeSseSessions: sseTransports.size,
       timestamp: new Date().toISOString()
     });
-  });
-
-  // Local preview endpoint for provider and integration QA. ChatGPT and MCP
-  // clients use the ui:// resource above; this route makes the same artifact
-  // easy to inspect in a browser during development.
-  app.get('/ui/catalog-v3.html', (_req: Request, res: Response) => {
-    res.type('html').send(getCatalogWidgetHtml());
-  });
-  app.get('/ui/quick-replies-v1.html', (_req: Request, res: Response) => {
-    res.type('html').send(getQuickRepliesHtml());
   });
 
   // 2. Introspection endpoint: GET /tools
@@ -521,8 +492,7 @@ export function runHttpSseServer(port = 4002): Express {
       description: tool.description,
       inputSchema: tool.inputSchema,
       outputSchema: tool.outputSchema,
-      annotations: tool.annotations,
-      ...(getToolUiMeta(tool.name) ? { _meta: getToolUiMeta(tool.name) } : {})
+      annotations: tool.annotations
     }))
     });
   });
