@@ -2056,17 +2056,14 @@ USER=${JSON.stringify(prompt)}`;
     userId: string,
     conversationId?: string,
   ): Promise<ActiveConsumerAction | null> {
-    const raw = await this.redisService.get(
-      this.activeActionStateKey(userId, conversationId),
-    );
-    if (!raw) return null;
     try {
+      const raw = await this.redisService?.get(
+        this.activeActionStateKey(userId, conversationId),
+      );
+      if (!raw) return null;
       const parsed = JSON.parse(raw) as ActiveConsumerAction;
       return parsed?.version === 1 && parsed.actionId ? parsed : null;
     } catch {
-      await this.redisService.del(
-        this.activeActionStateKey(userId, conversationId),
-      );
       return null;
     }
   }
