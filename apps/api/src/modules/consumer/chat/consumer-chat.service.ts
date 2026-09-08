@@ -48,18 +48,66 @@ type InteractionChoice = {
   multiSelect?: boolean;
 };
 
+type ProviderCardItem = {
+  id: string;
+  slug: string;
+  name: string;
+  logoUrl?: string;
+  brandColor?: string;
+  badge?: string;
+  cuisine?: string;
+  prompt: string;
+};
+
+type CategoryRibbonItem = {
+  id: string;
+  slug: string;
+  title: string;
+  imageUrl?: string;
+  emoji?: string;
+  itemCount: number;
+};
+
+type CatalogOfferingItem = {
+  id: string;
+  offeringId: string;
+  providerSlug: string;
+  categorySlug: string;
+  title: string;
+  description?: string;
+  price: number;
+  currency: string;
+  imageUrl?: string;
+  variantsCount?: number;
+  optionsCount?: number;
+};
+
+type CatalogSectionItem = {
+  categorySlug: string;
+  categoryTitle: string;
+  itemCount: number;
+  offerings: CatalogOfferingItem[];
+};
+
 type ChatInteraction = {
   version: 1;
-  kind: "choice_cards";
+  kind: "choice_cards" | "provider_list" | "catalog_menu";
   title?: string;
   subtitle?: string;
-  groups: Array<{
+  groups?: Array<{
     id: string;
     title: string;
     subtitle?: string;
     selectionMode: "single" | "multiple";
     choices: InteractionChoice[];
   }>;
+  providers?: ProviderCardItem[];
+  providerSlug?: string;
+  providerName?: string;
+  providerLogoUrl?: string;
+  locationName?: string;
+  categories?: CategoryRibbonItem[];
+  sections?: CatalogSectionItem[];
 };
 
 type ChatExecutionResult = {
@@ -426,9 +474,7 @@ Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing — menyu va narx
         plan: this.emptyPlan("capabilities"),
         liveContext: [],
         directAnswer: fastAnswer,
-        interaction: this.isCapabilityRequest(prompt)
-          ? this.buildProviderInteraction(providers)
-          : undefined,
+        interaction: this.buildProviderInteraction(providers),
       };
     }
     const plan = await this.planWithAi(prompt, history, providers);
@@ -709,10 +755,21 @@ Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing — menyu va narx
       groupId: "providers",
     }));
 
+    const providerCards: ProviderCardItem[] = visible.map((provider) => ({
+      id: `provider:${provider.slug}`,
+      slug: provider.slug,
+      name: this.cleanMarkdownText(provider.name),
+      logoUrl: this.safeInteractionImage(provider.logoUrl),
+      cuisine: this.describeProvider(provider),
+      prompt: this.cleanMarkdownText(provider.name),
+    }));
+
     return {
       version: 1,
-      kind: "choice_cards",
-      title: plan?.query ? "Mos restoranni tanlang" : "Restoranni tanlang",
+      kind: "provider_list",
+      title: "Assalomu alaykum! Qaysi fast-fooddan buyurtma qilmoqchisiz?",
+      subtitle: "Quyidagilardan birini bosing — xabar avtomatik yuboriladi.",
+      providers: providerCards,
       groups: [
         {
           id: "providers",
@@ -750,6 +807,8 @@ Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing — menyu va narx
     const available = entries.filter(({ offering }) => offering?.id && offering?.title);
     if (!available.length) return undefined;
 
+    const firstContext = liveContext[0] || entries[0]?.context;
+
     const groups = new Map<string, { context: any; entries: any[] }>();
     for (const entry of available.slice(0, 24)) {
       const groupId = `offerings:${entry.context?.slug || "zayuno"}`;
@@ -758,35 +817,94 @@ Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing — menyu va narx
       groups.set(groupId, group);
     }
 
+    const legacyGroups = Array.from(groups.entries()).map(([id, group]) => ({
+      id,
+      title: this.cleanMarkdownText(group.context?.name || "Mavjud variantlar"),
+      selectionMode: "multiple" as const,
+      choices: group.entries.map(({ context, offering }): InteractionChoice => ({
+        id: `offering:${context.slug}:${offering.id}`,
+        kind: "offering",
+        title: this.cleanMarkdownText(offering.title),
+        subtitle: this.truncateInteractionText(
+          this.cleanMarkdownText(offering.summary || offering.description),
+          92,
+        ),
+        price: Number.isFinite(Number(offering.basePrice)) ? Number(offering.basePrice) : undefined,
+        currency: offering.currency || "UZS",
+        imageUrl: this.safeInteractionImage(
+          offering.imageUrl || offering.media?.[0]?.url || offering.metadata?.imageUrl,
+        ),
+        providerSlug: context.slug,
+        offeringId: offering.id,
+        prompt: this.cleanMarkdownText(offering.title),
+        groupId: id,
+        multiSelect: true,
+      })),
+    }));
+
+    const sectionsMap = new Map<string, { categorySlug: string; categoryTitle: string; offerings: CatalogOfferingItem[] }>();
+    for (const { context, offering } of available) {
+      const catSlug = offering.categorySlug || "general";
+      const catTitle = offering.categoryTitle || offering.categoryName || catSlug;
+      if (!sectionsMap.has(catSlug)) {
+        sectionsMap.set(catSlug, {
+          categorySlug: catSlug,
+          categoryTitle: this.cleanMarkdownText(catTitle),
+          offerings: [],
+        });
+      }
+      sectionsMap.get(catSlug)!.offerings.push({
+        id: `offering:${context.slug}:${offering.id}`,
+        offeringId: offering.id,
+        providerSlug: context.slug,
+        categorySlug: catSlug,
+        title: this.cleanMarkdownText(offering.title),
+        description: offering.description || offering.summary,
+        price: Number(offering.basePrice || offering.price || 0),
+        currency: offering.currency || "UZS",
+        imageUrl: this.safeInteractionImage(
+          offering.imageUrl || offering.media?.[0]?.url || offering.metadata?.imageUrl,
+        ),
+        variantsCount: Array.isArray(offering.variants) ? offering.variants.length : 0,
+        optionsCount: Array.isArray(offering.optionGroups) ? offering.optionGroups.length : 0,
+      });
+    }
+
+    const rawCategories = Array.isArray(firstContext?.metadata?.categories)
+      ? firstContext.metadata.categories
+      : [];
+
+    const categoriesRibbon: CategoryRibbonItem[] = rawCategories.length > 0
+      ? rawCategories.map((c: any) => ({
+          id: c.id || c.slug,
+          slug: c.slug,
+          title: this.cleanMarkdownText(c.name || c.title || c.slug),
+          imageUrl: this.safeInteractionImage(c.imageUrl),
+          emoji: c.emoji,
+          itemCount: sectionsMap.get(c.slug)?.offerings.length || 0,
+        }))
+      : Array.from(sectionsMap.values()).map((s) => ({
+          id: s.categorySlug,
+          slug: s.categorySlug,
+          title: s.categoryTitle,
+          itemCount: s.offerings.length,
+        }));
+
     return {
       version: 1,
-      kind: "choice_cards",
-      title: plan.intent === "food_selection" ? "Tanlovingiz" : "Nima buyurtma qilamiz?",
-      subtitle: "Taomni tanlang. Istasangiz, xabaringizga qo‘shimcha izoh yozing.",
-      groups: Array.from(groups.entries()).map(([id, group]) => ({
-        id,
-        title: this.cleanMarkdownText(group.context?.name || "Mavjud variantlar"),
-        selectionMode: "multiple" as const,
-        choices: group.entries.map(({ context, offering }): InteractionChoice => ({
-          id: `offering:${context.slug}:${offering.id}`,
-          kind: "offering",
-          title: this.cleanMarkdownText(offering.title),
-          subtitle: this.truncateInteractionText(
-            this.cleanMarkdownText(offering.summary || offering.description),
-            92,
-          ),
-          price: Number.isFinite(Number(offering.basePrice)) ? Number(offering.basePrice) : undefined,
-          currency: offering.currency || "UZS",
-          imageUrl: this.safeInteractionImage(
-            offering.imageUrl || offering.media?.[0]?.url || offering.metadata?.imageUrl,
-          ),
-          providerSlug: context.slug,
-          offeringId: offering.id,
-          prompt: this.cleanMarkdownText(offering.title),
-          groupId: id,
-          multiSelect: true,
-        })),
+      kind: "catalog_menu",
+      providerSlug: firstContext?.slug || "evos",
+      providerName: this.cleanMarkdownText(firstContext?.name || "Restoran"),
+      providerLogoUrl: this.safeInteractionImage(firstContext?.logoUrl),
+      locationName: "Toshkent",
+      categories: categoriesRibbon,
+      sections: Array.from(sectionsMap.values()).map((s) => ({
+        categorySlug: s.categorySlug,
+        categoryTitle: s.categoryTitle,
+        itemCount: s.offerings.length,
+        offerings: s.offerings,
       })),
+      groups: legacyGroups,
     };
   }
 

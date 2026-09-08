@@ -37,10 +37,16 @@ import {
   InteractionCards,
   SelectionTray,
 } from "../../src/components/InteractionCards";
+import { ProviderPickerCard } from "../../src/components/food/ProviderPickerCard";
+import { InChatCatalogWidget } from "../../src/components/food/InChatCatalogWidget";
+import { ContextTrayDock } from "../../src/components/food/ContextTrayDock";
 import {
   ChatInteraction,
   InteractionChoice,
   choiceLabel,
+  TrayItem,
+  CatalogOfferingItem,
+  ProviderCardItem,
 } from "../../src/lib/interaction";
 
 const suggestions = [
@@ -115,6 +121,9 @@ export default function HomeScreen() {
   const [selectedChoices, setSelectedChoices] = useState<InteractionChoice[]>(
     [],
   );
+  const [trayItems, setTrayItems] = useState<TrayItem[]>([]);
+  const [addNoteModalVisible, setAddNoteModalVisible] = useState(false);
+  const [customNoteInput, setCustomNoteInput] = useState("");
   const [historyVisible, setHistoryVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportText, setReportText] = useState("");
@@ -139,6 +148,60 @@ export default function HomeScreen() {
     addMessage,
     setLoading,
   } = useChatStore();
+
+  const handleAddToCart = (offering: CatalogOfferingItem) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    setTrayItems((current) => {
+      const existingIndex = current.findIndex(
+        (item) => item.type === "offering" && item.offeringId === offering.offeringId,
+      );
+      if (existingIndex >= 0) {
+        const updated = [...current];
+        const existing = updated[existingIndex] as any;
+        updated[existingIndex] = {
+          ...existing,
+          quantity: (existing.quantity || 1) + 1,
+        };
+        return updated;
+      }
+      return [
+        ...current,
+        {
+          type: "offering",
+          id: `tray_offering_${Date.now()}_${offering.offeringId}`,
+          offeringId: offering.offeringId,
+          providerSlug: offering.providerSlug,
+          title: offering.title,
+          price: offering.price,
+          currency: offering.currency,
+          imageUrl: offering.imageUrl,
+          quantity: 1,
+        },
+      ];
+    });
+  };
+
+  const handleRemoveTrayItem = (id: string) => {
+    setTrayItems((current) => current.filter((item) => item.id !== id));
+  };
+
+  const handleAddNote = () => {
+    if (!customNoteInput.trim()) return;
+    setTrayItems((current) => [
+      ...current,
+      {
+        type: "note",
+        id: `tray_note_${Date.now()}`,
+        text: customNoteInput.trim(),
+      },
+    ]);
+    setCustomNoteInput("");
+    setAddNoteModalVisible(false);
+  };
+
+  const handleSelectProvider = (provider: ProviderCardItem) => {
+    sendMessage(provider.name);
+  };
 
   const messages = useMemo(
     () =>
@@ -187,13 +250,38 @@ export default function HomeScreen() {
   const sendMessage = async (
     value = input,
     choices: InteractionChoice[] = selectedChoices,
+    currentTray: TrayItem[] = trayItems,
   ) => {
-    const selectionText = choices.map(choiceLabel).join(", ");
-    const prompt = [selectionText, value.trim()].filter(Boolean).join(". ");
+    const offeringTrayItems = currentTray.filter(
+      (i): i is Extract<TrayItem, { type: "offering" }> => i.type === "offering",
+    );
+    const trayChoices: InteractionChoice[] = offeringTrayItems.map((item) => ({
+      id: `offering:${item.providerSlug}:${item.offeringId}`,
+      kind: "offering",
+      title: item.title,
+      price: item.price,
+      currency: item.currency || "UZS",
+      providerSlug: item.providerSlug,
+      offeringId: item.offeringId,
+      prompt: `${item.title} (${item.quantity || 1} ta)`,
+      groupId: `offerings:${item.providerSlug}`,
+      multiSelect: true,
+    }));
+
+    const allChoices = [...choices, ...trayChoices];
+    const noteItems = currentTray.filter(
+      (i): i is Extract<TrayItem, { type: "note" }> => i.type === "note",
+    );
+    const notesText = noteItems.map((n) => n.text).join(". ");
+
+    const selectionText = allChoices.map(choiceLabel).join(", ");
+    const promptParts = [selectionText, notesText, value.trim()].filter(Boolean);
+    const prompt = promptParts.join(". ");
     if (!prompt || isLoading) return;
 
-    const submittedChoices = [...choices];
-    const visibleUserContent = value.trim() || selectionText;
+    const submittedChoices = [...allChoices];
+    const visibleUserContent =
+      [value.trim(), notesText].filter(Boolean).join(". ") || selectionText;
 
     const conversation = messages.slice(-16).map(({ role, content }) => ({
       role,
@@ -201,6 +289,7 @@ export default function HomeScreen() {
     }));
     setInput("");
     setSelectedChoices([]);
+    setTrayItems([]);
     setLastFailed(null);
     setStreamingText("");
     setStreamingInteraction(null);
@@ -386,7 +475,28 @@ export default function HomeScreen() {
         <View style={styles.assistantContentWrap}>
           <ChatMarkdown content={item.content} />
           {item.interaction ? (
-            <InteractionCards interaction={item.interaction} onSelect={selectChoice} />
+            item.interaction.kind === "provider_list" ? (
+              <ProviderPickerCard
+                providers={item.interaction.providers || []}
+                title={item.interaction.title}
+                subtitle={item.interaction.subtitle}
+                onSelectProvider={handleSelectProvider}
+                disabled={isLoading}
+              />
+            ) : item.interaction.kind === "catalog_menu" ? (
+              <InChatCatalogWidget
+                providerSlug={item.interaction.providerSlug || "evos"}
+                providerName={item.interaction.providerName || "Restoran"}
+                providerLogoUrl={item.interaction.providerLogoUrl}
+                locationName={item.interaction.locationName}
+                categories={item.interaction.categories || []}
+                sections={item.interaction.sections || []}
+                onAddToCart={handleAddToCart}
+                disabled={isLoading}
+              />
+            ) : (
+              <InteractionCards interaction={item.interaction} onSelect={selectChoice} />
+            )
           ) : null}
           {item.latencyMs !== undefined ? (
             <View style={styles.latencyBadge}>
@@ -481,11 +591,32 @@ export default function HomeScreen() {
                   <View style={styles.assistantContentWrap}>
                     {streamingText ? <ChatMarkdown content={streamingText} /> : null}
                     {streamingInteraction ? (
-                      <InteractionCards
-                        interaction={streamingInteraction}
-                        onSelect={selectChoice}
-                        disabled
-                      />
+                      streamingInteraction.kind === "provider_list" ? (
+                        <ProviderPickerCard
+                          providers={streamingInteraction.providers || []}
+                          title={streamingInteraction.title}
+                          subtitle={streamingInteraction.subtitle}
+                          onSelectProvider={handleSelectProvider}
+                          disabled
+                        />
+                      ) : streamingInteraction.kind === "catalog_menu" ? (
+                        <InChatCatalogWidget
+                          providerSlug={streamingInteraction.providerSlug || "evos"}
+                          providerName={streamingInteraction.providerName || "Restoran"}
+                          providerLogoUrl={streamingInteraction.providerLogoUrl}
+                          locationName={streamingInteraction.locationName}
+                          categories={streamingInteraction.categories || []}
+                          sections={streamingInteraction.sections || []}
+                          onAddToCart={handleAddToCart}
+                          disabled
+                        />
+                      ) : (
+                        <InteractionCards
+                          interaction={streamingInteraction}
+                          onSelect={selectChoice}
+                          disabled
+                        />
+                      )
                     ) : null}
                     {streamingDuration !== null ? (
                       <View style={styles.latencyBadge}>
@@ -531,8 +662,27 @@ export default function HomeScreen() {
         />
 
         <View style={styles.composerShell}>
-          <SelectionTray choices={selectedChoices} onRemove={removeChoice} />
+          <ContextTrayDock
+            items={trayItems}
+            onRemoveItem={handleRemoveTrayItem}
+          />
+          {selectedChoices.length > 0 && trayItems.length === 0 ? (
+            <SelectionTray choices={selectedChoices} onRemove={removeChoice} />
+          ) : null}
+
           <View style={styles.composer}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Qo‘shimcha izoh yoki istak qo‘shish"
+              onPress={() => setAddNoteModalVisible(true)}
+              style={({ pressed }) => [
+                styles.plusButton,
+                pressed && styles.plusButtonPressed,
+              ]}
+            >
+              <Ionicons name="add" size={24} color="#9487FF" />
+            </Pressable>
+
             <TextInput
               value={input}
               onChangeText={setInput}
@@ -545,26 +695,39 @@ export default function HomeScreen() {
               maxLength={1200}
               accessibilityLabel="Zayunoga xabar yozish"
             />
+
             <Pressable
               accessibilityLabel={
                 isLoading ? "Javobni to‘xtatish" : "Xabarni yuborish"
               }
-              disabled={!isLoading && !input.trim() && !selectedChoices.length}
+              disabled={
+                !isLoading &&
+                !input.trim() &&
+                !selectedChoices.length &&
+                !trayItems.length
+              }
               onPress={() =>
                 isLoading ? abortRef.current?.abort() : sendMessage()
               }
               style={({ pressed }) => [
                 styles.sendButton,
-                !isLoading && !input.trim() && !selectedChoices.length && styles.sendDisabled,
+                !isLoading &&
+                  !input.trim() &&
+                  !selectedChoices.length &&
+                  !trayItems.length &&
+                  styles.sendDisabled,
                 pressed && styles.pressed,
               ]}
             >
               <Ionicons
-                name={isLoading ? "stop" : "paper-plane-outline"}
-                size={23}
+                name={isLoading ? "stop" : "paper-plane"}
+                size={20}
                 color={
-                  isLoading || input.trim() || selectedChoices.length
-                    ? "#9B82FF"
+                  isLoading ||
+                  input.trim() ||
+                  selectedChoices.length ||
+                  trayItems.length
+                    ? "#FFFFFF"
                     : "#657087"
                 }
               />
@@ -779,6 +942,62 @@ export default function HomeScreen() {
           </SafeAreaView>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Add Custom Note / Special Wish Modal */}
+      <Modal
+        visible={addNoteModalVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setAddNoteModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.noteModalRoot}
+        >
+          <Pressable
+            accessibilityLabel="Oynani yopish"
+            onPress={() => setAddNoteModalVisible(false)}
+            style={styles.reportBackdrop}
+          />
+          <SafeAreaView style={styles.noteSheet} edges={["bottom"]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.noteTitle}>Maxsus istak yoki eslatma</Text>
+            <Text style={styles.noteSubtitle}>
+              Masalan: “Achchiq bo‘lmasin”, “Piyoz solinmasin”, “Cola ham qo‘shing”
+            </Text>
+
+            <TextInput
+              value={customNoteInput}
+              onChangeText={setCustomNoteInput}
+              placeholder="Eslatmani yozing..."
+              placeholderTextColor="#737B95"
+              multiline
+              maxLength={300}
+              style={styles.noteModalInput}
+            />
+
+            <View style={styles.noteModalActions}>
+              <Pressable
+                onPress={() => setAddNoteModalVisible(false)}
+                style={styles.noteCancelButton}
+              >
+                <Text style={styles.noteCancelText}>Bekor qilish</Text>
+              </Pressable>
+              <Pressable
+                disabled={!customNoteInput.trim()}
+                onPress={handleAddNote}
+                style={[
+                  styles.noteSubmitButton,
+                  !customNoteInput.trim() && styles.noteSubmitDisabled,
+                ]}
+              >
+                <Text style={styles.noteSubmitText}>Saqlash</Text>
+              </Pressable>
+            </View>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -937,15 +1156,31 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 10,
   },
-  sendButton: {
-    width: 49,
-    height: 49,
-    borderRadius: 24,
-    backgroundColor: "rgba(92,72,173,0.18)",
+  plusButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(124,103,255,0.14)",
+    marginRight: 6,
+    marginBottom: 2,
   },
-  sendDisabled: { opacity: 0.72 },
+  plusButtonPressed: {
+    backgroundColor: "rgba(124,103,255,0.28)",
+    transform: [{ scale: 0.94 }],
+  },
+  sendButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#4B3AE0",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 6,
+    marginBottom: 2,
+  },
+  sendDisabled: { opacity: 0.45 },
   modalRoot: {
     flex: 1,
     flexDirection: "row",
@@ -1135,4 +1370,77 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(70,211,123,0.08)",
   },
   reportSuccessText: { color: "#D9FBE6", fontSize: 13, textAlign: "center" },
+  noteModalRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  noteSheet: {
+    paddingHorizontal: 22,
+    paddingTop: 10,
+    paddingBottom: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: "rgba(126,134,165,0.28)",
+    backgroundColor: "#0C1021",
+  },
+  noteTitle: {
+    color: "#F6F7FB",
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  noteSubtitle: {
+    color: "#8890A6",
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  noteModalInput: {
+    minHeight: 100,
+    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(126,134,165,0.26)",
+    backgroundColor: "#13182B",
+    color: "#F6F7FB",
+    fontSize: 14,
+    textAlignVertical: "top",
+  },
+  noteModalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+  noteCancelButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(126,134,165,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noteCancelText: {
+    color: "#B4BCD0",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  noteSubmitButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "#5645EC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noteSubmitDisabled: {
+    opacity: 0.45,
+  },
+  noteSubmitText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
 });

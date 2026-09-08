@@ -96,7 +96,7 @@ export function InteractionCards({
   onSelect,
   disabled,
 }: InteractionCardsProps) {
-  const groups = interaction.groups.filter((group) => group.choices.length > 0);
+  const groups = (interaction.groups || []).filter((group) => group.choices.length > 0);
   if (!groups.length) return null;
 
   return (
