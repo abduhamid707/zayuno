@@ -1,7 +1,6 @@
 import { z, ZodTypeAny } from 'zod';
 import { randomUUID } from 'crypto';
 import { ZayunoApiClient } from './client.js';
-import { choiceToolMeta, choiceResultMeta } from './choices.js';
 import {
   formatCustomerQuote,
   formatCustomerActionConfirmation,
@@ -422,7 +421,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 6. get_catalog
   {
     name: 'get_catalog',
-    description: 'Use this when the user wants to see a provider menu or choose products. Call with a verified providerSlug; discovery does not return the menu. Returns products and concise customerMessage, with optional compact text choices in compatible clients. Can be filtered by category or location. Selecting a product does not confirm an order.',
+    description: 'Use this when the user wants to see a provider menu or choose products. Call with a verified providerSlug; discovery does not return the menu. Returns products and a concise numbered customerMessage with names and prices for ordinary chat. Can be filtered by category or location. Show text only, not buttons or embedded UI. Selecting a product does not confirm an order.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -1084,8 +1083,7 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
         title: tool.name,
         description: tool.description,
         inputSchema: zodShape,
-        annotations: tool.annotations,
-        ...(choiceToolMeta(tool.name) ? { _meta: choiceToolMeta(tool.name) } : {})
+        annotations: tool.annotations
       },
       async (args: any) => {
         try {
@@ -1095,7 +1093,6 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
             ? result
             : JSON.stringify(result, null, 2);
           return {
-            ...(choiceResultMeta(tool.name, args, result) ? { _meta: choiceResultMeta(tool.name, args, result) } : {}),
             structuredContent: typeof result === 'string' ? { customerMessage: result } : result,
             content: [
               {
