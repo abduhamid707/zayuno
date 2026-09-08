@@ -1,0 +1,2847 @@
+{
+  "provider": {
+    "slug": "yaponamama",
+    "name": "Yaponamama Pan-Asian & Sushi Uzbekistan",
+    "website": "https://yaponamama.uz",
+    "source": "https://customer.api.delever.uz/v2 (Yaponamama API)",
+    "currency": "UZS",
+    "fetchedAt": "2026-09-08T08:21:22.057Z",
+    "totalCategories": 18,
+    "totalItems": 157
+  },
+  "categories": [
+    {
+      "id": "8cd61ca2-ecf7-460d-a73a-8eb94a17cd17",
+      "slug": "best-seller",
+      "title": {
+        "uz": "Xitlar 🌟",
+        "ru": "Хит продаж🌟"
+      },
+      "items": [
+        {
+          "id": "741eabf4-b098-407f-aa6b-df3360f83793",
+          "code": "",
+          "name": {
+            "uz": "Guruch bilan katsu foreli",
+            "ru": "Форель кацу с рисом",
+            "en": "Trout Katsu with Rice"
+          },
+          "description": {
+            "uz": "Panirovkali forel, guruch, motsarella pishlog‘i, shiitake, sabzi, chilibum sousi, soya sousi, sarimsoq, piyoz, ko‘k piyoz, qora murch, zanjabil ildizi, kunjut",
+            "ru": "Форель в панировке, рис, сыр моцарелла, шиитаке, морковь, соус чилибум, соевый соус, чеснок, лук, зелёный лук, чёрный перец, корень имбиря, кунжут",
+            "en": "Breaded trout, rice, mozzarella cheese, shiitake mushrooms, carrots, chiliboom sauce, soy sauce, garlic, onion, green onion, black pepper, ginger root, sesame seeds"
+          },
+          "price": 69000,
+          "image": "https://cdn.delever.uz/delever/c4b77621-a826-4e4e-a16a-3e64af4a9c12",
+          "weight": "420 g"
+        },
+        {
+          "id": "75fda7a5-f7c1-4cc5-944a-f35fb276ac95",
+          "code": "",
+          "name": {
+            "uz": "Moxito",
+            "ru": "Мохито 0,4 Л",
+            "en": "Мojito"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 39000,
+          "image": "https://cdn.delever.uz/delever/705f96ef-f290-47ce-a981-ef25dd495b6f"
+        },
+        {
+          "id": "1587abae-1761-4903-9b4b-c753fcdbd634",
+          "code": "",
+          "name": {
+            "uz": "Ko'p baliqli roll",
+            "ru": "Ролл много рыбы 8 ШТ.",
+            "en": "A lot of fish roll"
+          },
+          "description": {
+            "uz": "Forel, avokado, qaymoqli pishloq, qaymoqli sous, sriracha sousi, unagi sousi",
+            "ru": "Форель, авокадо, сыр сливочный, соус сливочный, соус шрирача, соус у��аги",
+            "en": "Trout, avocado, cream cheese, creamy sauce, sriracha sauce, unagi sauce"
+          },
+          "price": 106000,
+          "image": "https://cdn.delever.uz/delever/ecb2cd31-d7c3-4676-8b73-5c4688059b76"
+        },
+        {
+          "id": "a7ea21d1-5be1-43da-85cc-de883b3c12ee",
+          "code": "",
+          "name": {
+            "uz": "Yunoncha salat",
+            "ru": "Салат греческий",
+            "en": "Greek salad"
+          },
+          "description": {
+            "uz": "Bodring, cherri pomidori, bulg‘or qalampiri, zaytun, salat bargi, aysberg salati, rukola, qizil piyoz, feta pishlog‘i, balzamli krem, zaytun moyi, olma sirkasi",
+            "ru": "Огурцы, помидоры черри, перец болгарский, маслины, листья салата, салат айсберг, рукола, лук красный, сыр фета, крем бальзамический, масло оливковое, уксус яблочный\n",
+            "en": "Cucumbers, cherry tomatoes, bell pepper, olives, lettuce leaves, arugula, red onion, feta cheese, balsamic cream, iceberg salad, olive oil, apple cider vinegar\n"
+          },
+          "price": 57000,
+          "image": "https://cdn.delever.uz/delever/90aba7db-4468-4c9f-aad6-18fb2853f3a2",
+          "weight": "225 g"
+        },
+        {
+          "id": "4a9afb7d-330f-4cdd-b684-1bbe5c2a97f7",
+          "code": "",
+          "name": {
+            "uz": "Krevetkali filadelfiya 8 dona",
+            "ru": "Филадельфия с креветкой 8 ШТ.",
+            "en": "Philadelphia with shrimp 8 pcs."
+          },
+          "description": {
+            "uz": "Krevetka, qaymoqli pishloq, bodring\n",
+            "ru": "Креветка, сыр сливочный, огурец",
+            "en": "Shrimp, cream cheese, cucumber"
+          },
+          "price": 95000,
+          "image": "https://cdn.delever.uz/delever/278a009f-9b54-4c78-9aa8-d1671ba4cbae",
+          "weight": "270 g"
+        },
+        {
+          "id": "cc65ed8e-cb55-4fea-914b-854f54bff112",
+          "code": "",
+          "name": {
+            "uz": "Tropik miks",
+            "ru": "Тропик микс салат",
+            "en": "Tropic Mix"
+          },
+          "description": {
+            "uz": "Su-vid tovuq filesi, salat barglari, rukola, pomidor, kimchi karami, konservalangan ananas, mevali sharchalar, zaytun yog’i, kimchi sousi, shirin chili sousi, kashnich, kunjut",
+            "ru": "Куриное филе су-вид, листья салата, руккола, помидоры, капуста кимчи, консервированный ананас, фруктовые шарики, оливковое масло, соус кимчи, соус сладкий чили, кинза, кунжут",
+            "en": "Sous-vide chicken fillet, lettuce leaves, arugula, tomatoes, kimchi cabbage, canned pineapple, fruit pearls, olive oil, kimchi sauce, sweet chili sauce, cilantro, sesame seeds"
+          },
+          "price": 45000,
+          "image": "https://cdn.delever.uz/delever/c472e3f6-c63e-4619-841d-fdb1085b4e45",
+          "weight": "280 g"
+        },
+        {
+          "code": "NFM-26702",
+          "name": {
+            "uz": "Vasabi bepul",
+            "ru": "Васаби",
+            "en": "Wasabi free"
+          },
+          "description": {
+            "uz": "Васаби широко используется в японской кухне как приправа к суши, сашими, рыбным блюдам и другим закускам. Его острота быстро развивается и быстро исчезает, что придает блюдам особый вкусовой акцент и нюанс. Кроме того, васаби также служит для очищения и освежения вкуса между употреблением различных блюд, подчеркивая их вкус и аромат.\n",
+            "ru": "Васаби широко используется в японской кухне как приправа к суши, сашими, рыбным блюдам и другим закускам. Его острота быстро развивается и быстро исчезает, что придает блюдам особый вкусовой акцент и нюанс. Кроме того, васаби также служит для очищения и освежения вкуса между употреблением различных блюд, подчеркивая их вкус и аромат.\n",
+            "en": ""
+          },
+          "price": 0,
+          "image": "https://cdn.delever.uz/delever/7db999e7-1d7f-4e5d-b6ee-d9d995a44d77",
+          "weight": "10 g"
+        }
+      ]
+    },
+    {
+      "id": "6e2c9c36-1c9e-4962-924d-249ef1443817",
+      "slug": "for-large-companies",
+      "title": {
+        "uz": "Setlar > Katta kompaniyalar uchun",
+        "ru": "Setlar > Для больших компаний"
+      },
+      "items": [
+        {
+          "id": "32799002-50ab-445e-80dc-7044a43813a7",
+          "code": "",
+          "name": {
+            "uz": "Kitana seti, 92 dona",
+            "ru": "Сет GAP 90 ШТ.",
+            "en": "Set Kitana, 92 pcs"
+          },
+          "description": {
+            "uz": "Filadelfiya classic – 8 dona, ilonbaliqli filadelfiya – 8 dona, spaysi syake – 8 dona, uzumi losos – 8 dona, akibuto – 8 dona, tobikoli kaliforniya – 8 dona, gurme maki – 8 dona, qovurilgan lososli americano – 10 dona, dudlangan lososli maki – 8 dona, krevetkali maki – 8 dona, nigiri lososi – 5 dona, nigiri ilonbalig‘i – 5 dona. Vasabi – 110 gr., zanjabil – 165 gr., soya qaylasi – 330 gr., 7-8 kishiga mo‘ljallangan\n\n\n---------\nYetkazish va olib ketish uchun quti/konteynerlarda tortiladi. Original usulda tortilishi uchun savatga taxtacha qo'shing🙃",
+            "ru": "\"Филадельфия классик — 8 шт.\nФиладельфия с угрём — 8 шт.\nСпайси сяке — 8 шт.\nУзуми лосось — 8 шт.\nАкибуто — 8 шт.\nКалифорния с тобико — 8 шт.\nГурме маки — 8 шт.\nАмерикано с жареным лососем — 10 шт.\nМаки с копчёным лососем — 8 шт.\nМаки с креветкой — 8 шт.\nРолл President — 8 шт.\n\nВасаби — 110 г\nИмбирь маринованный — 165 г\nСоевый соус — 330 г\n\nРассчитано на 7–8 персон.\"",
+            "en": "Philadelphia Classic – 8 pieces, Philadelphia with eel – 8 pieces, Spicy Salmon – 8 pieces, Baked Salmon – 8 pieces, Akibuto – 8 pieces, California with Tobiko – 8 pieces, Gourmet Maki – 8 pieces, Americano Fried Salmon – 10 pieces, Thin Roll with Smoked Salmon – 8 pieces, Thin Roll with Shrimp – 8 pieces, Salmon Nigiri – 5 pieces, Eel Nigiri – 5 pieces, Wasabi – 110 grams, Ginger – 165 grams, Soy sauce – 330 grams. \n\nServes 7-8 people\n*Sets for delivery and take away are carried out in boxes\n\n\n---------\nDefault serving for delivery and pick-up is done in boxes/containers. To make the service more creative, add a board🙃\n"
+          },
+          "price": 808000,
+          "image": "https://cdn.delever.uz/delever/4dd85d27-a179-4483-816e-99ddede741e8",
+          "weight": "2465 g"
+        },
+        {
+          "id": "5bfa2b28-b95c-4a8d-85ff-15c14e7f832d",
+          "code": "",
+          "name": {
+            "uz": "Big Ben seti, 58 dona",
+            "ru": "Сет Биг Бен 58 ШТ.",
+            "en": "Set Big Ben, 58 pcs"
+          },
+          "description": {
+            "uz": "Filadelfiya classic – 4 dona, ilonbaliqli filadelfiya – 4 dona, qaymoqli tunets – 4 dona, gurme maki – 4 dona, unagi roll – 4 dona, akibuto – 8 dona, qovurilgan lososli americano – 5 dona, tovuqli americano – 5 dona, tunetsli miniroll – 6 dona, lososli miniroll – 6 dona, Xinode – 8 dona, Vasabi – 70 gr, zanjabil – 105 gr, soya – 210 gr. 4-5 kishiga mo'ljallangan\n\n---------\nYetkazish va olib ketish uchun quti/konteynerlarda tortiladi. Original usulda tortilishi uchun savatga taxtacha qo'shing🙃",
+            "ru": "Филадельфия classic – 4 шт, филадельфия с угрём – 4 шт, сливочный тунец – 4 шт, гурме маки – 4 шт, унаги ролл – 4 шт, akibuto – 8 шт, americano жареный лосось – 5 шт, americano чикен – 5 шт, miniroll тунец – 6 шт, miniroll лосось – 6 шт, хинодэ – 8 шт. Васаби – 70 гр, имбирь – 105 гр, соус соевый – 210 гр. На 4-5 персон ",
+            "en": "Philadelphia Classic – 4 pieces, Philadelphia with eel – 4 pieces, Creamy Tuna – 4 pieces, Gourmet Maki – 4 pieces, Unagi Maki – 4 pieces, Akibuto – 8 pieces, Americano Fried Salmon – 5 pieces, Americano Chicken – 5 pieces, Mini Roll Tuna – 6 pieces, Mini Roll Salmon – 6 pieces, Hinode – 8 pieces, Wasabi – 70 grams, Ginger – 105 grams, Soy sauce – 210 grams. \nServes 4-5 people\n\n*Sets for delivery and take away are carried out in boxes\n\n\n---------\nDefault serving for delivery and pick-up is done in boxes/containers. To make the service more creative, add a board🙃"
+          },
+          "price": 545000,
+          "image": "https://cdn.delever.uz/delever/3a67f723-d8f6-47b6-827b-364fdf9fcc3e",
+          "weight": "1875 g"
+        },
+        {
+          "id": "76547585-f074-4319-9f9a-c0d76dd562b4",
+          "code": "",
+          "name": {
+            "uz": "Salmon seti, 50 dona",
+            "ru": "Сет Салмон 50 ШТ",
+            "en": "Set Salmon, 50 pcs"
+          },
+          "description": {
+            "uz": "Filadelfiya classic – 8 dona, spaysi syake – 8 dona, akibuto – 8 dona, syake tempura – 8 dona, uzumi losos – 8 dona, lososli maxroll - 10 dona. Vasabi - 60 gr., zanjabil – 90 gr., soya qaylasi – 190 gr., 4-5 kishiga mo‘ljallangan\n\n---------\nYetkazish va olib ketish uchun quti/konteynerlarda tortiladi. Original usulda tortilishi uchun savatga taxtacha qo'shing🙃",
+            "ru": "Филадельфия classic – 8 шт, спайси сяке – 8 шт, akibuto – 8 шт, сяке темпура – 8 шт, uzumi лосось – 8 шт, maxroll лосось – 10 шт. Васаби – 60 гр, имбирь – 90 гр, соус соевый – 190 гр. На 4-5 персон",
+            "en": "Philadelphia Classic – 8 pieces, Spicy Salmon – 8 pieces, Akibuto – 8 pieces, Salmon Tempura – 8 pieces, Baked Salmon – 8 pieces, Max Roll Salmon – 10 pieces, Wasabi – 60 grams, Ginger – 90 grams, Soy sauce – 190 grams. \nServes 4-5 people\n\n*Sets for delivery and take away are carried out in boxes\n\n---------\nDefault serving for delivery and pick-up is done in boxes/containers. To make the service more creative, add a board🙃\n"
+          },
+          "price": 459000,
+          "image": "https://cdn.delever.uz/delever/4aeb528e-5257-42aa-8fcc-f743cd251e68",
+          "weight": "1330 g"
+        },
+        {
+          "id": "3f21cc68-2479-467a-b7eb-56f15c11e91d",
+          "code": "",
+          "name": {
+            "uz": "Yakudza set 46 don",
+            "ru": "Сет Якудза 46 ШТ.",
+            "en": "Set Yakuza, 46 pcs"
+          },
+          "description": {
+            "uz": "Qaymoqli losos – 8 dona, akibuto – 8 dona, krabli maksroll – 8 dona, gril lososli maksroll – 8 dona, tovuqli americano – 10 dona, Vasabi – 50 gr, zanjabil – 75 gr, soya – 150 gr. 3-4 kishiga mo'ljallangan",
+            "ru": "Сливочный лосось – 8 шт, akibuto – 8 шт, maxroll краб – 10 шт, maxroll лосось гриль – 10 шт, americano жареный лосось – 10 шт. Васаби – 50 гр, имбирь – 75 гр, соус соевый – 150 гр. На 3-4 персоны",
+            "en": "Creamy Salmon – 8 pieces, Akibuto – 8 pieces, Max Roll Crab – 10 pieces, Max Roll Grilled Salmon – 10 pieces, Americano Chicken – 10 pieces, Wasabi – 50 grams, Ginger – 75 grams, Soy sauce – 150 grams. \n\nServes 3-4 people\n\n*Sets for delivery and take away are carried out in boxes"
+          },
+          "price": 369000,
+          "image": "https://cdn.delever.uz/delever/a024de74-ad55-454f-90fd-f6d0a72656d8",
+          "weight": "1445 g"
+        },
+        {
+          "id": "496fc750-1853-4624-a85f-fd914d90f397",
+          "code": "",
+          "name": {
+            "uz": "Mika Love seti, 34 dona",
+            "ru": "Сет Mika Love 34 ШТ.",
+            "en": "Set Mika Love 34 pcs."
+          },
+          "description": {
+            "uz": "Filadelfiya classic – 8 dona, tobikoli kaliforniya – 8 dona, lososli maki – 8 dona, uzumi losos – 8 dona, nigiri lososi – 2 dona, Vasabi – 40 gr, zanjabil – 60 gr, soya – 120 gr. 2-3 kishiga mo'ljallangan\n\n-------\n\nYetkazish va olib ketish uchun quti/konteynerlarda tortiladi. Original usulda tortilishi uchun savatga taxtacha qo'shing🙃",
+            "ru": "Филадельфия classic – 8 шт, калифорния с тобико – 8 шт, маки с лососем – 8 шт, uzumi лосось – 8 шт, лосось нигири – 2 шт. Васаби – 40 гр, имбирь – 60 гр, соус соевый – 120 гр. На 2-3 персоны",
+            "en": "Philadelphia Classic – 8 pieces, California with Tobiko – 8 pieces, Thin Roll with Salmon – 8 pieces, Baked Salmon – 8 pieces, Salmon Nigiri – 2 pieces, Wasabi – 40 grams, Ginger – 60 grams, Soy sauce – 120 grams. \nServes 2-3 people\n\n*Sets for delivery and take away are carried out in boxes\n\n-----------\n\nDefault serving for delivery and pick-up is done in boxes/containers. To make the service more creative, add a board🙃"
+          },
+          "price": 339000,
+          "image": "https://cdn.delever.uz/delever/e2a41a55-fb73-478a-984c-dce50d05dfcb",
+          "weight": "915 g"
+        },
+        {
+          "id": "dda0bb48-bf37-4bf4-bf08-85cf21594563",
+          "code": "",
+          "name": {
+            "uz": "Tsuki seti, 30 dona",
+            "ru": "Сет Tsuki 30 ШТ.",
+            "en": "Set Tsuki, 30 pcs"
+          },
+          "description": {
+            "uz": "Uzumi losos – 8 dona, lososli miniroll – 6 dona, tovuqli miniroll – 6 dona, qovurilgan lososli americano – 10 dona, Vasabi – 40 gr, zanjabil – 60 gr, soya – 120 gr. 2-3 kishiga mo'ljallangan\n\n-------\n\nYetkazish va olib ketish uchun quti/konteynerlarda tortiladi. Original usulda tortilishi uchun savatga taxtacha qo'shing🙃",
+            "ru": "Uzumi лосось – 8 шт, miniroll лосось – 6 шт, miniroll чикен – 6 шт, americano жареный лосось – 10 шт. Васаби – 40 гр, имбирь – 60 гр, соус соевый – 120 гр. На 2-3 персоны",
+            "en": "Baked Salmon – 8 pieces, Mini Roll Salmon – 6 pieces, Mini Roll Chicken – 6 pieces, Americano Fried Salmon – 10 pieces, Wasabi – 40 grams, Ginger – 60 grams, Soy sauce – 120 grams. \nServes 2-3 people\n\n-----------\n\nDefault serving for delivery and pick-up is done in boxes/containers. To make the service more creative, add a board🙃\n"
+          },
+          "price": 241000,
+          "image": "https://cdn.delever.uz/delever/a893ca63-07de-417b-ac9b-a977f7619551",
+          "weight": "1010 g"
+        },
+        {
+          "id": "925b8dab-332c-4174-b6fd-fc293d699c5a",
+          "code": "",
+          "name": {
+            "uz": "Taxtacha",
+            "ru": "Роллы на Дощечке",
+            "en": "Tablet"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 20000,
+          "image": "https://cdn.delever.uz/delever/84e69b73-e7ac-4ee5-8b80-3bb4af7ed0f9"
+        },
+        {
+          "id": "54f7f8c9-3d17-4de5-9988-eab32bd166d7",
+          "code": "",
+          "name": {
+            "uz": "Tayoqchalar (qo'shimcha)",
+            "ru": "Палочки дополнительные",
+            "en": "Chopsticks (extra)"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 1500,
+          "image": "https://cdn.delever.uz/delever/3b41c722-33e5-4038-9aea-80ab151c5d33"
+        },
+        {
+          "id": "e9ccf050-9d37-476f-b112-9c0087faca53",
+          "code": "",
+          "name": {
+            "uz": "Marinadlangan zanjabil",
+            "ru": "Имбирь маринованный",
+            "en": "Pickled ginger "
+          },
+          "description": {
+            "uz": "Маринованный имбирь обладает освежающим вкусом с легкой кислинкой и нотками остроты, который отлично сбалансирован с нежной сладостью. Используется для освежения вкуса между употреблением различных видов рыбы и морепродуктов.\n",
+            "ru": "Маринованный имбирь обладает освежающим вкусом с легкой кислинкой и нотками остроты, который отлично сбалансирован с нежной сладостью. Используется для освежения вкуса между употреблением различных видов рыбы и морепродуктов.\n",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://cdn.delever.uz/delever/42a1effc-b46d-4de5-b306-d69da0fbe5a9",
+          "weight": "45 g"
+        },
+        {
+          "id": "3a1a6d7a-3863-4f33-ba7c-d74fa3fa8ac4",
+          "code": "",
+          "name": {
+            "uz": "Soya",
+            "ru": "Соус соевый",
+            "en": "Soy"
+          },
+          "description": {
+            "uz": "Незаменимый соус для ваших любимых роллов\n",
+            "ru": "Незаменимый соус для ваших любимых роллов\n",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://cdn.delever.uz/delever/7901917e-29f5-4bba-bd3f-b6209c4016af",
+          "weight": "50 g"
+        },
+        {
+          "id": "e96b4292-c473-43f6-904d-f9cbf3bf0a8a",
+          "code": "",
+          "name": {
+            "uz": "Vasabi",
+            "ru": "Васаби",
+            "en": "Wasabi"
+          },
+          "description": {
+            "uz": "Васаби широко используется в японской кухне как приправа к суши, сашими, рыбным блюдам и другим закускам. Его острота быстро развивается и быстро исчезает, что придает блюдам особый вкусовой акцент и нюанс. Кроме того, васаби также служит для очищения и освежения вкуса между употреблением различных блюд, подчеркивая их вкус и аромат.\n",
+            "ru": "Васаби широко используется в японской кухне как приправа к суши, сашими, рыбным блюдам и другим закускам. Его острота быстро развивается и быстро исчезает, что придает блюдам особый вкусовой акцент и нюанс. Кроме того, васаби также служит для очищения и освежения вкуса между употреблением различных блюд, подчеркивая их вкус и аромат.\n",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://cdn.delever.uz/delever/6a9542a0-1400-4387-9be7-a2365f2aae71",
+          "weight": "30 g"
+        }
+      ]
+    },
+    {
+      "id": "a03da2a6-d2fd-481c-87fb-c4f2e2926984",
+      "slug": "mini-sets",
+      "title": {
+        "uz": "Setlar > Mini setlar",
+        "ru": "Setlar > Маленькие сеты"
+      },
+      "items": [
+        {
+          "id": "c15a36bd-b0fe-4e53-adc6-f1f313b7797f",
+          "code": "",
+          "name": {
+            "uz": "Unagi Deluxe to‘plami (24 dona) ",
+            "ru": "Сет унаги делюкс (24шт) ",
+            "en": "Deluxe Unagi Set (24 pcs)"
+          },
+          "description": {
+            "uz": "Uzumi unagi ruleti (8 dona), krach tempura ruleti (8 dona), cheddar unagi ruleti (8 dona)",
+            "ru": "Ролл Узуми унаги (8 шт.), ролл кранч темпура (8 шт.), ролл чеддер унаги (8 шт.)",
+            "en": "Roll Uzumi unagi (8 pcs.), roll crunch tempura (8 pcs.), roll cheddar unagi (8 pcs.)"
+          },
+          "price": 255000,
+          "image": "https://cdn.delever.uz/delever/e70c5165-3424-41a0-ad72-6c8e874455b8"
+        },
+        {
+          "id": "eb80cfac-8962-4952-9dae-55c4cdc4b34d",
+          "code": "",
+          "name": {
+            "uz": "Detroyt seti, 26 dona",
+            "ru": "Сет Детройт 26 ШТ.",
+            "en": "Set Detroit, 26 pcs"
+          },
+          "description": {
+            "uz": "Filadelfiya classic – 4 dona, uzumi losos – 4 dona, lososli maki – 8 dona, kiiro tempura – 4 dona, tunetsli miniroll – 6 dona, Vasabi – 30 gr, zanjabil – 45 gr, soya – 90 gr. 2 kishiga mo'ljallangan\n\n--------\nYetkazish va olib ketish uchun quti/konteynerlarda tortiladi. Original usulda tortilishi uchun savatga taxtacha qo'shing🙃",
+            "ru": "Филадельфия classic – 4 шт, uzumi лосось – 4 шт, маки с лососем – 8 шт, кииро темпура – 4 шт, miniroll тунец – 6 шт. Васаби – 30 гр, имбирь – 45 гр, соус соевый – 90 гр. На 2 персоны",
+            "en": "Philadelphia Classic – 4 pieces, Baked Salmon – 4 pieces, Thin Roll with Salmon – 8 pieces, Kiiro Tempura – 4 pieces, Mini Roll Tuna – 6 pieces, Wasabi – 40 grams, Ginger – 40 grams, Soy sauce – 100 grams. Serves 2 people\n\n-------\n\nDefault serving for delivery and pick-up is done in boxes/containers. To make the service more creative, add a board🙃"
+          },
+          "price": 219000,
+          "image": "https://cdn.delever.uz/delever/57a61338-d7fd-4115-89c3-2984f0c87b13",
+          "weight": "805 g"
+        },
+        {
+          "id": "56c0e7ee-57e2-43a9-ba0d-4ce360b42b5f",
+          "code": "",
+          "name": {
+            "uz": "Yamomoto seti, 26 dona",
+            "ru": "Сет Ямомо��о 26 ШТ.",
+            "en": "Set Yamomoto, 26 pcs"
+          },
+          "description": {
+            "uz": "Qaymoqli losos – 8 dona, kunjutli kaliforniya – 8 dona, tovuqli maksroll – 10 dona, Vasabi – 30 gr, zanjabil – 45 gr, soya – 90 gr. 2 kishiga mo'ljallangan\n\n---------\nYetkazish va olib ketish uchun quti/konteynerlarda tortiladi. Original usulda tortilishi uchun savatga taxtacha qo'shing🙃",
+            "ru": "Сливочный лосось – 8 шт, калифорния с кунжутом – 8 шт, maxroll чикен – 10 шт. Васаби – 30 гр, имбирь – 45 гр, соус соевый – 90 гр. На 2 персоны",
+            "en": "Creamy Salmon – 8 pieces, California with sesame seeds – 8 pieces, Max Roll Chicken – 10 pieces, Wasabi – 30 grams, Ginger – 45 grams, Soy sauce – 100 grams. Serves 2 people\n\n---------\nDefault serving for delivery and pick-up is done in boxes/containers. To make the service more creative, add a board🙃\n"
+          },
+          "price": 189000,
+          "image": "https://cdn.delever.uz/delever/d59aa9b7-d448-41f2-974a-564b1b1c1cac",
+          "weight": "875 g"
+        },
+        {
+          "id": "d2f3344a-20ac-47d5-9615-72abd73d168e",
+          "code": "",
+          "name": {
+            "uz": "Jigar seti, 26 dona",
+            "ru": "Сет Жигар 26 ШТ.",
+            "en": "The Bro Set 26 pieces"
+          },
+          "description": {
+            "uz": "\"Qaymoqli losos – 4 dona, tobikoli kaliforniya – 4 dona, kunjutli kaliforniya – 4 dona, kiiro tempura – 4 dona, uzumi losos – 4 dona, tovuqli miniroll – 6 dona.\nVasabi – 30 gr, zanjabil – 45 gr, soya – 90 gr. 2-3 kishiga mo'ljallangan\"",
+            "ru": "Сливочный лосось – 4 шт, калифорния с тобико – 4 шт, калифорния с кунжутом – 4 шт, кииро темпура – 4 шт, uzumi лосось – 4 шт, miniroll чикен – 6 шт.Васаби – 30 гр, имбирь – 45 гр, соус соевый – 90 гр. На 2-3 персоны",
+            "en": "\"Creamy salmon - 4 pieces, California with tobiko - 4 pieces, California with sesame seeds - 4 pieces, kiiro tempura - 4 pieces, uzumi salmon - 4 pieces, miniroll chicken - 6 pieces.\nWasabi – 30 grams, ginger – 45 grams, soy sauce – 90 grams. Serves 2-3 people\""
+          },
+          "price": 184000,
+          "image": "https://cdn.delever.uz/delever/1aaaf711-58f6-49c6-b7ff-249c4cad69a9",
+          "weight": "920 g"
+        },
+        {
+          "id": "a318c329-30e1-422b-be33-d487a6c56df6",
+          "code": "",
+          "name": {
+            "uz": "Yoko set, 22 dona",
+            "ru": "Yoko сет 22 ШТ.",
+            "en": "YOKO Set (22 pcs)"
+          },
+          "description": {
+            "uz": "\"Filadelfiya classic - 8 dona Tovuqli mini roll — 6 dona\nKunjutli Kaliforniya roll — 4 dona\nTobikoli Kaliforniya roll — 4 dona\"",
+            "ru": "\"Фила классик — 8 шт\nMini чикен — 6 шт\nКалифорния с кунжутом — 4 шт\nКалифорния с тобико — 4 шт\"",
+            "en": "Philadelphia Classic – 8 pcs, Mini Chicken Roll – 6 pcs, California with Sesame – 4 pcs, California with Tobiko – 4 pcs"
+          },
+          "price": 175000,
+          "image": "https://cdn.delever.uz/delever/5b971459-a4e5-4712-b27b-aebd0e94ddcd",
+          "weight": "680 g"
+        },
+        {
+          "id": "4a30021c-91e4-445e-9425-00d20ab7b22b",
+          "code": "",
+          "name": {
+            "uz": "Pishirilgan mini seti, 18 dona",
+            "ru": "Сет Запечённый mini 18 ШТ.",
+            "en": "Set Baked mini, 18 pcs"
+          },
+          "description": {
+            "uz": "Lososli miniroll – 6 dona, ilonbaliqli miniroll – 6 dona, tovuqli miniroll – 6 dona, Vasabi – 30 gr, zanjabil – 45 gr, soya – 90 gr. 1-2 kishiga mo'ljallangan\n\n\n-------\n\nYetkazish va olib ketish uchun quti/konteynerlarda tortiladi. Original usulda tortilishi uchun savatga taxtacha qo'shing🙃",
+            "ru": "Miniroll лосось – 6 шт, miniroll угорь – 6 шт, miniroll чикен – 6 шт. Васаби – 30 гр, имбирь – 45 гр, соус соевый – 90 гр. На 1-2 персоны",
+            "en": "Mini Roll Salmon – 6 pieces, Mini Roll Eel – 6 pieces, Mini Roll Chicken – 6 pieces, Wasabi – 30 grams, Ginger – 45 grams, Soy sauce – 90 grams. Serves 1-2 people\n\n-----------\n\nDefault serving for delivery and pick-up is done in boxes/containers. To make the service more creative, add a board🙃"
+          },
+          "price": 161000,
+          "image": "https://cdn.delever.uz/delever/cca8e10b-4ab1-4b9b-9cc5-0ab544159260",
+          "weight": "780 g"
+        },
+        {
+          "id": "0279f239-30f3-4144-b659-401c08cbb979",
+          "code": "",
+          "name": {
+            "uz": "Kantan seti, 19 dona",
+            "ru": "Сет Кантан 19 ШТ.",
+            "en": "Set Kantan, 19 pcs"
+          },
+          "description": {
+            "uz": "Kunjutli kaliforniya – 4 dona, tobikoli kaliforniya – 4 dona, qovurilgan lososli americano – 5 dona, tovuqli miniroll – 6 dona, Vasabi – 30 gr, zanjabil – 45 gr, soya – 90 gr. 1-2 kishiga mo'ljallangan\n\n---------\nYetkazish va olib ketish uchun quti/konteynerlarda tortiladi. Original usulda tortilishi uchun savatga taxtacha qo'shing🙃",
+            "ru": "Калифорния с кунжутом – 4 шт, калифорния с тобико – 4 шт, americano жареный лосось – 5 шт, miniroll чикен – 6 шт. Васаби – 30 гр, имбирь – 45 гр, соус соевый – 90 гр. На 1-2 персоны",
+            "en": "California with sesame seeds – 4 pieces, California with Tobiko – 4 pieces, Americano Fried Salmon – 5 pieces, Mini Roll Chicken – 6 pieces, Wasabi – 30 grams, Ginger – 45 grams, Soy sauce – 90 grams. Serves 1-2 people\n\n---------\nDefault serving for delivery and pick-up is done in boxes/containers. To make the service more creative, add a board🙃"
+          },
+          "price": 133000,
+          "image": "https://cdn.delever.uz/delever/60a6770f-973d-434d-980b-2d45cdf28533",
+          "weight": "645 g"
+        }
+      ]
+    },
+    {
+      "id": "227bda31-b2df-4b36-8df2-8ffa7017399f",
+      "slug": "with-fish",
+      "title": {
+        "uz": "Rollar va sushi > Losos",
+        "ru": "Rollar va sushi > С лососем"
+      },
+      "items": [
+        {
+          "id": "f6648e0a-51b2-4818-8d35-76448423805a",
+          "code": "",
+          "name": {
+            "uz": "Dudlangan lososli MAXROLL 10 dona",
+            "ru": "Maxroll Копчёный лосось",
+            "en": "Smoked salmon MAXROLL 10 pcs."
+          },
+          "description": {
+            "uz": "Dudlangan losos, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Лосось копчёный, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Smoked salmon, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 94000,
+          "image": "https://cdn.delever.uz/delever/f3394d97-8777-47c8-9587-b2d6f7c185a6"
+        },
+        {
+          "id": "e16c3f7d-f7b3-4249-a48d-255cb6161f55",
+          "code": "",
+          "name": {
+            "uz": "Gril lososli maksroll, 10 dona",
+            "ru": "Maxroll Лосось гриль",
+            "en": "MAXROLL Grilled Salmon"
+          },
+          "description": {
+            "uz": "Gril losos, olma, bodring, qaymoqli pishloq, yaki sousi, qovurilgan klyar, unagi sousi, kunjut",
+            "ru": "Лосось гриль, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Grilled salmon, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 88000,
+          "image": "https://cdn.delever.uz/delever/2cb3b291-1538-4606-9ed1-72132c1b4b7a",
+          "weight": "390 g"
+        },
+        {
+          "id": "47abd27a-7d26-4f4f-9252-5833a7b4beb4",
+          "code": "",
+          "name": {
+            "uz": "Qizil baliqli MAXROLL 10 dona",
+            "ru": "Maxroll Лосось",
+            "en": "MAXROLL with salmon 10 pcs."
+          },
+          "description": {
+            "uz": "Tarkibi:\nQizil baliq\nOlma\nBodring\nQaymoqli pishloq\nYaki qaylasi\nQovurilgan klyar\nUnagi sous\nKunjut",
+            "ru": "Лосось, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут\n\n",
+            "en": "Salmon, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 85000,
+          "image": "https://cdn.delever.uz/delever/27edf9cc-e1f3-4c98-86fc-883740ea166f"
+        },
+        {
+          "id": "a781017b-beab-44ab-bb9e-a3c0ad3f0fa1",
+          "code": "",
+          "name": {
+            "uz": "Dudlangan lososli MINIROLL 6 dona",
+            "ru": "Miniroll Копчёный лосось",
+            "en": "Smoked salmon MINIROLL 6 pcs."
+          },
+          "description": {
+            "uz": "Dudlangan losos, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Лосось копчёный, яблоко, огурец, сыр сливочный, яки соус, жареный кляр, унаги соус, кунжут",
+            "en": "Smoked salmon, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 64000,
+          "image": "https://cdn.delever.uz/delever/6af1ac4c-062c-4127-a287-2e7dac0f3a65"
+        },
+        {
+          "id": "610de6ce-7a02-4ffe-a762-3895af9f2481",
+          "code": "",
+          "name": {
+            "uz": "Gril lososli miniroll, 6 dona ",
+            "ru": "Miniroll Лосось гриль ",
+            "en": "MINIROLL Grilled Salmon "
+          },
+          "description": {
+            "uz": "Gril losos, olma, bodring, qaymoqli pishloq, yaki sousi, qovurilgan klyar, unagi sousi, kunjut",
+            "ru": "Лосось гриль, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Grilled salmon, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 64000,
+          "image": "https://cdn.delever.uz/delever/f7c46377-4c6c-414f-83da-5ec712a7b917",
+          "weight": "215 g"
+        },
+        {
+          "id": "e3231f34-5f26-4b93-9ddc-09066ef71ab0",
+          "code": "",
+          "name": {
+            "uz": "Lososli MINIROLL 6 dona ",
+            "ru": "Miniroll Лосось",
+            "en": "Salmon MINIROLL 6 pcs."
+          },
+          "description": {
+            "uz": "Losos, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Лосось, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Salmon, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 61000,
+          "image": "https://cdn.delever.uz/delever/c2173231-d92c-470a-ae1b-40f0a7180d66",
+          "weight": "215 g"
+        },
+        {
+          "id": "9211554b-4f68-4bbd-ba10-4367be0f8ef0",
+          "code": "",
+          "name": {
+            "uz": "Filadelfiya klassik 8 dona",
+            "ru": "Филадельфия Classic 8 ШТ.",
+            "en": "Philadelphia classic 8 pcs."
+          },
+          "description": {
+            "uz": "Losos, qaymoqli pishloq, bodring\n",
+            "ru": "Лосось, сыр сливочный, огурец\n\n",
+            "en": "Salmon, cream cheese, cucumber"
+          },
+          "price": 109000,
+          "image": "https://cdn.delever.uz/delever/6795f0c1-f50c-4dc8-9bc6-8e89b69fe648",
+          "weight": "260 g"
+        },
+        {
+          "id": "8df2d7b2-55c4-4db2-8474-3735e3be5ccf",
+          "code": "",
+          "name": {
+            "uz": "Mozaik",
+            "ru": "Ролл Мозаика 8 ШТ.",
+            "en": "Mosaic"
+          },
+          "description": {
+            "uz": "Losos, dudlangan losos, baliq iloni, qisqichbaqa, tuna baliq, krem pishloq, bodring, unagi sousi, kunjut",
+            "ru": "Лосось, копчёный лосось, угорь, креветка, тунец, сыр сливочный, огурец, соус унаги, кунжут",
+            "en": "Salmon, smoked salmon, eel, shrimp, tuna, cream cheese, cucumber, unagi sauce, sesame"
+          },
+          "price": 103000,
+          "image": "https://cdn.delever.uz/delever/26332c15-8933-44e3-b893-0d88256e6200",
+          "weight": "225 g"
+        },
+        {
+          "id": "f2b762d0-f8ed-4956-811e-3384a32ff7b2",
+          "code": "",
+          "name": {
+            "uz": "Filadelfiya kunsey 8 dona",
+            "ru": "Филадельфия кунсей 8 ШТ.",
+            "en": "Philadelphia kunsei 8 pcs."
+          },
+          "description": {
+            "uz": "Dudlangan losos, krab aralashmasi, qaymoqli pishloq, bodring, aysberg salati, qovurilgan klyar, ko'k piyoz\n",
+            "ru": "Лосось копчёный, крабовый микс, сыр сливочный, огурец, салат айсберг, кляр жареный, лук зелёный",
+            "en": "Smoked salmon, crab mix, cream cheese, cucumber, iceberg lettuce, fried batter, green onion\n"
+          },
+          "price": 91000,
+          "image": "https://cdn.delever.uz/delever/4c71bdc5-7146-4d24-879c-9a3e4d3ad547",
+          "weight": "270 g"
+        },
+        {
+          "id": "f914f889-9dd2-499d-ab0b-6320b3092a56",
+          "code": "",
+          "name": {
+            "uz": "Qaymoqli losos 8 dona",
+            "ru": "Сливочный лосось 8 ШТ.",
+            "en": "Creamy salmon 8 pcs."
+          },
+          "description": {
+            "uz": "Losos, qaymoqli pishloq, bodring",
+            "ru": "Лосось, сыр сливочный, огурец\n",
+            "en": "Salmon, cream cheese, cucumber"
+          },
+          "price": 83000,
+          "image": "https://cdn.delever.uz/delever/2362413a-d523-40c3-9bf9-c5504561f3a3",
+          "weight": "225 g"
+        },
+        {
+          "id": "6793a4de-b0d3-448e-980a-7530b4832e97",
+          "code": "",
+          "name": {
+            "uz": "Filadelfiya klassik 4 dona",
+            "ru": "Филадельфия Classic 4 ШТ.",
+            "en": "Philadelphia classic 4 pcs."
+          },
+          "description": {
+            "uz": "Losos, qaymoqli pishloq, bodring",
+            "ru": "Лосось, сыр сливочный, огурец\n",
+            "en": "Salmon, cream cheese, cucumber"
+          },
+          "price": 61000,
+          "image": "https://cdn.delever.uz/delever/484532b4-f10b-41ed-b6e8-60e491e76a53",
+          "weight": "130 g"
+        },
+        {
+          "id": "aab68f96-df69-44b4-9df1-ddd54b58e7ab",
+          "code": "",
+          "name": {
+            "uz": "Qaymoqli losos 4 dona",
+            "ru": "Сливочный лосось 4 ШТ.",
+            "en": "Creamy salmon 4 pcs."
+          },
+          "description": {
+            "uz": "Losos, qaymoqli pishloq, bodring",
+            "ru": "Лосось, сыр сливочный, огурец\n\n",
+            "en": "Salmon, cream cheese, cucumber"
+          },
+          "price": 47000,
+          "image": "https://cdn.delever.uz/delever/c099ac8c-3d0d-4995-bc13-02e49d37cd2a",
+          "weight": "100 g"
+        },
+        {
+          "id": "0a4c4f48-fb3b-47e9-96ad-efeeced0956c",
+          "code": "",
+          "name": {
+            "uz": "Yaki filadelfiya 8 dona",
+            "ru": "Яки Филадельфия 8 ШТ.",
+            "en": "Yaki philadelphia 8 pcs."
+          },
+          "description": {
+            "uz": "Losos, olma, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Лосось, яблоко, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут\n\n",
+            "en": "Salmon, apple, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 131000,
+          "image": "https://cdn.delever.uz/delever/fc6f442d-5c67-4a90-8f9f-42b29ece74f5",
+          "weight": "345 g"
+        },
+        {
+          "id": "a566d4b9-676f-404f-bdc4-7ea87438ec0f",
+          "code": "",
+          "name": {
+            "uz": "Uzumi losos 8 dona",
+            "ru": "UZUMI лосось 8 ШТ.",
+            "en": "Uzumi salmon 8 pcs."
+          },
+          "description": {
+            "uz": "Losos, qaymoqli pishloq, bodring, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Лосось, сыр сливочный, огурец, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Salmon, cream cheese, cucumber, yaki sauce, fried batter, unagi sauce, sesame"
+          },
+          "price": 79000,
+          "image": "https://cdn.delever.uz/delever/25b6a619-65ba-4d97-ba73-8bfa39ba1e90",
+          "weight": "225 g"
+        },
+        {
+          "id": "003eca45-4f3f-42b4-94a3-4d049f5c2cdf",
+          "code": "",
+          "name": {
+            "uz": "King roll, 8 dona",
+            "ru": "King ролл 8 ШТ.",
+            "en": "King Roll (8 pcs)"
+          },
+          "description": {
+            "uz": "Dudlangan losos, qaymoqli pishloq, bodring, qattiq pishloq, mayonez, unagi sousi, kunjut, ko‘k piyoz",
+            "ru": "Копчёный лосось, сливочный сыр, огурец, твёрдый сыр, майонез, соус унаги, кунжут, зелёный лук",
+            "en": "Smoked salmon, cream cheese, cucumber, hard cheese, mayonnaise, unagi sauce, sesame seeds, green onion"
+          },
+          "price": 72000,
+          "image": "https://cdn.delever.uz/delever/bacc98d0-94db-4bba-83f4-9f62fe3b7d23",
+          "weight": "240 g"
+        },
+        {
+          "id": "a1185e44-18f9-4260-86f7-eaa6cf8b0abe",
+          "code": "",
+          "name": {
+            "uz": "Losos shiitake, 6 dona",
+            "ru": "Лосось шиитаке 6 ШТ",
+            "en": "Salmon Shiitake (6 pcs)"
+          },
+          "description": {
+            "uz": "\"Losos, tamago, shiitake, mayonez, spaysi sous, uchar baliq ikrasi, unagi sousi, kunjut\n\"",
+            "ru": "Лосось, тамаго, шиитаке, майонез, спайси соус, икра летучей рыбы, соус унаги, кунжут",
+            "en": "Salmon, tamago egg, shiitake mushrooms, mayonnaise, spicy sauce, flying fish roe (tobiko), unagi sauce, sesame seeds"
+          },
+          "price": 51000,
+          "image": "https://cdn.delever.uz/delever/1dcc55b1-342b-4e10-9f1e-34b86c86547f",
+          "weight": "180 g"
+        },
+        {
+          "id": "bf76b2fd-2099-49e5-92aa-b9d25b85b05b",
+          "code": "",
+          "name": {
+            "uz": "Lososli kaliforniya 8 dona",
+            "ru": "КАЛИФОРНИЯ С ЛОСОСЕМ 8 ШТ.",
+            "en": "California with salmon 8 pcs."
+          },
+          "description": {
+            "uz": "Losos, mayonez, bodring, uchar baliq ikrasi",
+            "ru": "Лосось, майонез, огурец, икра летучей рыбы\n",
+            "en": "Salmon, mayonnaise, cucumber, flying fish roe"
+          },
+          "price": 89000,
+          "image": "https://cdn.delever.uz/delever/c84cf0f6-6115-4e3e-94cd-f29aa90372d5",
+          "weight": "210 g"
+        },
+        {
+          "id": "e5a740b3-3615-416f-aeaa-ff2ac466e17c",
+          "code": "",
+          "name": {
+            "uz": "Akibuto 8 dona",
+            "ru": "Akibuto 8 ШТ.",
+            "en": "Akibuto 8 pcs."
+          },
+          "description": {
+            "uz": "Losos gril, olma, bodring, qaymoqli pishloq, uchar baliq ikrasi",
+            "ru": "Лосось гриль, яблоко, огурец, сыр сливочный, икра летучей рыбы",
+            "en": "Grilled salmon, apple, cucumber, cream cheese, flying fish roe"
+          },
+          "price": 83000,
+          "image": "https://cdn.delever.uz/delever/979c8a94-1150-412e-9599-aed792e3c1e4",
+          "weight": "220 g"
+        },
+        {
+          "id": "32bc0069-6ca7-4c02-b6d5-18dea74bdb8f",
+          "code": "",
+          "name": {
+            "uz": " Qovurilgan lososli americano 10 dona",
+            "ru": "Americano жареный лосось 10 ШТ.",
+            "en": "Americano fried salmon"
+          },
+          "description": {
+            "uz": "Losos, bodring, olma, qaymoqli pishloq, qovurilgan klyar, qattiq pishloq\n",
+            "ru": "Лосось, огурец, яблоко, сыр сливочный, кляр жареный, сыр твёрдый, соус унаги, кунжут",
+            "en": "Salmon, cucumber, apple, cream cheese, fried batter, hard cheese, unagi sauce, sesame seeds"
+          },
+          "price": 74000,
+          "image": "https://cdn.delever.uz/delever/e0434edc-9df3-4407-a50f-a99248839aae",
+          "weight": "280 g"
+        },
+        {
+          "id": "63048c19-bb49-4237-937c-ac7885f3fe6a",
+          "code": "",
+          "name": {
+            "uz": "Vavilon 8 dona",
+            "ru": "Вавилон 8 ШТ.",
+            "en": "Babylon 8 pcs."
+          },
+          "description": {
+            "uz": "Dudlangan losos, olma, qaymoqli pishloq, ko'k piyoz, unagi qaylasi, kunjut",
+            "ru": "Лосось копчёный, яблоко, сыр сливочный, лук зелёный, соус унаги, кунжут",
+            "en": "Smoked salmon, apple, cream cheese, green onion, unagi sauce, sesame seeds"
+          },
+          "price": 72000,
+          "image": "https://cdn.delever.uz/delever/332efc83-a1c2-47fc-ac1b-f7485638d96f",
+          "weight": "245 g"
+        },
+        {
+          "id": "28c5f4ed-212c-4b0e-9938-1ab3bce44347",
+          "code": "",
+          "name": {
+            "uz": "Syake tempura 8 dona",
+            "ru": "Сяке Темпура 8 ШТ.",
+            "en": "Sake tempura 8 pcs."
+          },
+          "description": {
+            "uz": "Losos, qaymoqli pishloq, unagi qaylasi, kunjut",
+            "ru": "Лосось, сыр сливочный, соус унаги, кунжут",
+            "en": "Salmon, cream cheese, unagi sauce, sesame seeds"
+          },
+          "price": 66000,
+          "image": "https://cdn.delever.uz/delever/e5164a12-d9d3-468b-8c31-baa406f78fe6",
+          "weight": "235 g"
+        },
+        {
+          "id": "1043d11c-edd4-48be-90fd-541f6aab135d",
+          "code": "",
+          "name": {
+            "uz": "Filaboom 6 dona",
+            "ru": "Filaboom 6 ШТ.",
+            "en": "Filaboom 6 pcs."
+          },
+          "description": {
+            "uz": "Losos, dudlangan krem, bodring, olma, unagi qaylasi, kunjut",
+            "ru": "Лосось, крем копчёный, огурец, яблоко, соус унаги, кунжут\n",
+            "en": "Salmon, smoked cream, cucumber, apple, unagi sauce, sesame seeds"
+          },
+          "price": 48000,
+          "image": "https://cdn.delever.uz/delever/a09f6ec5-83e2-489e-b9de-ddbb44d72d2f",
+          "weight": "225 g"
+        },
+        {
+          "id": "ac5a1a50-7455-4e27-97a6-2a7dadca8df9",
+          "code": "",
+          "name": {
+            "uz": "Prezident roll",
+            "ru": "Ролл President 8 ШТ.",
+            "en": "President roll"
+          },
+          "description": {
+            "uz": "Forel, bodring, qaymoqli pishloq, muz tog'i salati, ukrop, achchiq sous, qizil bulg‘or qalampiri, yashil piyoz",
+            "ru": "Лосось, огурец, сыр сливочный, салат айсберг, укроп ",
+            "en": "Trout, cucumber, cream cheese, iceberg lettuce, dill, hot sauce, red bell pepper, green onion"
+          },
+          "price": 82000,
+          "image": "https://cdn.delever.uz/delever/4c6a0b31-1947-469e-97a5-99b35142d40e",
+          "weight": "243 g"
+        },
+        {
+          "id": "8af91595-865a-4a44-a8db-adb7ef0c9872",
+          "code": "",
+          "name": {
+            "uz": "Sakura roll, 8 dona",
+            "ru": "Сакура ролл 8 ШТ.",
+            "en": "Sakura Roll (8 pcs)"
+          },
+          "description": {
+            "uz": "Dudlangan losos, krab miks, cherri pomidorlari, qaymoqli pishloq, shivit, ko‘k piyoz",
+            "ru": "Копчёный лосось, краб микс, помидоры черри, сливочный сыр, укроп, зелёный лук",
+            "en": "Smoked salmon, crab mix, cherry tomatoes, cream cheese, dill, green onion"
+          },
+          "price": 79000,
+          "image": "https://cdn.delever.uz/delever/5312332b-da6d-4bae-a3ae-ad26b129d398",
+          "weight": "220 g"
+        },
+        {
+          "id": "48acf975-050a-466a-8614-e4cbc0cc5698",
+          "code": "",
+          "name": {
+            "uz": "Spaysi syake 8 don",
+            "ru": "Спайси сяке 8 ШТ.",
+            "en": "Spicy sake 8 pcs."
+          },
+          "description": {
+            "uz": "Losos, bodring, kunjut, spaysi qaylasi",
+            "ru": "Лосось, огурец, кунжут, соус спайси\n",
+            "en": "Salmon, cucumber, sesame seeds, spicy sauce"
+          },
+          "price": 63000,
+          "image": "https://cdn.delever.uz/delever/fa3a71e8-231b-463a-a6ed-709ca41e5455",
+          "weight": "205 g"
+        },
+        {
+          "id": "a5185336-7742-4651-9dc7-4c5df6728018",
+          "code": "",
+          "name": {
+            "uz": "Dudlangan lososli maki 8 dona",
+            "ru": "МАКИ с копчёным лососем 8 ШТ",
+            "en": "Maki with smoked salmon 8 pcs."
+          },
+          "description": {
+            "uz": "Dudlangan losos, qaymoqli pishloq",
+            "ru": "Лосось копчёный, сыр сливочный\n\n",
+            "en": "Smoked salmon, cream cheese"
+          },
+          "price": 53000,
+          "image": "https://cdn.delever.uz/delever/304a7bd0-2287-4a40-a550-406080044202",
+          "weight": "120 g"
+        },
+        {
+          "id": "af9bdd4c-1a4b-4a9a-96c8-3f36ade13861",
+          "code": "",
+          "name": {
+            "uz": "Lososli maki 8 dona",
+            "ru": "МАКИ с лососем 8 ШТ.",
+            "en": "Maki with salmon 8 pcs."
+          },
+          "description": {
+            "uz": "Losos\n",
+            "ru": "Лосось (8 шт.)\n",
+            "en": "Salmon"
+          },
+          "price": 49000,
+          "image": "https://cdn.delever.uz/delever/66f2989a-832a-4cef-b78a-c634b17ede17",
+          "weight": "120 g"
+        }
+      ]
+    },
+    {
+      "id": "3ac2dd47-3aa4-41e2-bbbb-848fa3d906e2",
+      "slug": "with-trout",
+      "title": {
+        "uz": "Rollar va sushi > Forel bilan",
+        "ru": "Rollar va sushi > С форелью"
+      },
+      "items": [
+        {
+          "id": "ed625e96-0213-4f9a-8047-2686ad4b463b",
+          "code": "",
+          "name": {
+            "uz": "Miniroll Forel 6 dona.",
+            "ru": "MINIROLL Форель",
+            "en": "Miniroll Trout 6 pcs."
+          },
+          "description": {
+            "uz": "Baliq, yaki sous, unagi sous, kunjut",
+            "ru": "Форель, соус яки, соус унаги, кунжут",
+            "en": "Trout, yaki sauce, unagi sauce, sesame"
+          },
+          "price": 59000,
+          "image": "https://cdn.delever.uz/delever/781334c1-5691-45f7-8b95-d1fa7e8db613",
+          "weight": "244 g"
+        },
+        {
+          "id": "cbd475e2-fa4f-4754-97af-2fef052095be",
+          "code": "",
+          "name": {
+            "uz": "Yaponamama 8 dona",
+            "ru": "Yaponamama 8 ШТ.",
+            "en": "Yaponamama 8 pcs."
+          },
+          "description": {
+            "uz": "Marinadlangan forel, qaymoqli pishloq, bodring, uchar baliq ikrasi",
+            "ru": "Форель маринованная, сыр сливочный, огурец, икра летучей рыбы",
+            "en": "Marinated trout, cream cheese, cucumber, flying fish roe\n"
+          },
+          "price": 93000,
+          "image": "https://cdn.delever.uz/delever/be5584a0-ec84-4929-bc77-3bf345d42869",
+          "weight": "290 g"
+        },
+        {
+          "id": "e759d65b-15ad-4dc5-945d-a4be6037b429",
+          "code": "",
+          "name": {
+            "uz": "Sensey roll, 8 dona",
+            "ru": "Сэнсэй ролл 8 ШТ.",
+            "en": "Sensei Roll (8 pcs)"
+          },
+          "description": {
+            "uz": "Kam tuzlangan forel, qaymoqli pishloq, bodring, spaysi sous, ko‘k piyoz",
+            "ru": "Слабосолёная форель, сливочный сыр, огурец, спайси соус, зелёный лук",
+            "en": "Lightly salted trout, cream cheese, cucumber, spicy sauce, green onion"
+          },
+          "price": 49000,
+          "image": "https://cdn.delever.uz/delever/608f2cab-f4ea-4109-8a65-2552e9e8000e",
+          "weight": "120 g"
+        }
+      ]
+    },
+    {
+      "id": "bc2f24c7-1f25-46ee-8857-a2cdbba93cf0",
+      "slug": "with-eel",
+      "title": {
+        "uz": "Rollar va sushi > Baliq bilan",
+        "ru": "Rollar va sushi > С угрём"
+      },
+      "items": [
+        {
+          "id": "a9a4ff24-9b66-46a1-9986-be12e4f78d9b",
+          "code": "",
+          "name": {
+            "uz": "Ilonbaliqli MAXROLL 10 dona",
+            "ru": "Maxroll Угорь",
+            "en": "Eel MAXROLL 10 pcs."
+          },
+          "description": {
+            "uz": "Ilonbaliq, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Угорь, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут\n",
+            "en": "Eel, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 104000,
+          "image": "https://cdn.delever.uz/delever/71563228-2cd4-4af7-9c5b-653debebef68",
+          "weight": "390 g"
+        },
+        {
+          "id": "9cbfcd16-8fe0-47de-bd4a-d5f4383d5ead",
+          "code": "",
+          "name": {
+            "uz": "Ilonbaliqli MINIROLL 6 dona",
+            "ru": "Miniroll Угорь ",
+            "en": "Eel MINIROLL 6 pcs."
+          },
+          "description": {
+            "uz": "Ilonbaliq, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Угорь, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Eel, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 66000,
+          "image": "https://cdn.delever.uz/delever/f4025fd1-db63-41fa-a7cb-72ba01d2a312",
+          "weight": "215 g"
+        },
+        {
+          "id": "34835507-be3a-425c-80a1-a83394a25c92",
+          "code": "",
+          "name": {
+            "uz": "Ilonbaliqli filadelfiya 8 dona",
+            "ru": "Филадельфия с угрём 8 ШТ.",
+            "en": "Philadelphia with eel 8 pcs."
+          },
+          "description": {
+            "uz": "Ilonbaliq, qaymoqli pishloq, bodring, unagi qaylasi, kunjut",
+            "ru": "Угорь, сыр сливочный, огурец, соус унаги, кунжут",
+            "en": "Eel, cream cheese, cucumber, unagi sauce, sesame seeds"
+          },
+          "price": 121000,
+          "image": "https://cdn.delever.uz/delever/0f891b3f-eaa1-4ea7-9920-bc4054925421",
+          "weight": "265 g"
+        },
+        {
+          "id": "3ad8d676-21dd-4462-8273-5c6fb81411eb",
+          "code": "",
+          "name": {
+            "uz": "Qaymoqli ilonbaliq, 8 dona",
+            "ru": "Сливочный угорь 8 ШТ.",
+            "en": "Creamy Eel (8 pcs)"
+          },
+          "description": {
+            "uz": "Ilonbaliq, qaymoqli pishloq, bodring, unagi sousi, kunjut",
+            "ru": "\"Угорь, сливочный сыр, огурец, соус унаги, кунжут\"",
+            "en": "Eel, cream cheese, cucumber, unagi sauce, sesame seeds"
+          },
+          "price": 69000,
+          "image": "https://cdn.delever.uz/delever/2f1b4fd2-e090-463d-baa8-283da51222a4",
+          "weight": "220 g"
+        },
+        {
+          "id": "b3b18cac-a481-444b-8999-8a063f726f64",
+          "code": "",
+          "name": {
+            "uz": "Ilonbaliqli filadelfiya 4 dona",
+            "ru": "Филадельфия с угрём 4 ШТ.",
+            "en": "Philadelphia with eel 4 pcs."
+          },
+          "description": {
+            "uz": "Ilonbaliq, qaymoqli pishloq, bodring, unagi qaylasi, kunjut",
+            "ru": "Угорь, сыр сливочный, огурец, соус унаги, кунжут",
+            "en": "Eel, cream cheese, cucumber, unagi sauce, sesame seeds"
+          },
+          "price": 65000,
+          "image": "https://cdn.delever.uz/delever/44b3c9bf-7d55-4ef8-90dd-77f26719651d",
+          "weight": "265 g"
+        },
+        {
+          "id": "82b52f35-5075-4fb1-9074-76d49122c36e",
+          "code": "",
+          "name": {
+            "uz": "Cheddar Unagi Roll (8 dona) ",
+            "ru": "Ролл чеддер унаги (8 шт) ",
+            "en": "Cheddar Unagi Roll (8 pcs) "
+          },
+          "description": {
+            "uz": "Bodring, tovuq, cheddar pishloq, unagi sousi",
+            "ru": "Огурец, курица, сыр чеддер, рис, сыр крем чиз, омлет куриный, кунжут жареный, паштет (угорь, соус спайси, соус унаги, курица терияки).",
+            "en": "Cucumber, chicken, cheddar cheese, unagi sauce"
+          },
+          "price": 85000,
+          "image": "https://cdn.delever.uz/delever/cd31cdb1-a21c-4810-a17b-60fa3ddb4339"
+        },
+        {
+          "id": "65ab0241-8cf2-4980-a4f0-837ef2b48b88",
+          "code": "",
+          "name": {
+            "uz": "Rol Uzumi unagi (8ta) ",
+            "ru": "Ролл Uzumi унаги (8шт)",
+            "en": "Roll Uzumi unagi (8pcs)"
+          },
+          "description": {
+            "uz": "Bodring, krem pishloq, yapon sousi",
+            "ru": "Огурец, крем сыр, японский соус",
+            "en": "Cucumber, cream cheese, Japanese sauce"
+          },
+          "price": 83000,
+          "image": "https://cdn.delever.uz/delever/c4584812-9946-4628-b7c5-a4cd31ba84e9"
+        },
+        {
+          "id": "4045a532-621a-40c3-af66-b494e41bb31e",
+          "code": "",
+          "name": {
+            "uz": "Unagi roll 8 dona",
+            "ru": "Унаги ролл 8 ШТ.",
+            "en": "Unagi roll 8 pcs."
+          },
+          "description": {
+            "uz": "Ilonbaliq, qaymoqli pishloq, bodring, aysberg salati, kunjut, unagi qaylasi",
+            "ru": "Угорь, сыр сливочный, огурец, листья салата, кунжут, соус унаги\n",
+            "en": "Eel, cucumber, iceberg salad, sesame seeds, unagi sauce\n"
+          },
+          "price": 79000,
+          "image": "https://cdn.delever.uz/delever/db3fbb56-d069-454f-80f8-eb9007c0cded",
+          "weight": "205 g"
+        },
+        {
+          "id": "5e161990-7c44-45ed-9754-f9fdd9272451",
+          "code": "",
+          "name": {
+            "uz": "Gold unagi, 8 dona",
+            "ru": "Голд унаги 8 ШТ.",
+            "en": "Gold Unagi (8 pcs"
+          },
+          "description": {
+            "uz": "Ilonbaliq, tamago, qaymoqli pishloq, mayonez, yaki sousi, unagi sousi, kunjut",
+            "ru": "Угорь, тамаго, сливочный сыр, майонез, соус яки, соус унаги, кунжут",
+            "en": "Eel, tamago egg, cream cheese, mayonnaise, yaki sauce, unagi sauce, sesame seeds"
+          },
+          "price": 69000,
+          "image": "https://cdn.delever.uz/delever/2722a381-27ac-4c79-b99e-f721ca83bdd7",
+          "weight": "220 g"
+        },
+        {
+          "id": "f213ef08-93e7-4959-8696-fcf573712cbe",
+          "code": "",
+          "name": {
+            "uz": "Kranç Tempura Rulon (8 dona) ",
+            "ru": "Ролл Кранч темпура (8шт)",
+            "en": "Crunch Tempura Roll (8 pcs) "
+          },
+          "description": {
+            "uz": "Bodring, tori unagi pate, maxsus sous",
+            "ru": "Огурец, паштет тори унаги, фирменный соус",
+            "en": "Cucumber, tori unagi pâté, signature sauce"
+          },
+          "price": 65000,
+          "image": "https://cdn.delever.uz/delever/07631195-a524-49e6-8272-86564ebd8a2d"
+        },
+        {
+          "id": "7a5c1110-61ee-4274-85a2-26d72f573dbc",
+          "code": "",
+          "name": {
+            "uz": "Unagi tempura 8 dona",
+            "ru": "Унаги темпура 8 ШТ.",
+            "en": "Unagi tempura 8 pcs."
+          },
+          "description": {
+            "uz": "Ilonbaliq, salat bargi, qaymoqli pishloq, unagi qaylasi, kunjut",
+            "ru": "Угорь, листья салата, сыр сливочный, соус унаги, кунжут\n\n",
+            "en": "Eel, lettuce leaves, cream cheese, unagi sauce, sesame seeds"
+          },
+          "price": 61000,
+          "image": "https://cdn.delever.uz/delever/8d565d3c-a443-44a9-ad7d-f4b97068dcc3",
+          "weight": "210 g"
+        },
+        {
+          "id": "010aaea6-042f-40b6-9d1e-f43a8a343e98",
+          "code": "",
+          "name": {
+            "uz": "Ilonbaliqli maki 8 dona",
+            "ru": "МАКИ с угрём 8 ШТ.",
+            "en": "Maki with eel 8 pcs."
+          },
+          "description": {
+            "uz": "Ilonbaliq, unagi qaylasi, kunjut",
+            "ru": "Угорь, унаги соус, кунжут (8 шт.)\n",
+            "en": "Eel, unagi sauce, sesame seeds"
+          },
+          "price": 56000,
+          "image": "https://cdn.delever.uz/delever/d69c62c2-3ac4-4889-8245-dab0332e2bc2",
+          "weight": "145 g"
+        }
+      ]
+    },
+    {
+      "id": "d866e920-f7e0-4769-adac-3ea9c4bacc79",
+      "slug": "kurinye-rolly",
+      "title": {
+        "uz": "Rollar va sushi > Tovuqli ",
+        "ru": "Rollar va sushi > С курицей"
+      },
+      "items": [
+        {
+          "id": "c21c02b5-8ea3-4cc1-aa39-b9de003865b2",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli MAXROLL 10 dona",
+            "ru": "Maxroll Чикен",
+            "en": "Chicken MAXROLL 10 pcs."
+          },
+          "description": {
+            "uz": "Teriyaki tovuq go'shti, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Курица терияки, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Teriyaki chicken, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 63000,
+          "image": "https://cdn.delever.uz/delever/522fcba7-9336-4da5-94e3-afba6f188891",
+          "weight": "390 g"
+        },
+        {
+          "id": "90915272-0ab1-435d-99b2-84723f9708b8",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli MINIROLL 6 dona",
+            "ru": "Miniroll Чикен",
+            "en": "Chicken MINIROLL 6 pcs."
+          },
+          "description": {
+            "uz": "Teriyaki tovuq go'shti, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Курица терияки, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Teriyaki chicken, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 43000,
+          "image": "https://cdn.delever.uz/delever/ae7ea80c-5f4a-4ecd-9d64-d355a9e8edb7",
+          "weight": "215 g"
+        },
+        {
+          "id": "45632f0b-ee3f-4d20-8389-c0536dc1f245",
+          "code": "",
+          "name": {
+            "uz": "Chicken Best 8 dona",
+            "ru": "Chicken Best 8 ШТ.",
+            "en": "Chicken Best 8 pcs."
+          },
+          "description": {
+            "uz": "Teriyaki tovuq go‘shti, bodring, qaymoqli pishloq, kimchi qaylasi, achchiq qayla, uchar baliq ikrasi, kunjut",
+            "ru": "Курица терияки, огурец, сыр сливочный, соус кимчи, соус спайси, икра летучей рыбы, кунжут",
+            "en": "Teriyaki chicken, cucumber, cream cheese, kimchi sauce, spicy sauce, flying fish roe, sesame seeds"
+          },
+          "price": 66000,
+          "image": "https://cdn.delever.uz/delever/40176e20-256e-4d4b-bb6c-1ea4bda423fa",
+          "weight": "270 g"
+        },
+        {
+          "id": "4d68ea6f-3744-4634-bde5-1008bad627a9",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli americano, 10 dona",
+            "ru": "Americano чикен 10 ШТ.",
+            "en": "Americano chicken, 10 pcs"
+          },
+          "description": {
+            "uz": "Teriyaki tovuq go‘shti, olma, bodring, qaymoqli pishloq, qattiq pishloq, unagi qaylasi, kunjut",
+            "ru": "Курица терияки, яблоко, огурец, сыр сливочный, твёрдый сыр, соус унаги, кунжут",
+            "en": "Teriyaki chicken, apple, cucumber, cream cheese, hard cheese, unagi sauce, sesame seeds"
+          },
+          "price": 65000,
+          "image": "https://cdn.delever.uz/delever/ce6e69a6-8a56-49ce-a37d-07201f94da37",
+          "weight": "280 g"
+        },
+        {
+          "id": "b42b4131-ee06-4db3-936c-08128ab849e5",
+          "code": "",
+          "name": {
+            "uz": "Tobi chiken maki 8 dona",
+            "ru": "Тоби чикен маки 8 ШТ.",
+            "en": "Tobi chicken maki 8 pcs."
+          },
+          "description": {
+            "uz": "Teriyaki tovuq go‘shti, mayonez, bodring, olma va uchar baliq ikrasi",
+            "ru": "Курица терияки, майонез, огурец, яблоко, икра летучей рыбы\n\n",
+            "en": "Teriyaki chicken, mayonnaise, cucumber, apple, flying fish roe\n"
+          },
+          "price": 58000,
+          "image": "https://cdn.delever.uz/delever/5b898b3b-37b2-4b0a-a612-304835959073",
+          "weight": "210 g"
+        },
+        {
+          "id": "180fca18-c876-457a-aa25-b9574cf19ba0",
+          "code": "",
+          "name": {
+            "uz": "Sezar roll 8 dona",
+            "ru": "Цезарь ролл 8 ШТ.",
+            "en": "Caesar roll 8 pcs."
+          },
+          "description": {
+            "uz": "Teriyaki tovuq go‘shti, qaymoqli pishloq, bodring, aysberg salati, quritilgan non bo‘laklari, yaki qaylasi, unagi qaylasi, kunjut",
+            "ru": "Курица терияки, сыр сливочный, огурец, салат айсберг, крутоны, соус яки, соус унаги, кунжут",
+            "en": "Chicken teriyaki, cream cheese, cucumber, salad leaves, croutons, yaki sauce, unagi sauce, sesame"
+          },
+          "price": 51000,
+          "image": "https://cdn.delever.uz/delever/e64057ca-544c-4e97-98d2-8e68dd10b51e",
+          "weight": "260 g"
+        },
+        {
+          "id": "56bd359b-953f-4690-8253-4a924f76e637",
+          "code": "",
+          "name": {
+            "uz": "Tori xon, 8 dona",
+            "ru": "Тори хан 8 ШТ.",
+            "en": "Tori Han (8 pcs)"
+          },
+          "description": {
+            "uz": "Panirovkali tovuq filesi, qaymoqli pishloq, bodring, qovurilgan kimchi, asal sousi, kunjut",
+            "ru": "Куриное филе в панировке, сливочный сыр, огурец, жареный кимчи, медовый соус, кунжут",
+            "en": "Breaded chicken fillet, cream cheese, cucumber, fried kimchi, honey sauce, sesame seeds"
+          },
+          "price": 49000,
+          "image": "https://cdn.delever.uz/delever/4908a368-68e2-434f-9846-a02fb7340c0a",
+          "weight": "220 g"
+        }
+      ]
+    },
+    {
+      "id": "8f69ef58-db1e-46bb-b283-8b57abcd5ee6",
+      "slug": "rybnye-rolly",
+      "title": {
+        "uz": "Rollar va sushi > Dengiz mahsulotlari bilan",
+        "ru": "Rollar va sushi > С морепродуктами"
+      },
+      "items": [
+        {
+          "id": "c750ee47-427b-4594-b064-e4c45e0d4731",
+          "code": "",
+          "name": {
+            "uz": "Krevetkali MAXROLL 10 dona",
+            "ru": "Maxroll Креветка",
+            "en": "Shrimp MAXROLL 10 pcs."
+          },
+          "description": {
+            "uz": "Krevetka, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Креветка, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Shrimp, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 82000,
+          "image": "https://cdn.delever.uz/delever/168b10aa-a82e-4b93-b1ec-a5a5890e32cf",
+          "weight": "390 g"
+        },
+        {
+          "id": "194a4a18-280c-4555-8956-7e5a8e82b5e1",
+          "code": "",
+          "name": {
+            "uz": "Tunetsli MAXROLL 10 dona",
+            "ru": "Maxroll Тунец",
+            "en": "Tuna MAXROLL 10 pcs."
+          },
+          "description": {
+            "uz": "Tunets, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Тунец, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут\n",
+            "en": "Tuna, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 77000,
+          "image": "https://cdn.delever.uz/delever/9e2ec672-196e-4d06-90c8-a0662dfea82b",
+          "weight": "390 g"
+        },
+        {
+          "id": "436c8038-7af6-46bd-a942-aa930941b0fb",
+          "code": "",
+          "name": {
+            "uz": "Krabli MAXROLL 10 dona",
+            "ru": "Maxroll Краб",
+            "en": "Crab MAXROLL 10 pcs."
+          },
+          "description": {
+            "uz": "Krab aralashmasi, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Крабовый микс, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Crab mix, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 66000,
+          "image": "https://cdn.delever.uz/delever/805047ff-1dcd-49d3-b016-337bbeb6bb12",
+          "weight": "390 g"
+        },
+        {
+          "id": "23abe01e-b1d9-4302-a6aa-851194cd0d81",
+          "code": "",
+          "name": {
+            "uz": "Krevetkali MINIROLL 6 dona",
+            "ru": "Miniroll Креветка",
+            "en": "Shrimp MINIROLL 6 pcs."
+          },
+          "description": {
+            "uz": "Krevetka, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Креветка, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут\n",
+            "en": "Shrimp, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 55000,
+          "image": "https://cdn.delever.uz/delever/d0ab4895-db85-490e-a5af-d10ac0b437ae",
+          "weight": "215 g"
+        },
+        {
+          "id": "6cd84c37-d729-42fc-af9f-582d67a5e4e5",
+          "code": "",
+          "name": {
+            "uz": "Tunetsli MINIROLL 6 dona",
+            "ru": "Miniroll Тунец",
+            "en": "Tuna MINIROLL 6 pcs."
+          },
+          "description": {
+            "uz": "Tunets, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Тунец, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут",
+            "en": "Tuna, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 54000,
+          "image": "https://cdn.delever.uz/delever/f4b0272a-f1f3-43f3-ae4e-d52245fcfafe",
+          "weight": "215 g"
+        },
+        {
+          "id": "17d7fec5-250d-4549-baae-4685a274b443",
+          "code": "",
+          "name": {
+            "uz": "Krabli MINIROLL 6 dona",
+            "ru": "Miniroll Краб",
+            "en": "Crab MINIROLL 6 pcs."
+          },
+          "description": {
+            "uz": "Krab aralashmasi, olma, bodring, qaymoqli pishloq, yaki qaylasi, qovurilgan klyar, unagi qaylasi, kunjut",
+            "ru": "Крабовый микс, яблоко, огурец, сыр сливочный, соус яки, кляр жареный, соус унаги, кунжут\n",
+            "en": "Crab mix, apple, cucumber, cream cheese, yaki sauce, fried batter, unagi sauce, sesame seeds"
+          },
+          "price": 45000,
+          "image": "https://cdn.delever.uz/delever/5a98ea31-1b30-43bb-9fd1-15ee5741e0d7",
+          "weight": "215 g"
+        },
+        {
+          "id": "1568ae11-fea1-4798-8bee-17364029c5c3",
+          "code": "",
+          "name": {
+            "uz": "Krevetkali filadelfiya 4 dona",
+            "ru": "Филадельфия с креветкой 4 ШТ.",
+            "en": "Philadelphia with shrimp 4 pcs."
+          },
+          "description": {
+            "uz": "Krevetka, qaymoqli pishloq, bodring",
+            "ru": "Креветка, сыр сливочный, огурец\n",
+            "en": "Shrimp, cream cheese, cucumber"
+          },
+          "price": 54000,
+          "image": "https://cdn.delever.uz/delever/2420041a-fbc7-42cb-bfee-56da3f66b5f1",
+          "weight": "130 g"
+        },
+        {
+          "id": "c9515b52-de22-4511-b59a-422203e9e82d",
+          "code": "",
+          "name": {
+            "uz": "Tobikoli kaliforniya 8 dona",
+            "ru": "Калифорния с тобико 8 ШТ.",
+            "en": "California with tobiko 8 pcs."
+          },
+          "description": {
+            "uz": "Krab aralashmasi, bodring, uchar baliq ikrasi\n",
+            "ru": "Крабовый микс, огурец, икра летучей рыбы",
+            "en": "Crab mix, cucumber, flying fish roe\n"
+          },
+          "price": 71000,
+          "image": "https://cdn.delever.uz/delever/3d12285f-5937-436e-9710-7fb9b3dd493d",
+          "weight": "225 g"
+        },
+        {
+          "id": "2ba08e5f-b547-4905-8edc-5c3626896e59",
+          "code": "",
+          "name": {
+            "uz": "Ebi mango, 8 dona",
+            "ru": "Эби манго 8 ШТ.",
+            "en": "Ebi Mango (8 pcs)"
+          },
+          "description": {
+            "uz": "Krevetka, avokado, mango, qaymoqli pishloq, unagi sousi, kunjut",
+            "ru": "Креветка, авокадо, манго, сливочный сыр, соус унаги, кунжут",
+            "en": "Shrimp, avocado, mango, cream cheese, unagi sauce, sesame seeds"
+          },
+          "price": 55000,
+          "image": "https://cdn.delever.uz/delever/e4b2193c-efb3-43cb-bb8c-c5c1504b5af5",
+          "weight": "220 g"
+        },
+        {
+          "id": "0b217d7f-34ca-4eb5-827d-b8f65c242b9c",
+          "code": "",
+          "name": {
+            "uz": "Kunjutli kaliforniya 8 dona",
+            "ru": "Калифорния с кунжутом 8 ШТ.",
+            "en": "California with sesame 8 pcs."
+          },
+          "description": {
+            "uz": "Krab miks, bodring, kunjut",
+            "ru": "Крабовый микс, огурец, кунжут",
+            "en": "Crab mix, cucumber, sesame seeds"
+          },
+          "price": 53000,
+          "image": "https://cdn.delever.uz/delever/94cc0a02-faa8-42c3-ac1e-e79bbc3f1066",
+          "weight": "220 g"
+        },
+        {
+          "id": "d6f90c5a-813b-4d78-b27d-2d4f7ff16580",
+          "code": "",
+          "name": {
+            "uz": "Krevetkali maki 8 dona",
+            "ru": "МАКИ ролл с креветкой 8 ШТ.",
+            "en": "Maki with shrimp 8 pcs."
+          },
+          "description": {
+            "uz": "Krevetka, qaymoqli pishloq",
+            "ru": "Креветка, сыр сливочный\n",
+            "en": "Shrimp, cream cheese"
+          },
+          "price": 48000,
+          "image": "https://cdn.delever.uz/delever/eeb22dd2-6820-4137-88c3-3ccd993b3faf",
+          "weight": "120 g"
+        },
+        {
+          "id": "5928c6a8-262d-4596-8367-09f5a2e0a859",
+          "code": "",
+          "name": {
+            "uz": "Tunetsli maki 8 dona",
+            "ru": "МАКИ с тунцом 8 ШТ.",
+            "en": "Maki with tuna 8 pcs."
+          },
+          "description": {
+            "uz": "Tunets, ko'k piyoz",
+            "ru": "Тунец, лук зелёный",
+            "en": "Tuna, green onion"
+          },
+          "price": 43000,
+          "image": "https://cdn.delever.uz/delever/6dfbd91d-493f-42ab-9d4d-c4d250f1c2db",
+          "weight": "120 g"
+        }
+      ]
+    },
+    {
+      "id": "ab6a1104-d2b1-42c1-906e-aa0083b90f46",
+      "slug": "vegetarianskie-rolly",
+      "title": {
+        "uz": "Rollar va sushi > Vegetarian",
+        "ru": "Rollar va sushi > Вегетарианские"
+      },
+      "items": [
+        {
+          "id": "55edc0f2-ecab-431a-8f10-680091a099ee",
+          "code": "",
+          "name": {
+            "uz": "Yasay maki 8 dona",
+            "ru": "Ясай маки 8 ШТ.",
+            "en": "Yasai maki 8 pcs."
+          },
+          "description": {
+            "uz": "Bodring, pomidor, salat bargi, ukrop, bulg‘or qalampiri, kunjut",
+            "ru": "Огурец, помидор, листья салата, укроп, перец болгарский, кунжут",
+            "en": "Cucumber, tomato, lettuce, dill, bell pepper, sesame seeds"
+          },
+          "price": 33000,
+          "image": "https://cdn.delever.uz/delever/4f6ef42a-e6ed-424d-80d2-8ae96078d201",
+          "weight": "200 g"
+        },
+        {
+          "id": "eeeaec1d-9fe7-4084-a571-297313b0e0a4",
+          "code": "",
+          "name": {
+            "uz": "Chuka salatli maki 8 dona",
+            "ru": "МАКИ с салатом чука 8 ШТ.",
+            "en": "Maki with chuka salad 8 pcs."
+          },
+          "description": {
+            "uz": "Chuka, kunjut",
+            "ru": "Чука, кунжут (8 шт.)\n",
+            "en": "Chuka, sesame seeds"
+          },
+          "price": 29000,
+          "image": "https://cdn.delever.uz/delever/a9cdd37e-0503-4349-9e21-611bea137909",
+          "weight": "120 g"
+        },
+        {
+          "id": "930eb477-458b-4b6e-a420-885f0088cb0c",
+          "code": "",
+          "name": {
+            "uz": "Bodringli maki 8 dona",
+            "ru": "МАКИ ролл с огурцом 8 ШТ.",
+            "en": "Maki with cucumber 8 pcs."
+          },
+          "description": {
+            "uz": "Bodring, kunjut",
+            "ru": "Огурец, кунжут (8 шт.)\n",
+            "en": "Cucumber, sesame seeds"
+          },
+          "price": 23000,
+          "image": "https://cdn.delever.uz/delever/0534f182-ec0d-48c5-8a68-856ad1c27be2",
+          "weight": "115 g"
+        }
+      ]
+    },
+    {
+      "id": "4ae52e2b-bd8f-45de-b0ee-76499e700d84",
+      "slug": "sushi",
+      "title": {
+        "uz": "Rollar va sushi > Sushi",
+        "ru": "Rollar va sushi > Суши"
+      },
+      "items": [
+        {
+          "id": "d02dda7d-d8af-4b82-bdad-ea967ff15f2a",
+          "code": "",
+          "name": {
+            "uz": "Nigiri lososi",
+            "ru": "Лосось нигири",
+            "en": "Salmon nigiri"
+          },
+          "description": {
+            "uz": "Losos, guruch, vasabi",
+            "ru": "Лосось, рис, васаби\n",
+            "en": "Salmon, rice, wasabi"
+          },
+          "price": 25000,
+          "image": "https://cdn.delever.uz/delever/a652c567-1f47-421f-a57f-578b1be8c494",
+          "weight": "30 g"
+        },
+        {
+          "id": "5986d1b3-5b24-414f-b1fe-2ecf572d507e",
+          "code": "",
+          "name": {
+            "uz": "Dudlangan losos nigiri",
+            "ru": "Копчёный лосось ни��ири",
+            "en": "Smoked salmon nigiri"
+          },
+          "description": {
+            "uz": "Dudlangan losos, guruch",
+            "ru": "Копчёный лосось, рис\n",
+            "en": "Salmon, rice"
+          },
+          "price": 27000,
+          "image": "https://cdn.delever.uz/delever/e565fd63-9f5f-4efb-bc46-348d6303c063",
+          "weight": "30 g"
+        },
+        {
+          "id": "b5ad5b0c-17b0-4d46-84b3-36fe915825b5",
+          "code": "",
+          "name": {
+            "uz": "Nigiri ilonbalig'i",
+            "ru": "Угорь нигири",
+            "en": "Eel nigiri"
+          },
+          "description": {
+            "uz": "Ilonbaliq, nori, guruch, unagi sousi, kunjut",
+            "ru": "Угорь, нори, рис, унаги соус, кунжут\n",
+            "en": "Eel, nori, rice, unagi sauce, sesame seeds"
+          },
+          "price": 31000,
+          "image": "https://cdn.delever.uz/delever/45db7efc-f306-4886-8a42-7d2045224414",
+          "weight": "35 g"
+        },
+        {
+          "id": "414ad138-c9f4-4d82-966e-68923242e721",
+          "code": "",
+          "name": {
+            "uz": "Nigiri krevetkasi",
+            "ru": "Креветка нигири",
+            "en": "Shrimp nigiri"
+          },
+          "description": {
+            "uz": "Krevetka, guruch, vasabi",
+            "ru": "Креветка, рис, васаби\n",
+            "en": "Shrimp, rice, wasabi"
+          },
+          "price": 22000,
+          "image": "https://cdn.delever.uz/delever/e86ff53e-c226-4e81-af1a-f7240f74b5ce",
+          "weight": "30 g"
+        }
+      ]
+    },
+    {
+      "id": "7f5eed31-d026-46bf-9782-f5b64e7b8067",
+      "slug": "sauce",
+      "title": {
+        "uz": "Rollar va sushi > Souslar",
+        "ru": "Rollar va sushi > Соусы"
+      },
+      "items": [
+        {
+          "id": "3d51fa35-9517-468e-aff8-41bd5befb2c0",
+          "code": "",
+          "name": {
+            "uz": "Unagi",
+            "ru": "Унаги соус",
+            "en": "Unagi"
+          },
+          "description": {
+            "uz": "Сладкий соус, вдохновленный японской кухней, который идеально подходит для приправления и глазури рыбных блюд, особенно угря (унаги)\n",
+            "ru": "Сладкий соус, вдохновленный японской кухней, который идеально подходит для приправления и глазури рыбных блюд, особенно угря (унаги)\n",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://cdn.delever.uz/delever/57253e06-05a9-4126-9b06-0091d6f1935d",
+          "weight": "50 g"
+        },
+        {
+          "id": "f0b9b1fc-24c1-4793-9a10-70f25ac10450",
+          "code": "",
+          "name": {
+            "uz": "Yong'oqli",
+            "ru": "Ореховый соус",
+            "en": "Nutty"
+          },
+          "description": {
+            "uz": "Насыщенный и кремовый соус идеально сочетается с различными блюдами, включая мясо, рыбу и овощи, придавая им утонченный аромат и неповторимый вкус\n",
+            "ru": "Насыщенный и кремовый соус идеально сочетается с различными блюдами, включая мясо, рыбу и овощи, придавая им утонченный аромат и неповторимый вкус\n",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://cdn.delever.uz/delever/b8c481df-2be4-480a-b244-830d8c8a514e",
+          "weight": "50 g"
+        },
+        {
+          "id": "6d5911b4-5fd3-4c13-9441-291109600281",
+          "code": "",
+          "name": {
+            "uz": "Ketchup",
+            "ru": "Кетчуп",
+            "en": "Ketchup"
+          },
+          "description": {
+            "uz": "Классический кисло-сладкий соус\n",
+            "ru": "Классический кисло-сладкий соус\n",
+            "en": ""
+          },
+          "price": 6000,
+          "image": "https://cdn.delever.uz/delever/52ad2276-53b0-408a-9a04-520958dbecbb",
+          "weight": "50 g"
+        },
+        {
+          "id": "5437d9cf-da04-4172-a626-c950ec68f367",
+          "code": "",
+          "name": {
+            "uz": " Spaysi",
+            "ru": "Спайси соус",
+            "en": "Spicy"
+          },
+          "description": {
+            "uz": "Пикантный соус с острым вкусом и ароматом, который придаёт блюдам особую насыщенность\n",
+            "ru": "Пикантный соус с острым вкусом и ароматом, который придаёт блюдам особую насыщенность\n",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://cdn.delever.uz/delever/c78ba3a5-26a3-4364-91dd-25a3906b5e63",
+          "weight": "50 g"
+        },
+        {
+          "id": "ff258abc-85d0-4e54-9de7-d269d647a44b",
+          "code": "",
+          "name": {
+            "uz": "Tartar",
+            "ru": "Тартар соус",
+            "en": "Tartar"
+          },
+          "description": {
+            "uz": "Изысканный соус с кремообразной текстурой и богатым вкусом\n",
+            "ru": "Изысканный соус с кремообразной текстурой и богатым вкусом\n",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://cdn.delever.uz/delever/87ace635-b010-47c4-a8b9-7628a5013526",
+          "weight": "50 g"
+        },
+        {
+          "id": "1ea7c763-0d8f-4ff7-b1a8-38507c6718e2",
+          "code": "",
+          "name": {
+            "uz": "Kimchi",
+            "ru": "Кимчи соус 50 гр",
+            "en": "Kimchi"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://cdn.delever.uz/delever/4df815a4-1d94-409c-b40a-beb1d6f37a37",
+          "weight": "50 g"
+        },
+        {
+          "id": "0b07a3b5-550b-458a-859a-09b8546d2618",
+          "code": "",
+          "name": {
+            "uz": "Shirin chili",
+            "ru": "Соус сладкий чили",
+            "en": "Sweet chili"
+          },
+          "description": {
+            "uz": "Азиатский соус с сочетанием сладости и легкой остроты\n",
+            "ru": "Азиатский соус с сочетанием сладости и легкой остроты\n",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://cdn.delever.uz/delever/87a8b32e-de45-4a5c-b112-12057ed399f6",
+          "weight": "50 g"
+        }
+      ]
+    },
+    {
+      "id": "bea61c3c-bdfc-453b-8b3e-13bd9effc8c4",
+      "slug": "salads",
+      "title": {
+        "uz": "Salatlar",
+        "ru": "Салаты "
+      },
+      "items": [
+        {
+          "id": "d06f5c13-6d09-412f-9038-daa264481f60",
+          "code": "",
+          "name": {
+            "uz": "Krevetkali sezar salati",
+            "ru": "САЛАТ Цезарь с креветками",
+            "en": "Caesar salad with shrimp"
+          },
+          "description": {
+            "uz": "Krevetka, cherri pomidori, salat bargi, aysberg salati, quritilgan non bo‘laklari, sezar qaylasi, qattiq pishloq, bedana tuxumi, quritilgan zaytun",
+            "ru": "Креветки, помидоры черри, листья салата, салат айсберг, крутоны, соус цезарь, сыр твёрдый, яйцо перепелиное, маслины сушёные",
+            "en": "Shrimp, cherry tomatoes, lettuce leaves, iceberg lettuce, croutons, Caesar dressing, hard cheese, quail egg, dried olives\n\n"
+          },
+          "price": 79000,
+          "image": "https://cdn.delever.uz/delever/67ea23cc-20cb-41bb-9713-7e047a7eebc0",
+          "weight": "240 g"
+        },
+        {
+          "id": "637c4cfb-5593-4726-b74a-2aaf63a56dba",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli sezar salati",
+            "ru": "САЛАТ Цезарь с курицей",
+            "en": "Caesar salad with chicken"
+          },
+          "description": {
+            "uz": "Su-vid tovuq filesi, cherri pomidori, salat barglari, aysberg salati, quritilgan non bo‘laklari, sezar qaylasi, qattiq pishloq, bedana tuxumi, quritilgan zaytun mevasi",
+            "ru": "Куриное филе су-вид, помидоры черри, листья салата, салат айсберг, крутоны, соус цезарь, сыр твёрдый, яйцо перепелиное, маслины сушёные",
+            "en": "Sous-vide chicken breast, cherry tomatoes, lettuce leaves, iceberg lettuce, croutons, Caesar dressing, hard cheese, quail egg, dried olives\n"
+          },
+          "price": 59000,
+          "image": "https://cdn.delever.uz/delever/4bc0e32e-6bb6-455d-b082-0f0ebec747ab",
+          "weight": "220 g"
+        },
+        {
+          "id": "0ab59617-6d82-41e7-bed3-51a809b9bb82",
+          "code": "",
+          "name": {
+            "uz": "Fila sarada",
+            "ru": "Фила сарада",
+            "en": "Phila sarada"
+          },
+          "description": {
+            "uz": "Teriyaki mol go‘shti, rukola, cherri pomidori, konservalangan nok, qaymoqli pishloq, balzamli krem, balzamli sirka, limonli fresh, zaytun moyi, ziravorlar",
+            "ru": "Говядина терияки, рукола, помидоры черри, груша консервированная, сыр сливочный, крем бальзамический, уксус бальзамический, фреш лимонный, масло оливковое, специи",
+            "en": "Teriyaki beef, arugula, cherry tomatoes, canned pear, cream cheese, balsamic cream, balsamic vinegar, lemon juice, olive oil, spices"
+          },
+          "price": 77000,
+          "image": "https://cdn.delever.uz/delever/d4de3556-9f56-450a-a9ef-22d544d27dc8",
+          "weight": "215 g"
+        },
+        {
+          "id": "452e32ec-efab-4fff-b01f-34448c166109",
+          "code": "",
+          "name": {
+            "uz": "Baqlajonli salat",
+            "ru": "Салат из баклажанов",
+            "en": "Eggplant salad"
+          },
+          "description": {
+            "uz": "Baqlajon, pomidor, qaymoqli pishloq, kimchi qaylasi, shirin chili qaylasi, kashnich va quritilgan zaytun mevasi",
+            "ru": "Баклажаны жареные, помидоры, сыр сливочный, соус кимчи, соус сладкий чили, кинза, масло базиликовое, маслины сушёные\n\n",
+            "en": "Eggplants, tomatoes, cream cheese, kimchi sauce, sweet chili sauce, cilantro, dried olives\n"
+          },
+          "price": 63000,
+          "image": "https://cdn.delever.uz/delever/be43a0b2-3cfe-4141-ae8f-d6bae807c357",
+          "weight": "315 g"
+        },
+        {
+          "id": "a43b4dfc-754b-4555-a71f-9c85d0726f20",
+          "code": "",
+          "name": {
+            "uz": "Chuka sarada",
+            "ru": "Чука сарада",
+            "en": "Chuka sarada"
+          },
+          "description": {
+            "uz": "Chuka salati, pomidor, kunjut yog‘i, limon, kunjut, yong‘oq qaylasi",
+            "ru": "Салат чука, помидор, масло кунжутное, лимон, кунжут, соус ореховый \n",
+            "en": "Chuka salad, tomato, sesame seeds oil, lemon, sesame seeds, nut sauce"
+          },
+          "price": 55000,
+          "image": "https://cdn.delever.uz/delever/4e5d76f6-b5e5-43ba-8bac-23e1599bf8ce",
+          "weight": "210 g"
+        },
+        {
+          "id": "d1cc6c1d-99f6-43a4-808b-975c1842bcd2",
+          "code": "",
+          "name": {
+            "uz": "Kani sarada",
+            "ru": "Кани сарада",
+            "en": "Kani sarada"
+          },
+          "description": {
+            "uz": "Krab aralashmasi, bodring, guruch, uchar baliq ikrasi, tartar qaylasi, qovurilgan klyar, qovurilgan kim, kunjut, ziravorlar va bambuk bargi",
+            "ru": "Крабовый микс, огурцы, рис, икра летучей рыбы, соус тартар, кляр жареный, ким жареный, кунжут, специи, лист бамбука",
+            "en": "Crab mix, cucumbers, rice, flying fish roe, tartar sauce, fried batter, fried seaweed (nori), sesame seeds, spices, bamboo leaves\n"
+          },
+          "price": 46000,
+          "image": "https://cdn.delever.uz/delever/27e9caca-4646-4457-b94a-a7d7490df083",
+          "weight": "225 g"
+        },
+        {
+          "id": "3fc0572a-cb28-47ee-899d-3a4753d4e94f",
+          "code": "",
+          "name": {
+            "uz": "Seulcha mol go'shtli kimchi",
+            "ru": "Кимчи с говядиной по-сеульски",
+            "en": "Seoul-Style Kimchi Beef Salad"
+          },
+          "description": {
+            "uz": "Mol go‘shti, pomidor, bodring, ismaloq, kunjut yog'i, kimchi sousi, soya sousi, maxsus sous, sarimsoq, ko‘k piyoz, kashnich, kunjut",
+            "ru": "Говядина, помидоры, огурцы, шпинат, кунжутное масло, соус кимчи, соевый соус, фирменный соус, чеснок, зелёный лук, кинза, кунжут",
+            "en": "Beef, tomatoes, cucumbers, spinach, sesame oil, kimchi sauce, soy sauce, signature sauce, garlic, green onion, cilantro, sesame seeds"
+          },
+          "price": 45000,
+          "image": "https://cdn.delever.uz/delever/fc770b4d-48de-472a-8a22-fdd27d00bc24",
+          "weight": "220 g"
+        },
+        {
+          "id": "24643b6c-edeb-4921-95e6-da3df4672376",
+          "code": "",
+          "name": {
+            "uz": "Kimchi redis",
+            "ru": "Редис кимчи",
+            "en": "Kimchi Radish"
+          },
+          "description": {
+            "uz": "Rediska, kimchi sousi, sirka, kashnich, kunjut",
+            "ru": "Редис, соус кимчи, уксус, кинза, кунжут",
+            "en": "Radish, kimchi sauce, vinegar, cilantro, sesame seeds"
+          },
+          "price": 15000,
+          "image": "https://cdn.delever.uz/delever/4905b4d3-2c73-4af4-ba54-1b20a9727833",
+          "weight": "110 g"
+        },
+        {
+          "id": "cbef2e0f-b36a-44bd-8f8f-14c566f45301",
+          "code": "",
+          "name": {
+            "uz": "Kimchi pomidor",
+            "ru": "Помидоры кимчи",
+            "en": "Kimchi Tomatoes"
+          },
+          "description": {
+            "uz": "Pomidor, kimchi sousi, kashnich, kunjut",
+            "ru": "Помидоры, соус кимчи, кинза, кунжут",
+            "en": "Tomatoes, kimchi sauce, cilantro, sesame seeds"
+          },
+          "price": 15000,
+          "image": "https://cdn.delever.uz/delever/644242ac-61db-48f0-a498-c4328f78797f",
+          "weight": "110 g"
+        },
+        {
+          "id": "28d65fe3-c4df-47c1-9ade-fc410fe34bd7",
+          "code": "",
+          "name": {
+            "uz": "Kimchi bodring",
+            "ru": "Огурцы кимчи",
+            "en": "Kimchi Cucumbers"
+          },
+          "description": {
+            "uz": "Bodring, kimchi sousi, sirka, kashnich, kunjut",
+            "ru": "Огурцы, соус кимчи, уксус, кинза, кунжут",
+            "en": "Cucumbers, kimchi sauce, vinegar, cilantro, sesame seeds"
+          },
+          "price": 15000,
+          "image": "https://cdn.delever.uz/delever/42c829d1-9792-42f9-bf3a-01eca1b9e559",
+          "weight": "110 g"
+        }
+      ]
+    },
+    {
+      "id": "d0fa2816-fbd7-478a-a418-ca53890304e7",
+      "slug": "cold-soups",
+      "title": {
+        "uz": "Sovuq sho'rvalar",
+        "ru": "Холодные супы"
+      },
+      "items": [
+        {
+          "id": "092fbbae-185b-443d-ad51-1db53824b37f",
+          "code": "",
+          "name": {
+            "uz": "Kuksi",
+            "ru": "Кукси",
+            "en": "Kuksi"
+          },
+          "description": {
+            "uz": "Mol go‘shti, muri, bodringlar, pomidorlar, karam, omlet, lag‘mon, kochi-tirimi, amoya, sirka",
+            "ru": "Говядина, мурри, огурцы, помидоры, капуста белокочанная, омлет, лапша, кочи-тирими, амоя, уксус",
+            "en": "Beef, murri, cucumbers, tomatoes, cabbage, omelette, noodles, kochi-tirimi, amoya, vinegar"
+          },
+          "price": 47000,
+          "image": "https://cdn.delever.uz/delever/ca3f07bc-9454-4e47-a8cd-e7d7045cf9f0"
+        },
+        {
+          "id": "5807bb0e-4d67-41d1-92e3-21b67519a770",
+          "code": "",
+          "name": {
+            "uz": "Kuksi muri (qo'shimcha porsiya)",
+            "ru": "Кукси мури (дополнительная порция)",
+            "en": "Kuksi moury (extra portion)"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 7000,
+          "image": ""
+        },
+        {
+          "id": "37e1ede1-a115-44db-b221-777ed0a4c2c5",
+          "code": "",
+          "name": {
+            "uz": "Okroshka",
+            "ru": "Окрошка",
+            "en": "Okroshka"
+          },
+          "description": {
+            "uz": "Говядина су-вид, айран, картофель, яйцо, фасоль стручковая, редис, фреш лимона, кинза, перец чёрный, укроп, лук зелёный",
+            "ru": "Говядина су-вид, айран, картофель, яйцо, фасоль стручковая, редис, фреш лимона, кинза, перец чёрный, укроп, лук зелёный",
+            "en": ""
+          },
+          "price": 47000,
+          "image": "https://cdn.delever.uz/delever/12f54a87-677c-4b19-868f-1c03f0c2e796"
+        }
+      ]
+    },
+    {
+      "id": "3eeb9283-9173-4649-9940-657248017c1e",
+      "slug": "soups",
+      "title": {
+        "uz": "Sho'rvalar",
+        "ru": "Супы"
+      },
+      "items": [
+        {
+          "id": "108091ad-ea0d-43d2-a962-a9b09804f934",
+          "code": "",
+          "name": {
+            "uz": "Tom Yam",
+            "ru": "Суп Том Ям",
+            "en": "Tom Yum "
+          },
+          "description": {
+            "uz": "Yo‘lbars krevetkasi, tovuq filesi, shampinyon qo‘ziqorini, tom yam pastasi, kokos suti, cherri pomidori, laym, chili qalampiri, kashnich, guruch\n",
+            "ru": "Креветки тигровые, куриное филе, шампиньоны, паста том ям, молоко кокосовое, помидоры черри, лайм, перец чили, кинза, рис\n",
+            "en": "Tiger shrimp, chicken fillet, champignon mushrooms, Tom Yum paste, coconut milk, cherry tomatoes, lime, chili pepper, cilantro, rice"
+          },
+          "price": 83000,
+          "image": "https://cdn.delever.uz/delever/e836e768-6756-494b-8839-d73e1ecd128e",
+          "weight": "330 g"
+        },
+        {
+          "id": "ba9a2ce6-7085-4886-92fc-83e8c20637e1",
+          "code": "",
+          "name": {
+            "uz": "Mol go'shtli ramen",
+            "ru": "Рамён с говядиной",
+            "en": "Ramen with beef"
+          },
+          "description": {
+            "uz": "Mol go‘shti, mol go‘shti bulyoni, daraxt qo‘ziqorini, qovoqcha, tuxumli ugra, teriyaki tuxumi, qizil qalampir, sarimsoq, porey piyozi, nori, kunjut",
+            "ru": "Говядина, говяжий бульон, древесные грибы, кабачки, лапша яичная, яйцо терияки, перец красный, чеснок, лук порей, нори, кунжут",
+            "en": "Beef, beef broth, wood ear mushrooms, zucchini, egg noodles, teriyaki egg, red pepper, garlic, leek, nori, sesame seeds\n"
+          },
+          "price": 66000,
+          "image": "https://cdn.delever.uz/delever/5f790e8f-e698-48bf-90db-39dc0be9bf82",
+          "weight": "465 g"
+        },
+        {
+          "id": "dd5473d1-2d42-45dd-ab3b-18cac3fff31e",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli ramyon",
+            "ru": "Рамён с курицей",
+            "en": "Ramen with chicken"
+          },
+          "description": {
+            "uz": "Unga belangan tovuq go‘shti, tovuq bulyoni, Vyetnam qaylasi, zanjabil qaylasi, tuxumli ugra, teriyaki tuxumi, krab aralashmasi, porey piyozi, nori, uchar baliq ikrasi, murch",
+            "ru": "Курица в панировке,  соус вьетнамский, соус имбирный, лапша яичная, яйцо терияки, крабовый микс, лук порей, нори, икра летучей рыбы, перец чёрный",
+            "en": "Breaded chicken, chicken broth, Vietnamese sauce, ginger sauce, egg noodles, teriyaki egg, crab mix, leek, nori, flying fish roe, black pepper\n"
+          },
+          "price": 58000,
+          "image": "https://cdn.delever.uz/delever/a4fd694d-d357-4bd9-a991-b14fc5fe5aae",
+          "weight": "670 g"
+        },
+        {
+          "id": "35e066df-ae0a-4720-a36b-aeff8aae0ca6",
+          "code": "",
+          "name": {
+            "uz": "Lososli miso sho'rvasi",
+            "ru": "Мисо с лососем",
+            "en": "Salmon Miso soup"
+          },
+          "description": {
+            "uz": "Losos, soya bulyoni, Pekin karami, shampinyon, tofu, vakame, kunjut moyi, boshpiyoz, ko‘k piyoz, qovurilgan klyar, qovurilgan kim, kunjut, guruch",
+            "ru": "Лосось, бульон из соевых бобов, капуста пекинская, шампиньоны, тофу, вакаме, масло кунжутное, лук репчатый, лук зелёный, кляр жареный, ким жареный, кунжут, рис",
+            "en": "Salmon, soy bean broth, napa cabbage, champignon mushrooms, tofu, wakame, sesame seeds oil, onion, green onions, fried batter, fried kim, sesame seeds, rice\n"
+          },
+          "price": 65000,
+          "image": "https://cdn.delever.uz/delever/0c72e513-3fb1-43e1-9577-f89b156d45eb",
+          "weight": "350 g"
+        },
+        {
+          "id": "6a4b57a0-5b9e-4c46-9cee-46be69084ac5",
+          "code": "",
+          "name": {
+            "uz": "Kimchi bilan tovuq",
+            "ru": "Кимчи суп с курицей",
+            "en": "Chicken with kimchi"
+          },
+          "description": {
+            "uz": "Sous-vide tovuqi, suimono sho‘rvasi, fo sho‘rva bulyoni, daraxt qo‘ziqorini, tuxum, vakame, miso pasta, tofu, kimchi qaylasi, shriracha qaylasi, ko‘k piyoz, qovurilgan xamir",
+            "ru": "Курица су-вид, суп суимоно, бульон фо, древесные грибы, яйца, вакаме, паста мисо, тофу, соус кимчи, соус шрирача, зеленый лук, жаренный кляр",
+            "en": "Sous-vide chicken, suimono soup, pho broth, tree mushrooms, eggs, wakame, miso paste, tofu, kimchi sauce, sriracha sauce, green onions, fried dough"
+          },
+          "price": 49000,
+          "image": "https://cdn.delever.uz/delever/9661a1bd-7ea5-4a17-929e-af5cbbc33d02",
+          "weight": "440 g"
+        },
+        {
+          "id": "4d1b47f9-b92e-4ad7-8e37-9fae33544b83",
+          "code": "",
+          "name": {
+            "uz": "Qaymoqli tovuq sho'rvasi",
+            "ru": "Сливочный суп с курицей",
+            "en": "Creamy chicken soup"
+          },
+          "description": {
+            "uz": "Tovuq filesi, suimono bulyoni, qaymoq, vakame, tuxum, qovurilgan klyar, qovurilgan kim, kunjut, guruch",
+            "ru": "Куриное филе, суимоно бульон, сливки, вакаме, яйцо, кляр жареный, ким жареный, кунжут, рис",
+            "en": "Chicken fillet, suimono broth, cream, wakame, egg, fried batter, fried kim, sesame seeds, rice"
+          },
+          "price": 51000,
+          "image": "https://cdn.delever.uz/delever/e074ec1b-5bbb-48df-a5ae-1430fdfc9cc1",
+          "weight": "410 g"
+        }
+      ]
+    },
+    {
+      "id": "5ee209c7-c395-45f7-89c4-0dac409561de",
+      "slug": "hot-dishes",
+      "title": {
+        "uz": "Issiq taomlar",
+        "ru": "Горячие блюда"
+      },
+      "items": [
+        {
+          "id": "8de66d66-77b1-4b4e-9f8a-086ad2c631da",
+          "code": "",
+          "name": {
+            "uz": "Forel bifshteksi",
+            "ru": "Стейк из форели",
+            "en": "Trout steak"
+          },
+          "description": {
+            "uz": "Marinadlangan forel, ismaloq chiplari, teriyaki sousi, imzo sousi, guruch, pomidorlar, shalot piyoz, limon sharbati, ukrop, maydalangan koriander, salat barglari, asal sousi, limon, sarimsoq, qora murch",
+            "ru": "Форель маринованная, чипсы из шпината, соус терияки, соус фирменный, рис, капуста пак-чой, соус медовый, лимон, чеснок, перец черный",
+            "en": "Marinated trout, spinach chips, teriyaki sauce, signature sauce, rice, tomatoes, shallots, lemon juice, dill, cilantro, lettuce leaves, honey sauce, lemon, garlic, black pepper"
+          },
+          "price": 79000,
+          "image": "https://cdn.delever.uz/delever/ee800e04-9c4a-4473-8786-b9554d15f437",
+          "weight": "399 g"
+        },
+        {
+          "id": "9afee863-e50e-4353-9de3-e9f948773554",
+          "code": "",
+          "name": {
+            "uz": "Gohan toniku",
+            "ru": "Гохан тонику",
+            "en": "Gohan toniku"
+          },
+          "description": {
+            "uz": "Mol go‘shti, salat bargi, pomidor, shalot piyozi, shirin chili qaylasi, kashnich, ukrop, limon freshi, guruch, kunjut, ziravorlar",
+            "ru": "Говядина, листья салата, помидор, лук шалот, соус сладкий чили, кинза, укроп, фреш лимона, рис, кунжут, специи",
+            "en": "Beef, lettuce leaves, tomato, shallots, sweet chili sauce, cilantro, dill, lemon juice, rice, sesame seeds, spices"
+          },
+          "price": 89000,
+          "image": "https://cdn.delever.uz/delever/5832a561-1e51-40b9-a0bf-9a9f7a8f7070",
+          "weight": "330 g"
+        },
+        {
+          "id": "9a2e3d9b-c8fb-4eb1-9561-c51ed05babfc",
+          "code": "",
+          "name": {
+            "uz": "Mol go'shtli kabob qo'ra",
+            "ru": "Жаровня с говядиной",
+            "en": "Roast beef"
+          },
+          "description": {
+            "uz": "Mol go‘shti, bulg‘or qalampiri, qovoqcha, cherri pomidori, boshpiyoz, Vyetnam qaylasi, qishloqcha pishirilgan kartoshka, murch, kashnich, ko‘k piyoz",
+            "ru": "Говядина, перец болгарский, кабачки, помидоры черри, лук репчатый, соус вьетнамский, картофель по-деревенски, перец чёрный, кинза, лук зелёный",
+            "en": "Beef, bell pepper, zucchini, cherry tomatoes, onion, Vietnamese sauce, rustic potatoes, black pepper, cilantro, green onions\n"
+          },
+          "price": 86000,
+          "image": "https://cdn.delever.uz/delever/aa8bd9fd-6f2c-409e-9bc0-94bbfa4554a9",
+          "weight": "260 g"
+        },
+        {
+          "id": "40092f73-2b2b-4852-b436-b71e59d3e874",
+          "code": "",
+          "name": {
+            "uz": "Asia Beef",
+            "ru": "Asia Beef",
+            "en": "Asia Beef"
+          },
+          "description": {
+            "uz": "Mol go‘shti, kartoshka, daraxt qo‘ziqorini, yashil loviya, soya sousi, maxsus sous, sarimsoq, piyoz, ko‘k piyoz, kashnich, qora murch, zanjabil ildizi, kunjut, ziravorlar",
+            "ru": "Говядина, картофель, древесные грибы, стручковая фасоль, соевый соус, фирменный соус, чеснок, лук, зелёный лук, кинза, чёрный перец, корень имбиря, кунжут, специи",
+            "en": "Beef, potatoes, wood ear mushrooms, green beans, soy sauce, signature sauce, garlic, onion, green onion, cilantro, black pepper, ginger root, sesame seeds, spices"
+          },
+          "price": 62000,
+          "image": "https://cdn.delever.uz/delever/e10335f3-e2a2-4520-95da-50ef80794fe0",
+          "weight": "380 g"
+        },
+        {
+          "id": "8105a5b6-9696-4e8f-8ba1-9e0074fbd212",
+          "code": "",
+          "name": {
+            "uz": "Tovuq qanotlari chili qaylasida 9dona.",
+            "ru": "Куриные крылья в чили соусе 9шт.",
+            "en": "Chicken wings in chili sauce 9 pcs."
+          },
+          "description": {
+            "uz": "Tovuq qanotlari, chili qaylasi, ko‘k piyoz, kunjut",
+            "ru": "Куриные крылья, соус чили, лук зелёный, кунжут",
+            "en": "Chicken wings, chili sauce, green onion, sesame seeds"
+          },
+          "price": 65000,
+          "image": "https://cdn.delever.uz/delever/a518603d-0cec-4911-ab3b-d52e3fc371aa",
+          "weight": "432 g"
+        },
+        {
+          "id": "7655d5e2-001e-428e-85b0-38059999209e",
+          "code": "",
+          "name": {
+            "uz": "Tovuq qanotlari chilibum qaylasida",
+            "ru": "Куриные крылья в соусе чилибум",
+            "en": "Chicken wings in Chili Boom sauce"
+          },
+          "description": {
+            "uz": "Tovuq qanotlari, klyar, chilibum qaylasi, ko‘k piyoz, qovurilgan klyar, kunjut, chili qalampiri",
+            "ru": "Куриные крылья, кляр, чилибум соус, лук зелёный, кляр жареный, кунжут, перец чили",
+            "en": "Chicken wings, batter, Chili Boom sauce, green onions, fried batter, sesame seeds, chili pepper"
+          },
+          "price": 65000,
+          "image": "https://cdn.delever.uz/delever/647cb489-51af-4341-9344-bb001fa79288",
+          "weight": "375 g"
+        },
+        {
+          "id": "c3e2abc6-d76d-426f-845c-6131918356be",
+          "code": "",
+          "name": {
+            "uz": "Tovuq qanotlari asal qaylasida",
+            "ru": "Куриные крылья в медовом соусе",
+            "en": "Chicken wings in honey sauce"
+          },
+          "description": {
+            "uz": "Tovuq qanotlari, klyar, asal qaylasi, limon, ko‘k piyoz, kunjut",
+            "ru": "Куриные крылья, кляр, медовый соус, лимон, лук зелёный, кунжут",
+            "en": "Chicken wings, fried batter, honey sauce, lemon, spring onions, sesame"
+          },
+          "price": 65000,
+          "image": "https://cdn.delever.uz/delever/3eadf2df-48a7-4c1c-bf0f-46cb413c52b7",
+          "weight": "330 g"
+        },
+        {
+          "id": "9a425819-71f4-42ec-9aae-ba4a57bdc2ba",
+          "code": "",
+          "name": {
+            "uz": "Qarsildoq klyardagi tovuq qanotlari",
+            "ru": "Куриные крылья в хрустящей панировке",
+            "en": "Chicken wings in crispy breading"
+          },
+          "description": {
+            "uz": "Tovuq qanotlari, klyar",
+            "ru": "Куриные крылья, кляр\n",
+            "en": "Chicken wings, batter"
+          },
+          "price": 55000,
+          "image": "https://cdn.delever.uz/delever/2eb837bc-0ecc-4260-85ee-b764920a8093",
+          "weight": "290 g"
+        },
+        {
+          "id": "639ba601-ba62-4a32-bef5-a212e37e207b",
+          "code": "",
+          "name": {
+            "uz": "Tovuq qanotlari chili qaylasida 6dona.",
+            "ru": "Куриные крылья в чили соусе 6шт.",
+            "en": "Chicken Wings in Chili Sauce 6pc."
+          },
+          "description": {
+            "uz": "Tovuq qanotlari, chili qaylasi, ko‘k piyoz, kunjut",
+            "ru": "Куриные крылья, соус чили, лук зелёный, кунжут",
+            "en": "Chicken wings, chili sauce, green onion, sesame seeds"
+          },
+          "price": 39000,
+          "image": "https://cdn.delever.uz/delever/e98f7fd2-7145-43b1-82b0-dabd66796585",
+          "weight": "288 g"
+        },
+        {
+          "id": "2317296f-b1d8-4724-a2ba-778ffe78d1c1",
+          "code": "",
+          "name": {
+            "uz": "Tovuq qanotlari chili qaylasida 3dona/",
+            "ru": "Куриные крылья в чили соусе 3шт.",
+            "en": "Chicken Wings in Chili Sauce 3pc."
+          },
+          "description": {
+            "uz": "Tovuq qanotlari, chili qaylasi, ko‘k piyoz, kunjut",
+            "ru": "Куриные крылья, соус чили, лук зелёный, кунжут",
+            "en": "Chicken wings, chili sauce, green onion, sesame seeds"
+          },
+          "price": 27000,
+          "image": "https://cdn.delever.uz/delever/0729001d-b348-4f01-b28b-be30e38de45b",
+          "weight": "144 g"
+        },
+        {
+          "id": "6fa663e7-3db1-4c90-aa04-abfa906a6b23",
+          "code": "",
+          "name": {
+            "uz": "Tori Don",
+            "ru": "Тори дон",
+            "en": "Tori Don"
+          },
+          "description": {
+            "uz": "Tovuq filesi, guruch, maxsus qayla, asal qaylasi, ko‘k piyoz, qovurilgan kim, kunjut",
+            "ru": "Куриное филе, рис, соус фирменный, соус медовый, лук зелёный, ким жареный, кунжут",
+            "en": "Chicken fillet, rice, signature sauce, honey sauce, green onions, fried kim, sesame seeds"
+          },
+          "price": 59000,
+          "image": "https://cdn.delever.uz/delever/c582fa0c-d21c-4320-a3c1-3cb87d8a2067",
+          "weight": "250 g"
+        },
+        {
+          "id": "0fdb866b-6b6a-47ae-b24e-a430160d9ebc",
+          "code": "",
+          "name": {
+            "uz": "Taycha pishirilgan tovuq go‘shti",
+            "ru": "Курица по-тайски",
+            "en": "Thai Chicken"
+          },
+          "description": {
+            "uz": "Tovuq filesi, Tay qaylasi, bulg‘or qalampiri, Pekin karami, qovoqcha, sabzi, bosh piyoz, ko‘k piyoz, kashnich, kunjut, guruch",
+            "ru": "Куриное филе, соус тайский, перец болгарский, капуста пекинская, кабачки, морковь, лук репчатый, лук зелёный, кинза, кунжут, рис \n",
+            "en": "Chicken fillet, Thai sauce, bell pepper, napa cabbage, zucchini, carrot, onion, green onions, cilantro, sesame seeds, rice"
+          },
+          "price": 56000,
+          "image": "https://cdn.delever.uz/delever/dbb729bd-233f-49c2-b18e-b517351ec90b",
+          "weight": "380 g"
+        },
+        {
+          "id": "e0c3f976-fa1c-4617-a05b-9c1b2c5b7ba3",
+          "code": "",
+          "name": {
+            "uz": "Soba ugrasi bilan katsu tovug'i",
+            "ru": "Чикен кацу с лапшой соба",
+            "en": "Chicken Katsu with Soba Noodles"
+          },
+          "description": {
+            "uz": "Tovuq filesi, soba ugrasi, motsarella pishlog‘i, daraxt qo‘ziqorini, bulg‘or qalampiri, soya sousi, shirin chili sousi, sarimsoq, piyoz, ko‘k piyoz, zanjabil ildizi, kunjut",
+            "ru": "Куриное филе, лапша соба, сыр моцарелла, древесные грибы, болгарский перец, соевый соус, соус сладкий чили, чеснок, лук, зелёный лук, корень имбиря, кунжут",
+            "en": "Chicken fillet, soba noodles, mozzarella cheese, wood ear mushrooms, bell pepper, soy sauce, sweet chili sauce, garlic, onion, green onion, ginger root, sesame seeds"
+          },
+          "price": 49000,
+          "image": "https://cdn.delever.uz/delever/fc1b84d5-88e2-4a26-b64f-23e7479a1f57",
+          "weight": "350 g"
+        },
+        {
+          "id": "b2a2e3b5-057d-4d06-b149-4dba4f5154fc",
+          "code": "",
+          "name": {
+            "uz": "Myondon tovug‘i",
+            "ru": "Мёндонская курочка",
+            "en": "Мёндонская курочка"
+          },
+          "description": {
+            "uz": "Tovuq filesi, klyar, achchiq qayla, kunjut",
+            "ru": "Куриное филе, кляр, соус острый, кунжут",
+            "en": "Куриное филе, кляр, соус острый, кунжут"
+          },
+          "price": 49000,
+          "image": "https://cdn.delever.uz/delever/b99e7766-60c9-4016-b116-041dc725fdc3",
+          "weight": "200 g"
+        },
+        {
+          "id": "d5c5344f-6f96-42a7-8d79-7e37179a52ec",
+          "code": "",
+          "name": {
+            "uz": "Kimchi gyodza",
+            "ru": "Гёдза кимчи",
+            "en": "Kimchi Gyoza"
+          },
+          "description": {
+            "uz": "Forel, piyoz, sariyog‘, sarimsoq, qora murch, xamir, kimchi sousi, shirin chili sousi, kashnich, kunjut",
+            "ru": "Форель, лук, сливочное масло, чеснок, чёрный перец, тесто, соус кимчи, соус сладкий чили, кинза, кунжут",
+            "en": "Trout, onion, butter, garlic, black pepper, dough, kimchi sauce, sweet chili sauce, cilantro, sesame seeds"
+          },
+          "price": 57000,
+          "image": "https://cdn.delever.uz/delever/2a7ee772-a182-4b77-ac9c-4d5a24109b38",
+          "weight": "140 g"
+        },
+        {
+          "id": "c2365907-41db-4d2b-94d1-a5e2f8346289",
+          "code": "",
+          "name": {
+            "uz": "Klassik gyodza",
+            "ru": "Гёдза классик",
+            "en": "Classic Gyoza"
+          },
+          "description": {
+            "uz": "Forel, piyoz, sariyog‘, sarimsoq, qora murch, xamir, kimchi sousi, shirin chili sousi, kashnich, kunjut",
+            "ru": "Форель, лук, сливочное масло, чеснок, чёрный перец, тесто, соус кимчи, соус сладкий чили, кинза, кунжут",
+            "en": "Trout, onion, butter, garlic, black pepper, dough, kimchi sauce, sweet chili sauce, cilantro, sesame seeds"
+          },
+          "price": 54000,
+          "image": "https://cdn.delever.uz/delever/0f30a272-d6e4-4f09-9f3b-fe8b3cbe5b99",
+          "weight": "120 g"
+        },
+        {
+          "id": "6aee9226-aa4f-490c-920c-d7740661cb6b",
+          "code": "",
+          "name": {
+            "uz": "Ismaloqli samosa",
+            "ru": "Самоса со шпинатом",
+            "en": "Spinach Samosa"
+          },
+          "description": {
+            "uz": "Ismaloq, xamir, piyoz, sariyog‘, sarimsoq, qora murch, maxsus sous, shirin chili sousi, bambuk bargi",
+            "ru": "Шпинат, тесто, лук, сливочное масло, чеснок, чёрный перец, фирменный соус, соус сладкий чили, бамбуковый лист",
+            "en": "Spinach, dough, onion, butter, garlic, black pepper, signature sauce, sweet chili sauce, bamboo leaf"
+          },
+          "price": 45000,
+          "image": "https://cdn.delever.uz/delever/4e795624-f253-4eb8-9cc5-2b3f8ac3776c",
+          "weight": "120 g"
+        },
+        {
+          "id": "3336df41-56a9-45b9-a2ad-eee93bc7de82",
+          "code": "",
+          "name": {
+            "uz": "Karri kartoshkali samosa",
+            "ru": "Самоса из картофеля карри",
+            "en": "Potato curry samosa"
+          },
+          "description": {
+            "uz": "Kartoshka, xamir, karri, piyoz, sariyog', bambuk bargi, smetana\n",
+            "ru": "Картофель, тесто, карри, лук репчатый, масло сливочное, лист бамбука, сметана\n",
+            "en": "Potatoes, dough, curry, onion, butter, bamboo leaf, sour cream.\n"
+          },
+          "price": 31000,
+          "image": "https://cdn.delever.uz/delever/b16d1352-9c1b-4b44-87c1-f813f1e455fe",
+          "weight": "130 g"
+        },
+        {
+          "id": "80bf9c38-9cd8-4cbc-b6d7-0a0bf51ebbad",
+          "code": "",
+          "name": {
+            "uz": "Qatlama tartar qaylasi bilan",
+            "ru": "Катлама с соусом тартар",
+            "en": "Катлама с соусом тартар"
+          },
+          "description": {
+            "uz": "Qatlama xamiri, o‘simlik yog‘i, sariyog‘, tartar qaylasi",
+            "ru": "Тесто катлама, масло растительное, масло сливочное, соус тартар",
+            "en": "Тесто катлама, масло растительное, масло сливочное, соус тартар"
+          },
+          "price": 29000,
+          "image": "https://cdn.delever.uz/delever/7dcc2402-2caa-4f09-8772-3ceba1b28984",
+          "weight": "170 g"
+        },
+        {
+          "id": "16f26720-0ddd-403a-8839-68ef7cc3bd4a",
+          "code": "",
+          "name": {
+            "uz": "Fish sousi bilan qishloqcha kartoshka",
+            "ru": "Картофель по-деревенски с соусом фиш",
+            "en": "Rustic potatoes with fish sauce"
+          },
+          "description": {
+            "uz": "Kartoshka, fish qaylasi, maxsus qayla, tuz",
+            "ru": "Картофель, соус фиш, соус фирменный, соль",
+            "en": "Potatoes, fish sauce, signature sauce, salt"
+          },
+          "price": 29000,
+          "image": "https://cdn.delever.uz/delever/be0f50ff-3e1e-4af1-bf6e-f1c6432e0b7c",
+          "weight": "175 g"
+        },
+        {
+          "id": "71d22641-047d-4744-ba9b-3e940a521551",
+          "code": "",
+          "name": {
+            "uz": "Kartoshka fri",
+            "ru": "Картофель фри",
+            "en": "French fries"
+          },
+          "description": {
+            "uz": "Kartoshka, tuz, ketchup",
+            "ru": "Картофель, соль, кетчуп\n",
+            "en": "Potatoes, salt, ketchup"
+          },
+          "price": 23000,
+          "image": "https://cdn.delever.uz/delever/2b7dbc77-e9fc-4aa7-b4aa-d4c33345c8af",
+          "weight": "170 g"
+        },
+        {
+          "id": "624bd96b-6159-458e-8a34-8eaa9dd11f40",
+          "code": "",
+          "name": {
+            "uz": "Guruch",
+            "ru": "Рис",
+            "en": "Rice"
+          },
+          "description": {
+            "uz": "Guruch, ziravorlar, makkajo‘xori, kunjut",
+            "ru": "Рис, заправка, кукуруза, кунжут\n",
+            "en": "Rice, dressing, corn, sesame"
+          },
+          "price": 18000,
+          "image": "https://cdn.delever.uz/delever/85fed73c-5f0e-4b44-9bd6-c538cee9edbe",
+          "weight": "150 g"
+        }
+      ]
+    },
+    {
+      "id": "9a7b7d99-d16e-4ec8-badc-cba7d8b91f82",
+      "slug": "wok",
+      "title": {
+        "uz": "WOK",
+        "ru": "WOK"
+      },
+      "items": [
+        {
+          "id": "62e1f064-1983-4bab-bbf5-0e2e5f3d2484",
+          "code": "",
+          "name": {
+            "uz": "Udon dengiz mahsulotlari bilan",
+            "ru": "Удон с морепродуктами",
+            "en": "Udon with seafood"
+          },
+          "description": {
+            "uz": "Yo‘lbars krevetkasi, sudak, sabzavot aralashmasi, soya maysasi, loviya, udon ugrasi, Vyetnam qaylasi, zanjabil qaylasi, tom yam pastasi, ko‘k piyoz, kashnich",
+            "ru": "Креветки тигровые, судак, овощной микс, ростки сои, фасоль стручковая, лапша удон, соус вьетнамский, соус имбирный, паста том ям, лук зелёный, кинза",
+            "en": "Tiger prawns, perch, vegetable mix, soybean sprouts, green beans, udon noodles, Vietnamese sauce, ginger sauce, tom yum paste, green onions, cilantro"
+          },
+          "price": 67000,
+          "image": "https://cdn.delever.uz/delever/07d2791e-4e94-4b1b-8ada-9a9c004fcd96",
+          "weight": "440 g"
+        },
+        {
+          "id": "24215c32-ef7b-4f24-8888-373cec46dece",
+          "code": "",
+          "name": {
+            "uz": "Udon mol go‘shti bilan",
+            "ru": "Удон с говядиной",
+            "en": "Udon with beef"
+          },
+          "description": {
+            "uz": "Mol go‘shti, sabzavot aralashmasi, shiitake, loviya, udon ugrasi, teriyaki tuxumi, Vyetnam qaylasi, ko‘k piyoz, kashnich, kunjut",
+            "ru": "Говядина, овощной микс, шиитаке, фасоль стручковая, лапша удон, яйцо терияки, соус вьетнамский, лук зелёный, кинза, кунжут",
+            "en": "Beef, vegetable mix, shiitake mushrooms, green beans, udon noodles, chicken egg, Vietnamese sauce, green onions, cilantro, sesame seeds"
+          },
+          "price": 59000,
+          "image": "https://cdn.delever.uz/delever/38b06f5d-40f8-4a37-acab-8001b773c288",
+          "weight": "370 g"
+        },
+        {
+          "id": "51b645a3-237a-4436-8f38-ea6a6ea7f2f9",
+          "code": "",
+          "name": {
+            "uz": "Asalli tovuq bilan udon",
+            "ru": "Удон с медовым цыплёнком",
+            "en": "Udon with Honey Chicken"
+          },
+          "description": {
+            "uz": "Tovuq filesi, udon ugrasi, shiitake, yashil loviya, tuxum, piyoz, paprika, vyetnam sousi, asal sousi, kashnich, kunjut",
+            "ru": "Куриное филе, лапша удон, шиитаке, стручковая фасоль, яйцо, лук, паприка, вьетнамский соус, медовый соус, кинза, кунжут",
+            "en": "Chicken fillet, udon noodles, shiitake mushrooms, green beans, egg, onion, paprika, Vietnamese sauce, honey sauce, cilantro, sesame seeds"
+          },
+          "price": 53000,
+          "image": "https://cdn.delever.uz/delever/63147dd7-f02f-4f3e-9154-a7d2499e4f39",
+          "weight": "380 g"
+        },
+        {
+          "id": "b80c3a73-2a47-4595-8f75-98ae57c9b92c",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli udon",
+            "ru": "Удон с курицей",
+            "en": "Udon with chicken"
+          },
+          "description": {
+            "uz": "Tovuq filesi, sabzavot aralashmasi, shiitake qo‘ziqorinlari, yashil loviya, udon noodles, teriyaki tuxumi, achchiq Vetnam sousi, yashil piyoz, koriandr, kunjut",
+            "ru": "Куриное филе, овощной микс, шиитаке, фасоль стручковая, лапша удон, яйцо терияки, соус вьетнамский, лук зелёный, кинза, кунжут",
+            "en": "Chicken fillet, mixed vegetables, shiitake mushrooms, green beans, udon noodles, teriyaki egg, spicy Vietnamese sauce, green onions, cilantro, sesame seeds\n"
+          },
+          "price": 51000,
+          "image": "https://cdn.delever.uz/delever/9abe0de8-2f7a-4526-8a0f-151fef5a6bb8",
+          "weight": "370 g"
+        },
+        {
+          "id": "ba19fd7b-0476-43d5-844c-9b70234ad90d",
+          "code": "",
+          "name": {
+            "uz": "Sabzavotli udon",
+            "ru": "Удон с овощами",
+            "en": "Udon with vegetables"
+          },
+          "description": {
+            "uz": "Sabzavotlar aralashmasi, shiitake, loviya, udon ugrasi, teriyaki tuxumi, Vyetnam qaylasi, ko‘k piyoz, kashnich, kunjut",
+            "ru": "Овощной микс, шиитаке, фасоль стручковая, лапша удон, яйцо терияки, соус вьетнамский, лук зелёный, кинза, кунжут",
+            "en": "(Spicy)Vegetable mix, shiitake mushrooms, green beans, udon noodles, chicken egg, Vietnamese sauce, green onions, cilantro, sesame seeds"
+          },
+          "price": 37000,
+          "image": "https://cdn.delever.uz/delever/be929608-e580-4a3d-8587-2127ae6f7c52",
+          "weight": "350 g"
+        },
+        {
+          "id": "d01ce295-8b22-4abe-96e3-0f8c48955da3",
+          "code": "",
+          "name": {
+            "uz": "Mol goʻshti bilan koreyscha ramyon",
+            "ru": "Корейский рамен с говядиной (БЕЗ БУЛЬОНА)",
+            "en": "Korean ramen with beef"
+          },
+          "description": {
+            "uz": "Mol go‘shti, ramyon ugrasi, sariyog‘, chedder pishlog‘i, daraxt qo‘ziqorini, pashot tuxumi, ko‘k piyoz, nori, kimchi qaylasi, marinadlangan daykon",
+            "ru": "Говядина, лапша рамен,  масло сливочное, сыр чеддер, древесные грибы, яйцо пашот, лук зеленый, нори, соус кимчи, дайкон маринованный",
+            "en": "Beef, ramen noodles, butter, cheddar cheese, wood ear mushrooms, poached egg, green onions, nori, kimchi sauce, pickled daikon"
+          },
+          "price": 69000,
+          "image": "https://cdn.delever.uz/delever/ec07857a-8e55-4dda-a7bc-398298b9da30",
+          "weight": "440 g"
+        },
+        {
+          "id": "9206c40a-a941-4788-ab95-2afbf61b07c2",
+          "code": "",
+          "name": {
+            "uz": "Tovuq bilan koreyscha ramyon",
+            "ru": "Корейский рамен с курицей (БЕЗ БУЛЬОНА)",
+            "en": "Korean ramen with chicken"
+          },
+          "description": {
+            "uz": "Sous-vide tovuq filesi, ramen lag'moni, bulyon, sariyog', qaymoqli pishloq, daraxt qo'ziqorinlari, poached tuxum, yashil piyoz, nori, tuzlangan daykon",
+            "ru": "Куриное филе су-вид, лапша рамен, масло сливочное, сыр сливочный, древесные грибы, яйцо пашот, лук зеленый, нори, дайкон маринованный ",
+            "en": "Sous-vide chicken fillet, ramen noodles, broth, butter, cream cheese, wood ear mushrooms, poached egg, green onion, nori, pickled daikon"
+          },
+          "price": 66000,
+          "image": "https://cdn.delever.uz/delever/5b92a861-6a00-4cd5-9556-74374fa83a8e",
+          "weight": "460 g"
+        },
+        {
+          "id": "7e4670b9-b4bf-44c8-81ff-17d46944decf",
+          "code": "",
+          "name": {
+            "uz": "Dengiz mahsulotli guruch",
+            "ru": "Рис с морепродуктами",
+            "en": "Rice with seafood"
+          },
+          "description": {
+            "uz": "Yo‘lbars krevetkasi, sudak, guruch, sabzavot aralashmasi, shampinyon, tuxum, maxsus qayla, sarimsoq, ziravorlar, ko‘k piyoz, kunjut, murch",
+            "ru": "Креветки тигровые, судак, рис, овощной микс, шампиньоны, яйцо, соус фирменный, чеснок, специи, лук зелёный, кунжут, перец чёрный",
+            "en": "Tiger prawns, perch, rice, vegetable mix, champignon mushrooms, egg, signature sauce, garlic, spices, green onions, sesame seeds, black pepper"
+          },
+          "price": 67000,
+          "image": "https://cdn.delever.uz/delever/2198540a-cbaa-4507-bb4a-f1e3a5399df3",
+          "weight": "390 g"
+        },
+        {
+          "id": "3ef4405c-e6ba-4519-8d7d-fa1ba2c39860",
+          "code": "",
+          "name": {
+            "uz": "Guruch tovuq go‘shti bilan",
+            "ru": "Рис с курицей",
+            "en": "Rice with chicken"
+          },
+          "description": {
+            "uz": "Tovuq filesi, guruch, sabzavot aralashmasi, shampinyon, tuxum, maxsus qayla, sarimsoq, ziravorlar, ko‘k piyoz, kunjut, murch",
+            "ru": "Куриное филе, рис, овощной микс, шампиньоны, яйцо, соус фирменный, чеснок, специи, лук зелёный, кунжут, перец чёрный",
+            "en": "Chicken fillet, rice, vegetable mix, champignon mushrooms, egg, signature sauce, garlic, spices, green onions, sesame seeds seeds, black pepper"
+          },
+          "price": 46000,
+          "image": "https://cdn.delever.uz/delever/ea84f76b-0f30-44e4-8b0d-5bad38bb6468",
+          "weight": "370 g"
+        },
+        {
+          "id": "911c205c-11f4-4bfd-8b7a-039a6a789de6",
+          "code": "",
+          "name": {
+            "uz": "Sabzavotli guruch",
+            "ru": "Рис с овощами",
+            "en": "Rice with Vegitables"
+          },
+          "description": {
+            "uz": "Guruch, sabzavotlar aralashmasi, shampinyon, tuxum, maxsus qayla, sarimsoq, ziravorlar, ko‘k piyoz, kunjut, murch",
+            "ru": "Рис, овощной микс, шампиньоны, яйцо, соус фирменный, чеснок, специи, лук зелёный, кунжут, перец чёрный\n",
+            "en": "Rice, vegetable mix, champignon mushrooms, egg, signature sauce, garlic, spices, green onions, sesame seeds, black pepper"
+          },
+          "price": 36000,
+          "image": "https://cdn.delever.uz/delever/26e15e91-7c5d-4d8a-b99a-d78dffabc791",
+          "weight": "360 g"
+        }
+      ]
+    },
+    {
+      "id": "b82292d9-46e8-4fe3-b5ee-7acb1de34ccc",
+      "slug": "bread-and-side-dishes",
+      "title": {
+        "uz": "Non va garnirlar ",
+        "ru": "Хлеб и гарниры"
+      },
+      "items": [
+        {
+          "id": "e1d5fdd5-142b-4951-a3b1-de6155b85fce",
+          "code": "",
+          "name": {
+            "uz": "Koplangan baliq noni ",
+            "ru": "Хлеб с копчёным угрём",
+            "en": "Smoked eel bread "
+          },
+          "description": {
+            "uz": "Non, tartar sous, unagi pate",
+            "ru": "Хлеб, соус тартар, унаги паштет",
+            "en": "Bread, tartar sauce, unagi pâté"
+          },
+          "price": 36000,
+          "image": "https://cdn.delever.uz/delever/04c3a5fa-e9de-453e-821f-d67abcf9d675"
+        },
+        {
+          "id": "7e7a6aa3-8167-4a5e-862e-44227f44026d",
+          "code": "",
+          "name": {
+            "uz": "Dudlangan pishloqli non",
+            "ru": "Хлеб с копчёным сыром",
+            "en": "Bread with smoked cheese"
+          },
+          "description": {
+            "uz": "Non, dudlangan pishloq, uchar baliq ikrasi, kunjut",
+            "ru": "Хлеб, сыр копчёный, икра летучей рыбы, кунжут",
+            "en": "Bread, smoked cheese, flying fish roe with kimchi, sesame seeds"
+          },
+          "price": 24000,
+          "image": "https://cdn.delever.uz/delever/505a7f2f-9d1b-4d79-b82f-e01c18171f45",
+          "weight": "190 g"
+        },
+        {
+          "id": "d885aa6e-55be-4626-a4b1-f8b54725691c",
+          "code": "",
+          "name": {
+            "uz": "Tartar sousi bilan non",
+            "ru": "Хлеб с соусом тартар",
+            "en": "Bread with tartar sauce"
+          },
+          "description": {
+            "uz": "Non, tartar qaylasi, sarimsoq, ko‘katlar, kunjut",
+            "ru": "Хлеб, соус тартар, чеснок, зелень, кунжут\n",
+            "en": "Bread, tartar sauce, garlic, herbs, sesame seeds"
+          },
+          "price": 19000,
+          "image": "https://cdn.delever.uz/delever/eac7c7f0-e2e4-4e3d-a57d-16d4b7f99fd7",
+          "weight": "220 g"
+        }
+      ]
+    },
+    {
+      "id": "67cf95fe-cd6c-48b8-b3cb-6eb65d66ff6e",
+      "slug": "desserts",
+      "title": {
+        "uz": "Desertlar",
+        "ru": "Десерты"
+      },
+      "items": [
+        {
+          "id": "16f51d83-d651-4e18-9378-58e898ccf01e",
+          "code": "",
+          "name": {
+            "uz": "Moti 3 dona",
+            "ru": "Моти",
+            "en": "Mochi 3 pcs"
+          },
+          "description": {
+            "uz": "Guruchli xamir, pishloqli krem, qorag‘at, shokolad, vanil, konservalangan olcha, yalpiz, murabbo",
+            "ru": "Тесто рисовое, крем сырный, смородина, шоколад, ваниль, вишня консервированная, мята, джем",
+            "en": "Rice dough, currant, chocolate, vanilla, canned cherries, mint, jam"
+          },
+          "price": 69000,
+          "image": "https://cdn.delever.uz/delever/ccf37983-5cac-4225-969d-e15361c00bfd",
+          "weight": "200 g"
+        },
+        {
+          "id": "07b26a14-191f-4bc0-b01d-138b2824b81c",
+          "code": "",
+          "name": {
+            "uz": "Shoko roll 8 done",
+            "ru": "Шоко ролл",
+            "en": "Choco roll 8 pcs"
+          },
+          "description": {
+            "uz": "Quymoq, pishloqli krem, banan, kivi, konservalangan ananas, konservalangan shaftoli, konservalangan olcha, keshyu yong‘og‘i, kokos qirindisi, shokoladli muss, yalpiz",
+            "ru": "Блинчик, крем сырный, банан, киви, ананас консервированный, персик консервированный, вишня консервированная, орешки кешью, стружка кокосовая, мусс шоколадный, мята",
+            "en": "Pancake, sweet cream cheese, banana, kiwi, canned pineapple, canned peach, canned cherry, cashew nuts, coconut flakes, chocolate mousse, mint"
+          },
+          "price": 56000,
+          "image": "https://cdn.delever.uz/delever/2705b64b-3608-4b1b-bd69-adeb50ff7151",
+          "weight": "210 g"
+        },
+        {
+          "id": "cc3fa9cc-863d-4623-a0c2-b5f2b399400e",
+          "code": "",
+          "name": {
+            "uz": "Laki roll 8 dona",
+            "ru": "Лаки ролл",
+            "en": "Lucky roll 8psc"
+          },
+          "description": {
+            "uz": "Quymoq, pishloqli krem, banan, kivi, konservalangan ananas, konservalangan shaftoli, konservalangan olcha, keshyu yong‘og‘i, qirg‘ichdan o‘tkazilgan shokolad, yalpiz, kokos qirindisi",
+            "ru": "Блинчик, крем сырный, банан, киви, ананас консервированный, персик консервированный, вишня консервированная, орешки кешью, шоколад тёртый, мята, стружка кокосовая",
+            "en": "Pancake, sweet cream cheese , banana, kiwi, canned pineapple, canned peach, canned cherry, cashew nuts, mint, grated chocolate"
+          },
+          "price": 56000,
+          "image": "https://cdn.delever.uz/delever/f16de784-29ff-4eda-b697-ee4aca196e9e",
+          "weight": "210 g"
+        }
+      ]
+    }
+  ]
+}

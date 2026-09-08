@@ -1,0 +1,2943 @@
+{
+  "provider": {
+    "slug": "chopar",
+    "name": "Chopar Pizza Uzbekistan",
+    "website": "https://choparpizza.uz",
+    "source": "https://api.choparpizza.uz/api/products (Official REST API)",
+    "currency": "UZS",
+    "fetchedAt": "2026-09-08T08:18:06.572Z",
+    "totalCategories": 9,
+    "totalItems": 191
+  },
+  "categories": [
+    {
+      "id": "sets",
+      "title": {
+        "uz": "Setlar 🍱",
+        "ru": "Сеты 🍱"
+      },
+      "match": {},
+      "items": [
+        {
+          "id": "352",
+          "code": "",
+          "name": {
+            "uz": "SNEK SET",
+            "ru": "СНЕК СЕТ"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">Turli ishtahaochar, qaynoq sneklar to’plami. Standart portsiyada maxsus Chopar sousdagi qanotchalar, sevimli fri kartoshkasi, pishloqli tovuq qalamchalari va jaydari kartoshka.</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Набор из разнообразных и аппетитных горячих закусок. Полноценные порции крылышек в фирменном соусе Chopar, любимой картошки фри, куриных палочек с сыром и картофеля по-деревенски.</span></p>"
+          },
+          "price": 107000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/10/05/dSNFYddiPY7Hsa5uZqH09JTansLyPdADHXKq7bkz.webp",
+          "weight": "690 g"
+        },
+        {
+          "id": "723",
+          "code": "",
+          "name": {
+            "uz": "YANGI MUMTOZ SET",
+            "ru": "ЯНГИ МУМТОЗ СЕТ"
+          },
+          "description": {
+            "uz": "Ikki karra pepperoni 25\nJulyen 25\nBarbekyu 25\nCoca-cola 1.5 L",
+            "ru": "Двойная пепперони 25\nЖульен 25\nБарбекю 25\nCoca-cola 1.5 л"
+          },
+          "price": 172000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/07/31/iBc9wXnKGYFWgpDqAEZfUb4rxcNtunQwKCtihJJm.webp",
+          "weight": "1270 g"
+        },
+        {
+          "id": "757",
+          "code": "",
+          "name": {
+            "uz": "GO’SHTLI SET",
+            "ru": "МЯСНОЙ СЕТ"
+          },
+          "description": {
+            "uz": "Go'shtli 30\nBarbekyu 30",
+            "ru": "Мясная 30\nБарбекю 30"
+          },
+          "price": 182000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/07/16/sju8Yq5l20p8yLrjshtSX47AuT481EgR7KRIvxD1.webp",
+          "weight": "1565 g"
+        },
+        {
+          "id": "758",
+          "code": "",
+          "name": {
+            "uz": "MAZALI SET",
+            "ru": "МАЗАЛИ СЕТ"
+          },
+          "description": {
+            "uz": "Kombo 30\nPepperoni 30\nJulyen 30",
+            "ru": "Комбо 30\nПепперони 30\nЖульен 30"
+          },
+          "price": 210000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/07/16/0tj2m2XnEfpQrmrmyGSnx5JRFdQ7Dp9GlEpgnQqn.webp",
+          "weight": "1760 g"
+        },
+        {
+          "id": "768",
+          "code": "",
+          "name": {
+            "uz": "BAYRAM SET",
+            "ru": "БАЙРАМ СЕТ"
+          },
+          "description": {
+            "uz": "Bayram 25\nKombo 25\nJulyen 25",
+            "ru": "Байрам 25\nКомбо 25\nЖульен 25"
+          },
+          "price": 150000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2025/01/30/jgIQ8oBInbwkXGsXIW876oqlPnNwPKUAMM5h8jTs.webp",
+          "weight": "1365 g"
+        },
+        {
+          "id": "769",
+          "code": "",
+          "name": {
+            "uz": "KLASSIK SET",
+            "ru": "КЛАССИК СЕТ"
+          },
+          "description": {
+            "uz": "Pepperoni 25\nMargarita 25\nPishloqli 25",
+            "ru": "Пепперони 25\nМаргарита 25\nСырная 25"
+          },
+          "price": 120000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2025/01/30/6FuR1rANW5qWORYk0L9L1HkswvEDSk49ghLJWm2z.webp",
+          "weight": "1080 g"
+        },
+        {
+          "id": "781",
+          "code": "",
+          "name": {
+            "uz": "MINI SET",
+            "ru": "МИНИ СЕТ"
+          },
+          "description": {
+            "uz": "<p>Mini Set — to‘yimli va mazali tamaddi! Pepperoni 20 sm, 1 portsiya Jaydari kartoshka, 2 dona naggets, ketchup va xushbo‘y Aysti 0.5. Bir kishi uchun ideal to‘plam!</p>",
+            "ru": "<p>Mini Set — всё, что нужно для сытного перекуса! Пепперони 20 см, хрустящая картошка по-деревенски, 2 сочных наггетса, кетчуп и освежающий айсти 0.5. Идеальный набор для одного!</p>"
+          },
+          "price": 50000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2025/09/02/U7KHicx6ua9wnvudTbrhWq5MuUswBA6v2vY2LQvL.webp",
+          "weight": "900 g"
+        },
+        {
+          "id": "792",
+          "code": "",
+          "name": {
+            "uz": "QUVVAT SET",
+            "ru": "QUVVAT СЕТ"
+          },
+          "description": {
+            "uz": "Quvvat 25\nDonar 25\nTovuqli donar 25",
+            "ru": "Quvvat 25\nДонар 25\nКуриный донар 25"
+          },
+          "price": 170000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/04/14/p2Lt8VQdG95pfntwVxmrAmfGkPqnPSyyomMyV1kf.webp",
+          "weight": "1263 g"
+        },
+        {
+          "id": "793",
+          "code": "",
+          "name": {
+            "uz": "DONAR SET",
+            "ru": "ДОНАР СЕТ"
+          },
+          "description": {
+            "uz": "Donar 25\nTovuqli donar 25",
+            "ru": "Донар 25\nКуриный донар 25"
+          },
+          "price": 99000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/04/08/VICTDQNvGRm1zpQ81UwYsDpt7pDZKnIwLkiog0Ps.webp",
+          "weight": "820 g"
+        },
+        {
+          "id": "800",
+          "code": "",
+          "name": {
+            "uz": "BAYRAM 20 SET",
+            "ru": "БАЙРАМ 20 СЕТ"
+          },
+          "description": {
+            "uz": "Bayram 20\nPepperoni 20\nTovuqli donar 20\nCoca-cola 1.0 L",
+            "ru": "Байрам 20\nПепперони 20\nКуриный донар 20\nCoca-cola 1.0 л"
+          },
+          "price": 95000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/06/04/HePCJiafjmsSIWT04ElXZDSbiildkGSS6DffWGcZ.png",
+          "weight": "850 g"
+        },
+        {
+          "id": "803",
+          "code": "",
+          "name": {
+            "uz": "KOMBO 20 SET",
+            "ru": "КОМБО 20 СЕТ"
+          },
+          "description": {
+            "uz": "Kombo 20\nJulyen 20\nDonar 20\nCoca-cola 1.0 L",
+            "ru": "Комбо 20\nЖульен 20\nДонар 20\nCoca-cola 1.0 л"
+          },
+          "price": 95000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/06/04/MC9dtdZPdITvHSrhELq08is0WaHBslVytp2aix3Z.png",
+          "weight": "850 g"
+        },
+        {
+          "id": "806",
+          "code": "",
+          "name": {
+            "uz": "PEPPERONI 20 SET",
+            "ru": "ПЕППЕРОНИ 20 СЕТ"
+          },
+          "description": {
+            "uz": "Pepperoni 20\nTovuqli donar 20\nPishloqli 20\nCoca-cola 1.0 L",
+            "ru": "Пепперони 20\nКуриный донар 20\nСырная 20\nCoca-cola 1.0 л"
+          },
+          "price": 90000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/06/04/9f4YtJmPzUOlp6qTxd4IyrUiUMZPmMqBAX2SMMdk.png",
+          "weight": "760 g"
+        },
+        {
+          "id": "827",
+          "code": "",
+          "name": {
+            "uz": "Tantana set",
+            "ru": "Тантана сет"
+          },
+          "description": {
+            "uz": "Bayram 25\nTovuqli donar 25\nShokoladli 25",
+            "ru": "Байрам 25\nКуриный донар 25\nШоколадная 25"
+          },
+          "price": 130000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/26/VBYW4O7EfZutYOmfL0Fru0Ez1SIFiRu4CGil8NAR.png",
+          "weight": "1100 g"
+        }
+      ]
+    },
+    {
+      "id": "pizza",
+      "title": {
+        "uz": "Pitsa 🍕",
+        "ru": "Пицца 🍕"
+      },
+      "match": {},
+      "items": [
+        {
+          "id": "296",
+          "code": "",
+          "name": {
+            "uz": "BAYRAM 30 sm",
+            "ru": "БАЙРАМ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 110000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/dXbMedBpXqHZxCOOlQl58wp5R1zPA1X11YH74sTw.webp",
+          "weight": "643 g"
+        },
+        {
+          "id": "297",
+          "code": "",
+          "name": {
+            "uz": "BARBEKYU 30 sm",
+            "ru": "БАРБЕКЮ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 88000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/2GRLwqqQb0h1YslPViBqoZLOl7SxroY0PLoxHJCn.webp",
+          "weight": "742 g"
+        },
+        {
+          "id": "302",
+          "code": "",
+          "name": {
+            "uz": "MARGARITA 30 sm",
+            "ru": "МАРГАРИТА 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 72000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/adVGIp2LwzaIojrui7y9CEWGokt3Afk3sofdF2qB.webp",
+          "weight": "545 g"
+        },
+        {
+          "id": "303",
+          "code": "",
+          "name": {
+            "uz": "GO‘SHTLI 30 sm",
+            "ru": "МЯСНАЯ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 115000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/8CCgPGTa01APnui0MoWASbafTS8x6920T2b67zwm.webp",
+          "weight": "703 g"
+        },
+        {
+          "id": "304",
+          "code": "",
+          "name": {
+            "uz": "PEPPERONI 30 sm",
+            "ru": "ПЕППЕРОНИ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 82000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/VcZi7YvrndONDso01eVHE8I5TLjLVp4U90c9fvrM.webp",
+          "weight": "495 g"
+        },
+        {
+          "id": "306",
+          "code": "",
+          "name": {
+            "uz": "PISHLOQLI 30 sm",
+            "ru": "СЫРНАЯ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 74000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/Q9J9FxLJuawNj4yZFKSqSzMkC3tIVc9hG7R8KB2l.webp",
+          "weight": "567 g"
+        },
+        {
+          "id": "307",
+          "code": "",
+          "name": {
+            "uz": "XON PITSA 30 sm",
+            "ru": "ХАНСКАЯ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 98000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/CSr9XcHytpbb5z0DXKcG6J2K6MLvRYohSAZUdP6D.webp",
+          "weight": "555 g"
+        },
+        {
+          "id": "308",
+          "code": "",
+          "name": {
+            "uz": "BARBEKYU 25 sm",
+            "ru": "БАРБЕКЮ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 65000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/2GRLwqqQb0h1YslPViBqoZLOl7SxroY0PLoxHJCn.webp",
+          "weight": "458 g"
+        },
+        {
+          "id": "313",
+          "code": "",
+          "name": {
+            "uz": "MARGARITA 25 sm",
+            "ru": "МАРГАРИТА 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 52000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/adVGIp2LwzaIojrui7y9CEWGokt3Afk3sofdF2qB.webp",
+          "weight": "378 g"
+        },
+        {
+          "id": "314",
+          "code": "",
+          "name": {
+            "uz": "GO‘SHTLI 25 sm",
+            "ru": "МЯСНАЯ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 80000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/8CCgPGTa01APnui0MoWASbafTS8x6920T2b67zwm.webp",
+          "weight": "430 g"
+        },
+        {
+          "id": "315",
+          "code": "",
+          "name": {
+            "uz": "PEPPERONI 25 sm",
+            "ru": "ПЕППЕРОНИ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 56000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/VcZi7YvrndONDso01eVHE8I5TLjLVp4U90c9fvrM.webp",
+          "weight": "355 g"
+        },
+        {
+          "id": "317",
+          "code": "",
+          "name": {
+            "uz": "PISHLOQLI 25 sm",
+            "ru": "СЫРНАЯ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 55000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/Q9J9FxLJuawNj4yZFKSqSzMkC3tIVc9hG7R8KB2l.webp",
+          "weight": "329 g"
+        },
+        {
+          "id": "318",
+          "code": "",
+          "name": {
+            "uz": "XON PITSA 25 sm",
+            "ru": "ХАНСКАЯ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 74000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/CSr9XcHytpbb5z0DXKcG6J2K6MLvRYohSAZUdP6D.webp",
+          "weight": "445 g"
+        },
+        {
+          "id": "319",
+          "code": "",
+          "name": {
+            "uz": "50/50 Bayram 30 sm",
+            "ru": "50/50 БАЙРАМ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 60000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/dXbMedBpXqHZxCOOlQl58wp5R1zPA1X11YH74sTw.webp"
+        },
+        {
+          "id": "320",
+          "code": "",
+          "name": {
+            "uz": "50/50 Barbekyu 30 sm",
+            "ru": "50/50 БАРБЕКЮ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 49000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/2GRLwqqQb0h1YslPViBqoZLOl7SxroY0PLoxHJCn.webp"
+        },
+        {
+          "id": "325",
+          "code": "",
+          "name": {
+            "uz": "50/50 Margarita 30 sm",
+            "ru": "50/50 МАРГАРИТА 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 41000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/adVGIp2LwzaIojrui7y9CEWGokt3Afk3sofdF2qB.webp"
+        },
+        {
+          "id": "326",
+          "code": "",
+          "name": {
+            "uz": "50/50 Go'shtli 30 sm",
+            "ru": "50/50 МЯСНАЯ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 63000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/8CCgPGTa01APnui0MoWASbafTS8x6920T2b67zwm.webp"
+        },
+        {
+          "id": "327",
+          "code": "",
+          "name": {
+            "uz": "50/50 Pepperoni 30 sm",
+            "ru": "50/50 ПЕППЕРОНИ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 46000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/VcZi7YvrndONDso01eVHE8I5TLjLVp4U90c9fvrM.webp"
+        },
+        {
+          "id": "329",
+          "code": "",
+          "name": {
+            "uz": "50/50 Pishloqli 30 sm",
+            "ru": "50/50 СЫРНАЯ 30  см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 42000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/Q9J9FxLJuawNj4yZFKSqSzMkC3tIVc9hG7R8KB2l.webp"
+        },
+        {
+          "id": "330",
+          "code": "",
+          "name": {
+            "uz": "50/50 Xon pitsa 30 sm",
+            "ru": "50/50 ХАНСКАЯ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 54000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/CSr9XcHytpbb5z0DXKcG6J2K6MLvRYohSAZUdP6D.webp"
+        },
+        {
+          "id": "351",
+          "code": "",
+          "name": {
+            "uz": "BAYRAM 25 sm",
+            "ru": "БАЙРАМ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 85000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/dXbMedBpXqHZxCOOlQl58wp5R1zPA1X11YH74sTw.webp",
+          "weight": "408 g"
+        },
+        {
+          "id": "355",
+          "code": "",
+          "name": {
+            "uz": "PISHLOQLI TOVUQ QALAMCHALARI",
+            "ru": "КУРИНЫЕ ПАЛОЧКИ С СЫРОМ"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">Maydalangan tovuq filesidan tayyorlangan pishloqli qalamchalar. 6 dona.</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Палочки из измельченного куриного филе с тающим сыром внутри </span></p><p><span style=\"color: rgb(0, 0, 0);\">Порция: 6 шт.</span></p>"
+          },
+          "price": 34000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/09/27/9eZLTws2Ki58c7AYXe9SfyP5tIJJVRodPAt2lAJb.webp",
+          "weight": "320 g"
+        },
+        {
+          "id": "361",
+          "code": "",
+          "name": {
+            "uz": "Bayram 30 + sosiskali bo'rt",
+            "ru": "Байрам 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 128000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/dXbMedBpXqHZxCOOlQl58wp5R1zPA1X11YH74sTw.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "362",
+          "code": "",
+          "name": {
+            "uz": "Barbekyu 30 + sosiskali bo'rt",
+            "ru": "Барбекю 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 106000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/2GRLwqqQb0h1YslPViBqoZLOl7SxroY0PLoxHJCn.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "367",
+          "code": "",
+          "name": {
+            "uz": "Margarita 30 + sosiskali bo'rt",
+            "ru": "Маргарита 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 90000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/adVGIp2LwzaIojrui7y9CEWGokt3Afk3sofdF2qB.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "368",
+          "code": "",
+          "name": {
+            "uz": "Go'shtli 30 + sosiskali bo'rt",
+            "ru": "Мясная 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 133000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/8CCgPGTa01APnui0MoWASbafTS8x6920T2b67zwm.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "369",
+          "code": "",
+          "name": {
+            "uz": "Pepperoni 30 + sosiskali bo'rt",
+            "ru": "Пепперони 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 100000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/VcZi7YvrndONDso01eVHE8I5TLjLVp4U90c9fvrM.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "371",
+          "code": "",
+          "name": {
+            "uz": "Pishloqli 30 + sosiskali bo'rt",
+            "ru": "Сырная 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 92000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/Q9J9FxLJuawNj4yZFKSqSzMkC3tIVc9hG7R8KB2l.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "372",
+          "code": "",
+          "name": {
+            "uz": "Xonlar pitsasi 30 + sosiskali bo'rt",
+            "ru": "Ханская 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 116000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/CSr9XcHytpbb5z0DXKcG6J2K6MLvRYohSAZUdP6D.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "397",
+          "code": "",
+          "name": {
+            "uz": "Bayram 35 + sosiskali bo'rt",
+            "ru": "Байрам 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 162000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/dXbMedBpXqHZxCOOlQl58wp5R1zPA1X11YH74sTw.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "398",
+          "code": "",
+          "name": {
+            "uz": "Barbekyu 35 + sosiskali bo'rt",
+            "ru": "Барбекю 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 124000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/2GRLwqqQb0h1YslPViBqoZLOl7SxroY0PLoxHJCn.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "403",
+          "code": "",
+          "name": {
+            "uz": "Margarita 35 + sosiskali bo'rt",
+            "ru": "Маргарита 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 102000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/adVGIp2LwzaIojrui7y9CEWGokt3Afk3sofdF2qB.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "404",
+          "code": "",
+          "name": {
+            "uz": "Go'shtli 35 + sosiskali bo'rt",
+            "ru": "Мясная 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 150000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/8CCgPGTa01APnui0MoWASbafTS8x6920T2b67zwm.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "405",
+          "code": "",
+          "name": {
+            "uz": "Pepperoni 35 + sosiskali bo'rt",
+            "ru": "Пепперони 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 114000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/VcZi7YvrndONDso01eVHE8I5TLjLVp4U90c9fvrM.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "407",
+          "code": "",
+          "name": {
+            "uz": "Pishloqli 35 + sosiskali bo'rt",
+            "ru": "Сырная 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 106000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/Q9J9FxLJuawNj4yZFKSqSzMkC3tIVc9hG7R8KB2l.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "408",
+          "code": "",
+          "name": {
+            "uz": "Xonlar pitsasi 35 + sosiskali bo'rt",
+            "ru": "Ханская 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 138000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/CSr9XcHytpbb5z0DXKcG6J2K6MLvRYohSAZUdP6D.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "409",
+          "code": "",
+          "name": {
+            "uz": "Bayram 35 sm",
+            "ru": "БАЙРАМ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 142000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/dXbMedBpXqHZxCOOlQl58wp5R1zPA1X11YH74sTw.webp",
+          "weight": "874 g"
+        },
+        {
+          "id": "410",
+          "code": "",
+          "name": {
+            "uz": "BARBEKYU 35 sm",
+            "ru": "БАРБЕКЮ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 104000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/2GRLwqqQb0h1YslPViBqoZLOl7SxroY0PLoxHJCn.webp",
+          "weight": "899 g"
+        },
+        {
+          "id": "415",
+          "code": "",
+          "name": {
+            "uz": "MARGARITA 35 sm",
+            "ru": "МАРГАРИТА 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 82000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/adVGIp2LwzaIojrui7y9CEWGokt3Afk3sofdF2qB.webp",
+          "weight": "811 g"
+        },
+        {
+          "id": "416",
+          "code": "",
+          "name": {
+            "uz": "GO‘SHTLI 35 sm",
+            "ru": "МЯСНАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 130000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/8CCgPGTa01APnui0MoWASbafTS8x6920T2b67zwm.webp",
+          "weight": "840 g"
+        },
+        {
+          "id": "417",
+          "code": "",
+          "name": {
+            "uz": "PEPPERONI 35 sm",
+            "ru": "ПЕППЕРОНИ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 94000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/VcZi7YvrndONDso01eVHE8I5TLjLVp4U90c9fvrM.webp",
+          "weight": "745 g"
+        },
+        {
+          "id": "419",
+          "code": "",
+          "name": {
+            "uz": "PISHLOQLI 35 sm",
+            "ru": "СЫРНАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 86000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/Q9J9FxLJuawNj4yZFKSqSzMkC3tIVc9hG7R8KB2l.webp",
+          "weight": "726 g"
+        },
+        {
+          "id": "420",
+          "code": "",
+          "name": {
+            "uz": "XON PITSA 35 см",
+            "ru": "ХАНСКАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 118000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/CSr9XcHytpbb5z0DXKcG6J2K6MLvRYohSAZUdP6D.webp",
+          "weight": "700 g"
+        },
+        {
+          "id": "421",
+          "code": "",
+          "name": {
+            "uz": "50/50 Bayram Katta",
+            "ru": "50/50 БАЙРАМ Большая"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 76000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/dXbMedBpXqHZxCOOlQl58wp5R1zPA1X11YH74sTw.webp"
+        },
+        {
+          "id": "422",
+          "code": "",
+          "name": {
+            "uz": "50/50 Barbekyu 35 sm",
+            "ru": "50/50 БАРБЕКЮ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 57000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/2GRLwqqQb0h1YslPViBqoZLOl7SxroY0PLoxHJCn.webp"
+        },
+        {
+          "id": "427",
+          "code": "",
+          "name": {
+            "uz": "50/50 Margarita 35 sm",
+            "ru": "50/50 МАРГАРИТА 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 46000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/adVGIp2LwzaIojrui7y9CEWGokt3Afk3sofdF2qB.webp"
+        },
+        {
+          "id": "428",
+          "code": "",
+          "name": {
+            "uz": "50/50 Go'shtli 35 sm",
+            "ru": "50/50 МЯСНАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 70000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/8CCgPGTa01APnui0MoWASbafTS8x6920T2b67zwm.webp"
+        },
+        {
+          "id": "429",
+          "code": "",
+          "name": {
+            "uz": "50/50 Pepperoni 35 sm",
+            "ru": "50/50 ПЕППЕРОНИ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 52000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/VcZi7YvrndONDso01eVHE8I5TLjLVp4U90c9fvrM.webp"
+        },
+        {
+          "id": "431",
+          "code": "",
+          "name": {
+            "uz": "50/50 Pishloqli 35 sm",
+            "ru": "50/50 СЫРНАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 48000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/Q9J9FxLJuawNj4yZFKSqSzMkC3tIVc9hG7R8KB2l.webp"
+        },
+        {
+          "id": "432",
+          "code": "",
+          "name": {
+            "uz": "50/50 Xon pitsa 35 sm",
+            "ru": "50/50 ХАНСКАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 64000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/CSr9XcHytpbb5z0DXKcG6J2K6MLvRYohSAZUdP6D.webp"
+        },
+        {
+          "id": "441",
+          "code": "",
+          "name": {
+            "uz": "IKKI KARRA PEPPERONI 35 sm",
+            "ru": "ДВОЙНАЯ ПЕППЕРОНИ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 97000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/sBn4pIcnjbvtPRq93tpN9gcyQHsKpleHMMF1lnm4.webp",
+          "weight": "825 g"
+        },
+        {
+          "id": "443",
+          "code": "",
+          "name": {
+            "uz": "IKKI KARRA PEPPERONI 25 sm",
+            "ru": "ДВОЙНАЯ ПЕППЕРОНИ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 67000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/sBn4pIcnjbvtPRq93tpN9gcyQHsKpleHMMF1lnm4.webp",
+          "weight": "395 g"
+        },
+        {
+          "id": "446",
+          "code": "",
+          "name": {
+            "uz": "IKKI KARRA PEPPERONI 30 sm",
+            "ru": "ДВОЙНАЯ ПЕППЕРОНИ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 83000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/sBn4pIcnjbvtPRq93tpN9gcyQHsKpleHMMF1lnm4.webp",
+          "weight": "560 g"
+        },
+        {
+          "id": "455",
+          "code": "",
+          "name": {
+            "uz": "50/50 Ikki karra pepperoni 35 sm",
+            "ru": "50/50 ДВОЙНАЯ ПЕППЕРОНИ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 54000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/sBn4pIcnjbvtPRq93tpN9gcyQHsKpleHMMF1lnm4.webp"
+        },
+        {
+          "id": "459",
+          "code": "",
+          "name": {
+            "uz": "50/50 Ikki karra pepperoni 30 sm",
+            "ru": "50/50 ДВОЙНАЯ ПЕППЕРОНИ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 47000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/sBn4pIcnjbvtPRq93tpN9gcyQHsKpleHMMF1lnm4.webp"
+        },
+        {
+          "id": "518",
+          "code": "",
+          "name": {
+            "uz": "Ikki karra pepperoni 35 + sosiskali bo'rt",
+            "ru": "Двойная пепперони 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 117000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/sBn4pIcnjbvtPRq93tpN9gcyQHsKpleHMMF1lnm4.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "519",
+          "code": "",
+          "name": {
+            "uz": "Ikki karra pepperoni 30 + sosiskali bo'rt",
+            "ru": "Двойная пепперони 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 101000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/sBn4pIcnjbvtPRq93tpN9gcyQHsKpleHMMF1lnm4.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "724",
+          "code": "",
+          "name": {
+            "uz": "PISHLOQLI PIDE",
+            "ru": "ПИДЕ С СЫРОМ"
+          },
+          "description": {
+            "uz": "<p>Mozzarella pishlog'i, asal, oq sedana.</p>",
+            "ru": "<p>Сыр Моццарелла, мёд, белый кунжут.</p>"
+          },
+          "price": 45000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/08/08/R6q9IiFAc9gYwvWai3mbq4cCur0WEpJpAW6fSJLL.webp",
+          "weight": "320 g"
+        },
+        {
+          "id": "786",
+          "code": "",
+          "name": {
+            "uz": "Donar pitsa 25 sm",
+            "ru": "Донар пицца 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 79000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/03/17/H1KcomcPPpsgt4yElJJUpoSjWbYmGRy1vzjw4agj.webp",
+          "weight": "400 g"
+        },
+        {
+          "id": "787",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli donar pitsa 25 sm",
+            "ru": "Куриная донар пицца 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 69000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/03/17/H1KcomcPPpsgt4yElJJUpoSjWbYmGRy1vzjw4agj.webp",
+          "weight": "420 g"
+        },
+        {
+          "id": "788",
+          "code": "",
+          "name": {
+            "uz": "Donar pitsa 35 sm",
+            "ru": "Донар пицца 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 109000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/03/17/H1KcomcPPpsgt4yElJJUpoSjWbYmGRy1vzjw4agj.webp",
+          "weight": "930 g"
+        },
+        {
+          "id": "789",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli donar pitsa 35 sm",
+            "ru": "Куриная донар пицца 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 99000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/03/17/H1KcomcPPpsgt4yElJJUpoSjWbYmGRy1vzjw4agj.webp",
+          "weight": "960 g"
+        },
+        {
+          "id": "815",
+          "code": "",
+          "name": {
+            "uz": "Go'shtli Donar 35 + Sosiskali bort",
+            "ru": "Мясной донер 35 + сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 129000,
+          "image": "",
+          "weight": "1 g"
+        }
+      ]
+    },
+    {
+      "id": "pide_lavash",
+      "title": {
+        "uz": "Pide va Lavash 🌯",
+        "ru": "Пиде и Лаваш 🌯"
+      },
+      "match": {},
+      "items": [
+        {
+          "id": "748",
+          "code": "",
+          "name": {
+            "uz": "VEGETARIAN LAVASH",
+            "ru": "ВЕГЕТАРИАНСКИЙ ЛАВАШ"
+          },
+          "description": {
+            "uz": "<p>Lavash xamir, mozzarella pishlog’i, shampinyon qo'ziqorini, sarxil pomidor, bulg’or qalampiri, qora va yashil zaytun, murch va<span style=\"color: black;\"> oq sedana.</span></p>",
+            "ru": "<p>Тесто – лаваш, сыр Моцарелла, шампиньоны, свежие помидоры, болгарский перец, маслины, оливки, черный молотый перец и белый кунжут.</p>"
+          },
+          "price": 27000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/07/15/Goy0Ga1FKIIyPJHe5gcxRB6Xb32sfjELnwVF5R2s.webp",
+          "weight": "179 g"
+        },
+        {
+          "id": "749",
+          "code": "",
+          "name": {
+            "uz": "TOVUQ STEYK LAVASH",
+            "ru": "КУРИНЫЙ СТЕЙК ЛАВАШ"
+          },
+          "description": {
+            "uz": "<p>Lavash xamir, mozzarella pishlog’i, tovuq steyki, sarxil pomidor, shampinyon qo'ziqorini, french sous, oq sedana.</p>",
+            "ru": "<p>Тесто – лаваш, сыр Моцарелла, куриный стейк, свежие помидоры, шампиньоны, френч соус и белый кунжут.</p>"
+          },
+          "price": 32000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/07/15/Nc4raW8NhiVNeaKf2ZZGUZqO6quXIPfgcxUobL81.webp",
+          "weight": "230 g"
+        },
+        {
+          "id": "750",
+          "code": "",
+          "name": {
+            "uz": "GO’SHTLI PIDE",
+            "ru": "ПИДЕ С МЯСОМ"
+          },
+          "description": {
+            "uz": "<p>Mozzarella pishlog’i, mol go'shti steyki, qizil va yashil bulg’or qalampiri, pomidor, oq sedana.</p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Сыр Моццарелла, говяжий стейк, красный и зелёный перец, помидоры, белый кунжут.</span></p>"
+          },
+          "price": 50000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/07/15/lUTjzVL8qQLyi0r2ktNCPYJmbAmUZqxomG6y0jwJ.webp",
+          "weight": "375 g"
+        },
+        {
+          "id": "760",
+          "code": "",
+          "name": {
+            "uz": "3+1 TOVUQ STEYK LAVASH",
+            "ru": "3+1 КУРИНЫЙ СТЕЙК ЛАВАШ"
+          },
+          "description": {
+            "uz": "<p>3 tasini narxida 4 ta Tovuq steyk lavashi.</p>",
+            "ru": "<p>4 лаваша Куриный стейк по цене 3x.</p>"
+          },
+          "price": 96000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/07/15/Nc4raW8NhiVNeaKf2ZZGUZqO6quXIPfgcxUobL81.webp",
+          "weight": "934 g"
+        },
+        {
+          "id": "761",
+          "code": "",
+          "name": {
+            "uz": "3+1 VEGETARIAN LAVASH",
+            "ru": "3+1 ВЕГЕТАРИАНСКИЙ ЛАВАШ"
+          },
+          "description": {
+            "uz": "<p>3 tasini narxida 4 ta Vegetarian lavashi.</p>",
+            "ru": "<p>4 лаваша Вегетарианский по цене 3x.</p>"
+          },
+          "price": 81000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/07/15/Goy0Ga1FKIIyPJHe5gcxRB6Xb32sfjELnwVF5R2s.webp",
+          "weight": "716 g"
+        },
+        {
+          "id": "817",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli Donar 35 + Sosiskali bort",
+            "ru": "Куриный донер 35 + сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 119000,
+          "image": "",
+          "weight": "1 g"
+        }
+      ]
+    },
+    {
+      "id": "snacks",
+      "title": {
+        "uz": "Sneklar 🍟",
+        "ru": "Снеки 🍟"
+      },
+      "match": {},
+      "items": [
+        {
+          "id": "353",
+          "code": "",
+          "name": {
+            "uz": "JAYDARI KARTOSHKA",
+            "ru": "КАРТОФЕЛЬ ПО-ДЕРЕВЕНСКИ"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">Ziravorlar bilan pishirilgan, ishtaha ochar jaydari kartoshka bo‘laklari.</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Аппетитные дольки картофеля со специями.</span></p>"
+          },
+          "price": 18000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/09/27/aLV5KcThV6nD9X4fVkP2dRhePmNx0SotTe7DDi5l.webp",
+          "weight": "120 g"
+        },
+        {
+          "id": "354",
+          "code": "",
+          "name": {
+            "uz": "CHOPAR SOUSIDAGI QANOTCHALAR",
+            "ru": "КРЫЛЫШКИ В СОУСЕ CHOPAR"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">Maxsus \"Chopar\" sousida tayyorlangan mazali tovuq qanotchalari. 6 dona.</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Сочные куриные крылышки, обжаренные в фирменном соусе \"Chopar\" Порция: 6 шт.</span></p>"
+          },
+          "price": 37000,
+          "image": "",
+          "weight": "300 g"
+        },
+        {
+          "id": "472",
+          "code": "",
+          "name": {
+            "uz": "FRI KARTOSHKASI",
+            "ru": "КАРТОШКА ФРИ"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">Ishtahaochar, qarsildoq fri kartoshkasi.</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Картошка фри с аппетитно хрустящей корочкой.</span></p>"
+          },
+          "price": 18000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/06/20/Pc7gjWaBB6dJWJGYRy9orX5yGRXCCQd3FeBfZuL4.png",
+          "weight": "110 g"
+        },
+        {
+          "id": "593",
+          "code": "",
+          "name": {
+            "uz": "TOVUQ NAGETS, 6 dona",
+            "ru": "КУРИНЫЕ НАГГЕТСЫ, 6 шт"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">Maxsus panirovka bilan qoplangan, tovuq qiymasidan tayyorlangan mazali naggetslar.</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Аппетитные наггетсы из куриного фарша в фирменной панировке.</span></p>"
+          },
+          "price": 26000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/07/10/2B3LX2pf0kApQHp85ynlmyPETOGoI1sMwJe7Dwkz.png",
+          "weight": "150 g"
+        },
+        {
+          "id": "594",
+          "code": "",
+          "name": {
+            "uz": "TOVUQ NAGETS, 9 dona",
+            "ru": "КУРИНЫЕ НАГГЕТСЫ, 9 шт"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">Maxsus panirovka bilan qoplangan, tovuq qiymasidan tayyorlangan mazali naggetslar.</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Аппетитные наггетсы из куриного фарша в фирменной панировке.</span></p>"
+          },
+          "price": 37000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/07/10/UoPeXti0SfcROfkP67OMu8BH1uVCHMFKqkwnkGjf.png",
+          "weight": "230 g"
+        }
+      ]
+    },
+    {
+      "id": "salads",
+      "title": {
+        "uz": "Salatlar 🥗",
+        "ru": "Салаты 🥗"
+      },
+      "match": {},
+      "items": [
+        {
+          "id": "433",
+          "code": "",
+          "name": {
+            "uz": "GREKCHA SALAT",
+            "ru": "Греческий салат"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">Sarxil salat barglari, pomidor, bodiring, zaytun va fetaksa pishlog‘I, limon va rayhonli souslar. 240 g.</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Cочные салатные листья, помидоры, маслины, свежие огурцы и сыр фетакса, приправленные лимонным соусом и соусом из базилика. 240 г.</span></p>"
+          },
+          "price": 30000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/09/27/ZLXOPJI5oCp0b1aN4rnwXiIx31EE5RRcRgidJD3N.webp",
+          "weight": "235 g"
+        },
+        {
+          "id": "434",
+          "code": "",
+          "name": {
+            "uz": "SEZAR SALATI",
+            "ru": "Салат цезарь"
+          },
+          "description": {
+            "uz": "<p>Parmezan pishlog‘I, yumshoqqina tovuq filesi, сherri pomidori, quritilgan non, aysberg salat barglari va sezar sousi<span style=\"color: rgb(0, 0, 0);\">. 220 g.</span></p>",
+            "ru": "<p>Сыр пармезан, филе куриное, помидоры черри, сухари, салатные листья айсберг, соус цезарь<span style=\"color: rgb(0, 0, 0);\">. 220 г.</span></p>"
+          },
+          "price": 30000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/09/28/vxriC75Ie6Wx9itE8WsZyQWtOy9GGJBRjO6R4jAJ.webp",
+          "weight": "245 g"
+        },
+        {
+          "id": "759",
+          "code": "",
+          "name": {
+            "uz": "SEZAR SOUS",
+            "ru": "ЦЕЗАРЬ СОУС"
+          },
+          "description": {
+            "uz": "Nimachchiq Sezar sous",
+            "ru": "<p>Пикантный Цезарь соус.</p>"
+          },
+          "price": 4000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/06/16/UYtVRWqC7lFqxX8dSVzq4KfIRjUWI9J8e6Oc0PyE.webp",
+          "weight": "20 g"
+        }
+      ]
+    },
+    {
+      "id": "drinks",
+      "title": {
+        "uz": "Ichimliklar 🥤",
+        "ru": "Напитки 🥤"
+      },
+      "match": {},
+      "items": [
+        {
+          "id": "344",
+          "code": "",
+          "name": {
+            "uz": "OLMA SHARBATI \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК  ЯБЛОКО \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "<p>1000 ml</p>",
+            "ru": "<p>1000 ml</p>"
+          },
+          "price": 18000,
+          "image": "",
+          "weight": "1000 ml"
+        },
+        {
+          "id": "345",
+          "code": "",
+          "name": {
+            "uz": "MULTIFRUT SHARBATI \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК  МУЛЬТИФРУТ \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "<p>1000 ml</p>",
+            "ru": "<p>1000 ml</p>"
+          },
+          "price": 18000,
+          "image": "",
+          "weight": "1000 ml"
+        },
+        {
+          "id": "347",
+          "code": "",
+          "name": {
+            "uz": "MONTELLA SUVI",
+            "ru": "ВОДА MONTELLA"
+          },
+          "description": {
+            "uz": "<p>330 ml</p>",
+            "ru": "<p>330 ml</p>"
+          },
+          "price": 4000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/09/27/U6rxEfPWXvq8ewvDud2TqUqV2NVIPgjfwDFHjMLK.webp",
+          "weight": "330 ml"
+        },
+        {
+          "id": "348",
+          "code": "",
+          "name": {
+            "uz": "SHOKOLADLI 25 SM",
+            "ru": "ШОКОЛАДНАЯ 25 СМ"
+          },
+          "description": {
+            "uz": "<p>Usti nafis marshmellou bilan bezatilgan, bortlariga yengil yong‘oq iforini beruvchi oq kunjut sepilgan va shokolad pastasi bilan saxiy qoplangan pitsa. Shirin va noodatiy — birinchi tishlamdanoq esda qoladigan, yana tatib ko‘rishni xohlatadigan desert.</p>",
+            "ru": "<p>Румяное тесто, щедро покрытое насыщенной шоколадной пастой. Сверху — мягкий, воздушный маршмеллоу, а на бортиках белый кунжут, добавляющий лёгкий ореховый аромат. Сладко, гармонично и необычно — десерт, который запоминается с первого кусочка и хочется попробовать снова.</p>"
+          },
+          "price": 40000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/09/27/plkTw5i5APB4XP70SCpu3f4mJNC4ojTctD9jYBWE.webp",
+          "weight": "280 g"
+        },
+        {
+          "id": "349",
+          "code": "",
+          "name": {
+            "uz": "SHOKOLADLI 30 SM",
+            "ru": "ШОКОЛАДНАЯ 30 СМ"
+          },
+          "description": {
+            "uz": "<p>Usti nafis marshmellou bilan bezatilgan, bortlariga yengil yong‘oq iforini beruvchi oq kunjut sepilgan va shokolad pastasi bilan saxiy qoplangan pitsa. Shirin va noodatiy — birinchi tishlamdanoq esda qoladigan, yana tatib ko‘rishni xohlatadigan desert.</p>",
+            "ru": "<p>Румяное тесто, щедро покрытое насыщенной шоколадной пастой. Сверху — мягкий, воздушный маршмеллоу, а на бортиках белый кунжут, добавляющий лёгкий ореховый аромат. Сладко, гармонично и необычно — десерт, который запоминается с первого кусочка и хочется попробовать снова.</p>"
+          },
+          "price": 45000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/09/27/GaqDxFQLP5AZwIsh5R6MVSOLKYzCx0pYdTFesmM0.webp",
+          "weight": "400 g"
+        },
+        {
+          "id": "435",
+          "code": "",
+          "name": {
+            "uz": "COCA-COLA 0.5",
+            "ru": "COCA-COLA 0.5"
+          },
+          "description": {
+            "uz": "<p>500 ml</p>",
+            "ru": "<p>500 ml</p>"
+          },
+          "price": 12000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/FixIs6Wths12CVE3ByaDN9y0w5ZwjYuIEmqnksyX.png",
+          "weight": "500 ml"
+        },
+        {
+          "id": "436",
+          "code": "",
+          "name": {
+            "uz": "COCA-COLA 1.5",
+            "ru": "COCA-COLA 1.5"
+          },
+          "description": {
+            "uz": "<p>1500 ml</p>",
+            "ru": "<p>1500 ml</p>"
+          },
+          "price": 22000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/eioPmXKGKYb1MXgwbdMN6ZBSlRUK9Mv52PHNJFPZ.png",
+          "weight": "1500 ml"
+        },
+        {
+          "id": "437",
+          "code": "",
+          "name": {
+            "uz": "FANTA 0.5",
+            "ru": "FANTA 0.5"
+          },
+          "description": {
+            "uz": "<p>500 ml</p>",
+            "ru": "<p>500 ml</p>"
+          },
+          "price": 12000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/bNnZGp7fHfnGYoVI6VPSDrOmRay92XdDES46FdpC.png",
+          "weight": "500 ml"
+        },
+        {
+          "id": "438",
+          "code": "",
+          "name": {
+            "uz": "FANTA 1.5",
+            "ru": "FANTA 1.5"
+          },
+          "description": {
+            "uz": "<p>1500 ml</p>",
+            "ru": "<p>1500 ml</p>"
+          },
+          "price": 22000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/D0LYXSL1rcbWhIkyWgmnkjRO3xcLsMbcthWXrYv4.png",
+          "weight": "1500 ml"
+        },
+        {
+          "id": "439",
+          "code": "",
+          "name": {
+            "uz": "SPRITE 0.5",
+            "ru": "SPRITE 0.5"
+          },
+          "description": {
+            "uz": "<p>500 ml</p>",
+            "ru": "<p>500 ml</p>"
+          },
+          "price": 12000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/LvGjFYu3PdYUr1xBFSJ93dKgWlOnp0dicE3TjRJU.png",
+          "weight": "500 ml"
+        },
+        {
+          "id": "440",
+          "code": "",
+          "name": {
+            "uz": "SPRITE 1.5",
+            "ru": "SPRITE 1.5"
+          },
+          "description": {
+            "uz": "<p>1500 ml</p>",
+            "ru": "<p>1500 ml</p>"
+          },
+          "price": 22000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/TAB3qwGWZ6CJDacNc3PXQOBSCXcWuxrj8QIdyxNC.png",
+          "weight": "1500 ml"
+        },
+        {
+          "id": "530",
+          "code": "",
+          "name": {
+            "uz": "LIMON VA YALPIZ SHARBATI \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК ЛИМОН И МЯТА \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "<p>1000 ml</p>",
+            "ru": "<p>1000 ml</p>"
+          },
+          "price": 18000,
+          "image": "",
+          "weight": "1000 ml"
+        },
+        {
+          "id": "532",
+          "code": "",
+          "name": {
+            "uz": "OLCHA SHARBATI \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК  ВИШНЯ \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "<p>1000 ml</p>",
+            "ru": "<p>1000 ml</p>"
+          },
+          "price": 18000,
+          "image": "",
+          "weight": "1000 ml"
+        },
+        {
+          "id": "533",
+          "code": "",
+          "name": {
+            "uz": "COCA-COLA 1.0",
+            "ru": "COCA-COLA 1.0"
+          },
+          "description": {
+            "uz": "<p>1000 ml</p>",
+            "ru": "<p>1000 ml</p>"
+          },
+          "price": 16000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/XeIhhs120QL216Q1K4CBMjvvZPJbh1voYkO0Vg8E.png",
+          "weight": "1000 ml"
+        },
+        {
+          "id": "534",
+          "code": "",
+          "name": {
+            "uz": "FANTA 1.0",
+            "ru": "FANTA 1.0"
+          },
+          "description": {
+            "uz": "<p>1000 ml</p>",
+            "ru": "<p>1000 ml</p>"
+          },
+          "price": 16000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/Ss5ZmWlMSVes3NL6TWWrypGDFcFiHyq7xeQAQKaT.png",
+          "weight": "1000 ml"
+        },
+        {
+          "id": "535",
+          "code": "",
+          "name": {
+            "uz": "SPRITE 1.0",
+            "ru": "SPRITE 1.0"
+          },
+          "description": {
+            "uz": "<p>1000 ml</p>",
+            "ru": "<p>1000 ml</p>"
+          },
+          "price": 16000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/KKuxg9AfL4lNzkCOXuacJGYhKWctX4wM1y6ELzgx.png",
+          "weight": "1000 ml"
+        },
+        {
+          "id": "538",
+          "code": "",
+          "name": {
+            "uz": "O‘RIK SHARBATI \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК АБРИКОС \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "<p>1000 ml</p>",
+            "ru": "<p>1000 ml</p>"
+          },
+          "price": 18000,
+          "image": "",
+          "weight": "1000 ml"
+        },
+        {
+          "id": "539",
+          "code": "",
+          "name": {
+            "uz": "OLCHA \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК ВИШНЯ \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "<p>200 ml</p>",
+            "ru": "<p>200 ml</p>"
+          },
+          "price": 6000,
+          "image": "",
+          "weight": "200 ml"
+        },
+        {
+          "id": "540",
+          "code": "",
+          "name": {
+            "uz": "MULTIFRUT SHARBATI \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК МУЛЬТИФРУКТ \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "<p>200 ml</p>",
+            "ru": "<p>200 ml</p>"
+          },
+          "price": 6000,
+          "image": "",
+          "weight": "200 ml"
+        },
+        {
+          "id": "541",
+          "code": "",
+          "name": {
+            "uz": "OLMA SHARBAT \"СОЧНАЯ ДОЛИНА\" I",
+            "ru": "СОК ЯБЛОКО \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "<p>200 ml</p>",
+            "ru": "<p>200 ml</p>"
+          },
+          "price": 6000,
+          "image": "",
+          "weight": "200 ml"
+        },
+        {
+          "id": "544",
+          "code": "",
+          "name": {
+            "uz": "SHAFTOLI SHARBATI \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК ПЕРСИК \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "<p>200 ml</p>",
+            "ru": "<p>200 ml</p>"
+          },
+          "price": 6000,
+          "image": "",
+          "weight": "200 ml"
+        },
+        {
+          "id": "655",
+          "code": "",
+          "name": {
+            "uz": "COCA-COLA 0.25С",
+            "ru": "COCA-COLA 0.25С"
+          },
+          "description": {
+            "uz": "<p>250 ml. can</p>",
+            "ru": "<p>250 ml. can</p>"
+          },
+          "price": 9000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/9ymV2bDlVCqKHLntkrrtLVIztB9eW83x8IdMQ0iN.png",
+          "weight": "250 ml"
+        },
+        {
+          "id": "656",
+          "code": "",
+          "name": {
+            "uz": "COCA-COLA 0.25B",
+            "ru": "COCA-COLA 0.25B"
+          },
+          "description": {
+            "uz": "<p>250 ml. bottle</p>",
+            "ru": "<p>250 ml. bottle</p>"
+          },
+          "price": 10000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/SGoXe9BEBm49TTIPGMIKy4kcExgc3wH5By0RHwRi.png",
+          "weight": "250 ml"
+        },
+        {
+          "id": "657",
+          "code": "",
+          "name": {
+            "uz": "COCA-COLA 0.25В ZERO SUGAR",
+            "ru": "COCA-COLA 0.25В ZERO SUGAR"
+          },
+          "description": {
+            "uz": "<p>250 ml. bottle</p>",
+            "ru": "<p>250 ml. bottle</p>"
+          },
+          "price": 10000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/pil92h7yuZUJQ4F141TIL5orCdZ7DalBWOLFoXbQ.png",
+          "weight": "250 ml"
+        },
+        {
+          "id": "658",
+          "code": "",
+          "name": {
+            "uz": "FANTA 0.25С",
+            "ru": "FANTA 0.25С"
+          },
+          "description": {
+            "uz": "<p>250 ml. can</p>",
+            "ru": "<p>250 ml. can</p>"
+          },
+          "price": 9000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/Ntpmxv836s40dv7m56kiSqIaA8llPHMXQx8dGawh.png",
+          "weight": "250 ml"
+        },
+        {
+          "id": "659",
+          "code": "",
+          "name": {
+            "uz": "FANTA 0.25В",
+            "ru": "FANTA 0.25В"
+          },
+          "description": {
+            "uz": "<p>250 ml. bottle</p>",
+            "ru": "<p>250 ml. bottle</p>"
+          },
+          "price": 10000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/Ngk6uUBReXhkHQaoN6YuBRX3KsKFl9LUJwZ8SLdq.png",
+          "weight": "250 ml"
+        },
+        {
+          "id": "660",
+          "code": "",
+          "name": {
+            "uz": "FUSE TEA SHAFTOLI",
+            "ru": "FUSE TEA SHAFTOLI"
+          },
+          "description": {
+            "uz": "<p>450 ml</p>",
+            "ru": "<p>450 ml</p>"
+          },
+          "price": 9000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/7QtbXlZ7Tz5WWCap2eZp0nf2JrhFhIFxZzG2tmGp.png",
+          "weight": "450 ml"
+        },
+        {
+          "id": "661",
+          "code": "",
+          "name": {
+            "uz": "FUSE TEA MANGO VA ANANAS",
+            "ru": "FUSE TEA MANGO VA ANANAS"
+          },
+          "description": {
+            "uz": "<p>450 ml</p>",
+            "ru": "<p>450 ml</p>"
+          },
+          "price": 9000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/KG0nzVNIiEMaGHvCoCTsmZXnGHFtsPvdbc2mrLkp.png",
+          "weight": "450 ml"
+        },
+        {
+          "id": "776",
+          "code": "",
+          "name": {
+            "uz": "SPRITE 0.25C",
+            "ru": "SPRITE 0.25C"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">250 ml. can</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">250 ml. can</span></p>"
+          },
+          "price": 9000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/OcGLCMmUz0BZgpzAUIkNhYXHxTvSGY4XEnQOKA8D.png",
+          "weight": "250 g"
+        },
+        {
+          "id": "783",
+          "code": "",
+          "name": {
+            "uz": "Shokoladli maffin",
+            "ru": "Шоколадный маффин"
+          },
+          "description": {
+            "uz": "<p>Kakao va saryog‘ asosida tayyorlangan, ichida - mazasi har bir luqmada ochiladigan quyuq shokolad. Sevimli ta’m, boy ifor va haqiqiy lazzat — shokolad ixlosmandlari uchun haqiqiy sovg‘a.</p>",
+            "ru": "<p>Плотный и в то же время нежный маффин, созданный на основе какао и сливочного масла. Его сердце — густая шоколадная начинка, которая раскрывается при каждом надкусе. Богатый вкус, глубокий аромат и насыщенность — настоящий подарок для всех любителей шоколада.</p>"
+          },
+          "price": 19000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2025/08/30/6CqBWLsz7toLHxTgiaDkJgZld8ixMYQ6sMpirl21.webp",
+          "weight": "90 g"
+        },
+        {
+          "id": "794",
+          "code": "",
+          "name": {
+            "uz": "Sprite Moxito 0.5",
+            "ru": "Sprite Moxito 0.5"
+          },
+          "description": {
+            "uz": "<p>Sprite Moxito</p>",
+            "ru": "<p>Спрайт Мохито</p>"
+          },
+          "price": 12000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/05/07/nTVxVxVvOW1DasaE4sDWQZwUYUFHNr62QA4MXWqv.webp",
+          "weight": "500 g"
+        },
+        {
+          "id": "811",
+          "code": "",
+          "name": {
+            "uz": "Shokoladli donat",
+            "ru": "Шоколадный донат"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 19000,
+          "image": "",
+          "weight": "90 g"
+        },
+        {
+          "id": "823",
+          "code": "",
+          "name": {
+            "uz": "MEVALI MIKS SHARBATI \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК ЯГОДНЫЙ МИКС \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "1000 ml",
+            "ru": "1000 мл"
+          },
+          "price": 18000,
+          "image": "",
+          "weight": "1000 g"
+        },
+        {
+          "id": "824",
+          "code": "",
+          "name": {
+            "uz": "ANANAS SHARBATI \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК АНАНАС \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "450 ml",
+            "ru": "450 мл"
+          },
+          "price": 12000,
+          "image": "",
+          "weight": "450 g"
+        },
+        {
+          "id": "825",
+          "code": "",
+          "name": {
+            "uz": "OLMA SHARBAT \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК ЯБЛОКО \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "450 ml",
+            "ru": "450 мл"
+          },
+          "price": 12000,
+          "image": "",
+          "weight": "450 g"
+        },
+        {
+          "id": "826",
+          "code": "",
+          "name": {
+            "uz": "MEVALI MIKS SHARBATI \"СОЧНАЯ ДОЛИНА\"",
+            "ru": "СОК ЯГОДНЫЙ МИКС \"СОЧНАЯ ДОЛИНА\""
+          },
+          "description": {
+            "uz": "450 ml",
+            "ru": "450 мл"
+          },
+          "price": 12000,
+          "image": "",
+          "weight": "450 g"
+        }
+      ]
+    },
+    {
+      "id": "desserts",
+      "title": {
+        "uz": "Desertlar 🍰",
+        "ru": "Десерты 🍰"
+      },
+      "match": {},
+      "items": [
+        {
+          "id": "782",
+          "code": "",
+          "name": {
+            "uz": "Reza mevali maffin",
+            "ru": "Ягодный маффин"
+          },
+          "description": {
+            "uz": "<p>Nozik va yumshoq, smorodinali maffin, saryog‘ va sut bilan tayyorlangan, og‘izda eriydi. Har bir luqmada shirinlik va mevali tarovatning mukammal uyg‘unligi.</p>",
+            "ru": "<p>Нежный, воздушный маффин с натуральным сливочным маслом и молоком, который тает во рту. Внутри — сочная начинка из смородины, придающая лёгкую кислинку и свежесть. Идеальное сочетание сладости и ягодной свежести, которое дарит летнее настроение в каждом кусочке.</p>"
+          },
+          "price": 19000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2025/08/30/TyhwilIicX2xCwXCbSq1AnxNxB38RlTLXCZp1QcY.webp",
+          "weight": "90 g"
+        }
+      ]
+    },
+    {
+      "id": "sauces",
+      "title": {
+        "uz": "Souslar 🥫",
+        "ru": "Соусы 🥫"
+      },
+      "match": {},
+      "items": [
+        {
+          "id": "357",
+          "code": "",
+          "name": {
+            "uz": "CHILI SOUS",
+            "ru": "ЧИЛИ СОУС"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">Achchiq Chili sousi.</span></p>",
+            "ru": "<p>Острый Чили соус.</p>"
+          },
+          "price": 4000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/09/27/gOmBIFAxUTySmZLS0wEGLB8o3pXAtYISaQ14Gsaq.webp",
+          "weight": "15 g"
+        },
+        {
+          "id": "358",
+          "code": "",
+          "name": {
+            "uz": "FRENCH SOUS",
+            "ru": "ФРЕНЧ СОУС"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">Xushta'm French sous.</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Изысканный Френч соус.</span></p>"
+          },
+          "price": 4000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/09/27/pit5ky1iWYJVKxdP7ZmBBDzdlLNkwQxOKOV6y3gz.webp",
+          "weight": "20 g"
+        },
+        {
+          "id": "359",
+          "code": "",
+          "name": {
+            "uz": "KETCHUP SOUS",
+            "ru": "КЕТЧУП СОУС"
+          },
+          "description": {
+            "uz": "<p>Sevimli Ketchup sous.</p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">Любимый Кетчуп соус.</span></p>"
+          },
+          "price": 4000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2021/09/27/g5DD7BYtLkhGNl2XjLssWeFVKHNxUk2wCqK3WBvg.webp",
+          "weight": "15 g"
+        }
+      ]
+    },
+    {
+      "id": "other",
+      "title": {
+        "uz": "Boshqalar",
+        "ru": "Другие"
+      },
+      "match": {},
+      "items": [
+        {
+          "id": "299",
+          "code": "",
+          "name": {
+            "uz": "Qo‘ziqorinli 30 sm",
+            "ru": "ГРИБНАЯ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 80000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/09/07/qmoHDJLGIkd8eaqXRRq8bDCV5au0N0REHT0LC0aj.png",
+          "weight": "635 g"
+        },
+        {
+          "id": "300",
+          "code": "",
+          "name": {
+            "uz": "KOMBO 30 sm",
+            "ru": "КОМБО 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 86000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/73AnQv1ZoGkpj7BN0Q0hFYj00esnvM9gk3nb6GzN.webp",
+          "weight": "665 g"
+        },
+        {
+          "id": "301",
+          "code": "",
+          "name": {
+            "uz": "TOVUQLI 30 sm",
+            "ru": "КУРИНАЯ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 80000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/bsxu71KeSsgm9u09B9RXIbBeUsFAHYNuxmfCoztz.webp",
+          "weight": "684 g"
+        },
+        {
+          "id": "305",
+          "code": "",
+          "name": {
+            "uz": "ROSTBIF 30 sm",
+            "ru": "РОСТБИФ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 100000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/U3pFTfbopJp9G7UwsnRhawOuLkdQ5CNKK3l3bT6t.webp",
+          "weight": "580 g"
+        },
+        {
+          "id": "310",
+          "code": "",
+          "name": {
+            "uz": "QO‘ZOQORINLI 25 sm",
+            "ru": "ГРИБНАЯ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 62000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/09/07/qmoHDJLGIkd8eaqXRRq8bDCV5au0N0REHT0LC0aj.png",
+          "weight": "382 g"
+        },
+        {
+          "id": "311",
+          "code": "",
+          "name": {
+            "uz": "KOMBO 25 sm",
+            "ru": "КОМБО 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 68000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/73AnQv1ZoGkpj7BN0Q0hFYj00esnvM9gk3nb6GzN.webp",
+          "weight": "440 g"
+        },
+        {
+          "id": "312",
+          "code": "",
+          "name": {
+            "uz": "TOVUQLI 25 sm",
+            "ru": "КУРИНАЯ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 62000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/bsxu71KeSsgm9u09B9RXIbBeUsFAHYNuxmfCoztz.webp",
+          "weight": "489 g"
+        },
+        {
+          "id": "316",
+          "code": "",
+          "name": {
+            "uz": "ROSTBIF 25 sm",
+            "ru": "РОСТБИФ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 72000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/U3pFTfbopJp9G7UwsnRhawOuLkdQ5CNKK3l3bT6t.webp",
+          "weight": "405 g"
+        },
+        {
+          "id": "322",
+          "code": "",
+          "name": {
+            "uz": "50/50 Qo'ziqorinli 30 sm",
+            "ru": "50/50 ГРИБНАЯ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 45000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/09/07/qmoHDJLGIkd8eaqXRRq8bDCV5au0N0REHT0LC0aj.png"
+        },
+        {
+          "id": "323",
+          "code": "",
+          "name": {
+            "uz": "50/50 Tovuqli 30 sm",
+            "ru": "50/50 КУРИНАЯ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 45000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/bsxu71KeSsgm9u09B9RXIbBeUsFAHYNuxmfCoztz.webp"
+        },
+        {
+          "id": "324",
+          "code": "",
+          "name": {
+            "uz": "50/50 Kombo 30 sm",
+            "ru": "50/50 КОМБО 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 48000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/73AnQv1ZoGkpj7BN0Q0hFYj00esnvM9gk3nb6GzN.webp"
+        },
+        {
+          "id": "328",
+          "code": "",
+          "name": {
+            "uz": "50/50 Rostbif 30 sm",
+            "ru": "50/50 РОСТБИФ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 55000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/U3pFTfbopJp9G7UwsnRhawOuLkdQ5CNKK3l3bT6t.webp"
+        },
+        {
+          "id": "364",
+          "code": "",
+          "name": {
+            "uz": "Qo'ziqorinli 30 + sosiskali bo'rt",
+            "ru": "Грибная 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 98000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/09/07/qmoHDJLGIkd8eaqXRRq8bDCV5au0N0REHT0LC0aj.png",
+          "weight": "1 g"
+        },
+        {
+          "id": "365",
+          "code": "",
+          "name": {
+            "uz": "Kombo 30 + sosiskali bo'rt",
+            "ru": "Комбо 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 104000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/73AnQv1ZoGkpj7BN0Q0hFYj00esnvM9gk3nb6GzN.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "366",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli 30 + sosiskali bo'rt",
+            "ru": "Куриная 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 98000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/bsxu71KeSsgm9u09B9RXIbBeUsFAHYNuxmfCoztz.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "370",
+          "code": "",
+          "name": {
+            "uz": "Rostbif 30 + sosiskali bo'rt",
+            "ru": "Ростбиф 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 118000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/U3pFTfbopJp9G7UwsnRhawOuLkdQ5CNKK3l3bT6t.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "400",
+          "code": "",
+          "name": {
+            "uz": "Qo'ziqorinli 35 + sosiskali bo'rt",
+            "ru": "Грибная 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 118000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/09/07/qmoHDJLGIkd8eaqXRRq8bDCV5au0N0REHT0LC0aj.png",
+          "weight": "1 g"
+        },
+        {
+          "id": "401",
+          "code": "",
+          "name": {
+            "uz": "Kombo 35 + sosiskali bo'rt",
+            "ru": "Комбо 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 120000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/73AnQv1ZoGkpj7BN0Q0hFYj00esnvM9gk3nb6GzN.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "402",
+          "code": "",
+          "name": {
+            "uz": "Tovuqli 35 + sosiskali bo'rt",
+            "ru": "Куриная 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 118000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/bsxu71KeSsgm9u09B9RXIbBeUsFAHYNuxmfCoztz.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "406",
+          "code": "",
+          "name": {
+            "uz": "Rostbif 35 + sosiskali bo'rt",
+            "ru": "Ростбиф 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 130000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/U3pFTfbopJp9G7UwsnRhawOuLkdQ5CNKK3l3bT6t.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "412",
+          "code": "",
+          "name": {
+            "uz": "QO‘ZIQORINLI 35 sm",
+            "ru": "ГРИБНАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 98000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/09/07/qmoHDJLGIkd8eaqXRRq8bDCV5au0N0REHT0LC0aj.png",
+          "weight": "768 g"
+        },
+        {
+          "id": "413",
+          "code": "",
+          "name": {
+            "uz": "KOMBO 35 sm",
+            "ru": "КОМБО 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 100000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/73AnQv1ZoGkpj7BN0Q0hFYj00esnvM9gk3nb6GzN.webp",
+          "weight": "880 g"
+        },
+        {
+          "id": "414",
+          "code": "",
+          "name": {
+            "uz": "TOVUQLI 35 sm",
+            "ru": "КУРИНАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 98000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/bsxu71KeSsgm9u09B9RXIbBeUsFAHYNuxmfCoztz.webp",
+          "weight": "877 g"
+        },
+        {
+          "id": "418",
+          "code": "",
+          "name": {
+            "uz": "ROSTBIF 35 sm",
+            "ru": "РОСТБИФ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 110000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/U3pFTfbopJp9G7UwsnRhawOuLkdQ5CNKK3l3bT6t.webp",
+          "weight": "800 g"
+        },
+        {
+          "id": "424",
+          "code": "",
+          "name": {
+            "uz": "50/50 Qo'ziqorinli 35 sm",
+            "ru": "50/50 ГРИБНАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 54000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/09/07/qmoHDJLGIkd8eaqXRRq8bDCV5au0N0REHT0LC0aj.png"
+        },
+        {
+          "id": "425",
+          "code": "",
+          "name": {
+            "uz": "50/50 Kombo 35 sm",
+            "ru": "50/50 КОМБО 35  см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 55000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2022/03/03/73AnQv1ZoGkpj7BN0Q0hFYj00esnvM9gk3nb6GzN.webp"
+        },
+        {
+          "id": "426",
+          "code": "",
+          "name": {
+            "uz": "50/50 Tovuqli 35 sm",
+            "ru": "50/50 КУРИНАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 54000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/bsxu71KeSsgm9u09B9RXIbBeUsFAHYNuxmfCoztz.webp"
+        },
+        {
+          "id": "430",
+          "code": "",
+          "name": {
+            "uz": "50/50 Rostbif 35 sm",
+            "ru": "50/50 РОСТБИФ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 60000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/U3pFTfbopJp9G7UwsnRhawOuLkdQ5CNKK3l3bT6t.webp"
+        },
+        {
+          "id": "442",
+          "code": "",
+          "name": {
+            "uz": "JULYEN 35 sm",
+            "ru": "ЖУЛЬЕН 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 90000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/5FGIBoYvEpKuKC9hCNdwa487DSlG7PWD1ihReRiL.webp",
+          "weight": "750 g"
+        },
+        {
+          "id": "444",
+          "code": "",
+          "name": {
+            "uz": "JULYEN 25 sm",
+            "ru": "ЖУЛЬЕН 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 62000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/5FGIBoYvEpKuKC9hCNdwa487DSlG7PWD1ihReRiL.webp",
+          "weight": "410 g"
+        },
+        {
+          "id": "447",
+          "code": "",
+          "name": {
+            "uz": "JULYEN 30 sm",
+            "ru": "ЖУЛЬЕН 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 80000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/5FGIBoYvEpKuKC9hCNdwa487DSlG7PWD1ihReRiL.webp",
+          "weight": "595 g"
+        },
+        {
+          "id": "456",
+          "code": "",
+          "name": {
+            "uz": "50/50 Julyen 35 sm",
+            "ru": "50/50 ЖУЛЬЕН 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 50000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/5FGIBoYvEpKuKC9hCNdwa487DSlG7PWD1ihReRiL.webp"
+        },
+        {
+          "id": "460",
+          "code": "",
+          "name": {
+            "uz": "50/50 Julyen 30 sm",
+            "ru": "50/50 ЖУЛЬЕН 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 45000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/5FGIBoYvEpKuKC9hCNdwa487DSlG7PWD1ihReRiL.webp"
+        },
+        {
+          "id": "517",
+          "code": "",
+          "name": {
+            "uz": "Julyen 35 + sosiskali bo'rt",
+            "ru": "Жульен 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 110000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/5FGIBoYvEpKuKC9hCNdwa487DSlG7PWD1ihReRiL.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "520",
+          "code": "",
+          "name": {
+            "uz": "Julyen 30 + sosiskali bo'rt",
+            "ru": "Жульен 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 98000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/11/02/5FGIBoYvEpKuKC9hCNdwa487DSlG7PWD1ihReRiL.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "687",
+          "code": "",
+          "name": {
+            "uz": "ORBIT BUBBLEMINT",
+            "ru": "ORBIT BUBBLEMINT"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 8000,
+          "image": "",
+          "weight": "14 g"
+        },
+        {
+          "id": "688",
+          "code": "",
+          "name": {
+            "uz": "ORBIT WINTERFRESH",
+            "ru": "ORBIT WINTERFRESH"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 8000,
+          "image": "",
+          "weight": "14 g"
+        },
+        {
+          "id": "689",
+          "code": "",
+          "name": {
+            "uz": "ORBIT SPEARMINT",
+            "ru": "ORBIT SPEARMINT"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 8000,
+          "image": "",
+          "weight": "14 g"
+        },
+        {
+          "id": "690",
+          "code": "",
+          "name": {
+            "uz": "ORBIT SWEET MINT",
+            "ru": "ORBIT SWEET MINT"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 8000,
+          "image": "",
+          "weight": "14 g"
+        },
+        {
+          "id": "691",
+          "code": "",
+          "name": {
+            "uz": "ORBIT JUICY WATERMELON",
+            "ru": "ORBIT JUICY WATERMELON"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 8000,
+          "image": "",
+          "weight": "14 g"
+        },
+        {
+          "id": "702",
+          "code": "",
+          "name": {
+            "uz": "Ovchi 35 + sosiskali bo'rt",
+            "ru": "Охотничья 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 116000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/08/20/HramGLl5xzdXRiJtMstQJIpxIWLlSGsPkpnsjb5d.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "703",
+          "code": "",
+          "name": {
+            "uz": "Quvvat 35 + sosiskali bo'rt",
+            "ru": "Quvvat 35 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 145000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/07/31/GFEUGsUkKcjn7sJXPUVQte4qAHaIWUKPcHc5ApDP.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "704",
+          "code": "",
+          "name": {
+            "uz": "Ovchi 30 + sosiskali bo'rt",
+            "ru": "Охотничья 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 104000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/08/20/HramGLl5xzdXRiJtMstQJIpxIWLlSGsPkpnsjb5d.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "705",
+          "code": "",
+          "name": {
+            "uz": "Quvvat 30 + sosiskali bo'rt",
+            "ru": "Quvvat 30 + Сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 123000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/07/31/GFEUGsUkKcjn7sJXPUVQte4qAHaIWUKPcHc5ApDP.webp",
+          "weight": "1 g"
+        },
+        {
+          "id": "712",
+          "code": "",
+          "name": {
+            "uz": "QUVVAT 25 sm",
+            "ru": "QUVVAT 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 82000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/07/31/GFEUGsUkKcjn7sJXPUVQte4qAHaIWUKPcHc5ApDP.webp",
+          "weight": "443 g"
+        },
+        {
+          "id": "713",
+          "code": "",
+          "name": {
+            "uz": "OVCHI 25 sm",
+            "ru": "ОХОТНИЧЬЯ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 68000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/08/20/HramGLl5xzdXRiJtMstQJIpxIWLlSGsPkpnsjb5d.webp",
+          "weight": "519 g"
+        },
+        {
+          "id": "714",
+          "code": "",
+          "name": {
+            "uz": "OVCHI 30 sm",
+            "ru": "ОХОТНИЧЬЯ 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 86000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/08/20/HramGLl5xzdXRiJtMstQJIpxIWLlSGsPkpnsjb5d.webp",
+          "weight": "665 g"
+        },
+        {
+          "id": "715",
+          "code": "",
+          "name": {
+            "uz": "QUVVAT 30 sm",
+            "ru": "QUVVAT 30 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 105000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/07/31/GFEUGsUkKcjn7sJXPUVQte4qAHaIWUKPcHc5ApDP.webp",
+          "weight": "632 g"
+        },
+        {
+          "id": "716",
+          "code": "",
+          "name": {
+            "uz": "OVCHI 35 sm",
+            "ru": "ОХОТНИЧЬЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 96000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/08/20/HramGLl5xzdXRiJtMstQJIpxIWLlSGsPkpnsjb5d.webp",
+          "weight": "822 g"
+        },
+        {
+          "id": "717",
+          "code": "",
+          "name": {
+            "uz": "QUVVAT 35 sm",
+            "ru": "QUVVAT 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 125000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2023/07/31/GFEUGsUkKcjn7sJXPUVQte4qAHaIWUKPcHc5ApDP.webp",
+          "weight": "827 g"
+        },
+        {
+          "id": "751",
+          "code": "",
+          "name": {
+            "uz": "MEKSIKA 25 sm",
+            "ru": "МЕКСИКАНСКАЯ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 60000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/07/11/7tMAtIu8figVMOkia68lIkLBo4K1dK1eZMG9vKVF.webp",
+          "weight": "435 g"
+        },
+        {
+          "id": "752",
+          "code": "",
+          "name": {
+            "uz": "VEGETARIAN 25 sm",
+            "ru": "ВЕГЕТАРИАНСКАЯ 25 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 52000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/01/17/Vms8aiMVwgbbYosxyavGfGNhy5eRA78ArQo12A29.webp",
+          "weight": "410 g"
+        },
+        {
+          "id": "753",
+          "code": "",
+          "name": {
+            "uz": "VEGETARIAN 35 sm",
+            "ru": "ВЕГЕТАРИАНСКАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 78000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/01/17/Vms8aiMVwgbbYosxyavGfGNhy5eRA78ArQo12A29.webp",
+          "weight": "870 g"
+        },
+        {
+          "id": "754",
+          "code": "",
+          "name": {
+            "uz": "MEKSIKA 35 sm",
+            "ru": "МЕКСИКАНСКАЯ 35 см"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 90000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/07/11/7tMAtIu8figVMOkia68lIkLBo4K1dK1eZMG9vKVF.webp",
+          "weight": "745 g"
+        },
+        {
+          "id": "766",
+          "code": "",
+          "name": {
+            "uz": "PRO 100 SOK BUBBLE GUM",
+            "ru": "PRO 100 SOK BUBBLE GUM"
+          },
+          "description": {
+            "uz": "<p>200 ml</p>",
+            "ru": "<p>200 ml</p>"
+          },
+          "price": 6000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/04/27/f065269aa0f1a35c9b925abcef77a99389b8440a.webp",
+          "weight": "200 g"
+        },
+        {
+          "id": "767",
+          "code": "",
+          "name": {
+            "uz": "PRO 100 SOK BANAN-KARAMEL",
+            "ru": "PRO 100 SOK БАНАН-КАРАМЕЛЬ"
+          },
+          "description": {
+            "uz": "<p>200 ml</p>",
+            "ru": "<p>200 ml</p>"
+          },
+          "price": 6000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/04/27/c7173ab4bcc0750d128dcc0e2f4c2e386c986871.webp",
+          "weight": "200 g"
+        },
+        {
+          "id": "777",
+          "code": "",
+          "name": {
+            "uz": "Bonaqua 0.5 (gazlanmagan)",
+            "ru": "Bonaqua 0.5 (без газа)"
+          },
+          "description": {
+            "uz": "<p><span style=\"color: rgb(0, 0, 0);\">500 ml</span></p>",
+            "ru": "<p><span style=\"color: rgb(0, 0, 0);\">500 ml</span></p>"
+          },
+          "price": 6000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2025/08/04/5W5eGlCdR5P3QWoEk1OVdRrmuFM7UvJ5GsSUhclH.webp",
+          "weight": "500 g"
+        },
+        {
+          "id": "780",
+          "code": "",
+          "name": {
+            "uz": "Aysti",
+            "ru": "Айсти"
+          },
+          "description": {
+            "uz": "<p>Olma ва apelsin mevali, yalpizning ifori bilan boyitilgan yorqin karkade choyi.</p> 500 ml",
+            "ru": "<p>Чай каркаде с кусочками сочного яблока и апельсина, свежей мятой и лёгкой сладостью.</p> 500 мл"
+          },
+          "price": 20000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2026/08/18/LCAZdmEiuBMvGHZ4dXBvq4aAZeamAKWEoXYu3ao8.png",
+          "weight": "500 g"
+        },
+        {
+          "id": "809",
+          "code": "",
+          "name": {
+            "uz": "Karamelli donat",
+            "ru": "Карамельный донат"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 19000,
+          "image": "",
+          "weight": "90 g"
+        },
+        {
+          "id": "810",
+          "code": "",
+          "name": {
+            "uz": "Malinali donat",
+            "ru": "Малиновый донат"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 19000,
+          "image": "",
+          "weight": "90 g"
+        },
+        {
+          "id": "816",
+          "code": "",
+          "name": {
+            "uz": "Meksikan 35 + Sosiskali bort",
+            "ru": "Мексиканская 35 + сосисочный борт"
+          },
+          "description": {
+            "uz": "",
+            "ru": ""
+          },
+          "price": 110000,
+          "image": "https://cdn.choparpizza.uz/storage/products/2024/07/11/7tMAtIu8figVMOkia68lIkLBo4K1dK1eZMG9vKVF.webp",
+          "weight": "1 g"
+        }
+      ]
+    }
+  ]
+}

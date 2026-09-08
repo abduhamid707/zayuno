@@ -1,0 +1,2870 @@
+{
+  "provider": {
+    "slug": "bellissimo",
+    "name": "Bellissimo Pizza Uzbekistan",
+    "website": "https://bellissimo.uz",
+    "source": "https://bellissimo.uz API (Next.js SSG/SSR payload)",
+    "currency": "UZS",
+    "fetchedAt": "2026-09-08T08:07:39.279Z",
+    "totalCategories": 8,
+    "totalItems": 127
+  },
+  "categories": [
+    {
+      "id": "combos",
+      "title": {
+        "uz": "Kombo to‘plamlar 🎁",
+        "ru": "Комбо наборы 🎁",
+        "en": "Combo Sets 🎁"
+      },
+      "items": [
+        {
+          "id": "03650000-6bec-ac1f-05ef-08db9f189c3d",
+          "name": {
+            "uz": "Donarli juftlik",
+            "ru": "Донарная двойка",
+            "en": "Doner Duo"
+          },
+          "description": {
+            "uz": "Ixtiyoringizdagi ikkita donar pitsa (25 cm): donar, tovuqli donar yoki cheddar donar",
+            "ru": "Любые две донар пиццы (25 см) на выбор: донар, куриный донар или чеддер донар",
+            "en": "Any two Doner pizzas (25 cm) of your choice: Doner, Chicken Doner, or Cheddar Doner."
+          },
+          "price": 115000,
+          "originalPrice": 138000,
+          "discountPercent": 17,
+          "image": "https://io.bellissimo.uz/images/03650000-6bec-ac1f-05ef-08db9f189c3d.jpg"
+        },
+        {
+          "id": "03bf0000-6bec-ac1f-1835-08dd5243903e",
+          "name": {
+            "uz": "Ishta-Ha! boks",
+            "ru": "Ишта-Ха! бокс",
+            "en": "Ishta-Ha! Box"
+          },
+          "description": {
+            "uz": "O‘zingiz tanlaydigan pitsa (20 cm), pechdan chiqqan kartoshka fri, 3 ta ishtahaochar stripslar. 1-2 kishi uchun ayni muddao! Maxsus va barbekyu souslari quti ichida!",
+            "ru": "Пицца на выбор (20 см), картошка фри из печи, 3 аппетитных стрипса, фирменный и барбекю соусы. Идеально для 1-2 человека!",
+            "en": "Pizza of your choice (20 cm), oven-baked French fries, 3 delicious chicken strips, signature sauce and BBQ sauce. Perfect for 1–2 people!"
+          },
+          "price": 54000,
+          "originalPrice": 0,
+          "discountPercent": -1079900,
+          "image": "https://io.bellissimo.uz/images/03bf0000-6bec-ac1f-1835-08dd5243903e.jpg"
+        },
+        {
+          "id": "03bf0000-6bec-ac1f-8510-08dc86e2eee7",
+          "name": {
+            "uz": "Uchta pitsa 109 000 soʻmdan boshlab",
+            "ru": "Три пиццы от 109 000 сум",
+            "en": "3 pizzas from 109 000"
+          },
+          "description": {
+            "uz": "Istalgan uchta pitsa (25 cm) 109 000 so‘mdan boshlab foydali narxda. 3-6 kishi uchun.",
+            "ru": "Три пиццы (25 см) на выбор по выгодной цене от 109 000 сум! Для  3-6 человек.",
+            "en": "Choose any three pizzas (25 cm) for a price starting from 119 000 UZS. This combo is for 3 to 6 people."
+          },
+          "price": 109000,
+          "originalPrice": 151000,
+          "discountPercent": 28,
+          "image": "https://io.bellissimo.uz/images/03bf0000-6bec-ac1f-8510-08dc86e2eee7.jpg"
+        },
+        {
+          "id": "03bf0000-6bec-ac1f-8938-08dd9ece412c",
+          "name": {
+            "uz": "Kombo 2+1",
+            "ru": "Комбо 2+1",
+            "en": "2+1 combo"
+          },
+          "description": {
+            "uz": "O‘z uchligingizni to‘plang va faqat ikkitasi uchun to‘lang! O‘z mukammal kombongizni yarating: istalgan uchta pitsani (25 cm) tanlang va faqat ikkitasi uchun to‘lang.   Kombo narxi 119 000 so‘mdan boshlanadi",
+            "ru": "Соберите свою троицу — и платите только за две! Создайте своё идеальное комбо: выберите любые три пиццы (25 см) и заплатите только за две.   Стоимость комбо от 119 000 сум",
+            "en": "Choose any three pizzas (25 cm). Pay for two. This combo's price starts at 119 000 UZS. Great for 3 to 6 people."
+          },
+          "price": 0,
+          "originalPrice": 0,
+          "discountPercent": null,
+          "image": "https://io.bellissimo.uz/images/03bf0000-6bec-ac1f-8938-08dd9ece412c.jpg"
+        },
+        {
+          "id": "03bf0000-6bec-ac1f-b56e-08de203d41e8",
+          "name": {
+            "uz": "Uchta pitsa 84 000 soʻmdan boshlab",
+            "ru": "Три пиццы от 84 000 сум",
+            "en": "3 Pizzas from 84,000"
+          },
+          "description": {
+            "uz": "Istalgan uchta pitsa (20 cm) 84 000 so‘mdan boshlab unumli narxda.",
+            "ru": "Выбирайте любые три пиццы (20 см) по выгодной цене от 84 000 сум.",
+            "en": "Choose any three pizzas (20 cm) at a great price from 84,000 UZS."
+          },
+          "price": 84000,
+          "originalPrice": 107000,
+          "discountPercent": 21,
+          "image": "https://io.bellissimo.uz/images/03bf0000-6bec-ac1f-b56e-08de203d41e8.jpg"
+        },
+        {
+          "id": "03bf0000-6bec-ac1f-e41a-08ddf5d89068",
+          "name": {
+            "uz": "PUBG mobile combo",
+            "ru": "PUBG mobile комбо",
+            "en": "PUBG combo"
+          },
+          "description": {
+            "uz": "Pepperoni pitsasi (20 cm), chitir-chitir kartoshka fri va 3 ta ishtahaochar stripslar. 1-2 kishi uchun ayni muddao!",
+            "ru": "Пицца пепперони (20 см), хрустящая картошка фри и 3 аппетитных стрипса. Идеально для 1-2 человека!",
+            "en": "This combo tastes like winning! Pepperoni pizza (20 cm), french fries and 3 chicken tenders, special sauce, barbecue sauce, and Coca-Cola (0.5 L). Each combo comes with surprise PUBG character figurines. By purchasing, you are automatically entered into a raffle and have a chance to win valuable prizes!"
+          },
+          "price": 65000,
+          "originalPrice": 89000,
+          "discountPercent": 27,
+          "image": "https://io.bellissimo.uz/images/03bf0000-6bec-ac1f-e41a-08ddf5d89068.jpg"
+        },
+        {
+          "id": "44730000-0f48-3056-0f6d-08def304dea0",
+          "name": {
+            "uz": "VIP kombo",
+            "ru": "VIP комбо",
+            "en": "VIP Combo"
+          },
+          "description": {
+            "uz": "Kruassanli pepperoni (25 cm), tanlash uchun: pechdan chiqqan kartoshka fri / jaydari kartoshka / 4 ta sinnamonchadan biri va 2 ta Coca-Cola (quyma), maxsus sous",
+            "ru": "Пепперони круассан (25 см), на выбор: картошка фри из печи / картофель по-деревенски / 4 синнамончика, 2 Coca-Cola (разлив), фирменный соус",
+            "en": "Pepperoni Croissant (25 cm), your choice of oven-baked French fries / potato wedges / 4 cinnamon rolls, 2 Coca-Cola fountain drinks, signature sauce"
+          },
+          "price": 88000,
+          "originalPrice": 130000,
+          "discountPercent": 32,
+          "image": "https://io.bellissimo.uz/images/44730000-0f48-3056-0f6d-08def304dea0.jpg"
+        },
+        {
+          "id": "44730000-0f48-3056-38ab-08dee0a57d32",
+          "name": {
+            "uz": "Oila kombo",
+            "ru": "Семейное комбо",
+            "en": "Family Combo"
+          },
+          "description": {
+            "uz": "Pepperoni pitsasi (30 cm), Mr. Pep, pechdan chiqqan kartoshka fri, tovuq popperslari, 4 ta sinnamoncha, 2 ta Coca-Cola (quyma), bolalar sharbati Bliss Smile (220 ml), 2 ta maxsus sous va 1 ta barbekyu sousi",
+            "ru": "Пицца пепперони (30 см), Мистер Пеп, картошка фри из печи, куриные попперсы, 4 синнамончика, 2 Coca-Cola (разлив), детский сок Bliss Smile (220 мл), 2 фирменных соуса и соус барбекю",
+            "en": "Pepperoni pizza (30 cm), Mr. Pep, oven-baked French fries, chicken poppers, 4 cinnamon rolls, 2 Coca-Cola fountain drinks, Bliss Smile kids' juice (220 ml), 2 signature sauces and BBQ sauce"
+          },
+          "price": 169000,
+          "originalPrice": 201000,
+          "discountPercent": 16,
+          "image": "https://io.bellissimo.uz/images/44730000-0f48-3056-38ab-08dee0a57d32.jpg"
+        },
+        {
+          "id": "44730000-0f48-3056-824b-08def060eaed",
+          "name": {
+            "uz": "Quvvatli juftlik",
+            "ru": "Заряженная пара",
+            "en": "Power Duo"
+          },
+          "description": {
+            "uz": "Pepperoni pitsasi (25 cm), pechdan chiqqan kartoshka fri yoki jaydari kartoshka va maxsus sous hamda tanlanadigan 2 ta Red Bull. Diqqat: energetik ichimliklar 18 yoshga to‘lmagan shaxslarga sotilmaydi",
+            "ru": "Пицца пепперони (25 см), картошка фри из печи или картофель по-деревенски, фирменный соус, 2 Red Bull на выбор. Внимание: мы не продаём энергетические напитки лицам младше 18 лет",
+            "en": "Pepperoni pizza (25 cm), oven-baked French fries or potato wedges, signature sauce, and 2 Red Bull drinks of your choice. Please note: we do not sell energy drinks to anyone under the age of 18"
+          },
+          "price": 115000,
+          "originalPrice": 125000,
+          "discountPercent": 8,
+          "image": "https://io.bellissimo.uz/images/44730000-0f48-3056-824b-08def060eaed.jpg"
+        },
+        {
+          "id": "44730000-0f48-3056-fad2-08dee0a20301",
+          "name": {
+            "uz": "To‘rt kishilik kombo",
+            "ru": "Комбо на четверых",
+            "en": "Combo for Four"
+          },
+          "description": {
+            "uz": "2 ta pepperoni pitsasi (25 cm), pechdan chiqqan kartoshka fri, tovuq popperslari, 4 ta Coca-Cola (quyma), 2 ta maxsus sous va 1 ta barbekyu sousi",
+            "ru": "2 пиццы пепперони (25 см), картошка фри из печи, куриные попперсы, 4 Coca-Cola (разлив), 2 фирменных соуса и соус барбекю",
+            "en": "2 pepperoni pizzas (25 cm), oven-baked French fries, chicken poppers, 4 Coca-Cola fountain drinks, 2 signature sauces and BBQ sauce"
+          },
+          "price": 149000,
+          "originalPrice": 199000,
+          "discountPercent": 25,
+          "image": "https://io.bellissimo.uz/images/44730000-0f48-3056-fad2-08dee0a20301.jpg"
+        },
+        {
+          "id": "f8990000-6beb-ac1f-1e2d-08dda8a6abc4",
+          "name": {
+            "uz": "Bir kishilik kombo",
+            "ru": "Комбо на одного",
+            "en": "Combo for One"
+          },
+          "description": {
+            "uz": "\"O‘zingiz tanlaysiz:  • bellisster / chiabatta  • tovuqli stripslar (3 ta) / pechdan chiqqan kartoshka fri • quyma gazli ichimlik / qahva / choy • tanlash uchun sous\"",
+            "ru": "На ваш выбор: беллисстер или чиабатта, куриные стрипсы (3 шт) или картошка фри из печи, а также напиток (газировка на разлив, кофе или чай) и соус на выбор",
+            "en": "Your choice of a Bellisster or ciabatta, 3 chicken strips or oven-baked French fries, plus a drink (fountain soda, coffee or tea) and a sauce of your choice"
+          },
+          "price": 42000,
+          "originalPrice": 61000,
+          "discountPercent": 31,
+          "image": "https://io.bellissimo.uz/images/f8990000-6beb-ac1f-1e2d-08dda8a6abc4.jpg"
+        },
+        {
+          "id": "f8990000-6beb-ac1f-3146-08dd1dbaa0d0",
+          "name": {
+            "uz": "Tovuqcha kombo",
+            "ru": "Товукча комбо",
+            "en": "Chicken combo"
+          },
+          "description": {
+            "uz": "Chitir-chitir tovuqcha: 3 ta tovuqli strips, popperslar va 3 ta tovuq qanotchalaridan iborat bazm",
+            "ru": "Пир из хрустящей, нежной курочки: 3 куриных стрипса, попперсы и 3 куриных крылышка",
+            "en": "A crunchy chicken feast: 3 chicken tenders, poppers and 3 wings."
+          },
+          "price": 54000,
+          "originalPrice": 66000,
+          "discountPercent": 18,
+          "image": "https://io.bellissimo.uz/images/f8990000-6beb-ac1f-3146-08dd1dbaa0d0.jpg"
+        },
+        {
+          "id": "f8990000-6beb-ac1f-4056-08dc575e681f",
+          "name": {
+            "uz": "4 ta pitsa va Coca-Cola",
+            "ru": "4 пиццы и Кока кола",
+            "en": "4 Pizzas & Coca-Cola"
+          },
+          "description": {
+            "uz": "O‘zingiz tanlaydigan 4 ta pitsa (30 cm) va 2 ta Coca-Cola (1.5 L). 8-12 kishini to‘ydiradi",
+            "ru": "4 пиццы (30 см) на ваш выбор и 2 Coca-Cola (1,5 л). Накормит от 8 до 12 человек",
+            "en": "Four pizzas (30 cm) of your choice and 2 Coca-Cola (1.5 L). Feeds 8 to 12."
+          },
+          "price": 255000,
+          "originalPrice": 344000,
+          "discountPercent": 26,
+          "image": "https://io.bellissimo.uz/images/f8990000-6beb-ac1f-4056-08dc575e681f.jpg"
+        },
+        {
+          "id": "f8990000-6beb-ac1f-ad8c-08dc575cbda9",
+          "name": {
+            "uz": "Doʻstlar",
+            "ru": "Друзья",
+            "en": "Friends"
+          },
+          "description": {
+            "uz": "Pitsa (25 cm), 8 ta sinnamonchalar, 5 ta tovuqli strips va 2 ta Coca-Cola (quyma). Ikki kishiga ayni muddao!",
+            "ru": "Пицца (25 см), 8 синнамончиков, 5 куриных стрипсов и 2 Coca-Cola (разлив). Идеально на двоих!",
+            "en": "Pizza (25 cm), 8 cinnamon rolls, 5 chicken tenders, and 2 Coca-Cola fountain drinks. Perfect for two!"
+          },
+          "price": 89000,
+          "originalPrice": 105000,
+          "discountPercent": 15,
+          "image": "https://io.bellissimo.uz/images/f8990000-6beb-ac1f-ad8c-08dc575cbda9.jpg"
+        }
+      ]
+    },
+    {
+      "id": "5abca05b-caf9-4ec3-8583-694363ac04af",
+      "title": {
+        "uz": "Pitsa kruassan 🥐",
+        "ru": "Пицца круассан 🥐",
+        "en": "Croissant Pizza"
+      },
+      "items": [
+        {
+          "id": "2b82c630-0ed4-407e-b92c-b2f9bb2ce4be",
+          "code": "1103211",
+          "name": {
+            "uz": "Kruassan Pepperoni",
+            "ru": "Пепперони круассан",
+            "en": "Pepperoni Croissant Pizza"
+          },
+          "description": {
+            "uz": "Sariyog‘li qatlama kruassan xamir (25 cm). Pepperoni, motsarella pishlog‘i va tomatli sous.",
+            "ru": "Сл��ёное круассан-тесто на сливочном масле (25 см). Пепперони, сыр моцарелла и томатный соус.",
+            "en": "Flaky croissant dough made with butter (25 cm). Pepperoni, Mozzarella cheese and tomato sauce."
+          },
+          "price": 89000,
+          "image": "https://io.bellissimo.uz/images/2b82c630-0ed4-407e-b92c-b2f9bb2ce4be.jpg"
+        },
+        {
+          "id": "c884834a-4d7d-4ceb-b857-f7d32694a8fc",
+          "code": "1103212",
+          "name": {
+            "uz": "Kruassan Alfredo",
+            "ru": "Альфредо круассан",
+            "en": "Alfredo Croissant Pizza"
+          },
+          "description": {
+            "uz": "Sariyog‘li qatlama kruassan xamir (25 cm). Tovuq va qo‘ziqorin, barchasi alfredo sousi ostida.",
+            "ru": "Слоёное ��руассан-тесто на сливочном масле (25 см). Курица и грибы, всё под соусом альфредо.",
+            "en": "Flaky croissant dough made with butter (25 cm). Chicken and mushrooms, all in Alfredo sauce."
+          },
+          "price": 89000,
+          "image": "https://io.bellissimo.uz/images/c884834a-4d7d-4ceb-b857-f7d32694a8fc.jpg"
+        },
+        {
+          "id": "3a89eef6-a5c1-484d-acc6-720dbb99c71e",
+          "code": "1103273",
+          "name": {
+            "uz": "Kruassan Pishloqli joʻja",
+            "ru": "Сырный цыпленок круассан",
+            "en": "Cheesy Chicken Croissant Pizza"
+          },
+          "description": {
+            "uz": "Sariyog‘li, kruassan xamirli pitsalar (25 cm). Tovuq lahmi va yetilib pishgan pomidorlar maxsus pishloqli sous ostida.",
+            "ru": "Слоёное круассан-тесто на сливочном масле (25 см). Куриное филе и спелые томаты на особенном сырном соусе.",
+            "en": "Flaky croissant dough made with butter (25 cm). Chicken fillet and ripe tomatoes in special cheese sauce."
+          },
+          "price": 94000,
+          "image": "https://io.bellissimo.uz/images/3a89eef6-a5c1-484d-acc6-720dbb99c71e.jpg"
+        },
+        {
+          "id": "561892e4-d94e-4d5b-be7f-995a7e398aad",
+          "code": "1103213",
+          "name": {
+            "uz": "Kruassan Margarita",
+            "ru": "Маргарита круассан",
+            "en": "Margherita Croissant Pizza"
+          },
+          "description": {
+            "uz": "Sariyog‘li qatlama kruassan xamir (25 cm). Yetilgan pomidorlar va oregano, motsarella va tomatli sous.",
+            "ru": "Слоёное круассан-тесто на сливочном масле (25 см). Спелые томаты и орегано, моцарелла и томатный соус.",
+            "en": "Flaky croissant dough made with butter (25 cm). Ripe tomatoes and oregano, Mozzarella and tomato sauce."
+          },
+          "price": 94000,
+          "image": "https://io.bellissimo.uz/images/561892e4-d94e-4d5b-be7f-995a7e398aad.jpg"
+        },
+        {
+          "id": "52041e91-e504-4e37-90d3-415e0f9c1a5b",
+          "code": "1103274",
+          "name": {
+            "uz": "Kruassan Barbekyu tovuq",
+            "ru": "Курица барбекю круассан",
+            "en": "BBQ Chicken Croissant Pizza"
+          },
+          "description": {
+            "uz": "Sariyog‘li, kruassan xamirli pitsalar (25 cm). Tovuq go‘shti, shalot piyozi, barbekyu sousi, tomatli sous, motsarella.",
+            "ru": "Слоёное круассан-тесто на сливочном масле (25 см). Курица, лук шалот, соус барбекю, томатный соус, моцарелла.",
+            "en": "Flaky croissant dough made with butter (25 cm). Chicken, shallot onions, BBQ sauce, tomato sauce, Mozzarella."
+          },
+          "price": 94000,
+          "image": "https://io.bellissimo.uz/images/52041e91-e504-4e37-90d3-415e0f9c1a5b.jpg"
+        },
+        {
+          "id": "4cd36296-0334-4feb-84bd-a90ff901dbba",
+          "code": "1103275",
+          "name": {
+            "uz": "Kruassan Cheddar donar",
+            "ru": "Чеддер донар круассан",
+            "en": "Cheddar Doner Croissant Pizza"
+          },
+          "description": {
+            "uz": "Sariyog‘li, kruassan xamirli pitsalar (25 cm). Donar go‘shti va chedder pishloq sousi, bulg‘or qalampiri, qizil piyoz.",
+            "ru": "Слоёное круассан-тесто на сливочном масле (25 см). Мясо донар и сырный соус чеддер, болгарский перец и красный лук.",
+            "en": "Flaky croissant dough made with butter (25 cm). Döner meat and Cheddar cheese sauce, bell pepper and red onion."
+          },
+          "price": 99000,
+          "image": "https://io.bellissimo.uz/images/4cd36296-0334-4feb-84bd-a90ff901dbba.jpg"
+        }
+      ]
+    },
+    {
+      "id": "4b328756-a3c4-4362-af84-9b029ee20c57",
+      "title": {
+        "uz": "Pitsa",
+        "ru": "Пицца",
+        "en": "Pizza"
+      },
+      "items": [
+        {
+          "id": "1f4b1bb5-0c01-4bee-8816-d8e4f662e979",
+          "name": {
+            "uz": "Texascha grill",
+            "ru": "Техасский гриль",
+            "en": "Texas Grill"
+          },
+          "description": {
+            "uz": "Kabob go‘shti, marinadlangan bodring, qizil piyoz, pomidorlar va dudli ta’mga ega grill sousi.",
+            "ru": "Мясо кебаб, маринованные огурцы, красный лук, помидоры и соус гриль с нотами дымка.",
+            "en": "Kebab meat, pickles, red onion, tomatoes, and smoky grill sauce."
+          },
+          "basePrice": 39000,
+          "image": "https://io.bellissimo.uz/images/1f4b1bb5-0c01-4bee-8816-d8e4f662e979.jpg",
+          "variants": [
+            {
+              "id": "63720542-a4b0-4372-bfb5-cc1360ea0530",
+              "code": "1103116",
+              "nameUz": "Texascha grill 20cm",
+              "nameRu": "Техасский гриль 20см",
+              "price": 39000,
+              "image": "https://io.bellissimo.uz/images/63720542-a4b0-4372-bfb5-cc1360ea0530.jpg"
+            },
+            {
+              "id": "cc8d6105-f4a8-4863-b831-2fd9458104d6",
+              "code": "1102828",
+              "nameUz": "Texascha grill 25cm",
+              "nameRu": "Техасский гриль 25см",
+              "price": 69000,
+              "image": "https://io.bellissimo.uz/images/cc8d6105-f4a8-4863-b831-2fd9458104d6.jpg"
+            },
+            {
+              "id": "68df980f-3da7-491d-a6c6-88df5ff72fe0",
+              "code": "1102829",
+              "nameUz": "Texascha grill 30sm",
+              "nameRu": "Техасский гриль 30см",
+              "price": 87000,
+              "image": "https://io.bellissimo.uz/images/68df980f-3da7-491d-a6c6-88df5ff72fe0.jpg"
+            },
+            {
+              "id": "f69a407e-62f6-493f-8021-e964f73a6fb0",
+              "code": "1102830",
+              "nameUz": "Texascha grill 35cm",
+              "nameRu": "Техасский гриль 35см",
+              "price": 104000,
+              "image": "https://io.bellissimo.uz/images/f69a407e-62f6-493f-8021-e964f73a6fb0.jpg"
+            }
+          ]
+        },
+        {
+          "id": "601282db-7274-43e4-ac74-e8987d53dd6e",
+          "name": {
+            "uz": "Pepperoni",
+            "ru": "Пепперони",
+            "en": "Pepperoni"
+          },
+          "description": {
+            "uz": "Pepperoni, motsarella pishlog‘i va tomat sousi",
+            "ru": "Пепперони, сыр моцарелла и томатный соус",
+            "en": "Pepperoni, mozzarella, and tomato sauce. A classic that always hits."
+          },
+          "basePrice": 37000,
+          "image": "https://io.bellissimo.uz/images/601282db-7274-43e4-ac74-e8987d53dd6e.jpg",
+          "variants": [
+            {
+              "id": "ef265f26-d395-4256-ab5d-dd092025fee9",
+              "code": "1101261",
+              "nameUz": "Pepperoni 20sm",
+              "nameRu": "Пепперони 20см",
+              "price": 37000,
+              "image": "https://io.bellissimo.uz/images/ef265f26-d395-4256-ab5d-dd092025fee9.jpg"
+            },
+            {
+              "id": "e1cb7f7f-62cb-49d9-bc46-cc49f659ddc5",
+              "code": "00094",
+              "nameUz": "Pepperoni 25sm",
+              "nameRu": "Пепперони 25см",
+              "price": 56000,
+              "image": "https://io.bellissimo.uz/images/e1cb7f7f-62cb-49d9-bc46-cc49f659ddc5.jpg"
+            },
+            {
+              "id": "ac673f67-45f6-44e8-926f-9c03035be725",
+              "code": "00106",
+              "nameUz": "Pepperoni 30sm",
+              "nameRu": "Пепперони 30см",
+              "price": 79000,
+              "image": "https://io.bellissimo.uz/images/ac673f67-45f6-44e8-926f-9c03035be725.jpg"
+            },
+            {
+              "id": "49312836-0ed5-4904-80f4-3c3e278cb928",
+              "code": "00125",
+              "nameUz": "Pepperoni 35sm",
+              "nameRu": "Пепперони 35см",
+              "price": 94000,
+              "image": "https://io.bellissimo.uz/images/49312836-0ed5-4904-80f4-3c3e278cb928.jpg"
+            }
+          ]
+        },
+        {
+          "id": "33b46d3a-a289-4971-88f5-bd0a3807785c",
+          "name": {
+            "uz": "Cheddar donar",
+            "ru": "Чеддер донар",
+            "en": "Cheddar Doner"
+          },
+          "description": {
+            "uz": "Donar go‘shti va chedder pishloq sousi, bulg‘or qalampiri, qizil piyoz",
+            "ru": "Мясо донар и сырный соус чеддер, болгарский перец и красный лук",
+            "en": "Doner meat, cheddar cheese sauce, bell pepper, and red onion."
+          },
+          "basePrice": 44000,
+          "image": "https://io.bellissimo.uz/images/33b46d3a-a289-4971-88f5-bd0a3807785c.jpg",
+          "variants": [
+            {
+              "id": "f8090e7f-7c5f-4bc7-b8a6-65d7024f8a2b",
+              "code": "1102968",
+              "nameUz": "Chedder Donar 20sm",
+              "nameRu": "Чеддер донар 20см",
+              "price": 44000,
+              "image": "https://io.bellissimo.uz/images/f8090e7f-7c5f-4bc7-b8a6-65d7024f8a2b.jpg"
+            },
+            {
+              "id": "1050d521-0449-4fe4-96ee-a426277df28c",
+              "code": "1101969",
+              "nameUz": "Chedder Donar 25sm",
+              "nameRu": "Чеддер донар 25см",
+              "price": 69000,
+              "image": "https://io.bellissimo.uz/images/1050d521-0449-4fe4-96ee-a426277df28c.jpg"
+            },
+            {
+              "id": "ed8b8a5a-7c16-4c39-9293-f38169f27d85",
+              "code": "1101968",
+              "nameUz": "Chedder Donar 30sm",
+              "nameRu": "Чеддер донар 30см",
+              "price": 87000,
+              "image": "https://io.bellissimo.uz/images/ed8b8a5a-7c16-4c39-9293-f38169f27d85.jpg"
+            },
+            {
+              "id": "2cb6cdb1-5338-4b0a-a6c8-87cb62f20d64",
+              "code": "1101966",
+              "nameUz": "Chedder Donar 35sm",
+              "nameRu": "Чеддер донар 35см",
+              "price": 104000,
+              "image": "https://io.bellissimo.uz/images/2cb6cdb1-5338-4b0a-a6c8-87cb62f20d64.jpg"
+            }
+          ]
+        },
+        {
+          "id": "cd4ec26b-2bd5-4416-b50b-46e0f8ac5ed8",
+          "name": {
+            "uz": "Bellissimo",
+            "ru": "Беллиссимо",
+            "en": "Bellissimo"
+          },
+          "description": {
+            "uz": "Mol go‘shti, tovuqli vetchina, pepperoni, qo‘ziqorin, zaytun, bulg‘or qalampiri, piyoz, motsarella, tomatli sous",
+            "ru": "Говядина, куриная ветчина, пепперони, грибы, маслины, боргарский перец, лук, томатный соус, моцарелла",
+            "en": "Beef, chicken ham, pepperoni, mushrooms, olives, bell pepper, onion, tomato sauce, mozzarella"
+          },
+          "basePrice": 44000,
+          "image": "https://io.bellissimo.uz/images/cd4ec26b-2bd5-4416-b50b-46e0f8ac5ed8.jpg",
+          "variants": [
+            {
+              "id": "12208733-fa63-4ed7-a668-4d24b995b273",
+              "code": "1102971",
+              "nameUz": "Bellissimo 20sm",
+              "nameRu": "Беллиссимо 20см",
+              "price": 44000,
+              "image": "https://io.bellissimo.uz/images/12208733-fa63-4ed7-a668-4d24b995b273.jpg"
+            },
+            {
+              "id": "dc92b561-ad04-4846-a532-18a726cdec90",
+              "code": "00103",
+              "nameUz": "Bellissimo 25sm",
+              "nameRu": "Беллиссимо 25см",
+              "price": 69000,
+              "image": "https://io.bellissimo.uz/images/dc92b561-ad04-4846-a532-18a726cdec90.jpg"
+            },
+            {
+              "id": "ecce17cd-76e3-44ab-9a86-3d9ba34377ba",
+              "code": "00115",
+              "nameUz": "Bellissimo 30sm",
+              "nameRu": "Беллиссимо 30см",
+              "price": 87000,
+              "image": "https://io.bellissimo.uz/images/ecce17cd-76e3-44ab-9a86-3d9ba34377ba.jpg"
+            },
+            {
+              "id": "5c9e5867-fd26-4515-8107-1df7b0f905c4",
+              "code": "00116",
+              "nameUz": "Bellissimo 35sm",
+              "nameRu": "Беллиссимо 35см",
+              "price": 104000,
+              "image": "https://io.bellissimo.uz/images/5c9e5867-fd26-4515-8107-1df7b0f905c4.jpg"
+            }
+          ]
+        },
+        {
+          "id": "c14e362c-57a5-49fd-9a80-b14ce099b777",
+          "name": {
+            "uz": "Goʻshtli miks",
+            "ru": "Мясной микс",
+            "en": "Meat Mix"
+          },
+          "description": {
+            "uz": "4 ta pitsa bittada: donar, kabob, dabl chizburger va klassik pepperoni",
+            "ru": "4 пиццы в одной: донар, кебаб, дабл чизбургер и классическая пепперони",
+            "en": "Four bold flavors in one: doner, kebab, double cheeseburger, and pepperoni."
+          },
+          "basePrice": 109000,
+          "image": "https://io.bellissimo.uz/images/c14e362c-57a5-49fd-9a80-b14ce099b777.jpg",
+          "variants": [
+            {
+              "id": "2ae873a1-bfaf-4714-9e25-0b3584f78c42",
+              "code": "1018177",
+              "nameUz": "Go`shtli miks katta",
+              "nameRu": "Мясной Микс большой",
+              "price": 109000,
+              "image": "https://io.bellissimo.uz/images/2ae873a1-bfaf-4714-9e25-0b3584f78c42.jpg"
+            }
+          ]
+        },
+        {
+          "id": "405e4be1-3493-49d2-ab92-4eb256200ac5",
+          "name": {
+            "uz": "Donar pitsa",
+            "ru": "Донар пицца",
+            "en": "Doner Pizza"
+          },
+          "description": {
+            "uz": "Donar go‘shti, bulg‘or qalampiri, qalampir, piyoz, pomidor, barbekyu sousi, motsarella",
+            "ru": "Мясо донар, болгарский перец, лук, помидоры, барбекю соус, моцарелла",
+            "en": "Juicy doner meat, bell pepper, onion, tomatoes, BBQ sauce, and mozzarella."
+          },
+          "basePrice": 44000,
+          "image": "https://io.bellissimo.uz/images/405e4be1-3493-49d2-ab92-4eb256200ac5.jpg",
+          "variants": [
+            {
+              "id": "30a08a5b-a315-4040-a0bb-021b8a19766c",
+              "code": "1102969",
+              "nameUz": "Donar pizza 20sm",
+              "nameRu": "Donar Pizza 20см",
+              "price": 44000,
+              "image": "https://io.bellissimo.uz/images/30a08a5b-a315-4040-a0bb-021b8a19766c.jpg"
+            },
+            {
+              "id": "84e21f38-b85a-46ba-aaae-b4f096147919",
+              "code": "1017689",
+              "nameUz": "Donar pizza 25sm",
+              "nameRu": "Донар пицца 25см",
+              "price": 69000,
+              "image": "https://io.bellissimo.uz/images/84e21f38-b85a-46ba-aaae-b4f096147919.jpg"
+            },
+            {
+              "id": "3844f4b1-8731-4818-96b9-7e3bbe2be3b3",
+              "code": "1017688",
+              "nameUz": "Donar pizza 30sm",
+              "nameRu": "Донар пицца 30см",
+              "price": 87000,
+              "image": "https://io.bellissimo.uz/images/3844f4b1-8731-4818-96b9-7e3bbe2be3b3.jpg"
+            },
+            {
+              "id": "bafd048a-0a3e-466f-bd0f-5e1c1a6175fd",
+              "code": "1017687",
+              "nameUz": "Donar Pizza 35sm",
+              "nameRu": "Донар пицца 35см",
+              "price": 104000,
+              "image": "https://io.bellissimo.uz/images/bafd048a-0a3e-466f-bd0f-5e1c1a6175fd.jpg"
+            }
+          ]
+        },
+        {
+          "id": "fd253a59-c094-468e-bb31-bda637aa9dcd",
+          "name": {
+            "uz": "Pishloqli pitsa 🌱 👶",
+            "ru": "Сырная пицца 🌱 👶",
+            "en": "Cheese Pizza"
+          },
+          "description": {
+            "uz": "Motsarella, alfredo",
+            "ru": "Моцарелла, соус альфредо",
+            "en": "Mozzarella with creamy Alfredo sauce. Simple and cheesy."
+          },
+          "basePrice": 29000,
+          "image": "https://io.bellissimo.uz/images/fd253a59-c094-468e-bb31-bda637aa9dcd.jpg",
+          "variants": [
+            {
+              "id": "7b5e9dfe-6275-4cff-aeea-e0d336ba661a",
+              "code": "1101262",
+              "nameUz": "Pishloqli pitsa 20sm",
+              "nameRu": "Сырная пицца 20см",
+              "price": 29000,
+              "image": "https://io.bellissimo.uz/images/7b5e9dfe-6275-4cff-aeea-e0d336ba661a.jpg"
+            },
+            {
+              "id": "1d242afb-7897-4122-aaa8-5c65a9124e41",
+              "code": "1018240",
+              "nameUz": "Pishloqli pitsa 25sm",
+              "nameRu": "Сырная пицца 25см",
+              "price": 39000,
+              "image": "https://io.bellissimo.uz/images/1d242afb-7897-4122-aaa8-5c65a9124e41.jpg"
+            },
+            {
+              "id": "6b3df1d9-488b-45d7-8008-dfcab4cef481",
+              "code": "1018239",
+              "nameUz": "Pishloqli pitsa 30sm",
+              "nameRu": "Сырная пицца 30см",
+              "price": 69000,
+              "image": "https://io.bellissimo.uz/images/6b3df1d9-488b-45d7-8008-dfcab4cef481.jpg"
+            },
+            {
+              "id": "2c2789b9-1ef5-4940-ac6b-86126605bfa9",
+              "code": "1018238",
+              "nameUz": "Pishloqli pitsa 35sm",
+              "nameRu": "Сырная пицца 35см",
+              "price": 81000,
+              "image": "https://io.bellissimo.uz/images/2c2789b9-1ef5-4940-ac6b-86126605bfa9.jpg"
+            }
+          ]
+        },
+        {
+          "id": "bd276106-b16a-4c07-a963-1ccffef5e30d",
+          "name": {
+            "uz": "Mr. Pep 👶",
+            "ru": "Mистер Пеп 👶",
+            "en": "Mister Pep"
+          },
+          "description": {
+            "uz": "Pepperoni va motsarella pishlog‘i. Pitsa maxsus bo‘yaladigan qutida tortiladi!",
+            "ru": "Пепперони и сыр моцарелла. Пицца подаётся в специальной коробке-раскраске!",
+            "en": "Pepperoni and mozzarella, served in a special coloring box."
+          },
+          "basePrice": 39000,
+          "image": "https://io.bellissimo.uz/images/bd276106-b16a-4c07-a963-1ccffef5e30d.jpg",
+          "variants": [
+            {
+              "id": "18373a36-cc14-4a03-b33e-fce674ca0553",
+              "code": "1101492",
+              "nameUz": "Mr.Pep Kichkina",
+              "nameRu": "Mr.Pep Маленькая",
+              "price": 39000,
+              "image": "https://io.bellissimo.uz/images/18373a36-cc14-4a03-b33e-fce674ca0553.jpg"
+            }
+          ]
+        },
+        {
+          "id": "1b7c0cde-d2e7-4f96-9e5e-bd303bd4c11f",
+          "name": {
+            "uz": "Frimen 👶",
+            "ru": "Фримен 👶",
+            "en": "Freeman"
+          },
+          "description": {
+            "uz": "Pechdan chiqqan kartoshka fri, sosiska, tomatli sous, motsarella",
+            "ru": "Картошка фри из печи, сосиски, томатный соус, моцарелла",
+            "en": "Oven-baked French fries, sausages, tomato sauce, mozzarella"
+          },
+          "basePrice": 39000,
+          "image": "https://io.bellissimo.uz/images/1b7c0cde-d2e7-4f96-9e5e-bd303bd4c11f.jpg",
+          "variants": [
+            {
+              "id": "b236df7c-14de-4d4d-8356-8e85ce7458e1",
+              "code": "1101493",
+              "nameUz": "Frimen Kichkina",
+              "nameRu": "Frimen Маленькая",
+              "price": 39000,
+              "image": "https://io.bellissimo.uz/images/b236df7c-14de-4d4d-8356-8e85ce7458e1.jpg"
+            }
+          ]
+        },
+        {
+          "id": "94844930-5c66-4c12-a670-93b048169dbe",
+          "name": {
+            "uz": "To‘rt fasl",
+            "ru": "Четыре сезона",
+            "en": "Four Seasons"
+          },
+          "description": {
+            "uz": "4 ta pitsa bittada: kebab, pepperoni, tovuq va qo'ziqorinlar, margarita",
+            "ru": "4 пиццы в одной: кебаб, пепперони, курица с грибами и маргарита.",
+            "en": "Four favorite flavors in one: kebab, pepperoni, chicken & mushroom, and Margherita."
+          },
+          "basePrice": 109000,
+          "image": "https://io.bellissimo.uz/images/94844930-5c66-4c12-a670-93b048169dbe.jpg",
+          "variants": [
+            {
+              "id": "af000c0e-03dc-49cc-92ed-44a2d0d40874",
+              "code": "101244",
+              "nameUz": "To‘rt fasl Katta",
+              "nameRu": "Четыре сезона большая",
+              "price": 109000,
+              "image": "https://io.bellissimo.uz/images/af000c0e-03dc-49cc-92ed-44a2d0d40874.jpg"
+            }
+          ]
+        },
+        {
+          "id": "49146c0e-fe2f-424a-a5b0-c167af6da6a1",
+          "name": {
+            "uz": "Alfredo",
+            "ru": "Альфредо",
+            "en": "Alfredo"
+          },
+          "description": {
+            "uz": "Tovuq go‘shti va qo‘ziqorinlar, barchasi alfredo sousi ostida",
+            "ru": "Курица и грибы, всё под соусом альфредо",
+            "en": "Chicken, mushrooms, mozzarella, and creamy Alfredo sauce."
+          },
+          "basePrice": 37000,
+          "image": "https://io.bellissimo.uz/images/49146c0e-fe2f-424a-a5b0-c167af6da6a1.jpg",
+          "variants": [
+            {
+              "id": "8903e71a-5aa2-4554-b2a4-2837857a2788",
+              "code": "1102976",
+              "nameUz": "Alfredo 20sm",
+              "nameRu": "Альфредо 20см",
+              "price": 37000,
+              "image": "https://io.bellissimo.uz/images/8903e71a-5aa2-4554-b2a4-2837857a2788.jpg"
+            },
+            {
+              "id": "d8729a1c-4c98-4b47-a519-5cd2683ebc59",
+              "code": "00102",
+              "nameUz": "Alfredo 25sm",
+              "nameRu": "Альфредо 25см",
+              "price": 56000,
+              "image": "https://io.bellissimo.uz/images/d8729a1c-4c98-4b47-a519-5cd2683ebc59.jpg"
+            },
+            {
+              "id": "085c6fcb-850a-4a77-9233-8a8e190b909c",
+              "code": "00114",
+              "nameUz": "Alfredo 30sm",
+              "nameRu": "Альфредо 30см",
+              "price": 79000,
+              "image": "https://io.bellissimo.uz/images/085c6fcb-850a-4a77-9233-8a8e190b909c.jpg"
+            },
+            {
+              "id": "352a5b94-f922-4053-a386-d2a64d05ea26",
+              "code": "00117",
+              "nameUz": "Alfredo 35sm",
+              "nameRu": "Альфредо 35см",
+              "price": 94000,
+              "image": "https://io.bellissimo.uz/images/352a5b94-f922-4053-a386-d2a64d05ea26.jpg"
+            }
+          ]
+        },
+        {
+          "id": "17126e05-7876-45a6-be19-e6d0af0328a4",
+          "name": {
+            "uz": "Pishloqli joʻja 👶",
+            "ru": "Сырный цыплёнок 👶",
+            "en": "Cheesy Chicken"
+          },
+          "description": {
+            "uz": "Tovuq lahmi va yetilib pishgan pomidorlar maxsus pishloqli sous ostida",
+            "ru": "Куриное филе и спелые томаты на особенном сырном соусе",
+            "en": "Tender chicken, ripe tomatoes, mozzarella, and creamy cheese sauce."
+          },
+          "basePrice": 33000,
+          "image": "https://io.bellissimo.uz/images/17126e05-7876-45a6-be19-e6d0af0328a4.jpg",
+          "variants": [
+            {
+              "id": "196903ab-15d9-4c6e-87b2-69e86040d21a",
+              "code": "1103115",
+              "nameUz": "Pishloqli joja 20sm",
+              "nameRu": "Сырный Цыпленок 20см",
+              "price": 33000,
+              "image": "https://io.bellissimo.uz/images/196903ab-15d9-4c6e-87b2-69e86040d21a.jpg"
+            },
+            {
+              "id": "432beaf8-f270-417b-ad98-64ac94cab908",
+              "code": "01087",
+              "nameUz": "Pishloqli joja 25sm",
+              "nameRu": "Сырный Цыпленок 25см",
+              "price": 56000,
+              "image": "https://io.bellissimo.uz/images/432beaf8-f270-417b-ad98-64ac94cab908.jpg"
+            },
+            {
+              "id": "91a9a8e9-6ae1-41e6-8ffb-163adcb79f07",
+              "code": "01088",
+              "nameUz": "Pishloqli joja 30sm",
+              "nameRu": "Сырный Цыпленок 30см",
+              "price": 79000,
+              "image": "https://io.bellissimo.uz/images/91a9a8e9-6ae1-41e6-8ffb-163adcb79f07.jpg"
+            },
+            {
+              "id": "c3e86157-395d-4269-bc8a-62bef970276a",
+              "code": "01089",
+              "nameUz": "Pishloqli joja 35sm",
+              "nameRu": "Сырный Цыпленок 35см",
+              "price": 94000,
+              "image": "https://io.bellissimo.uz/images/c3e86157-395d-4269-bc8a-62bef970276a.jpg"
+            }
+          ]
+        },
+        {
+          "id": "23138748-1bff-4994-b42b-cf7044ed4e0d",
+          "name": {
+            "uz": "Dabl pepperoni",
+            "ru": "Двойная пепперони",
+            "en": "Double Pepperoni"
+          },
+          "description": {
+            "uz": "Klassik pepperoni pitsasidan ikki hissa ko‘proq pepperoni!",
+            "ru": "В два раза больше пепперони, чем в классической пицце пепперони!",
+            "en": "Double pepperoni with mozzarella and tomato sauce for extra flavor."
+          },
+          "basePrice": 44000,
+          "image": "https://io.bellissimo.uz/images/23138748-1bff-4994-b42b-cf7044ed4e0d.jpg",
+          "variants": [
+            {
+              "id": "bd6ca126-8113-408a-a826-d403e6dcbd03",
+              "code": "1102972",
+              "nameUz": "Dabl pepperoni 20sm",
+              "nameRu": "Двойная пепперони 20см",
+              "price": 44000,
+              "image": "https://io.bellissimo.uz/images/bd6ca126-8113-408a-a826-d403e6dcbd03.jpg"
+            },
+            {
+              "id": "eaf2f0b2-c55f-413f-a9c8-589debf8c700",
+              "code": "00971",
+              "nameUz": "Dabl pepperoni 25sm",
+              "nameRu": "Двойная пепперони 25см",
+              "price": 69000,
+              "image": "https://io.bellissimo.uz/images/eaf2f0b2-c55f-413f-a9c8-589debf8c700.jpg"
+            },
+            {
+              "id": "0c7e61ef-a395-4eaf-95fa-5f69bd94dd1e",
+              "code": "00970",
+              "nameUz": "Dabl pepperoni 30sm",
+              "nameRu": "Двойная пепперони 30см",
+              "price": 87000,
+              "image": "https://io.bellissimo.uz/images/0c7e61ef-a395-4eaf-95fa-5f69bd94dd1e.jpg"
+            },
+            {
+              "id": "bd22a604-6488-4e4e-acdc-2837af3dc1f8",
+              "code": "00969",
+              "nameUz": "Dabl pepperoni 35sm",
+              "nameRu": "Двойная пепперони 35см",
+              "price": 104000,
+              "image": "https://io.bellissimo.uz/images/bd22a604-6488-4e4e-acdc-2837af3dc1f8.jpg"
+            }
+          ]
+        },
+        {
+          "id": "0a6ad3e4-3cac-40d4-a278-13416f28b5fe",
+          "name": {
+            "uz": "Ranch jo‘jacha",
+            "ru": "Цыплёнок ранч",
+            "en": "Chicken Ranch"
+          },
+          "description": {
+            "uz": "Tovuq lahmi va pomidorlar ishtahaochar ranch sousi ostida",
+            "ru": "Куриное филе и томаты на аппетитном соусе ранч",
+            "en": "Tender chicken, tomatoes, mozzarella, and creamy ranch sauce."
+          },
+          "basePrice": 37000,
+          "image": "https://io.bellissimo.uz/images/0a6ad3e4-3cac-40d4-a278-13416f28b5fe.jpg",
+          "variants": [
+            {
+              "id": "eb14d6e1-a5c7-431b-b032-74d3cf473ef7",
+              "code": "1102970",
+              "nameUz": "Joʻjacha Ranch 20sm",
+              "nameRu": "Цыплёнок Ранч 20см",
+              "price": 37000,
+              "image": "https://io.bellissimo.uz/images/eb14d6e1-a5c7-431b-b032-74d3cf473ef7.jpg"
+            },
+            {
+              "id": "95aea8af-0f44-4392-9d27-4aa9d532804e",
+              "code": "00619",
+              "nameUz": "Joʻjacha Ranch 25sm",
+              "nameRu": "Цыплёнок Ранч 25см",
+              "price": 56000,
+              "image": "https://io.bellissimo.uz/images/95aea8af-0f44-4392-9d27-4aa9d532804e.jpg"
+            },
+            {
+              "id": "4cfef179-4130-4d0a-b341-f5c2840e30ce",
+              "code": "00620",
+              "nameUz": "Joʻjacha Ranch 30sm",
+              "nameRu": "Цыплёнок Ранч 30см",
+              "price": 79000,
+              "image": "https://io.bellissimo.uz/images/4cfef179-4130-4d0a-b341-f5c2840e30ce.jpg"
+            },
+            {
+              "id": "80d95983-b9e8-45b5-ba85-a9bb0149028b",
+              "code": "00608",
+              "nameUz": "Joʻjacha Ranch 35sm",
+              "nameRu": "Цыплёнок Ранч 35см",
+              "price": 94000,
+              "image": "https://io.bellissimo.uz/images/80d95983-b9e8-45b5-ba85-a9bb0149028b.jpg"
+            }
+          ]
+        },
+        {
+          "id": "84e3a554-551a-45f6-9ac1-9c7870aa6f14",
+          "name": {
+            "uz": "Halapeno 🌶",
+            "ru": "Халапеньо 🌶",
+            "en": "Jalapeno"
+          },
+          "description": {
+            "uz": "Tovuqli vetchina, mol go‘shti, halapenyo, piyoz,pomidor, barbekyu sousi, motsarella",
+            "ru": "Куриная ветчина, говядина, халапеньо, помидоры, лук, соус барбекю, моцарелла",
+            "en": "Chicken ham, beef, jalapeno, tomatoes, onion, BBQ sauce, mozzarella"
+          },
+          "basePrice": 36000,
+          "image": "https://io.bellissimo.uz/images/84e3a554-551a-45f6-9ac1-9c7870aa6f14.jpg",
+          "variants": [
+            {
+              "id": "58c08bd4-1777-4fd8-9f36-6f53828d25ed",
+              "code": "1103117",
+              "nameUz": "Halapenyo 20sm",
+              "nameRu": "Халапеньо 20см",
+              "price": 36000,
+              "image": "https://io.bellissimo.uz/images/58c08bd4-1777-4fd8-9f36-6f53828d25ed.jpg"
+            },
+            {
+              "id": "75b6c16f-3296-431e-ae2f-d1ddcd9964ee",
+              "code": "00446",
+              "nameUz": "Halapenyo 25sm",
+              "nameRu": "Халапеньо 25см",
+              "price": 63000,
+              "image": "https://io.bellissimo.uz/images/75b6c16f-3296-431e-ae2f-d1ddcd9964ee.jpg"
+            },
+            {
+              "id": "071899c9-d70b-421d-bc4f-d12b939c8e66",
+              "code": "00447",
+              "nameUz": "Halapenyo 30sm",
+              "nameRu": "Халапеньо 30см",
+              "price": 83000,
+              "image": "https://io.bellissimo.uz/images/071899c9-d70b-421d-bc4f-d12b939c8e66.jpg"
+            },
+            {
+              "id": "85f6f6ef-6c17-424a-8147-7ab058d58301",
+              "code": "00448",
+              "nameUz": "Halapenyo 35sm",
+              "nameRu": "Халапеньо 35см",
+              "price": 99000,
+              "image": "https://io.bellissimo.uz/images/85f6f6ef-6c17-424a-8147-7ab058d58301.jpg"
+            }
+          ]
+        },
+        {
+          "id": "07b2af79-95e0-48ae-8962-3b29fdfcb6d4",
+          "name": {
+            "uz": "Meksikancha 🌶",
+            "ru": "Мексиканская 🌶",
+            "en": "Mexican"
+          },
+          "description": {
+            "uz": "Mol go‘shti, pepperoni, halapenyo, bulg‘or qalampiri, barbekyu sousi, pomidor, piyoz, motsarella,  tomatli sous",
+            "ru": "Говядина, пепперони, халапеньо, болгарский перец, помидоры, лук, соус барбекю, моцарелла, томатный соус",
+            "en": "Beef, pepperoni, jalapenos, bell peppers, tomatoes, onions, BBQ sauce, mozzarella, and tomato sauce."
+          },
+          "basePrice": 41000,
+          "image": "https://io.bellissimo.uz/images/07b2af79-95e0-48ae-8962-3b29fdfcb6d4.jpg",
+          "variants": [
+            {
+              "id": "bd2acf6d-5a0f-42d0-b252-cbc87cadd6cf",
+              "code": "1102974",
+              "nameUz": "Meksikancha 20sm",
+              "nameRu": "Мексиканская 20см",
+              "price": 41000,
+              "image": "https://io.bellissimo.uz/images/bd2acf6d-5a0f-42d0-b252-cbc87cadd6cf.jpg"
+            },
+            {
+              "id": "a85fc0b2-6bb4-422b-8653-01690a07b96c",
+              "code": "00616",
+              "nameUz": "Meksikancha 25sm",
+              "nameRu": "Мексиканская 25см",
+              "price": 63000,
+              "image": "https://io.bellissimo.uz/images/a85fc0b2-6bb4-422b-8653-01690a07b96c.jpg"
+            },
+            {
+              "id": "4680ddc1-18d4-49d7-a077-66d04abe3d2b",
+              "code": "00617",
+              "nameUz": "Meksikancha 30sm",
+              "nameRu": "Мексиканская 30см",
+              "price": 83000,
+              "image": "https://io.bellissimo.uz/images/4680ddc1-18d4-49d7-a077-66d04abe3d2b.jpg"
+            },
+            {
+              "id": "dba93fff-18c1-4ffb-9a8f-20aa18a43c7b",
+              "code": "00611",
+              "nameUz": "Meksikancha 35sm",
+              "nameRu": "Мексиканская 35см",
+              "price": 99000,
+              "image": "https://io.bellissimo.uz/images/dba93fff-18c1-4ffb-9a8f-20aa18a43c7b.jpg"
+            }
+          ]
+        },
+        {
+          "id": "d356188d-b9b4-4c06-9251-4429a17adfd5",
+          "name": {
+            "uz": "Margarita 🌱",
+            "ru": "Маргарита 🌱",
+            "en": "Margherita"
+          },
+          "description": {
+            "uz": "Yetilib pishgan pomidorlar va oregano, motsarella hamda tomat sousi",
+            "ru": "Спелые томаты и орегано, моцарелла и томатный соус",
+            "en": "Mozzarella, ripe tomatoes, oregano, and tomato sauce. Fresh and timeless."
+          },
+          "basePrice": 34000,
+          "image": "https://io.bellissimo.uz/images/d356188d-b9b4-4c06-9251-4429a17adfd5.jpg",
+          "variants": [
+            {
+              "id": "a85b5ba2-bfba-4f44-8ed7-a6c21a4811c9",
+              "code": "1102973",
+              "nameUz": "Margarita 20sm",
+              "nameRu": "Маргарита 20см",
+              "price": 34000,
+              "image": "https://io.bellissimo.uz/images/a85b5ba2-bfba-4f44-8ed7-a6c21a4811c9.jpg"
+            },
+            {
+              "id": "1210521c-d687-421f-b231-c39b21bad7a0",
+              "code": "00092",
+              "nameUz": "Margarita 25sm",
+              "nameRu": "Маргарита 25см",
+              "price": 49000,
+              "image": "https://io.bellissimo.uz/images/1210521c-d687-421f-b231-c39b21bad7a0.jpg"
+            },
+            {
+              "id": "cf5f61a2-798f-4d9b-a942-d60982e37996",
+              "code": "000104",
+              "nameUz": "Margarita 30sm",
+              "nameRu": "Маргарита 30см",
+              "price": 73000,
+              "image": "https://io.bellissimo.uz/images/cf5f61a2-798f-4d9b-a942-d60982e37996.jpg"
+            },
+            {
+              "id": "c88cb9ac-b139-4bb4-9f90-4c265324d4b6",
+              "code": "00127",
+              "nameUz": "Margarita 35sm",
+              "nameRu": "Маргарита 35см",
+              "price": 94000,
+              "image": "https://io.bellissimo.uz/images/c88cb9ac-b139-4bb4-9f90-4c265324d4b6.jpg"
+            }
+          ]
+        },
+        {
+          "id": "18dcffd2-c192-4811-8698-68c8a51cdb34",
+          "name": {
+            "uz": "Barbekyu tovuq",
+            "ru": "Курица барбекю",
+            "en": "BBQ Chicken"
+          },
+          "description": {
+            "uz": "Tovuq go‘shti, qizil piyoz, barbekyu sousi, motsarella, tomatli sous",
+            "ru": "Курица, красный лук, соус барбекю, томатный соус, моцарелла",
+            "en": "Chicken, red onion, BBQ sauce, tomato sauce, mozzarella"
+          },
+          "basePrice": 33000,
+          "image": "https://io.bellissimo.uz/images/18dcffd2-c192-4811-8698-68c8a51cdb34.jpg",
+          "variants": [
+            {
+              "id": "439da184-1406-4833-babd-22e6f595c055",
+              "code": "1103114",
+              "nameUz": "Barbekyu tovuq 20sm",
+              "nameRu": "Курица-барбекю 20см",
+              "price": 33000,
+              "image": "https://io.bellissimo.uz/images/439da184-1406-4833-babd-22e6f595c055.jpg"
+            },
+            {
+              "id": "064b7789-cb4e-468c-8fc1-f76fe29714e9",
+              "code": "00096",
+              "nameUz": "Barbekyu tovuq 25sm",
+              "nameRu": "Курица-барбекю 25см",
+              "price": 56000,
+              "image": "https://io.bellissimo.uz/images/064b7789-cb4e-468c-8fc1-f76fe29714e9.jpg"
+            },
+            {
+              "id": "b78f737f-2ede-4e3c-8593-5e11c3dbbdac",
+              "code": "00108",
+              "nameUz": "Barbekyu tovuq 30sm",
+              "nameRu": "Курица-барбекю 30см",
+              "price": 79000,
+              "image": "https://io.bellissimo.uz/images/b78f737f-2ede-4e3c-8593-5e11c3dbbdac.jpg"
+            },
+            {
+              "id": "462d169e-115d-4bf2-a3bc-ff014fdae99b",
+              "code": "00123",
+              "nameUz": "Barbekyu tovuq 35sm",
+              "nameRu": "Курица-барбекю 35см",
+              "price": 94000,
+              "image": "https://io.bellissimo.uz/images/462d169e-115d-4bf2-a3bc-ff014fdae99b.jpg"
+            }
+          ]
+        },
+        {
+          "id": "0c3ac5fd-3915-42a6-8bca-dd74ae0fcef4",
+          "name": {
+            "uz": "Kombo",
+            "ru": "Комбо",
+            "en": "Combo"
+          },
+          "description": {
+            "uz": "Tovuqli vetchina, tovuq go‘shti, pepperoni, motsarella, tomatli sous",
+            "ru": "Куриная ветчина, курица, пепперони, томатный соус, моцарелла",
+            "en": "Chicken ham, chicken, pepperoni, tomato sauce, mozzarella"
+          },
+          "basePrice": 36000,
+          "image": "https://io.bellissimo.uz/images/0c3ac5fd-3915-42a6-8bca-dd74ae0fcef4.jpg",
+          "variants": [
+            {
+              "id": "d0ed68dd-60ca-46a1-800e-b29a3ec2bcc8",
+              "code": "1103111",
+              "nameUz": "Kombo 20cm",
+              "nameRu": "Комбо 20см",
+              "price": 36000,
+              "image": "https://io.bellissimo.uz/images/d0ed68dd-60ca-46a1-800e-b29a3ec2bcc8.jpg"
+            },
+            {
+              "id": "4ce64bb6-25b7-48a3-b424-e648c94e8919",
+              "code": "00097",
+              "nameUz": "Kombo 25cm",
+              "nameRu": "Комбо 25см",
+              "price": 63000,
+              "image": "https://io.bellissimo.uz/images/4ce64bb6-25b7-48a3-b424-e648c94e8919.jpg"
+            },
+            {
+              "id": "72128991-7205-4ecb-96f6-f6bdff5fe9a1",
+              "code": "00109",
+              "nameUz": "Kombo 30cm",
+              "nameRu": "Комбо 30см",
+              "price": 83000,
+              "image": "https://io.bellissimo.uz/images/72128991-7205-4ecb-96f6-f6bdff5fe9a1.jpg"
+            },
+            {
+              "id": "b06d12d9-a351-4f97-a724-fba0dc816173",
+              "code": "00122",
+              "nameUz": "Kombo 35cm",
+              "nameRu": "Комбо 35см",
+              "price": 99000,
+              "image": "https://io.bellissimo.uz/images/b06d12d9-a351-4f97-a724-fba0dc816173.jpg"
+            }
+          ]
+        },
+        {
+          "id": "d0d3d914-a239-428b-b493-ad80516bb39f",
+          "name": {
+            "uz": "Kebab",
+            "ru": "Кебаб",
+            "en": "Kebab"
+          },
+          "description": {
+            "uz": "Kabob go‘shti, bulg‘or qalampiri, pomidor, tomatli sous, motsarella",
+            "ru": "Мясо кебаб, болгарский перец, помидоры, томатный соус, моцарелла",
+            "en": "Kebab meat, bell pepper, tomatoes, mozzarella, and tomato sauce."
+          },
+          "basePrice": 36000,
+          "image": "https://io.bellissimo.uz/images/d0d3d914-a239-428b-b493-ad80516bb39f.jpg",
+          "variants": [
+            {
+              "id": "ae761e88-e167-4296-b8d1-f55727c9c949",
+              "code": "1103110",
+              "nameUz": "Kebab pitsa 20cm",
+              "nameRu": "Кебаб пицца 20см",
+              "price": 36000,
+              "image": "https://io.bellissimo.uz/images/ae761e88-e167-4296-b8d1-f55727c9c949.jpg"
+            },
+            {
+              "id": "879ceb1b-d0fd-4b40-8eb7-ea21e3b5508c",
+              "code": "00760",
+              "nameUz": "Kebab pitsa 25cm",
+              "nameRu": "Кебаб пицца 25см",
+              "price": 63000,
+              "image": "https://io.bellissimo.uz/images/879ceb1b-d0fd-4b40-8eb7-ea21e3b5508c.jpg"
+            },
+            {
+              "id": "30614a92-303e-4c7a-a4fc-d6183f71c004",
+              "code": "00761",
+              "nameUz": "Kebab pitsa 30cm",
+              "nameRu": "Кебаб пицца 30см",
+              "price": 83000,
+              "image": "https://io.bellissimo.uz/images/30614a92-303e-4c7a-a4fc-d6183f71c004.jpg"
+            },
+            {
+              "id": "2dd7842f-67e7-49e3-b588-158748ee31b5",
+              "code": "00759",
+              "nameUz": "Kebab pitsa 35cm",
+              "nameRu": "Кебаб пицца 35см",
+              "price": 99000,
+              "image": "https://io.bellissimo.uz/images/2dd7842f-67e7-49e3-b588-158748ee31b5.jpg"
+            }
+          ]
+        },
+        {
+          "id": "32dd0b5b-8fc0-400d-8ad0-cf929a2538ed",
+          "name": {
+            "uz": "Dabl chizburger",
+            "ru": "Дабл чизбургер",
+            "en": "Double Cheeseburger"
+          },
+          "description": {
+            "uz": "Mol go‘shti, qizil piyoz, marinadlangan bodring, pomidor, motsarella, burger sousi",
+            "ru": "Говядина, красный лук, маринованные огурцы, помидоры, бургерный соус, моцарелла",
+            "en": "Beef, red onion, pickles, tomatoes, burger sauce, mozzarella"
+          },
+          "basePrice": 39000,
+          "image": "https://io.bellissimo.uz/images/32dd0b5b-8fc0-400d-8ad0-cf929a2538ed.jpg",
+          "variants": [
+            {
+              "id": "cc6a2233-51f5-45d6-ba85-bbd885e5e442",
+              "code": "1103109",
+              "nameUz": "Dabl chizburger 20cm",
+              "nameRu": "Дабл чизбургер-пицца 20см",
+              "price": 39000,
+              "image": "https://io.bellissimo.uz/images/cc6a2233-51f5-45d6-ba85-bbd885e5e442.jpg"
+            },
+            {
+              "id": "08e54c5c-6078-4777-91fc-6bb66d90c926",
+              "code": "00095",
+              "nameUz": "Dabl chizburger 25cm",
+              "nameRu": "Дабл чизбургер-пицца 25см",
+              "price": 69000,
+              "image": "https://io.bellissimo.uz/images/08e54c5c-6078-4777-91fc-6bb66d90c926.jpg"
+            },
+            {
+              "id": "355c30bb-76c8-4174-87ad-c0ecdb578f8f",
+              "code": "00107",
+              "nameUz": "Dabl chizburger 30cm",
+              "nameRu": "Дабл Чизбургер-пицца 30см",
+              "price": 87000,
+              "image": "https://io.bellissimo.uz/images/355c30bb-76c8-4174-87ad-c0ecdb578f8f.jpg"
+            },
+            {
+              "id": "5d60cd02-bd71-43db-900d-547850f26d05",
+              "code": "00124",
+              "nameUz": "Dabl chizburger 35cm",
+              "nameRu": "Дабл Чизбургер пицца 35см",
+              "price": 104000,
+              "image": "https://io.bellissimo.uz/images/5d60cd02-bd71-43db-900d-547850f26d05.jpg"
+            }
+          ]
+        },
+        {
+          "id": "dd24081f-68dd-46e0-b7a1-6d7ed3e1ac1b",
+          "name": {
+            "uz": "Gavaycha",
+            "ru": "Гавайская",
+            "en": "Hawaiian"
+          },
+          "description": {
+            "uz": "Ashaddiy taomsevarlar uchun! Shirin, sersharbat ananas ishtahaochar kurka go‘shti bilan uyg‘unlikda",
+            "ru": "Для дерзких гурманов! Сладкий, сочный ананас в сочетании с аппетитной индейкой",
+            "en": "Sweet juicy pineapple with tender turkey and mozzarella for bold flavor lovers."
+          },
+          "basePrice": 33000,
+          "image": "https://io.bellissimo.uz/images/dd24081f-68dd-46e0-b7a1-6d7ed3e1ac1b.jpg",
+          "variants": [
+            {
+              "id": "af0c03b5-e6ce-4aa6-b91d-8ce85a9f8865",
+              "code": "1103108",
+              "nameUz": "Gavaycha 20cm",
+              "nameRu": "Гавайская 20см",
+              "price": 33000,
+              "image": "https://io.bellissimo.uz/images/af0c03b5-e6ce-4aa6-b91d-8ce85a9f8865.jpg"
+            },
+            {
+              "id": "04a76d21-d647-4224-8777-7c27df2c9bad",
+              "code": "00098",
+              "nameUz": "Gavaycha 25cm",
+              "nameRu": "Гавайская 25см",
+              "price": 56000,
+              "image": "https://io.bellissimo.uz/images/04a76d21-d647-4224-8777-7c27df2c9bad.jpg"
+            },
+            {
+              "id": "5d102fd9-b028-4624-8fd5-568024291fae",
+              "code": "00110",
+              "nameUz": "Gavaycha 30cm",
+              "nameRu": "Гавайская 30см",
+              "price": 79000,
+              "image": "https://io.bellissimo.uz/images/5d102fd9-b028-4624-8fd5-568024291fae.jpg"
+            },
+            {
+              "id": "e5cf9941-9138-4ac3-9544-6c4ca2a8b448",
+              "code": "00121",
+              "nameUz": "Gavaycha 35cm",
+              "nameRu": "Гавайская 35см",
+              "price": 94000,
+              "image": "https://io.bellissimo.uz/images/e5cf9941-9138-4ac3-9544-6c4ca2a8b448.jpg"
+            }
+          ]
+        },
+        {
+          "id": "b50af92d-1c52-499e-8408-348cede05938",
+          "name": {
+            "uz": "Vegaboom",
+            "ru": "Вегабум",
+            "en": "Vegaboom"
+          },
+          "description": {
+            "uz": "Qo‘ziqorin, zaytun, bulg‘or qalampiri, qizil piyoz, oregano, tomatli sous, motsarella",
+            "ru": "Грибы, фетакса, маслины, болгарский перец, помидоры, красный лук, орегано, томатный соус, моцарелла",
+            "en": "Mushrooms, fetaxa cheese, olives, bell pepper, tomatoes, red onion, oregano, tomato sauce, mozzarella"
+          },
+          "basePrice": 36000,
+          "image": "https://io.bellissimo.uz/images/b50af92d-1c52-499e-8408-348cede05938.jpg",
+          "variants": [
+            {
+              "id": "d77fd219-c0f8-472e-a871-4a7a4363cfed",
+              "code": "1103107",
+              "nameUz": "Vegetariancha 20cm",
+              "nameRu": "Вегетарианская 20см",
+              "price": 36000,
+              "image": "https://io.bellissimo.uz/images/d77fd219-c0f8-472e-a871-4a7a4363cfed.jpg"
+            },
+            {
+              "id": "6e26ef03-14c4-43dc-b13b-13243196626d",
+              "code": "00099",
+              "nameUz": "Vegetariancha 25cm",
+              "nameRu": "Вегетарианская 25см",
+              "price": 63000,
+              "image": "https://io.bellissimo.uz/images/6e26ef03-14c4-43dc-b13b-13243196626d.jpg"
+            },
+            {
+              "id": "ddd604cb-864f-41dd-9d1d-9ddd9e39745c",
+              "code": "00111",
+              "nameUz": "Vegetariancha 30cm",
+              "nameRu": "Вегетарианская 30см",
+              "price": 83000,
+              "image": "https://io.bellissimo.uz/images/ddd604cb-864f-41dd-9d1d-9ddd9e39745c.jpg"
+            },
+            {
+              "id": "93324593-9d11-470f-8954-85c71ea4f804",
+              "code": "00120",
+              "nameUz": "Vegetariancha 35cm",
+              "nameRu": "Вегетарианская 35см",
+              "price": 99000,
+              "image": "https://io.bellissimo.uz/images/93324593-9d11-470f-8954-85c71ea4f804.jpg"
+            }
+          ]
+        },
+        {
+          "id": "5fb58b09-5c77-44de-8de8-f1be55c2aef1",
+          "name": {
+            "uz": "Tovuqli donar",
+            "ru": "Куриный донар",
+            "en": "Chicken Doner"
+          },
+          "description": {
+            "uz": "Tovuqli donar, aysberg, piyoz va pomidorlar, yana burger va ranch souslari",
+            "ru": "Куриный донар, айсберг, лук и помидоры, а также соусы бургер и ранч",
+            "en": "Chicken doner with iceberg lettuce, onion, tomatoes, burger sauce, and ranch sauce."
+          },
+          "basePrice": 39000,
+          "image": "https://io.bellissimo.uz/images/5fb58b09-5c77-44de-8de8-f1be55c2aef1.jpg",
+          "variants": [
+            {
+              "id": "626e4e77-062a-4a5e-89b3-6f3ca70d4ea6",
+              "code": "1103112",
+              "nameUz": "Tovuqli donar 20cm",
+              "nameRu": "Куриный Донар 20см",
+              "price": 39000,
+              "image": "https://io.bellissimo.uz/images/626e4e77-062a-4a5e-89b3-6f3ca70d4ea6.jpg"
+            },
+            {
+              "id": "6f5a89e4-002f-4307-a811-5e27ccc36120",
+              "code": "1018344",
+              "nameUz": "Tovuqli donar 25cm",
+              "nameRu": "Куриный Донар 25см",
+              "price": 69000,
+              "image": "https://io.bellissimo.uz/images/6f5a89e4-002f-4307-a811-5e27ccc36120.jpg"
+            },
+            {
+              "id": "1dff0ac8-89ed-4d0b-922a-472bfefacbf4",
+              "code": "1018345",
+              "nameUz": "Tovuqli donar 30cm",
+              "nameRu": "Куриный Донар 30см",
+              "price": 87000,
+              "image": "https://io.bellissimo.uz/images/1dff0ac8-89ed-4d0b-922a-472bfefacbf4.jpg"
+            },
+            {
+              "id": "f8e7ce95-c656-40dd-90dd-d6d4b4115667",
+              "code": "1018343",
+              "nameUz": "Tovuqli donar 35cm",
+              "nameRu": "Куриный Донар 35см",
+              "price": 104000,
+              "image": "https://io.bellissimo.uz/images/f8e7ce95-c656-40dd-90dd-d6d4b4115667.jpg"
+            }
+          ]
+        },
+        {
+          "id": "30a219fa-4065-4390-9fb7-d71b5d6974e2",
+          "name": {
+            "uz": "50 ga 50",
+            "ru": "50 на 50",
+            "en": "Half & Half"
+          },
+          "description": {
+            "uz": "Tanlash qiyin bo‘lganida — yarim-yarim qilib pitsa (35 cm) yig‘ing!",
+            "ru": "Когда невозможно выбрать — собирайте пиццу (35 см) из половинок!",
+            "en": "When one flavor is not enough, build one 35 cm pizza from two favorite halves."
+          },
+          "basePrice": 109000,
+          "image": "https://io.bellissimo.uz/images/30a219fa-4065-4390-9fb7-d71b5d6974e2.jpg",
+          "variants": [
+            {
+              "id": "35de96c2-17c9-4b91-a608-c04c9c85bb20",
+              "code": "00573",
+              "nameUz": "50 ga 50 pitsa",
+              "nameRu": "50 на 50 Пицца",
+              "price": 109000,
+              "image": "https://io.bellissimo.uz/images/35de96c2-17c9-4b91-a608-c04c9c85bb20.jpg"
+            }
+          ]
+        },
+        {
+          "id": "3d8d6a24-5595-4116-a19a-997ad6b27a60",
+          "name": {
+            "uz": "Konstruktor",
+            "ru": "Конструктор",
+            "en": "Build Your Own"
+          },
+          "description": {
+            "uz": "Eng kreativlar uchun: siz tarkib, xamir va chetki buramalarni tanlaysiz, biz esa uni eng a’lo ko‘rinishga keltiramiz!",
+            "ru": "Для самых креативных: вы выбираете состав, тесто и борт, а мы всё сделаем в лучшем виде!",
+            "en": "Choose the toppings, dough, and crust, and we will make it just right."
+          },
+          "basePrice": 0,
+          "image": "https://io.bellissimo.uz/images/3d8d6a24-5595-4116-a19a-997ad6b27a60.jpg",
+          "variants": [
+            {
+              "id": "9b4d5bd1-9bcb-49fd-a07e-2cd187168b4c",
+              "code": "00632",
+              "nameUz": "Katta",
+              "nameRu": "Большая конструктор",
+              "price": 0,
+              "image": "https://io.bellissimo.uz/images/9b4d5bd1-9bcb-49fd-a07e-2cd187168b4c.jpg"
+            },
+            {
+              "id": "07f2c5f0-6e4b-4da0-b9ef-81c2ec26afaa",
+              "code": "00635",
+              "nameUz": "Ortacha",
+              "nameRu": "Средняя конструктор",
+              "price": 0,
+              "image": "https://io.bellissimo.uz/images/07f2c5f0-6e4b-4da0-b9ef-81c2ec26afaa.jpg"
+            },
+            {
+              "id": "c06ebce3-7575-4f65-bde1-da36aa1e2a8f",
+              "code": "00634",
+              "nameUz": "Kichkina",
+              "nameRu": "Маленькая конструктор",
+              "price": 0,
+              "image": "https://io.bellissimo.uz/images/c06ebce3-7575-4f65-bde1-da36aa1e2a8f.jpg"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8ba69bed-a233-4c0f-97d8-c380dbdb5a8f",
+      "title": {
+        "uz": "Gazaklar",
+        "ru": "Закуски",
+        "en": "Snacks"
+      },
+      "items": [
+        {
+          "id": "e320b58d-0393-42c9-81b4-c0074beb6a21",
+          "code": "1103101",
+          "name": {
+            "uz": "Sezar roll",
+            "ru": "Цезарь ролл",
+            "en": "Caesar Roll"
+          },
+          "description": {
+            "uz": "sershira tovuq stripslari, yangi pomidorlar, aysberg salati va ranch sousi bilan tayyorlangan tortilla. Sovutilgan holda tortiq qilinadi.",
+            "ru": "Холодная закуска: тортилья с сочными куриными стрипсами, свежими помидорами, салатом айсберг и соусом ранч. Подаётся охлаждённой.",
+            "en": "Cold appetizer: tortilla with juicy chicken strips, fresh tomatoes, iceberg lettuce and Ranch sauce. Served chilled."
+          },
+          "price": 25000,
+          "image": "https://io.bellissimo.uz/images/e320b58d-0393-42c9-81b4-c0074beb6a21.jpg"
+        },
+        {
+          "id": "612ab9b5-1cbf-494a-aa65-6bc7f0373444",
+          "code": "1102590",
+          "name": {
+            "uz": "Go‘shtli Chiabatta",
+            "ru": "Мясная Чиабатта",
+            "en": "Meat ciabatta"
+          },
+          "description": {
+            "uz": "Goʻshtsevarlar uchun: pepperoni va kabob goʻshti boʻrsildoq chiabattada. Yana bulgʻor qalampiri, burger sousi va pishloq mujassam.",
+            "ru": "Для любителей мяса: сэндвич с пепперони и мясом кебаб на воздушной чиабатте. А ещё болгарский перец, бургерный соус и сыр",
+            "en": "For meat lovers: a sandwich with pepperoni and kebab meat on airy ciabatta. Plus bell pepper, burger sauce and cheese."
+          },
+          "price": 36000,
+          "image": "https://io.bellissimo.uz/images/612ab9b5-1cbf-494a-aa65-6bc7f0373444.jpg"
+        },
+        {
+          "id": "c2f51f99-49b6-45d3-bded-67a5d21ad4eb",
+          "code": "1102668",
+          "name": {
+            "uz": "Pikant chiabatta 🌶",
+            "ru": "Пикантная чиабатта 🌶",
+            "en": "Spicy ciabatta"
+          },
+          "description": {
+            "uz": "Donar go‘shti, halapenyo, marinadlangan bodring, pishloq, pomidor, motsarella, ranch va barbekyu souslari",
+            "ru": "Мясо донар, халапеньо, маринованные огурцы, сыр, соус ранч, соус барбекю",
+            "en": "Doner meat, jalapeno, pickles, cheese, ranch sauce, BBQ sauce"
+          },
+          "price": 34000,
+          "image": "https://io.bellissimo.uz/images/c2f51f99-49b6-45d3-bded-67a5d21ad4eb.jpg"
+        },
+        {
+          "id": "02b6e2a7-787c-46cb-b5b3-2dfafb6d23e2",
+          "code": "00646",
+          "name": {
+            "uz": "Kartoshka fri 👶",
+            "ru": "Картошка фри 👶",
+            "en": "French fries"
+          },
+          "description": {
+            "uz": "To‘g‘ri pechdan olingan chitir-chitir kartoshka",
+            "ru": "Хрустящая картошка фри прямо из печи",
+            "en": "Crispy fries baked in the oven."
+          },
+          "price": 19000,
+          "image": "https://io.bellissimo.uz/images/02b6e2a7-787c-46cb-b5b3-2dfafb6d23e2.jpg"
+        },
+        {
+          "id": "6a0457e3-5606-4bf1-a8ed-ade0a5dc3485",
+          "code": "00647",
+          "name": {
+            "uz": "Jaydari kartoshka",
+            "ru": "Картошка по-деревенски",
+            "en": "Potato wedges"
+          },
+          "description": {
+            "uz": "Pechdan qizig‘ida olingan qarsildoq jaydari kartoshka",
+            "ru": "Хрустящая картошка по-деревенски из печи",
+            "en": "Crispy potato wedges baked in the oven."
+          },
+          "price": 19000,
+          "image": "https://io.bellissimo.uz/images/6a0457e3-5606-4bf1-a8ed-ade0a5dc3485.jpg"
+        },
+        {
+          "id": "5aabe16c-ace1-40af-9225-8342ce4533ab",
+          "code": "00974",
+          "name": {
+            "uz": "Pepperoni rollar 12 ta",
+            "ru": "Пепперони-роллы 12 шт",
+            "en": "Pepperoni rolls (12 pcs)"
+          },
+          "description": {
+            "uz": "Pepperoni, pishloq va mayin ranch sousi chitir-chitir xamirda",
+            "ru": "Хрустящее тесто с пепперони, сыром и нежным соусом ранч",
+            "en": "Rolls made from pizza dough, filled with pepperoni, cheese, and ranch sauce."
+          },
+          "price": 35000,
+          "image": "https://io.bellissimo.uz/images/5aabe16c-ace1-40af-9225-8342ce4533ab.jpg"
+        },
+        {
+          "id": "dace3fca-88fd-425e-a142-e4bd8ac0ca17",
+          "code": "1102987",
+          "name": {
+            "uz": "Grill bellisster",
+            "ru": "Беллисстер гриль",
+            "en": "Grill bellisster"
+          },
+          "description": {
+            "uz": "Dudli grill sous, kornishon va pomidorli mol go‘shti. Barchasi cho‘ziluvchan pishloq bilan qoplanadi, tortilyaga o‘raladi va pechda yopiladi.",
+            "ru": "Говядина с дымчатым соусом гриль, корнишонами, помидорами. Всё покрывается тягучим сыром, заворачивается в тортилью и запекается.",
+            "en": "Beef with smoky grill sauce, gherkins, tomatoes. It's all covered with stretchy cheese, wrapped in a tortilla and baked."
+          },
+          "price": 32000,
+          "image": "https://io.bellissimo.uz/images/dace3fca-88fd-425e-a142-e4bd8ac0ca17.jpg"
+        },
+        {
+          "id": "383534d2-68d6-43bb-8ca2-45127018845c",
+          "code": "1017871",
+          "name": {
+            "uz": "Tovuqli bellisster",
+            "ru": "Куриный беллисстер",
+            "en": "Chicken bellisster"
+          },
+          "description": {
+            "uz": "Xushxo‘r tovuq go‘shti, pomidorlar, ranch sousi va ko‘p pishloq –– barchasi tandirda yopilgan tortilyaga o‘ralgan",
+            "ru": "Сочная курочка, помидоры, соус ранч и много сыра, всё в тортилье, приготовленной в печи",
+            "en": "Juicy chicken, tomatoes, Ranch sauce and plenty of cheese, all in a tortilla, oven-baked."
+          },
+          "price": 29000,
+          "image": "https://io.bellissimo.uz/images/383534d2-68d6-43bb-8ca2-45127018845c.jpg"
+        },
+        {
+          "id": "5f20fa5f-87a6-4956-9884-6ebcf76531aa",
+          "code": "1017872",
+          "name": {
+            "uz": "Goʻshtli bellisster",
+            "ru": "Мясной беллисстер",
+            "en": "Meat bellisster"
+          },
+          "description": {
+            "uz": "Donar go‘shti pomidor, piyoz va barbekyu sousi bilan. Tortilyaga o‘raladi va pechda yopiladi",
+            "ru": "Мясо донар с помидорами, луком и соусом барбекю. Заварачивается в тортилью и запекается в печи",
+            "en": "Doner meat, tomatoes, onions, barbeque sauce and cheese. Everything is wrapped in a tortilla and baked."
+          },
+          "price": 32000,
+          "image": "https://io.bellissimo.uz/images/5f20fa5f-87a6-4956-9884-6ebcf76531aa.jpg"
+        },
+        {
+          "id": "4aeb4e3d-672d-4697-8be2-566235d329e3",
+          "code": "1018346",
+          "name": {
+            "uz": "Shef’dan bellisster",
+            "ru": "Беллисстер от шефа",
+            "en": "Chef's bellisster"
+          },
+          "description": {
+            "uz": "Tovuqli donar, pomidorlar, aysberg va pishloqli sous. Barchasi tortilyaga o‘ralgan va pechda yopilgan",
+            "ru": "Куриный донар, томаты, айсберг и сырный соус. Всё в тортилье и запечённое в печи",
+            "en": "Chicken doner meat, tomatoes, iceberg salad, cheese sauce and cheese. Everything is wrapped in a tortilla and baked."
+          },
+          "price": 29000,
+          "image": "https://io.bellissimo.uz/images/4aeb4e3d-672d-4697-8be2-566235d329e3.jpg"
+        },
+        {
+          "id": "aa3dfa3c-badd-4d96-99a1-1c6e2f09b42d",
+          "code": "00847",
+          "name": {
+            "uz": "Alfredo pasta",
+            "ru": "Паста альфредо",
+            "en": "Pasta alfredo"
+          },
+          "description": {
+            "uz": "Tovuqli vetchina, shampinyon, motsarella, ranch sousi, oregano",
+            "ru": "Куриная ветчина, шампиньоны, моцарелла",
+            "en": "Chicken ham, mushrooms, mozzarella"
+          },
+          "price": 39000,
+          "image": "https://io.bellissimo.uz/images/aa3dfa3c-badd-4d96-99a1-1c6e2f09b42d.jpg"
+        },
+        {
+          "id": "c9bc5494-548f-4287-905b-93e9689ae436",
+          "code": "1101524",
+          "name": {
+            "uz": "Bayts barbekyu  🌶",
+            "ru": "Байтсы барбекю 🌶",
+            "en": "Barbeque bites"
+          },
+          "description": {
+            "uz": "Tovuq go‘shti, ananas va achchiq halapenyolar motsarella pishlog‘i va barbekyu sousi bilan qoplab pishirilgan taom",
+            "ru": "Запечённое блюдо с курицей, ананасами и жгучими халапеньо под моцареллой и соусом барбекю",
+            "en": "A baked dish with chicken, pineapple, jalapeno, covered in mozarella and barbeque sauce."
+          },
+          "price": 42000,
+          "image": "https://io.bellissimo.uz/images/c9bc5494-548f-4287-905b-93e9689ae436.jpg"
+        },
+        {
+          "id": "d0dcf2c3-749c-49bd-a27f-9359d7eab013",
+          "code": "1101525",
+          "name": {
+            "uz": "Pishloqli baytslar",
+            "ru": "Байтсы сырные",
+            "en": "Cheesy bites"
+          },
+          "description": {
+            "uz": "Tovuqli popperslar, tovuqli vetchina, pomidor, motsarella, pishloqli sous",
+            "ru": "Куриные стрипсы, куриная ветчина, помидоры, моцарелла, сырный соус",
+            "en": "Chicken strips, chicken ham, tomatoes, mozzarella, cheese sauce"
+          },
+          "price": 39000,
+          "image": "https://io.bellissimo.uz/images/d0dcf2c3-749c-49bd-a27f-9359d7eab013.jpg"
+        },
+        {
+          "id": "e83b5a8f-f0c0-4c81-bb1e-9ee88475f9b7",
+          "code": "1101140",
+          "name": {
+            "uz": "Tovuqli stripslar 3 ta",
+            "ru": "Куриные стрипсы 3 шт",
+            "en": "Chicken tenders (3 pcs)"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Crunchy chicken tenders. Barbeque sauce is included!"
+          },
+          "price": 21000,
+          "image": "https://io.bellissimo.uz/images/e83b5a8f-f0c0-4c81-bb1e-9ee88475f9b7.jpg"
+        },
+        {
+          "id": "45458d7f-4661-4107-9bd5-b007f7c28f79",
+          "code": "1101141",
+          "name": {
+            "uz": "Tovuqli stripslar 5 ta",
+            "ru": "Куриные стрипсы 5 шт",
+            "en": "Chicken tenders (5 pcs)"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Crunchy chicken tenders. Barbeque sauce is included!"
+          },
+          "price": 29000,
+          "image": "https://io.bellissimo.uz/images/45458d7f-4661-4107-9bd5-b007f7c28f79.jpg"
+        },
+        {
+          "id": "95332ad5-f444-41ed-8d80-f2f740e94b28",
+          "code": "1101142",
+          "name": {
+            "uz": "Tovuqli stripslar 8 ta",
+            "ru": "Куриные стрипсы 8 шт",
+            "en": "Chicken tenders (8 pcs)"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Crunchy chicken tenders. Barbeque sauce is included!"
+          },
+          "price": 42000,
+          "image": "https://io.bellissimo.uz/images/95332ad5-f444-41ed-8d80-f2f740e94b28.jpg"
+        },
+        {
+          "id": "9e629de6-027e-431c-b3d3-bc2762b8238c",
+          "code": "1017863",
+          "name": {
+            "uz": "Tovuqli popperslar",
+            "ru": "Куриные попперсы",
+            "en": "Chicken poppers"
+          },
+          "description": {
+            "uz": "Chitir-chitir qobiqdagi tovuq lahmi. Barbekyu sousi bilan tortiladi!",
+            "ru": "Хрустящие кусочки куриного филе в панировке. Подаются с соусом барбекю!",
+            "en": "Round, breaded chicken poppers. Barbeque sauce is included!"
+          },
+          "price": 24000,
+          "image": "https://io.bellissimo.uz/images/9e629de6-027e-431c-b3d3-bc2762b8238c.jpg"
+        },
+        {
+          "id": "d43794b0-c30d-489e-949f-726d9bb83d5d",
+          "code": "1101758",
+          "name": {
+            "uz": "Qanotchalar 3 ta",
+            "ru": "Крылышки 3 шт",
+            "en": "Chicken wings (3 pcs)"
+          },
+          "description": {
+            "uz": "Tovuq qanotchalari barbekyu sousi ostida –– shunchalar mazaliki, voh-voh! Ranch sousi bilan lazzatliroq",
+            "ru": "Куриные крылышки в соусе барбекю — пальчики оближите! Вкуснее с соусом ранч",
+            "en": "Chicken wings in barbeque sauce, served with delicious ranch."
+          },
+          "price": 21000,
+          "image": "https://io.bellissimo.uz/images/d43794b0-c30d-489e-949f-726d9bb83d5d.jpg"
+        },
+        {
+          "id": "b1b3f8c5-3d6c-4bab-87b6-0805ac1d23a3",
+          "code": "1101759",
+          "name": {
+            "uz": "Qanotchalar 5 ta",
+            "ru": "Крылышки 5 шт",
+            "en": "Chicken wings (5 pcs)"
+          },
+          "description": {
+            "uz": "Tovuq qanotchalari barbekyu sousi ostida –– shunchalar mazaliki, voh-voh! Ranch sousi bilan lazzatliroq",
+            "ru": "Куриные крылышки в соусе барбекю — пальчики оближите! Вкуснее с соусом ранч",
+            "en": "Chicken wings in barbeque sauce, served with delicious ranch."
+          },
+          "price": 34000,
+          "image": "https://io.bellissimo.uz/images/b1b3f8c5-3d6c-4bab-87b6-0805ac1d23a3.jpg"
+        },
+        {
+          "id": "e0e92f4c-2126-4652-94d6-5d54aba1ba14",
+          "code": "1101760",
+          "name": {
+            "uz": "Qanotchalar 8 ta",
+            "ru": "Крылышки 8 шт",
+            "en": "Chicken wings (8 pcs)"
+          },
+          "description": {
+            "uz": "Tovuq qanotchalari barbekyu sousi ostida –– shunchalar mazaliki, voh-voh! Ranch sousi bilan lazzatliroq",
+            "ru": "Куриные крылышки в соусе барбекю — пальчики оближите! Вкуснее с соусом ранч",
+            "en": "Chicken wings in barbeque sauce, served with delicious ranch."
+          },
+          "price": 50000,
+          "image": "https://io.bellissimo.uz/images/e0e92f4c-2126-4652-94d6-5d54aba1ba14.jpg"
+        }
+      ]
+    },
+    {
+      "id": "2a8e8de6-1e21-451d-ad46-56d2bfdd3db4",
+      "title": {
+        "uz": "Ichimliklar",
+        "ru": "Напитки",
+        "en": "Drinks"
+      },
+      "items": [
+        {
+          "id": "b3c127ef-0a3b-45a9-a8ee-7a5610d2a05e",
+          "code": "10102",
+          "name": {
+            "uz": "Coca-Cola 0.5 L",
+            "ru": "Coca-Cola 0,5 л",
+            "en": "Coca-Cola 0.5 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/b3c127ef-0a3b-45a9-a8ee-7a5610d2a05e.jpg"
+        },
+        {
+          "id": "2f2455a5-c436-42c3-be06-a9d1314326a6",
+          "code": "01011",
+          "name": {
+            "uz": "Coca-Cola Zero 0,5 L",
+            "ru": "Coca-Cola Zero 0,5 л",
+            "en": "Coca-Cola Zero 0.5 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/2f2455a5-c436-42c3-be06-a9d1314326a6.jpg"
+        },
+        {
+          "id": "f956bfaa-a2db-401a-8e9b-2edb2cc6a099",
+          "code": "10103",
+          "name": {
+            "uz": "Coca-Cola 1 L",
+            "ru": "Coca-Cola 1 л",
+            "en": "Coca-Cola 1 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 16000,
+          "image": "https://io.bellissimo.uz/images/f956bfaa-a2db-401a-8e9b-2edb2cc6a099.jpg"
+        },
+        {
+          "id": "83bf6e19-b204-4351-84ce-ab7376b40827",
+          "code": "10104",
+          "name": {
+            "uz": "Coca-Cola 1.5 L",
+            "ru": "Coca-Cola 1,5 л",
+            "en": "Coca-Cola 1.5 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 22000,
+          "image": "https://io.bellissimo.uz/images/83bf6e19-b204-4351-84ce-ab7376b40827.jpg"
+        },
+        {
+          "id": "50ec7051-bfd1-4a3f-9337-90065ad68222",
+          "code": "1103335",
+          "name": {
+            "uz": "Cappy Pulpy Apelsin 0,5L",
+            "ru": "Cappy Pulpy Апельсин 0,5L",
+            "en": "Cappy Pulpy Apelsin 0,5L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 17000,
+          "image": "https://io.bellissimo.uz/images/50ec7051-bfd1-4a3f-9337-90065ad68222.jpg"
+        },
+        {
+          "id": "62b4dcb4-dde4-45a2-a7ca-3a9dc9bc070a",
+          "code": "1103334",
+          "name": {
+            "uz": "Cappy Pulpy Apelsin 1,0L",
+            "ru": "Cappy Pulpy Апельсин 1Л",
+            "en": "Cappy Pulpy PET 1,0L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 28000,
+          "image": "https://io.bellissimo.uz/images/62b4dcb4-dde4-45a2-a7ca-3a9dc9bc070a.jpg"
+        },
+        {
+          "id": "bdfbcaf4-2438-4148-a55c-ac0d304582a7",
+          "code": "1103336",
+          "name": {
+            "uz": "Sprite Moxito 0,5L",
+            "ru": "Sprite Мохито 0,5Л",
+            "en": "Sprite Moxito 0,5L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/bdfbcaf4-2438-4148-a55c-ac0d304582a7.jpg"
+        },
+        {
+          "id": "f4178a50-ded0-4d30-a17f-7032b7973a9b",
+          "code": "1103337",
+          "name": {
+            "uz": "Sprite Moxito 1,0L",
+            "ru": "Sprite Мохито 1,0Л",
+            "en": "Sprite Moxito PET 1,0L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 16000,
+          "image": "https://io.bellissimo.uz/images/f4178a50-ded0-4d30-a17f-7032b7973a9b.jpg"
+        },
+        {
+          "id": "149fb86e-b132-4f67-820e-98bf52cf54ce",
+          "code": "1103338",
+          "name": {
+            "uz": "Fanta (Anor) 0,45 L",
+            "ru": "Fanta (Гранат) 0,45 L",
+            "en": "Fanta Pomegranate (GRANAT) 0.45 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 17000,
+          "image": "https://io.bellissimo.uz/images/149fb86e-b132-4f67-820e-98bf52cf54ce.jpg"
+        },
+        {
+          "id": "68becb55-af08-4690-b56c-4b148a81210f",
+          "code": "10105",
+          "name": {
+            "uz": "Fanta 0.5 L",
+            "ru": "Fanta 0,5 л",
+            "en": "Fanta 0.5 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/68becb55-af08-4690-b56c-4b148a81210f.jpg"
+        },
+        {
+          "id": "e7bd94ce-ad87-4f2e-9076-e9586a355ec5",
+          "code": "10106",
+          "name": {
+            "uz": "Fanta 1 L",
+            "ru": "Fanta 1 л",
+            "en": "Fanta 1 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 16000,
+          "image": "https://io.bellissimo.uz/images/e7bd94ce-ad87-4f2e-9076-e9586a355ec5.jpg"
+        },
+        {
+          "id": "a3ae1e91-cfdb-4178-8053-9f2f193af066",
+          "code": "10107",
+          "name": {
+            "uz": "Fanta 1.5 L",
+            "ru": "Fanta 1,5 л",
+            "en": "Fanta 1.5 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 22000,
+          "image": "https://io.bellissimo.uz/images/a3ae1e91-cfdb-4178-8053-9f2f193af066.jpg"
+        },
+        {
+          "id": "d4cf1df6-32a9-45f6-a677-e88b77f7adce",
+          "code": "10108",
+          "name": {
+            "uz": "Sprite 0.5 L",
+            "ru": "Sprite 0,5 л",
+            "en": "Sprite 0.5 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/d4cf1df6-32a9-45f6-a677-e88b77f7adce.jpg"
+        },
+        {
+          "id": "19bc3e6f-eba0-4904-8bc2-477c380b7d80",
+          "code": "10109",
+          "name": {
+            "uz": "Sprite 1 L",
+            "ru": "Sprite 1 л",
+            "en": "Sprite 1 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 16000,
+          "image": "https://io.bellissimo.uz/images/19bc3e6f-eba0-4904-8bc2-477c380b7d80.jpg"
+        },
+        {
+          "id": "6569e14a-4bf5-4382-96a7-ebe1013ea8b3",
+          "code": "10110",
+          "name": {
+            "uz": "Sprite 1.5 L",
+            "ru": "Sprite 1,5 л",
+            "en": "Sprite 1.5 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 22000,
+          "image": "https://io.bellissimo.uz/images/6569e14a-4bf5-4382-96a7-ebe1013ea8b3.jpg"
+        },
+        {
+          "id": "d5d07d32-45aa-4d51-89b9-f8b1f6bd2f43",
+          "code": "1018516",
+          "name": {
+            "uz": "Fuse Tea Mango va moychechak 0,5 L.",
+            "ru": "Fuse Tea Манго-ромашка 0,5 Л.",
+            "en": "Fuse Tea Mango Chamomile"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/d5d07d32-45aa-4d51-89b9-f8b1f6bd2f43.jpg"
+        },
+        {
+          "id": "4cd93006-a23c-4a5f-bb2d-f96cadc3ee9f",
+          "code": "1101127",
+          "name": {
+            "uz": "Fuse Tea Shaftoli 0,5 L.",
+            "ru": "Fuse Tea Персик 0,5 Л.",
+            "en": "Fuse Tea Peach"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/4cd93006-a23c-4a5f-bb2d-f96cadc3ee9f.jpg"
+        },
+        {
+          "id": "0ac31de0-f650-4a36-a203-87a9cd116ee5",
+          "code": "1103303",
+          "name": {
+            "uz": "Fuse Tea Tarvuz 0,5L",
+            "ru": "Fuse Tea Арбузный 0,5Л",
+            "en": "Fuse Tea Watermelon 0.5 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/0ac31de0-f650-4a36-a203-87a9cd116ee5.jpg"
+        },
+        {
+          "id": "cb0805f7-22de-4d4f-8cb2-1517fd00db40",
+          "code": "1018518",
+          "name": {
+            "uz": "Fuse Tea Limon 0,5 L",
+            "ru": "Fuse Tea Лимон 0,5 Л",
+            "en": ""
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/cb0805f7-22de-4d4f-8cb2-1517fd00db40.jpg"
+        },
+        {
+          "id": "7c62f119-0713-43f0-988e-2d162e035906",
+          "code": "1017912",
+          "name": {
+            "uz": "Quyiladigan Fanta",
+            "ru": "Fanta на разлив",
+            "en": "Fountain Fanta"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 11000,
+          "image": "https://io.bellissimo.uz/images/7c62f119-0713-43f0-988e-2d162e035906.jpg"
+        },
+        {
+          "id": "d0f7954b-2bc3-4e0d-b492-d8e9256d451a",
+          "code": "1017911",
+          "name": {
+            "uz": "Quyiladigan Coca-Cola",
+            "ru": "Coca-Cola на разлив",
+            "en": "Fountain Coca-Cola"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 11000,
+          "image": "https://io.bellissimo.uz/images/d0f7954b-2bc3-4e0d-b492-d8e9256d451a.jpg"
+        },
+        {
+          "id": "8caf0b7d-006e-47cf-ac71-63c0a91475ba",
+          "code": "1017913",
+          "name": {
+            "uz": "Quyiladigan Sprite",
+            "ru": "Sprite на разлив",
+            "en": "Fountain Sprite"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 11000,
+          "image": "https://io.bellissimo.uz/images/8caf0b7d-006e-47cf-ac71-63c0a91475ba.jpg"
+        },
+        {
+          "id": "91ef5f46-8461-4dc3-9039-47e5c08ba675",
+          "code": "00035",
+          "name": {
+            "uz": "Qora choy",
+            "ru": "Черный чай",
+            "en": "Black tea"
+          },
+          "description": {
+            "uz": "Qaynoqqina, tetiklantiruvchi qora choy",
+            "ru": "Горячий, бодрящий чёрный чай",
+            "en": "Hot black tea."
+          },
+          "price": 6000,
+          "image": "https://io.bellissimo.uz/images/91ef5f46-8461-4dc3-9039-47e5c08ba675.jpg"
+        },
+        {
+          "id": "d0d5ba4a-9bea-40d5-99e1-189bf1761089",
+          "code": "01095",
+          "name": {
+            "uz": "Ko‘k choy",
+            "ru": "Зеленый чай",
+            "en": "Green tea"
+          },
+          "description": {
+            "uz": "Qaynoqqina, soflik ulashuvchi ko‘k choy",
+            "ru": "Горячий, освежающий зеленый чай",
+            "en": "Hot green tea."
+          },
+          "price": 6000,
+          "image": "https://io.bellissimo.uz/images/d0d5ba4a-9bea-40d5-99e1-189bf1761089.jpg"
+        },
+        {
+          "id": "b8674ebc-27b8-43c0-9e24-afcdb66daea2",
+          "code": "01092",
+          "name": {
+            "uz": "Amerikano",
+            "ru": "Американо",
+            "en": "Americano"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Italian espresso with hot water."
+          },
+          "price": 15000,
+          "image": "https://io.bellissimo.uz/images/b8674ebc-27b8-43c0-9e24-afcdb66daea2.jpg"
+        },
+        {
+          "id": "f358a55b-d1b1-4378-9253-6afdccadf482",
+          "code": "101385",
+          "name": {
+            "uz": "\"Latte\" qahvasi",
+            "ru": "Кофе Латте",
+            "en": "Latte"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Italian espresso with hot milk."
+          },
+          "price": 18000,
+          "image": "https://io.bellissimo.uz/images/f358a55b-d1b1-4378-9253-6afdccadf482.jpg"
+        },
+        {
+          "id": "59cabb59-c25b-4082-a865-c5a9e90510bb",
+          "code": "01093",
+          "name": {
+            "uz": "Kapuchino",
+            "ru": "Капучино",
+            "en": "Cappuccino"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Italian espresso with hot milk foam."
+          },
+          "price": 18000,
+          "image": "https://io.bellissimo.uz/images/59cabb59-c25b-4082-a865-c5a9e90510bb.jpg"
+        },
+        {
+          "id": "0eb85e3d-0488-42d0-a102-63febf94d8fc",
+          "code": "1018167",
+          "name": {
+            "uz": "Apelsinli sharbat",
+            "ru": "Апельсиновый сок",
+            "en": "Orange juice"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 22000,
+          "image": "https://io.bellissimo.uz/images/0eb85e3d-0488-42d0-a102-63febf94d8fc.jpg"
+        },
+        {
+          "id": "41d9f060-2dc0-49ac-a79c-12ccee820ff9",
+          "code": "1018161",
+          "name": {
+            "uz": "Multimevali sharbat",
+            "ru": "Мультифрукт сок",
+            "en": "Multifruit juice"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 22000,
+          "image": "https://io.bellissimo.uz/images/41d9f060-2dc0-49ac-a79c-12ccee820ff9.jpg"
+        },
+        {
+          "id": "9377493d-0585-4152-a4b4-fb67f5779208",
+          "code": "1018164",
+          "name": {
+            "uz": "Olmali sharbat",
+            "ru": "Яблочный сок",
+            "en": "Apple juice"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 22000,
+          "image": "https://io.bellissimo.uz/images/9377493d-0585-4152-a4b4-fb67f5779208.jpg"
+        },
+        {
+          "id": "fbf79350-764a-46d1-905f-a139599e8923",
+          "code": "1103374",
+          "name": {
+            "uz": "Premium GARDI Apelsin",
+            "ru": "Premium GARDI Апельсин",
+            "en": ""
+          },
+          "description": {
+            "uz": "Apelsin sharbati",
+            "ru": "Апельсиновый сок",
+            "en": ""
+          },
+          "price": 22000,
+          "image": "https://io.bellissimo.uz/images/fbf79350-764a-46d1-905f-a139599e8923.jpg"
+        },
+        {
+          "id": "1049ffdc-3487-421b-8605-306cdf819650",
+          "code": "1018751",
+          "name": {
+            "uz": "Multimeva sharbati (330 ml)",
+            "ru": "Сок мультифрукт 330 мл",
+            "en": "Multifruit Juice 330 ml"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/1049ffdc-3487-421b-8605-306cdf819650.jpg"
+        },
+        {
+          "id": "023d3607-bde6-407c-8e2a-4c3e8c4fc705",
+          "code": "1018748",
+          "name": {
+            "uz": "Olmali sharbat (330 ml)",
+            "ru": "Яблочный сок 330 мл",
+            "en": "Apple Juice 330 ml"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/023d3607-bde6-407c-8e2a-4c3e8c4fc705.jpg"
+        },
+        {
+          "id": "a7901e9e-9ae4-42e6-b8c7-575b02defb14",
+          "code": "1101627",
+          "name": {
+            "uz": "Multimeva sharbati (220 ml)",
+            "ru": "Сок мультифрукт (220 мл)",
+            "en": "Multifruit juice (200 ml)"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 6000,
+          "image": "https://io.bellissimo.uz/images/a7901e9e-9ae4-42e6-b8c7-575b02defb14.jpg"
+        },
+        {
+          "id": "b4dd40ad-ac20-4b60-84a4-85181c5c11d2",
+          "code": "1101626",
+          "name": {
+            "uz": "Olmali sharbat (220 ml)",
+            "ru": "Яблочный сок (220 мл)",
+            "en": "Apple juice (220 ml)"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 6000,
+          "image": "https://io.bellissimo.uz/images/b4dd40ad-ac20-4b60-84a4-85181c5c11d2.jpg"
+        },
+        {
+          "id": "2e6957dd-7e64-4538-99c3-1139e1b3d0b7",
+          "code": "101438",
+          "name": {
+            "uz": "Moxito",
+            "ru": "Мохито",
+            "en": "Mojito"
+          },
+          "description": {
+            "uz": "Limon va yalpiz ta’mli klassik limonad",
+            "ru": "Классический лимонад со вкусом лимона и мяты",
+            "en": "Classic lemon and mint flavored drink."
+          },
+          "price": 17000,
+          "image": "https://io.bellissimo.uz/images/2e6957dd-7e64-4538-99c3-1139e1b3d0b7.jpg"
+        },
+        {
+          "id": "d4eb7152-2d95-4734-8e22-1ebc0fc9cca4",
+          "code": "1101279",
+          "name": {
+            "uz": "Mango-marakuyya",
+            "ru": "Манго-маракуйя",
+            "en": "Mango-passion fruit"
+          },
+          "description": {
+            "uz": "Tropik ta’mga ega salqin ichimlik",
+            "ru": "Прохладительный напиток с тропическим вкусом",
+            "en": "A tropical mango and passion fruit flavored drink."
+          },
+          "price": 17000,
+          "image": "https://io.bellissimo.uz/images/d4eb7152-2d95-4734-8e22-1ebc0fc9cca4.jpg"
+        },
+        {
+          "id": "c15ad22d-f540-47ef-89ca-e02dee5d89e1",
+          "code": "1017514",
+          "name": {
+            "uz": "Suv 0,5 l (gazlanmagan)",
+            "ru": "Вода 0,5 л (негазированная)",
+            "en": "Water 0.5 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 5000,
+          "image": "https://io.bellissimo.uz/images/c15ad22d-f540-47ef-89ca-e02dee5d89e1.jpg"
+        },
+        {
+          "id": "eb1c2377-8c15-4750-acbc-a6afa34c0c32",
+          "code": "1103238",
+          "name": {
+            "uz": "Red Bull Shakarsiz 0.25 L",
+            "ru": "Red Bull Без Сахара 0.25 л",
+            "en": "Red Bull Sugarfree 0.25 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 25000,
+          "image": "https://io.bellissimo.uz/images/eb1c2377-8c15-4750-acbc-a6afa34c0c32.jpg"
+        },
+        {
+          "id": "6cbc92a2-61a7-4066-9a3c-edb5a175e694",
+          "code": "1103237",
+          "name": {
+            "uz": "Red Bull Klassik 0.25 L",
+            "ru": "Red Bull Классический 0.25 л",
+            "en": "Red Bull Original 0.25 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 25000,
+          "image": "https://io.bellissimo.uz/images/6cbc92a2-61a7-4066-9a3c-edb5a175e694.jpg"
+        },
+        {
+          "id": "9408ff33-3a47-45c2-ae2e-4cdede00a9d0",
+          "code": "1103329",
+          "name": {
+            "uz": "Red Bull Shaftoli 0.25 L",
+            "ru": "Red Bull Персик 0.25 Л",
+            "en": "Red Bull Peach 0.25 L"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 25000,
+          "image": "https://io.bellissimo.uz/images/9408ff33-3a47-45c2-ae2e-4cdede00a9d0.jpg"
+        }
+      ]
+    },
+    {
+      "id": "34b23388-aa3d-4a24-9820-892dc731b6eb",
+      "title": {
+        "uz": "Salatlar",
+        "ru": "Салаты",
+        "en": "Salads"
+      },
+      "items": [
+        {
+          "id": "c9683d57-8d30-44fa-ad1e-2e1b53091fb0",
+          "code": "00450",
+          "name": {
+            "uz": "\"Grecheskiy\" salati",
+            "ru": "Салат \"Греческий\"",
+            "en": "Greek salad"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Iceberg lettuce, olives, cherry tomatoes, cucumber, bell pepper, feta cheese, greek salad dressing, oreganoю"
+          },
+          "price": 32000,
+          "image": "https://io.bellissimo.uz/images/c9683d57-8d30-44fa-ad1e-2e1b53091fb0.jpg"
+        },
+        {
+          "id": "fc1cd67e-1b88-4c03-86ed-11f43a784fbe",
+          "code": "00449",
+          "name": {
+            "uz": "“Sezar” salati",
+            "ru": "Салат \"Цезарь\"",
+            "en": "Caesar salad"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Iceberg lettuce, chicken tenders, cheese, croutons, cherry tomatoes, ceasar salad dressing."
+          },
+          "price": 32000,
+          "image": "https://io.bellissimo.uz/images/fc1cd67e-1b88-4c03-86ed-11f43a784fbe.jpg"
+        }
+      ]
+    },
+    {
+      "id": "f5927e50-d95c-454f-bdb8-c1b6e335d066",
+      "title": {
+        "uz": "Desertlar",
+        "ru": "Десерты",
+        "en": "Desserts"
+      },
+      "items": [
+        {
+          "id": "8e827ad6-07c1-4666-9710-2e88e769a5c6",
+          "code": "101076",
+          "name": {
+            "uz": "Sinnamonchalar 4 ta 👶",
+            "ru": "Синнамончики 4 шт 👶",
+            "en": "Cinnamon rolls (4 pieces)"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Cinnamon sugar rolls covered in sweet cream cheese sauce (4 pcs)."
+          },
+          "price": 12000,
+          "image": "https://io.bellissimo.uz/images/8e827ad6-07c1-4666-9710-2e88e769a5c6.jpg"
+        },
+        {
+          "id": "3a9e1b1a-9327-4c6c-959f-a2981565baaa",
+          "code": "00624",
+          "name": {
+            "uz": "Sinnamonchalar 8 ta 👶",
+            "ru": "Синнамончики 8 шт 👶",
+            "en": "Cinnamon rolls (8 pieces)"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Cinnamon sugar rolls covered in sweet cream cheese sauce (8 pcs)."
+          },
+          "price": 15000,
+          "image": "https://io.bellissimo.uz/images/3a9e1b1a-9327-4c6c-959f-a2981565baaa.jpg"
+        },
+        {
+          "id": "02708d12-129a-42d3-b69e-287f19e14751",
+          "code": "00625",
+          "name": {
+            "uz": "Sinnamonchalar 16 ta 👶",
+            "ru": "Синнамончики 16 шт 👶",
+            "en": "Cinnamon rolls (16 pieces)"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": "Cinnamon sugar rolls covered in sweet cream cheese sauce (16 pcs)."
+          },
+          "price": 28000,
+          "image": "https://io.bellissimo.uz/images/02708d12-129a-42d3-b69e-287f19e14751.jpg"
+        },
+        {
+          "id": "bbd16a6f-11d9-4fa6-998a-ace862d3ed87",
+          "code": "1103029",
+          "name": {
+            "uz": "Shokoladli sinnamonchalar 4 ta",
+            "ru": "Шоколадные синнамончики 4 шт",
+            "en": "Chocolate Cinnamon Rolls (4 pcs)"
+          },
+          "description": {
+            "uz": "Afsonaviy sinnamonchalar endi yangi shokoladli sous bilan.",
+            "ru": "Легендарные синнамончики теперь с новым шоколадным соусом.",
+            "en": "Soft cinnamon rolls with a rich chocolate finish."
+          },
+          "price": 16000,
+          "image": "https://io.bellissimo.uz/images/bbd16a6f-11d9-4fa6-998a-ace862d3ed87.jpg"
+        },
+        {
+          "id": "295dbcc9-b347-4dc8-ad58-fd0d551ae25d",
+          "code": "1103030",
+          "name": {
+            "uz": "Shokoladli sinnamonchalar 8 ta",
+            "ru": "Шоколадные синнамончики 8 шт",
+            "en": "Chocolate Cinnamon Rolls (8 pcs)"
+          },
+          "description": {
+            "uz": "Afsonaviy sinnamonchalar endi yangi shokoladli sous bilan.",
+            "ru": "Легендарные синнамончики теперь с новым шоколадным соусом.",
+            "en": "Soft cinnamon rolls with a rich chocolate finish."
+          },
+          "price": 20000,
+          "image": "https://io.bellissimo.uz/images/295dbcc9-b347-4dc8-ad58-fd0d551ae25d.jpg"
+        },
+        {
+          "id": "ed6e6ea5-d8df-4f49-98cf-fccff4c7f87f",
+          "code": "1103031",
+          "name": {
+            "uz": "Shokoladli sinnamonchalar 16 ta",
+            "ru": "Шоколадные синнамончики 16 шт",
+            "en": "Chocolate Cinnamon Rolls (16 pcs)"
+          },
+          "description": {
+            "uz": "Afsonaviy sinnamonchalar endi yangi shokoladli sous bilan.",
+            "ru": "Легендарные синнамончики теперь с новым шоколадным соусом.",
+            "en": "Soft cinnamon rolls with a rich chocolate finish."
+          },
+          "price": 40000,
+          "image": "https://io.bellissimo.uz/images/ed6e6ea5-d8df-4f49-98cf-fccff4c7f87f.jpg"
+        },
+        {
+          "id": "b643ceb5-6a4e-4101-a3dc-91c5327c588a",
+          "code": "101126",
+          "name": {
+            "uz": "Shokoladli fondan",
+            "ru": "Шоколадный фондан",
+            "en": "Chocolate Fondant"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 23000,
+          "image": "https://io.bellissimo.uz/images/b643ceb5-6a4e-4101-a3dc-91c5327c588a.jpg"
+        },
+        {
+          "id": "0f273e76-ee34-42e5-b565-500186dc2f5b",
+          "code": "1017936",
+          "name": {
+            "uz": "Shokoladli chizkeyk",
+            "ru": "Шоколадный чизкейк",
+            "en": "Chocolate cheesecake"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 25000,
+          "image": "https://io.bellissimo.uz/images/0f273e76-ee34-42e5-b565-500186dc2f5b.jpg"
+        },
+        {
+          "id": "697b7e86-f11a-4090-89f1-45cadba7f1e0",
+          "code": "1017935",
+          "name": {
+            "uz": "Klassik chizkeyk",
+            "ru": "Классический чизкейк",
+            "en": "Classic cheesecake"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 25000,
+          "image": "https://io.bellissimo.uz/images/697b7e86-f11a-4090-89f1-45cadba7f1e0.jpg"
+        },
+        {
+          "id": "537f8bae-5692-4d7b-89d8-4981a3601ca1",
+          "code": "1102990",
+          "name": {
+            "uz": "Rezavorli donat",
+            "ru": "Ягодный донат",
+            "en": "Wild Berry Donut"
+          },
+          "description": {
+            "uz": "O‘rmon mevalaridan to‘ldirmali, mevali sirt bilan qoplangan donat.",
+            "ru": "Донат с начинкой из лесных ягод, покрытая фруктовой глазурью.",
+            "en": "Soft donut with a juicy wild berry center."
+          },
+          "price": 18000,
+          "image": "https://io.bellissimo.uz/images/537f8bae-5692-4d7b-89d8-4981a3601ca1.jpg"
+        },
+        {
+          "id": "70630c04-44c1-4919-8fb6-4e2dfc99c8a0",
+          "code": "1102991",
+          "name": {
+            "uz": "Findiqli donat",
+            "ru": "Фундучный донат",
+            "en": "Hazelnut Donut"
+          },
+          "description": {
+            "uz": "Yong‘oqli to‘ldirmali va findiq, yeryong‘oq sepilgan shokolad sirtli donat.",
+            "ru": "Донат с ореховой начинкой и шоколадной глазурью, посыпанный фундуком и арахисом.",
+            "en": "Soft donut with a rich hazelnut center."
+          },
+          "price": 18000,
+          "image": "https://io.bellissimo.uz/images/70630c04-44c1-4919-8fb6-4e2dfc99c8a0.jpg"
+        },
+        {
+          "id": "1f0b38f2-b2d4-4c44-8ef9-04ceaa48a585",
+          "code": "1103072",
+          "name": {
+            "uz": "Qulupnayli donat",
+            "ru": "Клубничный донат",
+            "en": "Strawberry Donut"
+          },
+          "description": {
+            "uz": "Qulupnay toʻldirmali va mevali glazur bilan.",
+            "ru": "Донат с клубничной начинкой и фруктовой глазурью.",
+            "en": "Soft donut with a bright strawberry center."
+          },
+          "price": 18000,
+          "image": "https://io.bellissimo.uz/images/1f0b38f2-b2d4-4c44-8ef9-04ceaa48a585.jpg"
+        }
+      ]
+    },
+    {
+      "id": "0e86aeb7-d000-4253-82b4-7982bd39bd59",
+      "title": {
+        "uz": "Souslar",
+        "ru": "Соусы",
+        "en": "Sauces"
+      },
+      "items": [
+        {
+          "id": "b33f0b64-fa93-4f15-8c94-21ceb4ce722b",
+          "code": "00128",
+          "name": {
+            "uz": "Maxsus sous",
+            "ru": "Фирменный соус",
+            "en": "Signature Sauce"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 5000,
+          "image": "https://io.bellissimo.uz/images/b33f0b64-fa93-4f15-8c94-21ceb4ce722b.jpg"
+        },
+        {
+          "id": "c2a176cd-4434-4afd-a4d4-9ea83ce5dd03",
+          "code": "00131",
+          "name": {
+            "uz": "Chili sous",
+            "ru": "Чили соус",
+            "en": "Chili Sauce"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 5000,
+          "image": "https://io.bellissimo.uz/images/c2a176cd-4434-4afd-a4d4-9ea83ce5dd03.jpg"
+        },
+        {
+          "id": "1c50817b-2ed5-41a4-8192-12aa169a734b",
+          "code": "10046",
+          "name": {
+            "uz": "Pishloqli sous",
+            "ru": "Сырный соус",
+            "en": "Cheese Sauce"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 5000,
+          "image": "https://io.bellissimo.uz/images/1c50817b-2ed5-41a4-8192-12aa169a734b.jpg"
+        },
+        {
+          "id": "fa3e85c6-813f-41d2-902e-56d9225e6608",
+          "code": "00437",
+          "name": {
+            "uz": "Barbekyu sous",
+            "ru": "Барбекю соус",
+            "en": "BBQ Sauce"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 5000,
+          "image": "https://io.bellissimo.uz/images/fa3e85c6-813f-41d2-902e-56d9225e6608.jpg"
+        },
+        {
+          "id": "306a44d7-ca18-4f68-a7c0-e15f9773226a",
+          "code": "101804",
+          "name": {
+            "uz": "Ketchup sous",
+            "ru": "Кетчуп соус",
+            "en": "Ketchup"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 5000,
+          "image": "https://io.bellissimo.uz/images/306a44d7-ca18-4f68-a7c0-e15f9773226a.jpg"
+        },
+        {
+          "id": "d51efc77-2eab-46de-ab72-e8f635a71d8c",
+          "code": "00436",
+          "name": {
+            "uz": "Sarimsoq sous",
+            "ru": "Чесночный соус",
+            "en": "Garlic Sauce"
+          },
+          "description": {
+            "uz": "",
+            "ru": "",
+            "en": ""
+          },
+          "price": 5000,
+          "image": "https://io.bellissimo.uz/images/d51efc77-2eab-46de-ab72-e8f635a71d8c.jpg"
+        }
+      ]
+    }
+  ]
+}

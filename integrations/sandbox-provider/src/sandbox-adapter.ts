@@ -52,28 +52,54 @@ export class SandboxProviderAdapter extends BaseProviderAdapter {
     ]);
   }
 
+  private getOfferings(): Offering[] {
+    const meta = this.config.metadata as Record<string, any> | undefined;
+    if (Array.isArray(meta?.offerings) && meta.offerings.length > 0) {
+      return meta.offerings;
+    }
+    return SANDBOX_OFFERINGS;
+  }
+
+  private getCategories() {
+    const meta = this.config.metadata as Record<string, any> | undefined;
+    if (Array.isArray(meta?.categories) && meta.categories.length > 0) {
+      return meta.categories;
+    }
+    return SANDBOX_CATEGORIES;
+  }
+
+  private getLocationsList(): Location[] {
+    const meta = this.config.metadata as Record<string, any> | undefined;
+    if (Array.isArray(meta?.locations) && meta.locations.length > 0) {
+      return meta.locations;
+    }
+    return SANDBOX_LOCATIONS;
+  }
+
   // 1. Metadata Capability
   async getProviderInfo(): Promise<ProviderInfo> {
+    const meta = (this.config.metadata as Record<string, any>) || {};
     return {
-      id: 'provider_sandbox',
+      id: meta.id || `provider_${this.providerSlug}`,
       slug: this.providerSlug,
-      name: 'Sandbox Capability Provider',
-      description: 'Domain-neutral fictional reference provider implementing all 11 capabilities.',
-      logoUrl: 'https://zayuno.uz/assets/sandbox-logo.png',
-      status: ProviderStatus.ACTIVE,
-      type: ProviderType.SERVICES,
-      category: 'general_services',
-      geography: ['UZ', 'Tashkent'],
+      name: meta.name || (this.providerSlug === 'sandbox-provider' ? 'Sandbox Capability Provider' : this.providerSlug),
+      description: meta.description || 'Domain-neutral fictional reference provider implementing all 11 capabilities.',
+      logoUrl: meta.logoUrl || 'https://zayuno.uz/assets/sandbox-logo.png',
+      status: (meta.status as ProviderStatus) || ProviderStatus.ACTIVE,
+      type: (meta.type as ProviderType) || ProviderType.SERVICES,
+      category: meta.category || 'general_services',
+      geography: meta.geography || ['UZ', 'Tashkent'],
       adapterType: 'sandbox',
       authMethod: 'API_KEY' as any,
       capabilities: this.getCapabilities(),
       baseUrl: this.config.baseUrl,
-      supportContact: '+998900000000',
+      supportContact: meta.supportContact?.phone || '+998900000000',
       isCertified: true,
       isPublished: true,
       metadata: {
         environment: 'SANDBOX',
-        tier: 'STANDARD'
+        tier: 'STANDARD',
+        ...meta
       }
     };
   }
@@ -90,19 +116,20 @@ export class SandboxProviderAdapter extends BaseProviderAdapter {
 
   // 3. Locations Capability
   async getLocations(_input?: GetLocationsInput): Promise<Location[]> {
-    return SANDBOX_LOCATIONS;
+    return this.getLocationsList();
   }
 
   // 4. Catalog Capability
   async getCatalog(input: GetCatalogInput): Promise<Catalog> {
-    let offerings = SANDBOX_OFFERINGS;
+    const allOfferings = this.getOfferings();
+    let offerings = allOfferings;
     if (input.categorySlug) {
       offerings = offerings.filter(o => o.categorySlug === input.categorySlug);
     }
     return {
       providerSlug: this.providerSlug,
       locationId: input.locationId,
-      categories: SANDBOX_CATEGORIES,
+      categories: this.getCategories(),
       offerings,
       version: '1.0.0',
       updatedAt: new Date().toISOString()
@@ -110,7 +137,8 @@ export class SandboxProviderAdapter extends BaseProviderAdapter {
   }
 
   async getOffering(input: GetOfferingInput): Promise<Offering> {
-    const found = SANDBOX_OFFERINGS.find(o => o.id === input.offeringId || o.offeringCode === input.offeringId);
+    const offerings = this.getOfferings();
+    const found = offerings.find(o => o.id === input.offeringId || o.offeringCode === input.offeringId);
     if (!found) {
       throw new Error(`Offering "${input.offeringId}" not found in sandbox catalog.`);
     }
@@ -120,7 +148,8 @@ export class SandboxProviderAdapter extends BaseProviderAdapter {
   // 5. Search Capability
   async searchOfferings(input: SearchCatalogInput): Promise<Offering[]> {
     const q = input.query.toLowerCase();
-    return SANDBOX_OFFERINGS.filter(o =>
+    const offerings = this.getOfferings();
+    return offerings.filter(o =>
       o.title.toLowerCase().includes(q) ||
       (o.description && o.description.toLowerCase().includes(q)) ||
       (o.tags && o.tags.some((t: string) => t.toLowerCase().includes(q)))
@@ -131,15 +160,34 @@ export class SandboxProviderAdapter extends BaseProviderAdapter {
   async requestQuote(input: RequestQuoteInput): Promise<NormalizedQuote> {
     let subtotal = 0;
     const lines: QuoteLine[] = [];
+    const offerings = this.getOfferings();
 
     for (const item of input.items) {
-      const offering = SANDBOX_OFFERINGS.find(o => o.id === item.offeringId || o.offeringCode === item.offeringId);
-      const unitPrice = offering ? offering.basePrice : 50000;
+      const offering = offerings.find(o => o.id === item.offeringId || o.offeringCode === item.offeringId);
+      let unitPrice = offering ? offering.basePrice : 50000;
+      if (item.variantId && offering && offering.variants) {
+        const variant = offering.variants.find((v: any) => v.id === item.variantId);
+        if (variant && typeof variant.basePrice === 'number') {
+          unitPrice = variant.basePrice;
+        }
+      }
       const title = offering ? offering.title : 'Standard Sandbox Offering';
 
       let optionsTotal = 0;
       if (item.selectedOptions && item.selectedOptions.length > 0) {
-        optionsTotal = item.selectedOptions.reduce((acc: number, opt: any) => acc + (opt.quantity || 1) * 15000, 0);
+        optionsTotal = item.selectedOptions.reduce((acc: number, opt: any) => {
+          let delta = typeof opt.priceDelta === 'number' ? opt.priceDelta : 0;
+          if (!delta && offering && offering.optionGroups) {
+            for (const og of offering.optionGroups) {
+              const found = (og.options || []).find((o: any) => o.id === opt.optionId || o.id === opt.id);
+              if (found) {
+                delta = found.priceDelta || 0;
+                break;
+              }
+            }
+          }
+          return acc + (opt.quantity || 1) * delta;
+        }, 0);
       }
 
       const lineTotal = (unitPrice * item.quantity) + optionsTotal;
@@ -193,14 +241,33 @@ export class SandboxProviderAdapter extends BaseProviderAdapter {
     let subtotal = 0;
     const lines: QuoteLine[] = [];
 
+    const offerings = this.getOfferings();
     for (const item of input.items) {
-      const offering = SANDBOX_OFFERINGS.find(o => o.id === item.offeringId || o.offeringCode === item.offeringId);
-      const unitPrice = offering ? offering.basePrice : 50000;
+      const offering = offerings.find(o => o.id === item.offeringId || o.offeringCode === item.offeringId);
+      let unitPrice = offering ? offering.basePrice : 50000;
+      if (item.variantId && offering && offering.variants) {
+        const variant = offering.variants.find((v: any) => v.id === item.variantId);
+        if (variant && typeof variant.basePrice === 'number') {
+          unitPrice = variant.basePrice;
+        }
+      }
       const title = offering ? offering.title : 'Standard Sandbox Offering';
 
       let optionsTotal = 0;
       if (item.selectedOptions && item.selectedOptions.length > 0) {
-        optionsTotal = item.selectedOptions.reduce((acc: number, opt: any) => acc + (opt.quantity || 1) * 15000, 0);
+        optionsTotal = item.selectedOptions.reduce((acc: number, opt: any) => {
+          let delta = typeof opt.priceDelta === 'number' ? opt.priceDelta : 0;
+          if (!delta && offering && offering.optionGroups) {
+            for (const og of offering.optionGroups) {
+              const found = (og.options || []).find((o: any) => o.id === opt.optionId || o.id === opt.id);
+              if (found) {
+                delta = found.priceDelta || 0;
+                break;
+              }
+            }
+          }
+          return acc + (opt.quantity || 1) * delta;
+        }, 0);
       }
 
       const lineTotal = (unitPrice * item.quantity) + optionsTotal;
