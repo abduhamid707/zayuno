@@ -270,14 +270,15 @@ STRICT RULES:
             model: modelName,
             systemInstruction,
             generationConfig: {
-              maxOutputTokens: 1400,
+              maxOutputTokens: 2500,
             },
           } as any),
           jsonClient: gemini.getGenerativeModel({
             model: modelName,
             generationConfig: {
               responseMimeType: "application/json",
-              maxOutputTokens: 700,
+              maxOutputTokens: 2500,
+              thinkingConfig: { thinkingBudget: 0 },
             },
           } as any),
         }
@@ -362,9 +363,9 @@ STRICT RULES:
       return { content, interaction: prepared.interaction };
     } catch (error) {
       this.logger.error("Gemini streaming response failed", error);
-      throw new ServiceUnavailableException(
-        "Zayuno hozir javob bera olmadi. Birozdan so‘ng qayta urinib ko‘ring.",
-      );
+      const fallback = this.fallbackAnswer(prepared);
+      onDelta(fallback);
+      return { content: fallback, interaction: prepared.interaction };
     }
   }
 
@@ -387,16 +388,25 @@ STRICT RULES:
 Masalan: **“150 ming so‘mgacha 2 kishilik ovqat top”**, **“achchiq bo‘lmagan lavash kerak”** yoki **“pitsa va ichimlik buyurtma qilmoqchiman”** deb yozing.`;
     }
 
-    // 2. Simple greetings (only at the beginning of conversation)
+    // 2. Greetings at any point
     if (
-      history.length === 0 &&
-      /^(salom|assalomu\s*alaykum|assalom\s*aleykum|qalesan|qalaysiz|salom\s*zayuno)[\s!.]*$/i.test(
+      /^(salom|assalomu\s*alaykum|assalom\s*aleykum|qalesan|qalaysiz|salom\s*zayuno|privet|hello|hi|hey)[\s!.]*$/i.test(
         raw,
       )
     ) {
-      return `Assalomu alaykum! Zayuno bilan sevimli restoraningizdan ovqat buyurtma qilish oson.
+      return `Assalomu alaykum! Zayunoga xush kelibsiz. Sevimli restoraningizdan ovqat buyurtma qilishingiz mumkin.
 
-Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing — menyu va narxlarni darhol ko‘rsataman.`;
+Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomingizni yozing 👇`;
+    }
+
+    // 3. Restaurant / Fast-food listing questions or requests
+    const norm = this.normalizeLookupText(prompt);
+    if (
+      /^(r[ae]st[ao]r[a-z]*|fast\s*food[a-z]*|kafe[a-z]*|brend[a-z]*)(\s+.*)?$/i.test(norm) ||
+      /(r[ae]st[ao]r[a-z]*|fast\s*food|fastfood|kafe|pitsa|pizza|lavash|burger|sushi|donar|menyu|katalog)/i.test(norm) &&
+      /(ko['‘’`]?rsat|chiqar|bor|bormi|qanday|qaysi|qayerda|ro['‘’`]?yxat|mavjud|buyurtma|zakaz|tanlash|och)/i.test(norm)
+    ) {
+      return `Quyidagi mashhur restoran va fast-food tarmoqlaridan buyurtma berishingiz mumkin. Menyu va narxlarni ko‘rish uchun birortasini tanlang 👇`;
     }
 
     return undefined;
@@ -477,11 +487,77 @@ Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing — menyu va narx
         interaction: this.buildProviderInteraction(providers),
       };
     }
-    const plan = await this.planWithAi(prompt, history, providers);
-    if (!plan) {
-      throw new ServiceUnavailableException(
-        "Zayuno hozir javob bera olmadi. Birozdan so‘ng qayta urinib ko‘ring.",
+    // Direct provider selection (e.g. user clicked brand card or typed brand name)
+    const directProvider = this.findDirectProvider(prompt, providers);
+    if (directProvider) {
+      const plan: LiveContextPlan = {
+        intent: "food_browse",
+        needsCatalog: true,
+        providerScope: "explicit",
+        providerSlugs: [directProvider.slug],
+        query: "",
+        quantity: 1,
+        itemRequests: [],
+        limit: 30,
+        page: 1,
+        allowCatalogFallback: true,
+        excludedOfferingIds: [],
+      };
+      const liveContext = await this.loadLiveContext(plan, providers);
+      return {
+        prompt,
+        history,
+        plan,
+        liveContext,
+        directAnswer: `${directProvider.name} menyusidan tanlang 👇`,
+        interaction: this.buildCatalogInteraction(plan, liveContext),
+      };
+    }
+
+    const aiPlan = await this.planWithAi(prompt, history, providers);
+    let plan: LiveContextPlan;
+    if (aiPlan) {
+      plan = aiPlan;
+    } else {
+      this.logger.warn(
+        `AI planner returned null, activating resilient fallback for: "${prompt}"`,
       );
+      const mentionedSlugs = this.findMentionedProviderSlugs(
+        prompt,
+        providers,
+        history,
+      );
+      if (mentionedSlugs.length > 0) {
+        plan = {
+          intent: "food_browse",
+          needsCatalog: true,
+          providerScope: "explicit",
+          providerSlugs: mentionedSlugs,
+          query: prompt,
+          quantity: 1,
+          itemRequests: [],
+          limit: 30,
+          page: 1,
+          allowCatalogFallback: true,
+          excludedOfferingIds: [],
+        };
+      } else {
+        plan = {
+          intent: "provider_listing",
+          needsCatalog: false,
+          providerScope: "food",
+          providerSlugs: providers.map((p) => p.slug),
+          query: prompt,
+          quantity: 1,
+          itemRequests: [],
+          limit: 10,
+          page: 1,
+          allowCatalogFallback: true,
+          excludedOfferingIds: [],
+          directAnswer:
+            "Qaysi restoran yoki fast-fooddan buyurtma bermoqchisiz? Quyidagi ro‘yxatdan tanlang yoki xohlagan taomingiz nomini yozing 👇",
+        };
+      }
     }
     const explicitlyMentionedProviders = this.findMentionedProviderSlugs(
       prompt,
@@ -559,9 +635,16 @@ Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing — menyu va narx
     const groundedAnswer = this.buildGroundedCatalogAnswer(plan, liveContext);
 
     if (!groundedAnswer && !this.model) {
-      throw new ServiceUnavailableException(
-        "Zayuno AI hozir sozlanmagan. Keyinroq qayta urinib ko‘ring.",
-      );
+      return {
+        prompt,
+        history,
+        plan,
+        liveContext,
+        directAnswer: "Quyidagi restoran va taomlardan birini tanlashingiz mumkin 👇",
+        interaction:
+          this.buildCatalogInteraction(plan, liveContext) ||
+          this.buildProviderInteraction(providers),
+      };
     }
 
     return {
@@ -575,27 +658,13 @@ Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing — menyu va narx
   }
 
   private async enforceFoodScope(
-    input: ChatRequest,
-    prompt: string,
-    history: ConversationMessage[],
-    providers: any[],
+    _input: ChatRequest,
+    _prompt: string,
+    _history: ConversationMessage[],
+    _providers: any[],
   ): Promise<string | undefined> {
-    if (this.isFoodScopePrompt(prompt, history, providers, input.selections)) {
-      await this.resetOffTopicAttempts(input.userId, input.conversationId);
-      return undefined;
-    }
-
-    const attempts = await this.incrementOffTopicAttempts(
-      input.userId,
-      input.conversationId,
-    );
-    if (attempts >= 4) {
-      return "Bu chat faqat restoran, menyu va ovqat buyurtmasi uchun ishlaydi.";
-    }
-    if (attempts === 1) {
-      return "Hozir Zayuno faqat restoran va fast-food buyurtmalariga yordam beradi. Taom, restoran yoki budjetingizni yozing.";
-    }
-    return "Bu savol food buyurtmasiga tegishli emas. Restoran, taom, ichimlik, yetkazib berish yoki buyurtma holati haqida so‘rashingiz mumkin.";
+    // Cheklovlar to‘liq olib tashlandi: foydalanuvchi xohlagancha yozishi mumkin, suhbat aslo bloklanmaydi
+    return undefined;
   }
 
   private isFoodScopePrompt(
@@ -895,7 +964,9 @@ Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing — menyu va narx
       kind: "catalog_menu",
       providerSlug: firstContext?.slug || "evos",
       providerName: this.cleanMarkdownText(firstContext?.name || "Restoran"),
-      providerLogoUrl: this.safeInteractionImage(firstContext?.logoUrl),
+      providerLogoUrl: this.safeInteractionImage(
+        firstContext?.logoUrl || firstContext?.metadata?.logoUrl,
+      ),
       locationName: "Toshkent",
       categories: categoriesRibbon,
       sections: Array.from(sectionsMap.values()).map((s) => ({
@@ -1448,9 +1519,7 @@ Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing — menyu va narx
         : undefined;
     const turn = await this.interpretPendingTurn(prompt, state, requirement);
     if (!turn) {
-      throw new ServiceUnavailableException(
-        "Xabaringizni tushunishda uzilish bo‘ldi. Iltimos, yana bir marta yozing.",
-      );
+      return "Kechirasiz, javobingizni aniq tushunmadim. Iltimos, yana bir bor yozing yoki kerakli variantni tanlang.";
     }
 
     if (turn.intent === "cancel") {
@@ -2237,8 +2306,14 @@ USER=${JSON.stringify(prompt)}`;
           ),
       );
       this.assertCompleteGeminiResponse(result.response);
-      const parsed = this.extractJson(result.response.text());
-      if (!parsed) throw new Error("semantic planner returned no JSON");
+      const rawText = result.response.text();
+      const parsed = this.extractJson(rawText);
+      if (!parsed) {
+        this.logger.warn(
+          `Semantic planner raw response was not JSON: ${rawText}`,
+        );
+        throw new Error("semantic planner returned no JSON");
+      }
       const allowedIntents: ChatIntent[] = [
         "greeting",
         "capabilities",
@@ -2784,6 +2859,20 @@ USER=${JSON.stringify(prompt)}`;
       .toLowerCase();
   }
 
+  private findDirectProvider(prompt: string, providers: any[]): any | null {
+    const raw = this.normalizeLookupText(prompt);
+    if (!raw || raw.length > 80) return null;
+    for (const p of providers) {
+      const slug = this.normalizeLookupText(p.slug);
+      const name = this.normalizeLookupText(p.name);
+      if (raw === slug || raw === name) return p;
+      if (raw.startsWith(slug) || raw.startsWith(name)) return p;
+      const parts = name.split(" ").filter((part: string) => part.length >= 4);
+      if (parts.some((part: string) => raw === part)) return p;
+    }
+    return null;
+  }
+
   private findMentionedProviderSlugs(
     prompt: string,
     providers: any[],
@@ -2816,10 +2905,11 @@ USER=${JSON.stringify(prompt)}`;
       { regex: /\b(notarius|apostil|ishonchnoma|tarjima\s*markazi|notarius\s*express)\b/i, slug: "notarius-express" },
       { regex: /\b(klining|tozalash|uborka|cleanpro)\b/i, slug: "cleanpro" },
       { regex: /\b(sport\s*zali|trenajyor|fitnes|fitness|basseyn|abonement)\b/i, slug: "fitness-hub" },
-      { regex: /\b(lavash|shaurma|oqtepa)\b/i, slug: "oqtepa-lavash" },
-      { regex: /\b(burger|chizburger|maxway)\b/i, slug: "maxway" },
-      { regex: /\b(pitsa|pizza|chopar)\b/i, slug: "chopar-pizza" },
-      { regex: /\b(tovuq|qarsildoq|strips|qanot|feedup)\b/i, slug: "feedup" },
+      { regex: /\b(lavash|shaurma|donar|evos)\b/i, slug: "evos" },
+      { regex: /\b(burger|chizburger|maxway|strips)\b/i, slug: "maxway" },
+      { regex: /\b(pitsa|pizza|bellissimo)\b/i, slug: ["bellissimo", "chopar"] },
+      { regex: /\b(chopar)\b/i, slug: "chopar" },
+      { regex: /\b(sushi|roll|yaponamama)\b/i, slug: "yaponamama" },
       { regex: /\b(qahva|kofe|cappuccino|latte|americano|coffee\s*time)\b/i, slug: "coffee-time" },
     ];
 
@@ -3076,6 +3166,20 @@ USER=${JSON.stringify(prompt)}`;
     }
   }
 
+  private fallbackAnswer(input: {
+    plan?: LiveContextPlan;
+    liveContext?: unknown[];
+  }): string {
+    if (input.plan?.needsCatalog && Array.isArray(input.liveContext) && input.liveContext.length > 0) {
+      const first = input.liveContext[0] as any;
+      return `${first?.name || "Restoran"} menyusi quyida keltirilgan. Taomlarni tanlashingiz mumkin 👇`;
+    }
+    if (input.plan?.intent === "provider_listing") {
+      return "Quyidagi mashhur restoran va fast-foodlardan birini tanlashingiz mumkin 👇";
+    }
+    return "Sizga sevimli taomingizni topish va buyurtma qilishda yordam berishga tayyorman. Masalan, pitsa, burger, lavash yoki sushi deb yozishingiz mumkin.";
+  }
+
   private async writeAnswer(input: {
     prompt: string;
     history: ConversationMessage[];
@@ -3099,9 +3203,7 @@ USER=${JSON.stringify(prompt)}`;
       return content;
     } catch (error) {
       this.logger.error("Gemini response generation failed", error);
-      throw new ServiceUnavailableException(
-        "Zayuno hozir javob bera olmadi. Birozdan so‘ng qayta urinib ko‘ring.",
-      );
+      return this.fallbackAnswer(input);
     }
   }
 
