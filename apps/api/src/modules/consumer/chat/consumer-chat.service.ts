@@ -287,7 +287,7 @@ STRICT RULES:
 
   async processMessage(input: ChatRequest): Promise<ChatExecutionResult> {
     const prepared = await this.prepareChat(input);
-    if (prepared.directAnswer) {
+    if (prepared.directAnswer !== undefined) {
       return { content: prepared.directAnswer, interaction: prepared.interaction };
     }
     const content = await this.writeAnswer(prepared);
@@ -326,8 +326,10 @@ STRICT RULES:
   ): Promise<ChatExecutionResult> {
     const prepared = await this.prepareChat(input);
     if (prepared.interaction) onInteraction?.(prepared.interaction);
-    if (prepared.directAnswer) {
-      onDelta(prepared.directAnswer);
+    if (prepared.directAnswer !== undefined) {
+      if (prepared.directAnswer) {
+        onDelta(prepared.directAnswer);
+      }
       return { content: prepared.directAnswer, interaction: prepared.interaction };
     }
     const instruction = this.buildInstruction(prepared);
@@ -500,22 +502,6 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       };
     }
 
-    const scopeAnswer = await this.enforceFoodScope(
-      input,
-      prompt,
-      history,
-      providers,
-    );
-    if (scopeAnswer) {
-      return {
-        prompt,
-        history,
-        plan: this.emptyPlan("general"),
-        liveContext: [],
-        directAnswer: scopeAnswer,
-      };
-    }
-
     const aiPlan = await this.planWithAi(prompt, history, providers);
     let plan: LiveContextPlan;
     if (aiPlan) {
@@ -584,6 +570,18 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         };
       }
     }
+
+    if (plan.intent === "general") {
+      const scopeAnswer = await this.enforceFoodScope(input);
+      return {
+        prompt,
+        history,
+        plan,
+        liveContext: [],
+        directAnswer: scopeAnswer,
+      };
+    }
+
     const explicitlyMentionedProviders = this.findMentionedProviderSlugs(
       prompt,
       providers,
@@ -682,54 +680,21 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     };
   }
 
-  private async enforceFoodScope(
-    input: ChatRequest,
-    prompt: string,
-    history: ConversationMessage[],
-    providers: any[],
-  ): Promise<string | undefined> {
-    if (this.isFoodScopePrompt(prompt, history, providers, input.selections)) {
-      await this.resetOffTopicAttempts(input.userId, input.conversationId);
-      return undefined;
-    }
-
+  private async enforceFoodScope(input: ChatRequest): Promise<string> {
     const attempts = await this.incrementOffTopicAttempts(
       input.userId,
       input.conversationId,
     );
-    if (attempts >= 4) {
+    if (attempts > 3) {
+      return "";
+    }
+    if (attempts === 3) {
       return "Bu chat faqat restoran, menyu va ovqat buyurtmasi uchun ishlaydi.";
     }
-    if (attempts === 1) {
-      return "Hozir Zayuno faqat restoran va fast-food buyurtmalariga yordam beradi. Taom, restoran yoki budjetingizni yozing.";
+    if (attempts === 2) {
+      return "Bu savol food buyurtmasiga tegishli emas. Restoran, taom, ichimlik, yetkazib berish yoki buyurtma holati haqida so‘rashingiz mumkin.";
     }
-    return "Bu savol food buyurtmasiga tegishli emas. Restoran, taom, ichimlik, yetkazib berish yoki buyurtma holati haqida so‘rashingiz mumkin.";
-  }
-
-  private isExplicitOffTopicPrompt(prompt: string): boolean {
-    const raw = this.normalizeLookupText(prompt);
-    if (!raw) return false;
-    return /\b(kod|dastur|programma|python|javascript|typescript|c\+\+|java|html|css|sql|php|react|nodejs|bug|algoritm|funksiya|repo|git|commit|ob\s*havo|weather|prognoz|insho|referat|she['‘’`]?r|hikoya|maqola|matematika|tarix|fizika|kimyo|biologiya|geografiya|astronomiya|siyosat|prezident|parlament|urush|dollar\s*kursi|valyuta\s*kursi|yangilik|news)/i.test(
-      raw,
-    );
-  }
-
-  private isFoodScopePrompt(
-    prompt: string,
-    history: ConversationMessage[],
-    providers: any[],
-    selections?: ChatSelection[],
-  ): boolean {
-    const raw = this.normalizeLookupText(prompt);
-    if (!raw) return false;
-
-    // 1. Explicit off-topic questions (coding, essays, weather, politics, math, etc.)
-    if (this.isExplicitOffTopicPrompt(prompt)) {
-      return false;
-    }
-
-    // 2. Everything else inside the food ordering chat is valid in-scope conversation
-    return true;
+    return "Hozir Zayuno faqat restoran va fast-food buyurtmalariga yordam beradi. Taom, restoran yoki budjetingizni yozing.";
   }
 
   private async incrementOffTopicAttempts(
@@ -2312,7 +2277,8 @@ Rules:
 - Budget, spice level, dietary preference, category and delivery speed belong in query.
 - A greeting uses greeting. A question about what Zayuno can do uses capabilities and must not request catalog data.
 - For greeting, capabilities and food_clarification write one short natural Uzbek answer. For catalog intents answer must be empty.
-- general is only a safety fallback and must briefly redirect to food ordering without answering an unrelated question.
+- If the user's message is unrelated to food ordering, restaurants, menus, dishes, drinks, or delivery (for example: programming, coding, math, science, politics, weather, news, essays, or general chitchat), set intent to "general".
+- general is an off-topic classification and must not request catalog data.
 
 PROVIDERS=${JSON.stringify(directory)}
 HISTORY=${JSON.stringify(recentHistory)}
@@ -2396,7 +2362,7 @@ USER=${JSON.stringify(prompt)}`;
         directAnswer:
           !needsCatalog && typeof parsed.answer === "string"
             ? (parsed.intent === "general"
-                ? "Hozir Zayuno faqat restoran va ovqat buyurtmalariga yordam beradi."
+                ? undefined
                 : parsed.answer.trim().slice(0, 1200))
             : undefined,
       };

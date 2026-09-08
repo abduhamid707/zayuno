@@ -388,8 +388,23 @@ async function main() {
     "an empty demo provider must not label real provider results as demo",
   );
 
-  // Re-mock planWithAi for capabilities and provider listing tests
+  // Re-mock planWithAi for capabilities, provider listing, and off-topic tests
   (dynamicFoodChat as any).planWithAi = async (prompt: string) => {
+    if (/python|ob-havo|matematika|yangilik/i.test(prompt)) {
+      return {
+        intent: "general" as const,
+        needsCatalog: false,
+        providerScope: "food" as const,
+        providerSlugs: [],
+        query: prompt,
+        limit: 6,
+        page: 0,
+        quantity: 1,
+        itemRequests: [],
+        allowCatalogFallback: false,
+        excludedOfferingIds: [],
+      };
+    }
     if (/yordam|qila olasan|nima qil/i.test(prompt)) {
       return {
         intent: "capabilities" as const,
@@ -465,12 +480,16 @@ async function main() {
     conversationId: "scope-chat",
   });
   assert.match(offTopic2.directAnswer, /food buyurtmasiga tegishli emas/i);
-  await (dynamicFoodChat as any).prepareChat({
+  const offTopic3 = await (dynamicFoodChat as any).prepareChat({
     prompt: "Menga matematika o‘rgat",
     messages: [],
     userId: "scope-user",
     conversationId: "scope-chat",
   });
+  assert.equal(
+    offTopic3.directAnswer,
+    "Bu chat faqat restoran, menyu va ovqat buyurtmasi uchun ishlaydi.",
+  );
   const offTopic4 = await (dynamicFoodChat as any).prepareChat({
     prompt: "Yangiliklarni ayt",
     messages: [],
@@ -479,7 +498,7 @@ async function main() {
   });
   assert.equal(
     offTopic4.directAnswer,
-    "Bu chat faqat restoran, menyu va ovqat buyurtmasi uchun ishlaydi.",
+    "",
   );
 
   const orderStore = new Map<string, string>();
