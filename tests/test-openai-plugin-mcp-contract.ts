@@ -366,7 +366,7 @@ async function main() {
     res.writeHead(200, { 'Content-Type': 'application/json' });
 
     if (url.includes('/welcome')) {
-      res.end(JSON.stringify({ customerMessage: 'Zayuno sizga uzoqni yaqin qiladi. Nima qilishni xohlaysiz?\n\nMen qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman. Bir qancha yo‘nalishlarda yordam bera olaman.', availableServiceCount: 1, dynamicServiceMessage: 'Bir qancha yo‘nalishlarda yordam bera olaman.', ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ customerMessage: 'Assalomu alaykum! Zayuno bilan sevimli restoraningizdan ovqat buyurtma qilish oson.\n\nHamkor restoranlar menyusidan sizga mos taomni topib beraman.', availableServiceCount: 1, dynamicServiceMessage: 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.', ...dirtySecretsInjection }));
     } else if (url.includes('/providers/search') || url.includes('/providers/find') || url.includes('/find')) {
       res.end(JSON.stringify({ providers: [{ slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', status: 'ACTIVE', isCertified: true, isPublished: true, ...dirtySecretsInjection }], total: 1, ...dirtySecretsInjection }));
     } else if (url.includes('/capabilities')) {
@@ -589,9 +589,9 @@ async function main() {
       if (url.includes('/welcome')) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          customerMessage: 'Zayuno sizga uzoqni yaqin qiladi. Nima qilishni xohlaysiz?\n\nMen qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman.',
+          customerMessage: 'Assalomu alaykum! Zayuno bilan sevimli restoraningizdan ovqat buyurtma qilish oson.\n\nHamkor restoranlar menyusidan sizga mos taomni topib beraman.',
           availableServiceCount: 1,
-          dynamicServiceMessage: 'Bir qancha yo‘nalishlarda yordam bera olaman.'
+          dynamicServiceMessage: 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.'
         }));
         return;
       }
@@ -774,7 +774,7 @@ async function main() {
   try {
     // 1. Welcome
     const welcome = await callCtMcp('get_welcome_message', {});
-    assert.ok(welcome.customerMessage.includes('Zayuno sizga uzoqni yaqin qiladi'));
+    assert.ok(welcome.customerMessage.includes('sevimli restoraningizdan ovqat buyurtma qilish oson'));
 
     // 2. Discover Coffee Time
     const discovery = await callCtMcp('find_providers', { category: 'food_delivery' });

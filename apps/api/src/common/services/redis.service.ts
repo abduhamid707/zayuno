@@ -86,6 +86,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return Boolean(this.client && this.client.status === 'ready');
   }
 
+  async health(): Promise<{ status: 'up' | 'down'; latencyMs: number | null }> {
+    if (!this.isReady()) return { status: 'down', latencyMs: null };
+    const startedAt = performance.now();
+    try {
+      const reply = await this.client.ping();
+      return {
+        status: reply === 'PONG' ? 'up' : 'down',
+        latencyMs: Math.max(0, Math.round((performance.now() - startedAt) * 10) / 10),
+      };
+    } catch (err: any) {
+      this.logger.warn(`Redis health check failed: ${err.message}`);
+      return { status: 'down', latencyMs: null };
+    }
+  }
+
   /**
    * Atomically increment a key and optionally set expiration if new.
    */

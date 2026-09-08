@@ -18,42 +18,42 @@ import { ZAYUNO_MCP_PROMPTS } from '../apps/mcp/src/server.ts';
 async function main() {
   console.log('🧪 Running Customer Experience & Presenter Tests...');
 
-  // 1. 7 ta faol offering -> "Bir qancha yo‘nalishlarda..."
+  // 1. 7 ta faol offering -> food-first copy
   {
     const msg7 = getDynamicServiceMessage(7);
-    assert.equal(msg7, 'Bir qancha yo‘nalishlarda yordam bera olaman.');
+    assert.equal(msg7, 'O‘nlab taomlar orasidan sizga mosini topib beraman.');
     const welcome7 = getWelcomeMessage(7);
-    assert.match(welcome7, /Zayuno sizga uzoqni yaqin qiladi/);
-    assert.match(welcome7, /Bir qancha yo‘nalishlarda yordam bera olaman\./);
+    assert.match(welcome7, /sevimli restoraningizdan ovqat buyurtma qilish oson/);
+    assert.match(welcome7, /O‘nlab taomlar orasidan sizga mosini topib beraman\./);
   }
 
-  // 2. 45 ta -> "O‘nlab..."
+  // 2. 45 ta -> 100 gacha food inventory copy
   {
     const msg45 = getDynamicServiceMessage(45);
-    assert.equal(msg45, 'O‘nlab xizmatlar orasidan sizga mosini topib beraman.');
+    assert.equal(msg45, '100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin.');
     const welcome45 = getWelcomeMessage(45);
-    assert.match(welcome45, /O‘nlab xizmatlar orasidan sizga mosini topib beraman\./);
+    assert.match(welcome45, /100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin\./);
   }
 
-  // 3. 154 ta -> "100 dan oshiq..."
+  // 3. 154 ta -> food inventory copy
   {
     const msg154 = getDynamicServiceMessage(154);
-    assert.equal(msg154, '100 dan oshiq xizmat orasidan sizga mosini topib beraman.');
+    assert.equal(msg154, '100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin.');
   }
 
-  // 4. 742 ta -> "700 dan oshiq..." (and 350, 1500, 6000 buckets)
+  // 4. Katta kataloglar -> overclaim qilmaydigan food copy
   {
     const msg742 = getDynamicServiceMessage(742);
-    assert.equal(msg742, '700 dan oshiq xizmat orasidan sizga mosini topib beraman.');
+    assert.equal(msg742, 'Yuzlab taom va ichimlik orasidan didingizga mosini topib beraman.');
 
     const msg350 = getDynamicServiceMessage(350);
-    assert.equal(msg350, '300 dan oshiq xizmat orasidan sizga mosini topib beraman.');
+    assert.equal(msg350, 'Yuzlab taom va ichimlik orasidan didingizga mosini topib beraman.');
 
     const msg1500 = getDynamicServiceMessage(1500);
-    assert.equal(msg1500, 'Minglab xizmatlar orasidan sizga mosini topib beraman.');
+    assert.equal(msg1500, 'Yuzlab taom va ichimlik orasidan didingizga mosini topib beraman.');
 
     const msg6000 = getDynamicServiceMessage(6000);
-    assert.equal(msg6000, 'Minglab xizmat va takliflar orasidan sizga mosini topib beraman.');
+    assert.equal(msg6000, 'Yuzlab taom va ichimlik orasidan didingizga mosini topib beraman.');
   }
 
   // 5. sandbox/demo offeringlar countga kirmaydi
@@ -124,15 +124,16 @@ async function main() {
 
     const totalAvailable = computeAvailableServiceCount(providers);
     assert.equal(totalAvailable, 37, 'Only real published offerings (25 + 12 = 37) should be counted.');
-    assert.equal(getDynamicServiceMessage(totalAvailable), 'O‘nlab xizmatlar orasidan sizga mosini topib beraman.');
+    assert.equal(getDynamicServiceMessage(totalAvailable), '100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin.');
   }
 
   // 6. stale/unknown count raqamsiz matn beradi
   {
-    assert.equal(getDynamicServiceMessage(null), 'Bir qancha yo‘nalishlarda yordam bera olaman.');
-    assert.equal(getDynamicServiceMessage(undefined), 'Bir qancha yo‘nalishlarda yordam bera olaman.');
-    assert.equal(getDynamicServiceMessage(0), 'Bir qancha yo‘nalishlarda yordam bera olaman.');
-    assert.equal(getDynamicServiceMessage(154, true), 'Bir qancha yo‘nalishlarda yordam bera olaman.'); // isStale = true
+    const fallback = 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.';
+    assert.equal(getDynamicServiceMessage(null), fallback);
+    assert.equal(getDynamicServiceMessage(undefined), fallback);
+    assert.equal(getDynamicServiceMessage(0), fallback);
+    assert.equal(getDynamicServiceMessage(154, true), fallback); // isStale = true
   }
 
   // 7. quote customer copy
@@ -410,7 +411,7 @@ async function main() {
 
     const physicalCount = computeAvailableServiceCount([physicalProviderNoLoc]);
     assert.equal(physicalCount, 0, 'Physical delivery provider without active locations must NOT be counted.');
-    assert.equal(getDynamicServiceMessage(physicalCount), 'Bir qancha yo‘nalishlarda yordam bera olaman.');
+    assert.equal(getDynamicServiceMessage(physicalCount), 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.');
   }
 
   // 17. get_welcome_message MCP tool handler returns customerMessage and matches dynamic API welcomeMessage
@@ -433,7 +434,7 @@ async function main() {
     assert.ok(result.customerMessage, 'customerMessage must be present in get_welcome_message response.');
     assert.equal(result.customerMessage, mockDynamicInfo.welcomeMessage, 'customerMessage must equal dynamic API welcomeMessage.');
     assert.equal(result.availableServiceCount, 154);
-    assert.equal(result.dynamicServiceMessage, '100 dan oshiq xizmat orasidan sizga mosini topib beraman.');
+    assert.equal(result.dynamicServiceMessage, '100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin.');
   }
 
   // 18. get_welcome_message API error fallback
@@ -449,10 +450,10 @@ async function main() {
 
     const fallbackResult = await welcomeTool.handler({}, failingClient);
     assert.ok(fallbackResult.customerMessage, 'customerMessage must be present on API error.');
-    assert.match(fallbackResult.customerMessage, /Bir qancha yo‘nalishlarda yordam bera olaman\./);
+    assert.match(fallbackResult.customerMessage, /Hamkor restoranlar menyusidan sizga mos taomni topib beraman\./);
     assert.doesNotMatch(fallbackResult.customerMessage, /O‘nlab/);
     assert.equal(fallbackResult.availableServiceCount, null);
-    assert.equal(fallbackResult.dynamicServiceMessage, 'Bir qancha yo‘nalishlarda yordam bera olaman.');
+    assert.equal(fallbackResult.dynamicServiceMessage, 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.');
   }
 
   // 19. Hardcoded "O‘nlab" is not used in static instructions

@@ -45,23 +45,23 @@ import {
 
 const suggestions = [
   {
-    label: "Bugun nima ovqat buyurtma qilsam bo‘ladi?",
+    label: "Restoranlarni ko‘rsat",
     icon: "restaurant-outline" as const,
     color: "#FF9D45",
   },
   {
-    label: "Ertaga soat 10:00 da shifokor qabuliga yozil",
-    icon: "calendar-outline" as const,
+    label: "Lavash va burgerlarni ko‘rsat",
+    icon: "fast-food-outline" as const,
     color: "#46D37B",
   },
   {
-    label: "Toshkentdan Samarqandga chipta top",
-    icon: "ticket-outline" as const,
+    label: "Pitsalarni ko‘rsat",
+    icon: "pizza-outline" as const,
     color: "#B05CFF",
   },
   {
-    label: "Yaqin atrofdagi dorixonalarni ko‘rsat",
-    icon: "location-outline" as const,
+    label: "Sushi va rollarni ko‘rsat",
+    icon: "fish-outline" as const,
     color: "#5590FF",
   },
 ];
@@ -419,9 +419,10 @@ export default function HomeScreen() {
     <View style={styles.emptyState}>
       <View style={styles.hero}>
         <Ionicons name="sparkles" size={38} color="#7668F6" />
-        <Text style={styles.greeting}>Assalomu alaykum!</Text>
+        <Text style={styles.heroEyebrow}>AI FOOD ASSISTANT</Text>
+        <Text style={styles.greeting}>Bugun nima yegingiz kelyapti?</Text>
         <Text style={styles.subtitle}>
-          Zayuno sizga qanday yordam berishi mumkin?
+          Sevimli restoraningizni tanlang yoki xohlagan taomingizni yozing.
         </Text>
       </View>
 
@@ -827,6 +828,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     textAlign: "center",
+  },
+  heroEyebrow: {
+    color: "#9186FF",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "800",
+    letterSpacing: 1.5,
   },
   suggestionList: { gap: 9, paddingBottom: 8 },
   suggestion: {

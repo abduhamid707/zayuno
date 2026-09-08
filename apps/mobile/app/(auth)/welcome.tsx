@@ -256,7 +256,7 @@ export default function WelcomeScreen() {
         <View style={styles.bottomBlock}>
           <Text style={styles.welcomeTitle}>Xush kelibsiz!</Text>
           <Text style={styles.welcomeCopy}>
-            Zayuno sizga kerakli xizmatlarni topishda{`\n`}yordam beradi.
+            Sevimli restoranlaringizdan taomni toping,{`\n`}tanlang va bir necha soniyada buyurtma bering.
           </Text>
 
           {clientReady ? (

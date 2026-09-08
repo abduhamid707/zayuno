@@ -17,28 +17,12 @@ export interface CustomerQuoteFormatOptions {
  */
 export function getDynamicServiceMessage(count?: number | null, isStale?: boolean): string {
   if (count === null || count === undefined || isStale || isNaN(count) || count <= 0) {
-    return 'Bir qancha yo‘nalishlarda yordam bera olaman.';
+    return 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.';
   }
 
-  if (count <= 9) {
-    return 'Bir qancha yo‘nalishlarda yordam bera olaman.';
-  }
-  if (count <= 99) {
-    return 'O‘nlab xizmatlar orasidan sizga mosini topib beraman.';
-  }
-  if (count <= 299) {
-    return '100 dan oshiq xizmat orasidan sizga mosini topib beraman.';
-  }
-  if (count <= 699) {
-    return '300 dan oshiq xizmat orasidan sizga mosini topib beraman.';
-  }
-  if (count <= 999) {
-    return '700 dan oshiq xizmat orasidan sizga mosini topib beraman.';
-  }
-  if (count <= 4999) {
-    return 'Minglab xizmatlar orasidan sizga mosini topib beraman.';
-  }
-  return 'Minglab xizmat va takliflar orasidan sizga mosini topib beraman.';
+  if (count <= 24) return 'O‘nlab taomlar orasidan sizga mosini topib beraman.';
+  if (count <= 199) return '100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin.';
+  return 'Yuzlab taom va ichimlik orasidan didingizga mosini topib beraman.';
 }
 
 /**
@@ -46,7 +30,7 @@ export function getDynamicServiceMessage(count?: number | null, isStale?: boolea
  */
 export function getWelcomeMessage(serviceCount?: number | null, isStale?: boolean): string {
   const dynamicMessage = getDynamicServiceMessage(serviceCount, isStale);
-  return `Zayuno sizga uzoqni yaqin qiladi. Nima qilishni xohlaysiz?\n\nMen qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman. ${dynamicMessage}`;
+  return `Assalomu alaykum! Zayuno bilan sevimli restoraningizdan ovqat buyurtma qilish oson.\n\n${dynamicMessage} Menyu, narx, yetkazib berish va buyurtma holatini bir chatda boshqaramiz. Bugun nima yegingiz kelyapti?`;
 }
 
 /**
@@ -395,31 +379,31 @@ export function formatCustomerAvailability(result: any, providerInfo?: any): str
  */
 export function formatCustomerProviders(providers: any[]): string {
   if (!Array.isArray(providers) || providers.length === 0) {
-    return 'Kechirasiz, so‘rovingiz bo‘yicha xizmatlar topilmadi.';
+    return 'Hozircha mos restoran yoki fast-food topilmadi.';
   }
   const names = providers.map(p => p.name || p.slug).filter(Boolean);
   if (names.length === 1) {
-    return `"${names[0]}" xizmati topildi. Menyu yoki takliflarni ko‘rishni xohlaysizmi?`;
+    return `"${names[0]}" topildi. Menyusini ko‘rishni xohlaysizmi?`;
   }
-  return `Topilgan xizmatlar: ${names.slice(0, 5).join(', ')}. Qaysi birining menyusini ko‘rishni xohlaysiz?`;
+  return `Mavjud restoranlar: ${names.slice(0, 5).join(', ')}. Qaysi birining menyusini ochamiz?`;
 }
 
 /**
  * Formats single provider metadata for customer.
  */
 export function formatCustomerProvider(provider: any): string {
-  if (!provider) return 'Xizmat ma’lumoti topilmadi.';
-  const name = provider.name || provider.slug || 'Xizmat';
+  if (!provider) return 'Restoran ma’lumoti topilmadi.';
+  const name = provider.name || provider.slug || 'Restoran';
   const desc = provider.description ? ` (${provider.description})` : '';
-  return `"${name}"${desc}. Menyu va takliflarni ko‘rishni xohlaysizmi?`;
+  return `"${name}"${desc}. Menyusini ko‘rishni xohlaysizmi?`;
 }
 
 /**
  * Formats provider capability summary for customer.
  */
 export function formatCustomerCapabilities(capabilities: string[], providerName?: string): string {
-  const name = providerName ? `"${providerName}"` : 'Ushbu xizmat';
-  return `${name} orqali buyurtma berish va xizmatlardan foydalanish mumkin.`;
+  const name = providerName ? `"${providerName}"` : 'Ushbu restoran';
+  return `${name} menyusini ko‘rish, narxni hisoblash va ovqat buyurtma qilish mumkin.`;
 }
 
 /**
@@ -483,5 +467,5 @@ export function formatCustomerError(error?: unknown): string {
  * Formats general conversational response when user asks about capabilities.
  */
 export function formatCustomerGeneralHelp(): string {
-  return 'Men qahva va ovqat buyurtma qilish, xizmatlar narxini hisoblash va buyurtmalarni kuzatishda yordam bera olaman. Nimadan boshlaymiz?';
+  return 'Men restoran tanlash, menyudan taom topish, aniq narxni hisoblash, buyurtma berish va holatini kuzatishda yordam beraman. Bugun nima yegingiz kelyapti?';
 }

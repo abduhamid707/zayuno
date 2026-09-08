@@ -441,7 +441,7 @@ async function main() {
     userId: "test-user",
   });
   assert.match(capabilities.directAnswer, /Zayuno/);
-  assert.match(capabilities.directAnswer, /MaxWay/);
+  assert.match(capabilities.directAnswer, /restoran/i);
 
   const providerListing = await (dynamicFoodChat as any).prepareChat({
     prompt: "senda qanday providerlar bor aniqlashtirchi",
@@ -450,6 +450,37 @@ async function main() {
   });
   assert.equal(providerListing.plan.intent, "provider_listing");
   assert.match(providerListing.directAnswer, /MaxiFood Express/);
+
+  const offTopic1 = await (dynamicFoodChat as any).prepareChat({
+    prompt: "Python kod yozib ber",
+    messages: [],
+    userId: "scope-user",
+    conversationId: "scope-chat",
+  });
+  assert.match(offTopic1.directAnswer, /faqat restoran va fast-food/i);
+  const offTopic2 = await (dynamicFoodChat as any).prepareChat({
+    prompt: "Bugungi ob-havoni ayt",
+    messages: [],
+    userId: "scope-user",
+    conversationId: "scope-chat",
+  });
+  assert.match(offTopic2.directAnswer, /food buyurtmasiga tegishli emas/i);
+  await (dynamicFoodChat as any).prepareChat({
+    prompt: "Menga matematika o‘rgat",
+    messages: [],
+    userId: "scope-user",
+    conversationId: "scope-chat",
+  });
+  const offTopic4 = await (dynamicFoodChat as any).prepareChat({
+    prompt: "Yangiliklarni ayt",
+    messages: [],
+    userId: "scope-user",
+    conversationId: "scope-chat",
+  });
+  assert.equal(
+    offTopic4.directAnswer,
+    "Bu chat faqat restoran, menyu va ovqat buyurtmasi uchun ishlaydi.",
+  );
 
   const orderStore = new Map<string, string>();
   const orderRedis = {

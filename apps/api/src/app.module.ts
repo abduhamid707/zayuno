@@ -13,8 +13,6 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { PublicPagesModule } from './modules/public-pages/public-pages.module';
-import { RedisService } from './common/services/redis.service';
-import { NatsService } from './common/services/nats.service';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
@@ -41,8 +39,6 @@ import { ConsumerModule } from './modules/consumer/consumer.module';
     DeveloperSandboxModule,
   ],
   providers: [
-    RedisService,
-    NatsService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     {
       provide: APP_FILTER,
@@ -53,6 +49,5 @@ import { ConsumerModule } from './modules/consumer/consumer.module';
       useClass: LoggingInterceptor,
     },
   ],
-  exports: [RedisService, NatsService],
 })
 export class AppModule {}

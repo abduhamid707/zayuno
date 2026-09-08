@@ -4,14 +4,23 @@ import { Response, Request } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getOpenAiAppsChallengeToken } from '@zayuno/shared';
+import { RedisService } from '../../common/services/redis.service';
 
 @Controller()
 export class PublicPagesController {
+  constructor(private readonly redisService: RedisService) {}
+
   // 1. Health check: /health
   @Get('health')
   @ApiExcludeEndpoint()
-  health() {
-    return { status: 'ok', service: 'zayuno-api', timestamp: new Date().toISOString() };
+  async health() {
+    const redis = await this.redisService.health();
+    return {
+      status: redis.status === 'up' ? 'ok' : 'degraded',
+      service: 'zayuno-api',
+      timestamp: new Date().toISOString(),
+      dependencies: { redis },
+    };
   }
 
   // 2. Static Asset Serving: /assets/:filename
