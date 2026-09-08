@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from "./config";
 import { useAuthStore } from "../store/authStore";
+import { ChatInteraction, InteractionChoice } from "./interaction";
 
 export class ApiError extends Error {
   constructor(
@@ -56,7 +57,13 @@ export async function apiFetch<T>(
 type StreamEvent =
   | { type: "delta"; content: string }
   | { type: "done" }
+  | { type: "ui"; interaction: ChatInteraction }
   | { type: "error"; message: string };
+
+export type StreamChatResult = {
+  content: string;
+  interaction?: ChatInteraction;
+};
 
 function abortError() {
   const error = new Error("So‘rov bekor qilindi.");
@@ -69,8 +76,10 @@ function executeChatStream(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   conversationId: string,
   onDelta: (content: string) => void,
+  onInteraction: (interaction: ChatInteraction) => void,
+  selections: InteractionChoice[],
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<StreamChatResult> {
   const baseUrl = getApiBaseUrl();
   if (!baseUrl) {
     return Promise.reject(new ApiError(0, "Server manzili sozlanmagan."));
@@ -81,6 +90,7 @@ function executeChatStream(
     let cursor = 0;
     let buffer = "";
     let content = "";
+    let interaction: ChatInteraction | undefined;
     let streamError: ApiError | null = null;
     let didComplete = false;
 
@@ -103,6 +113,9 @@ function executeChatStream(
           if (event.type === "delta" && event.content) {
             content += event.content;
             onDelta(event.content);
+          } else if (event.type === "ui" && event.interaction) {
+            interaction = event.interaction;
+            onInteraction(event.interaction);
           } else if (event.type === "done") {
             didComplete = true;
           } else if (event.type === "error") {
@@ -143,7 +156,7 @@ function executeChatStream(
           ),
         );
       }
-      resolve(content.trim());
+      resolve({ content: content.trim(), interaction });
     };
     xhr.onerror = () => {
       signal?.removeEventListener("abort", handleAbort);
@@ -153,7 +166,20 @@ function executeChatStream(
       signal?.removeEventListener("abort", handleAbort);
       reject(abortError());
     };
-    xhr.send(JSON.stringify({ prompt, messages, conversationId }));
+    xhr.send(
+      JSON.stringify({
+        prompt,
+        messages,
+        conversationId,
+        selections: selections.map(({ id, kind, title, providerSlug, offeringId }) => ({
+          id,
+          kind,
+          title,
+          providerSlug,
+          offeringId,
+        })),
+      }),
+    );
   });
 }
 
@@ -162,14 +188,18 @@ export async function streamChat(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
   conversationId: string,
   onDelta: (content: string) => void,
+  onInteraction: (interaction: ChatInteraction) => void,
+  selections: InteractionChoice[] = [],
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<StreamChatResult> {
   try {
     return await executeChatStream(
       prompt,
       messages,
       conversationId,
       onDelta,
+      onInteraction,
+      selections,
       signal,
     );
   } catch (error) {
@@ -185,6 +215,8 @@ export async function streamChat(
           messages,
           conversationId,
           onDelta,
+          onInteraction,
+          selections,
           signal,
         );
       }

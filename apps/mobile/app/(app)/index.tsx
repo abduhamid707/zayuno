@@ -33,6 +33,15 @@ import {
 import { apiFetch, streamChat } from "../../src/lib/api";
 import { theme } from "../../src/theme";
 import { ChatMarkdown } from "../../src/components/ChatMarkdown";
+import {
+  InteractionCards,
+  SelectionTray,
+} from "../../src/components/InteractionCards";
+import {
+  ChatInteraction,
+  InteractionChoice,
+  choiceLabel,
+} from "../../src/lib/interaction";
 
 const suggestions = [
   {
@@ -101,6 +110,11 @@ export default function HomeScreen() {
   const [input, setInput] = useState("");
   const [lastFailed, setLastFailed] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState("");
+  const [streamingInteraction, setStreamingInteraction] =
+    useState<ChatInteraction | null>(null);
+  const [selectedChoices, setSelectedChoices] = useState<InteractionChoice[]>(
+    [],
+  );
   const [historyVisible, setHistoryVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportText, setReportText] = useState("");
@@ -170,19 +184,32 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [isLoading]);
 
-  const sendMessage = async (value = input) => {
-    const prompt = value.trim();
+  const sendMessage = async (
+    value = input,
+    choices: InteractionChoice[] = selectedChoices,
+  ) => {
+    const selectionText = choices.map(choiceLabel).join(", ");
+    const prompt = [selectionText, value.trim()].filter(Boolean).join(". ");
     if (!prompt || isLoading) return;
+
+    const submittedChoices = [...choices];
+    const visibleUserContent = value.trim() || selectionText;
 
     const conversation = messages.slice(-16).map(({ role, content }) => ({
       role,
       content,
     }));
     setInput("");
+    setSelectedChoices([]);
     setLastFailed(null);
     setStreamingText("");
+    setStreamingInteraction(null);
     Keyboard.dismiss();
-    const conversationId = addMessage({ role: "user", content: prompt });
+    const conversationId = addMessage({
+      role: "user",
+      content: visibleUserContent,
+      selections: submittedChoices,
+    });
     setLoading(true);
     const startTime = Date.now();
     streamStartRef.current = startTime;
@@ -193,21 +220,31 @@ export default function HomeScreen() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      const content = await streamChat(
+      const result = await streamChat(
         prompt,
         conversation,
         conversationId,
         (delta) => setStreamingText((current) => current + delta),
+        (interaction) => setStreamingInteraction(interaction),
+        submittedChoices,
         controller.signal,
       );
       const latencyMs = Date.now() - startTime;
-      addMessage({ role: "assistant", content, latencyMs });
+      addMessage({
+        role: "assistant",
+        content: result.content,
+        interaction: result.interaction,
+        latencyMs,
+      });
       setStreamingText("");
+      setStreamingInteraction(null);
     } catch (error: any) {
       setStreamingText("");
+      setStreamingInteraction(null);
       const latencyMs = Date.now() - startTime;
       if (error?.name !== "AbortError") {
         setLastFailed(prompt);
+        setSelectedChoices(submittedChoices);
         addMessage({
           role: "assistant",
           content:
@@ -221,6 +258,38 @@ export default function HomeScreen() {
       streamStartRef.current = null;
       setLoading(false);
     }
+  };
+
+  const selectChoice = (choice: InteractionChoice) => {
+    if (isLoading) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+      () => undefined,
+    );
+    setSelectedChoices((current) => {
+      const existing = current.some(
+        (item) => item.groupId === choice.groupId && item.id === choice.id,
+      );
+      if (existing) {
+        return current.filter(
+          (item) => !(item.groupId === choice.groupId && item.id === choice.id),
+        );
+      }
+      if (!choice.multiSelect) {
+        return [
+          ...current.filter((item) => item.groupId !== choice.groupId),
+          choice,
+        ];
+      }
+      return [...current, choice];
+    });
+  };
+
+  const removeChoice = (choice: InteractionChoice) => {
+    setSelectedChoices((current) =>
+      current.filter(
+        (item) => !(item.groupId === choice.groupId && item.id === choice.id),
+      ),
+    );
   };
 
   const openReport = useCallback(async () => {
@@ -298,7 +367,15 @@ export default function HomeScreen() {
     if (mine) {
       return (
         <View style={styles.userMessage}>
-          <Text style={styles.userMessageText}>{item.content}</Text>
+          {item.selections?.length ? (
+            <SelectionTray choices={item.selections} />
+          ) : null}
+          {item.content && item.selections?.length && item.content !== item.selections.map(choiceLabel).join(", ") ? (
+            <Text style={styles.userMessageText}>{item.content}</Text>
+          ) : null}
+          {!item.selections?.length ? (
+            <Text style={styles.userMessageText}>{item.content}</Text>
+          ) : null}
         </View>
       );
     }
@@ -308,6 +385,9 @@ export default function HomeScreen() {
         <Ionicons name="sparkles" size={17} color="#8376FF" />
         <View style={styles.assistantContentWrap}>
           <ChatMarkdown content={item.content} />
+          {item.interaction ? (
+            <InteractionCards interaction={item.interaction} onSelect={selectChoice} />
+          ) : null}
           {item.latencyMs !== undefined ? (
             <View style={styles.latencyBadge}>
               <Ionicons name="timer-outline" size={12} color="#7E86A5" />
@@ -323,11 +403,15 @@ export default function HomeScreen() {
 
   const openSession = (session: ChatSession) => {
     selectSession(session.id);
+    setSelectedChoices([]);
+    setInput("");
     setHistoryVisible(false);
   };
 
   const startNewChat = () => {
     newChat();
+    setSelectedChoices([]);
+    setInput("");
     setHistoryVisible(false);
   };
 
@@ -390,11 +474,18 @@ export default function HomeScreen() {
           ListEmptyComponent={emptyState}
           ListFooterComponent={
             isLoading ? (
-              streamingText ? (
+              streamingText || streamingInteraction ? (
                 <View style={styles.assistantMessage}>
                   <Ionicons name="sparkles" size={17} color="#8376FF" />
                   <View style={styles.assistantContentWrap}>
-                    <ChatMarkdown content={streamingText} />
+                    {streamingText ? <ChatMarkdown content={streamingText} /> : null}
+                    {streamingInteraction ? (
+                      <InteractionCards
+                        interaction={streamingInteraction}
+                        onSelect={selectChoice}
+                        disabled
+                      />
+                    ) : null}
                     {streamingDuration !== null ? (
                       <View style={styles.latencyBadge}>
                         <Ionicons
@@ -439,6 +530,7 @@ export default function HomeScreen() {
         />
 
         <View style={styles.composerShell}>
+          <SelectionTray choices={selectedChoices} onRemove={removeChoice} />
           <View style={styles.composer}>
             <TextInput
               value={input}
@@ -456,20 +548,24 @@ export default function HomeScreen() {
               accessibilityLabel={
                 isLoading ? "Javobni to‘xtatish" : "Xabarni yuborish"
               }
-              disabled={!isLoading && !input.trim()}
+              disabled={!isLoading && !input.trim() && !selectedChoices.length}
               onPress={() =>
                 isLoading ? abortRef.current?.abort() : sendMessage()
               }
               style={({ pressed }) => [
                 styles.sendButton,
-                !isLoading && !input.trim() && styles.sendDisabled,
+                !isLoading && !input.trim() && !selectedChoices.length && styles.sendDisabled,
                 pressed && styles.pressed,
               ]}
             >
               <Ionicons
                 name={isLoading ? "stop" : "paper-plane-outline"}
                 size={23}
-                color={isLoading || input.trim() ? "#9B82FF" : "#657087"}
+                color={
+                  isLoading || input.trim() || selectedChoices.length
+                    ? "#9B82FF"
+                    : "#657087"
+                }
               />
             </Pressable>
           </View>

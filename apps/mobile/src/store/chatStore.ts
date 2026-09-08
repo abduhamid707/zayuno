@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
+import { ChatInteraction, InteractionChoice } from "../lib/interaction";
 
 const STORAGE_KEY = "zayuno_chat_sessions_v1";
 
@@ -9,6 +10,8 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   latencyMs?: number;
+  interaction?: ChatInteraction;
+  selections?: InteractionChoice[];
 }
 
 export interface ChatSession {
@@ -29,7 +32,11 @@ interface ChatState {
   selectSession: (id: string) => void;
   deleteSession: (id: string) => Promise<void>;
   addMessage: (
-    message: Pick<ChatMessage, "role" | "content"> & { latencyMs?: number },
+    message: Pick<ChatMessage, "role" | "content"> & {
+      latencyMs?: number;
+      interaction?: ChatInteraction;
+      selections?: InteractionChoice[];
+    },
   ) => string;
   setLoading: (loading: boolean) => void;
 }
@@ -84,7 +91,7 @@ export const useChatStore = create<ChatState>((set) => ({
     });
   },
 
-  addMessage: ({ role, content, latencyMs }) => {
+  addMessage: ({ role, content, latencyMs, interaction, selections }) => {
     const now = new Date().toISOString();
     const message: ChatMessage = {
       id: makeId(),
@@ -92,6 +99,8 @@ export const useChatStore = create<ChatState>((set) => ({
       content,
       createdAt: now,
       latencyMs,
+      interaction,
+      selections,
     };
     let resolvedSessionId = "";
     set((state) => {

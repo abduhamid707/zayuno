@@ -17,9 +17,60 @@ type ConversationMessage = {
   content: string;
 };
 
+type ChatSelection = {
+  id?: string;
+  kind?: string;
+  title?: string;
+  providerSlug?: string;
+  offeringId?: string;
+};
+
+type InteractionChoice = {
+  id: string;
+  kind:
+    | "provider"
+    | "category"
+    | "offering"
+    | "variant"
+    | "option"
+    | "service"
+    | "generic";
+  title: string;
+  subtitle?: string;
+  price?: number;
+  currency?: string;
+  imageUrl?: string;
+  emoji?: string;
+  providerSlug?: string;
+  offeringId?: string;
+  prompt: string;
+  groupId: string;
+  multiSelect?: boolean;
+};
+
+type ChatInteraction = {
+  version: 1;
+  kind: "choice_cards";
+  title?: string;
+  subtitle?: string;
+  groups: Array<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    selectionMode: "single" | "multiple";
+    choices: InteractionChoice[];
+  }>;
+};
+
+type ChatExecutionResult = {
+  content: string;
+  interaction?: ChatInteraction;
+};
+
 type ChatRequest = {
   prompt: string;
   messages?: ConversationMessage[];
+  selections?: ChatSelection[];
   userId: string;
   userEmail?: string;
   conversationId?: string;
@@ -125,13 +176,14 @@ type PreparedChat = {
   plan: LiveContextPlan;
   liveContext: unknown[];
   directAnswer?: string;
+  interaction?: ChatInteraction;
 };
 
 @Injectable()
 export class ConsumerChatService {
   private readonly logger = new Logger(ConsumerChatService.name);
   private readonly model: { name: string; client: any; jsonClient?: any } | null;
-  private readonly inFlightStreams = new Map<string, Promise<string>>();
+  private readonly inFlightStreams = new Map<string, Promise<ChatExecutionResult>>();
   private readonly memoryPendingOrders = new Map<string, { state: PendingConsumerOrder; expiresAt: number }>();
 
   constructor(
@@ -179,29 +231,33 @@ STRICT RULES:
       : null;
   }
 
-  async processMessage(input: ChatRequest): Promise<{ content: string }> {
+  async processMessage(input: ChatRequest): Promise<ChatExecutionResult> {
     const prepared = await this.prepareChat(input);
-    if (prepared.directAnswer) return { content: prepared.directAnswer };
+    if (prepared.directAnswer) {
+      return { content: prepared.directAnswer, interaction: prepared.interaction };
+    }
     const content = await this.writeAnswer(prepared);
-    return { content };
+    return { content, interaction: prepared.interaction };
   }
 
   async streamMessage(
     input: ChatRequest,
     onDelta: (content: string) => void,
+    onInteraction?: (interaction: ChatInteraction) => void,
   ): Promise<string> {
     const requestKey = this.chatRequestKey(input);
     const existing = this.inFlightStreams.get(requestKey);
     if (existing) {
-      const content = await existing;
-      onDelta(content);
-      return content;
+      const result = await existing;
+      if (result.interaction) onInteraction?.(result.interaction);
+      onDelta(result.content);
+      return result.content;
     }
 
-    const task = this.executeStreamMessage(input, onDelta);
+    const task = this.executeStreamMessage(input, onDelta, onInteraction);
     this.inFlightStreams.set(requestKey, task);
     try {
-      return await task;
+      return (await task).content;
     } finally {
       if (this.inFlightStreams.get(requestKey) === task) {
         this.inFlightStreams.delete(requestKey);
@@ -212,16 +268,18 @@ STRICT RULES:
   private async executeStreamMessage(
     input: ChatRequest,
     onDelta: (content: string) => void,
-  ): Promise<string> {
+    onInteraction?: (interaction: ChatInteraction) => void,
+  ): Promise<ChatExecutionResult> {
     const prepared = await this.prepareChat(input);
+    if (prepared.interaction) onInteraction?.(prepared.interaction);
     if (prepared.directAnswer) {
       onDelta(prepared.directAnswer);
-      return prepared.directAnswer;
+      return { content: prepared.directAnswer, interaction: prepared.interaction };
     }
     const instruction = this.buildInstruction(prepared);
 
     try {
-      return await this.runGeminiWithRetry(
+      const content = await this.runGeminiWithRetry(
         "stream response",
         9_500,
         async (timeoutMs) => {
@@ -248,6 +306,7 @@ STRICT RULES:
           }
         },
       );
+      return { content, interaction: prepared.interaction };
     } catch (error) {
       this.logger.error("Gemini streaming response failed", error);
       throw new ServiceUnavailableException(
@@ -330,12 +389,17 @@ Qaysi shifokor yoki tahlil zarurligini yozing, darhol qabulga yozib beraman.`;
       input.conversationId,
     );
     if (pendingOrderAnswer) {
+      const pendingState = await this.readPendingOrder(
+        input.userId,
+        input.conversationId,
+      );
       return {
         prompt,
         history: this.normalizeHistory(input.messages),
         plan: this.emptyPlan("general"),
         liveContext: [],
         directAnswer: pendingOrderAnswer,
+        interaction: this.buildRequirementInteraction(pendingState),
       };
     }
     const activeActionAnswer = await this.handleActiveActionFollowUp(
@@ -354,6 +418,10 @@ Qaysi shifokor yoki tahlil zarurligini yozing, darhol qabulga yozib beraman.`;
     }
 
     const history = this.normalizeHistory(input.messages);
+    const providers = (await this.providersService.listProviders()).sort(
+      (left: any, right: any) =>
+        this.providerPriority(left.slug) - this.providerPriority(right.slug),
+    );
     const fastAnswer = this.matchFastIntentAnswer(prompt, history);
     if (fastAnswer) {
       return {
@@ -362,13 +430,11 @@ Qaysi shifokor yoki tahlil zarurligini yozing, darhol qabulga yozib beraman.`;
         plan: this.emptyPlan("capabilities"),
         liveContext: [],
         directAnswer: fastAnswer,
+        interaction: this.isCapabilityRequest(prompt)
+          ? this.buildProviderInteraction(providers)
+          : undefined,
       };
     }
-
-    const providers = (await this.providersService.listProviders()).sort(
-      (left: any, right: any) =>
-        this.providerPriority(left.slug) - this.providerPriority(right.slug),
-    );
     const plan = await this.planWithAi(prompt, history, providers);
     if (!plan) {
       throw new ServiceUnavailableException(
@@ -394,6 +460,7 @@ Qaysi shifokor yoki tahlil zarurligini yozing, darhol qabulga yozib beraman.`;
         plan,
         liveContext: [],
         directAnswer: providerAnswer,
+        interaction: this.buildProviderInteraction(providers, plan),
       };
     }
 
@@ -408,6 +475,10 @@ Qaysi shifokor yoki tahlil zarurligini yozing, darhol qabulga yozib beraman.`;
         plan,
         liveContext: [],
         directAnswer: foodProviderAnswer,
+        interaction: this.buildProviderInteraction(
+          providers.filter((provider: any) => this.isFoodProvider(provider)),
+          plan,
+        ),
       };
     }
 
@@ -430,12 +501,17 @@ Qaysi shifokor yoki tahlil zarurligini yozing, darhol qabulga yozib beraman.`;
       input.conversationId,
     );
     if (orderAnswer) {
+      const pendingState = await this.readPendingOrder(
+        input.userId,
+        input.conversationId,
+      );
       return {
         prompt,
         history,
         plan,
         liveContext,
         directAnswer: orderAnswer,
+        interaction: this.buildRequirementInteraction(pendingState),
       };
     }
     const groundedAnswer = this.buildGroundedCatalogAnswer(plan, liveContext);
@@ -452,7 +528,232 @@ Qaysi shifokor yoki tahlil zarurligini yozing, darhol qabulga yozib beraman.`;
       plan,
       liveContext,
       directAnswer: groundedAnswer,
+      interaction: this.buildCatalogInteraction(plan, liveContext),
     };
+  }
+
+  private buildProviderInteraction(
+    providers: any[],
+    plan?: LiveContextPlan,
+  ): ChatInteraction | undefined {
+    let candidates = providers;
+    if (plan?.providerSlugs.length) {
+      candidates = providers.filter((provider) =>
+        plan.providerSlugs.includes(provider.slug),
+      );
+    } else if (plan?.query) {
+      const terms = this.normalizeLookupText(plan.query)
+        .split(/\s+/)
+        .filter((term) => term.length >= 3);
+      if (terms.length) {
+        const ranked = providers
+          .map((provider) => ({
+            provider,
+            score: terms.reduce(
+              (score, term) =>
+                score +
+                (this.normalizeLookupText(this.providerIdentity(provider)).includes(term)
+                  ? 1
+                  : 0),
+              0,
+            ),
+          }))
+          .filter(({ score }) => score > 0)
+          .sort((left, right) => right.score - left.score)
+          .map(({ provider }) => provider);
+        if (ranked.length) candidates = ranked;
+      }
+    }
+    const production = candidates.filter(
+      (provider) => !this.isDemoProvider(provider),
+    );
+    const visible = (production.length ? production : candidates).slice(0, 10);
+    if (!visible.length) return undefined;
+
+    const choices = visible.map((provider): InteractionChoice => ({
+      id: `provider:${provider.slug}`,
+      kind: "provider",
+      title: this.cleanMarkdownText(provider.name),
+      subtitle: this.describeProvider(provider),
+      imageUrl: this.safeInteractionImage(provider.logoUrl),
+      emoji: this.providerEmoji(provider),
+      providerSlug: provider.slug,
+      prompt: this.cleanMarkdownText(provider.name),
+      groupId: "providers",
+    }));
+
+    return {
+      version: 1,
+      kind: "choice_cards",
+      title: plan?.query ? "Mos xizmatni tanlang" : "Xizmatni tanlang",
+      groups: [
+        {
+          id: "providers",
+          title: "Mavjud hamkorlar",
+          selectionMode: "single",
+          choices,
+        },
+      ],
+    };
+  }
+
+  private isCapabilityRequest(prompt: string): boolean {
+    const raw = prompt.toLowerCase().trim();
+    return (
+      /^(nima|nimalar)\s*(qila|qila\s*ola|qilas|qila\s*olasiz|qilaolasan|qilaolasiz|qilsa\s*bo['`]?ladi|bilasiz|mumkin)/i.test(raw) ||
+      /qanday\s*(xizmat|servis|imkoniyat|yordam)/i.test(raw) ||
+      /imkoniyatlaring\s*(nima|qanday)/i.test(raw) ||
+      /qanaqa\s*(xizmat|servis)/i.test(raw) ||
+      /nima\s*ish\s*(qilas|qilasan)/i.test(raw) ||
+      /yordam\s*berchi/i.test(raw)
+    );
+  }
+
+  private buildCatalogInteraction(
+    plan: LiveContextPlan,
+    liveContext: any[],
+  ): ChatInteraction | undefined {
+    if (!plan.needsCatalog) return undefined;
+    const entries = (Array.isArray(liveContext) ? liveContext : []).flatMap(
+      (context: any) =>
+        (Array.isArray(context?.offerings) ? context.offerings : []).map(
+          (offering: any) => ({ context, offering }),
+        ),
+    );
+    const available = entries.filter(({ offering }) => offering?.id && offering?.title);
+    if (!available.length) return undefined;
+
+    const groups = new Map<string, { context: any; entries: any[] }>();
+    for (const entry of available.slice(0, 24)) {
+      const groupId = `offerings:${entry.context?.slug || "zayuno"}`;
+      const group = groups.get(groupId) || { context: entry.context, entries: [] };
+      group.entries.push(entry);
+      groups.set(groupId, group);
+    }
+
+    return {
+      version: 1,
+      kind: "choice_cards",
+      title: plan.intent === "food_selection" ? "Tanlovni tekshiring" : "Kerakli variantni tanlang",
+      subtitle: "Tanlovni bosib, pastdagi yuborish tugmasi orqali davom eting.",
+      groups: Array.from(groups.entries()).map(([id, group]) => ({
+        id,
+        title: this.cleanMarkdownText(group.context?.name || "Mavjud variantlar"),
+        selectionMode: "multiple" as const,
+        choices: group.entries.map(({ context, offering }): InteractionChoice => ({
+          id: `offering:${context.slug}:${offering.id}`,
+          kind: "offering",
+          title: this.cleanMarkdownText(offering.title),
+          subtitle: this.truncateInteractionText(
+            this.cleanMarkdownText(offering.summary || offering.description),
+            92,
+          ),
+          price: Number.isFinite(Number(offering.basePrice)) ? Number(offering.basePrice) : undefined,
+          currency: offering.currency || "UZS",
+          imageUrl: this.safeInteractionImage(
+            offering.imageUrl || offering.media?.[0]?.url || offering.metadata?.imageUrl,
+          ),
+          providerSlug: context.slug,
+          offeringId: offering.id,
+          prompt: this.cleanMarkdownText(offering.title),
+          groupId: id,
+          multiSelect: true,
+        })),
+      })),
+    };
+  }
+
+  private buildRequirementInteraction(
+    state: PendingConsumerOrder | null,
+  ): ChatInteraction | undefined {
+    if (!state) return undefined;
+    const requirement = this.nextOrderRequirement(state);
+    if (!requirement || requirement.kind === "delivery_contact") return undefined;
+
+    const rawChoices = Array.isArray(requirement.choices)
+      ? requirement.choices
+      : [];
+    if (!rawChoices.length) return undefined;
+    const groupId = `requirement:${requirement.kind}:${requirement.key || requirement.itemIndex || "current"}`;
+    const currentItem =
+      typeof requirement.itemIndex === "number"
+        ? state.items[requirement.itemIndex]
+        : undefined;
+    const choices = rawChoices.map((choice: any, index: number): InteractionChoice => {
+      const label = this.cleanMarkdownText(
+        this.fulfillmentLabel(String(choice?.name ?? choice?.title ?? choice?.id ?? choice)),
+      );
+      const price =
+        requirement.kind === "variant"
+          ? Number(choice?.basePrice)
+          : Number(choice?.priceDelta);
+      return {
+        id: `choice:${choice?.id || index}`,
+        kind: requirement.kind === "variant" ? "variant" : "option",
+        title: label,
+        subtitle:
+          requirement.kind === "variant"
+            ? currentItem?.offeringTitle
+            : requirement.title,
+        price: Number.isFinite(price) && price > 0 ? price : undefined,
+        currency: "UZS",
+        prompt: label,
+        groupId,
+        offeringId: currentItem?.offeringId,
+        multiSelect:
+          requirement.kind === "option" &&
+          Number(requirement.maxSelections || 1) > 1,
+      };
+    });
+
+    return {
+      version: 1,
+      kind: "choice_cards",
+      title: this.cleanMarkdownText(requirement.title || "Tanlovni belgilang"),
+      subtitle:
+        requirement.kind === "option" && requirement.minSelections === 0
+          ? "Tanlamasangiz ham davom etishingiz mumkin."
+          : "Kerakli variantni tanlang.",
+      groups: [
+        {
+          id: groupId,
+          title: currentItem?.offeringTitle || "Tanlovlar",
+          selectionMode:
+            requirement.kind === "option" &&
+            Number(requirement.maxSelections || 1) > 1
+              ? "multiple"
+              : "single",
+          choices,
+        },
+      ],
+    };
+  }
+
+  private safeInteractionImage(value: unknown): string | undefined {
+    try {
+      const url = new URL(String(value || ""));
+      if (url.protocol !== "https:" || url.username || url.password) return undefined;
+      return url.toString();
+    } catch {
+      return undefined;
+    }
+  }
+
+  private truncateInteractionText(value: string, maxLength: number): string | undefined {
+    if (!value) return undefined;
+    return value.length > maxLength
+      ? `${value.slice(0, Math.max(maxLength - 1, 1)).trim()}…`
+      : value;
+  }
+
+  private providerEmoji(provider: any): string | undefined {
+    const identity = this.providerIdentity(provider);
+    if (/food|restaurant|cafe|coffee|fast.?food|ovqat|taom/.test(identity)) return "🍽️";
+    if (/medical|clinic|dental|health|doctor|tibb/.test(identity)) return "🏥";
+    if (/travel|tour|umrah|sayohat/.test(identity)) return "✈️";
+    if (/ticket|rail|avia|bus|transport/.test(identity)) return "🎫";
+    if (/job|recruit|vakans/.test(identity)) return "💼";
+    return "✨";
   }
 
   private buildProviderAnswer(
@@ -2052,6 +2353,7 @@ USER=${JSON.stringify(prompt)}`;
         const base = {
           slug: provider.slug,
           name: provider.name,
+          logoUrl: provider.logoUrl,
           category: provider.category || provider.type,
           description: provider.description,
           geography: provider.geography,
@@ -2168,6 +2470,11 @@ USER=${JSON.stringify(prompt)}`;
               .map((item) => ({
                 id: item.id,
                 title: item.title,
+                description: item.description,
+                categorySlug: item.categorySlug,
+                categoryTitle: item.categoryTitle,
+                imageUrl: item.imageUrl,
+                media: item.media,
                 basePrice: item.basePrice,
                 currency: item.currency,
                 variants: item.variants || [],
@@ -2578,6 +2885,14 @@ USER=${JSON.stringify(prompt)}`;
       userId: input.userId,
       conversationId: this.conversationScope(input.conversationId),
       prompt: String(input.prompt || "").trim(),
+      selections: Array.isArray(input.selections)
+        ? input.selections.map((selection) => ({
+            kind: selection.kind,
+            providerSlug: selection.providerSlug,
+            offeringId: selection.offeringId,
+            title: selection.title,
+          }))
+        : [],
       history: this.normalizeHistory(input.messages).slice(-6),
     });
     return createHash("sha256").update(normalized).digest("hex");

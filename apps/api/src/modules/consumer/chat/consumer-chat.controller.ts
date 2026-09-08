@@ -19,10 +19,19 @@ type ConversationMessage = {
   content: string;
 };
 
+type ChatSelection = {
+  id?: string;
+  kind?: string;
+  title?: string;
+  providerSlug?: string;
+  offeringId?: string;
+};
+
 type ChatBody = {
   prompt: string;
   messages?: ConversationMessage[];
   conversationId?: string;
+  selections?: ChatSelection[];
 };
 
 @ApiTags("Consumer App - Chat")
@@ -46,6 +55,7 @@ export class ConsumerChatController {
         prompt: body.prompt,
         messages: body.messages,
         conversationId: body.conversationId,
+        selections: body.selections,
         userId: req.user.id,
         userEmail: req.user.email,
       });
@@ -82,6 +92,7 @@ export class ConsumerChatController {
           prompt: body.prompt,
           messages: body.messages,
           conversationId: body.conversationId,
+          selections: body.selections,
           userId: req.user.id,
           userEmail: req.user.email,
         },
@@ -90,6 +101,11 @@ export class ConsumerChatController {
             res.write(
               `data: ${JSON.stringify({ type: "delta", content })}\n\n`,
             );
+          }
+        },
+        (interaction) => {
+          if (!res.destroyed) {
+            res.write(`data: ${JSON.stringify({ type: "ui", interaction })}\n\n`);
           }
         },
       );
