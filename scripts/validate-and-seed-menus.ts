@@ -43,6 +43,18 @@ export function loadAndFormatAllMenus() {
       const img = item.image && isSafePublicHttpsUrl(item.image) ? item.image : null;
       const id = `bel-${item.id || cIdx + '_' + iIdx}`;
 
+      const variants = Array.isArray(item.variants)
+        ? item.variants.map((v: any) => ({
+            id: v.id,
+            name: v.nameUz || v.nameRu || v.name || 'Variant',
+            price: Number(v.price) || 0,
+            imageUrl: v.image || null,
+          }))
+        : [];
+      const resolvedBasePrice =
+        Number(item.basePrice || item.price) ||
+        (variants.length > 0 ? variants[0].price : 0);
+
       belOfferings.push({
         id,
         providerId: 'bellissimo',
@@ -53,10 +65,10 @@ export function loadAndFormatAllMenus() {
         categoryTitle: catTitle,
         imageUrl: img,
         media: img ? [{ url: img, altText: title, order: 0 }] : [],
-        basePrice: Number(item.price) || 0,
+        basePrice: resolvedBasePrice,
         currency: 'UZS',
         isAvailable: true,
-        variants: [],
+        variants,
         optionGroups: [],
         tags: ['pizza', 'bellissimo', catSlug],
         metadata: {

@@ -122,8 +122,6 @@ export default function HomeScreen() {
     [],
   );
   const [trayItems, setTrayItems] = useState<TrayItem[]>([]);
-  const [addNoteModalVisible, setAddNoteModalVisible] = useState(false);
-  const [customNoteInput, setCustomNoteInput] = useState("");
   const [historyVisible, setHistoryVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportText, setReportText] = useState("");
@@ -183,20 +181,6 @@ export default function HomeScreen() {
 
   const handleRemoveTrayItem = (id: string) => {
     setTrayItems((current) => current.filter((item) => item.id !== id));
-  };
-
-  const handleAddNote = () => {
-    if (!customNoteInput.trim()) return;
-    setTrayItems((current) => [
-      ...current,
-      {
-        type: "note",
-        id: `tray_note_${Date.now()}`,
-        text: customNoteInput.trim(),
-      },
-    ]);
-    setCustomNoteInput("");
-    setAddNoteModalVisible(false);
   };
 
   const handleSelectProvider = (provider: ProviderCardItem) => {
@@ -280,8 +264,11 @@ export default function HomeScreen() {
     if (!prompt || isLoading) return;
 
     const submittedChoices = [...allChoices];
-    const visibleUserContent =
-      [value.trim(), notesText].filter(Boolean).join(". ") || selectionText;
+    const itemsSummary = offeringTrayItems.length > 0
+      ? offeringTrayItems.map((item) => `${item.title}${item.quantity > 1 ? ` (${item.quantity} ta)` : ""}`).join(", ")
+      : allChoices.map((c) => c.title).join(", ");
+    const userTextParts = [itemsSummary, notesText, value.trim()].filter(Boolean);
+    const visibleUserContent = userTextParts.join("\n") || selectionText;
 
     const conversation = messages.slice(-16).map(({ role, content }) => ({
       role,
@@ -456,15 +443,7 @@ export default function HomeScreen() {
     if (mine) {
       return (
         <View style={styles.userMessage}>
-          {item.selections?.length ? (
-            <SelectionTray choices={item.selections} />
-          ) : null}
-          {item.content && item.selections?.length && item.content !== item.selections.map(choiceLabel).join(", ") ? (
-            <Text style={styles.userMessageText}>{item.content}</Text>
-          ) : null}
-          {!item.selections?.length ? (
-            <Text style={styles.userMessageText}>{item.content}</Text>
-          ) : null}
+          <Text style={styles.userMessageText}>{item.content}</Text>
         </View>
       );
     }
@@ -671,18 +650,6 @@ export default function HomeScreen() {
           ) : null}
 
           <View style={styles.composer}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Qo‘shimcha izoh yoki istak qo‘shish"
-              onPress={() => setAddNoteModalVisible(true)}
-              style={({ pressed }) => [
-                styles.plusButton,
-                pressed && styles.plusButtonPressed,
-              ]}
-            >
-              <Ionicons name="add" size={24} color="#9487FF" />
-            </Pressable>
-
             <TextInput
               value={input}
               onChangeText={setInput}
@@ -943,61 +910,6 @@ export default function HomeScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Add Custom Note / Special Wish Modal */}
-      <Modal
-        visible={addNoteModalVisible}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setAddNoteModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.noteModalRoot}
-        >
-          <Pressable
-            accessibilityLabel="Oynani yopish"
-            onPress={() => setAddNoteModalVisible(false)}
-            style={styles.reportBackdrop}
-          />
-          <SafeAreaView style={styles.noteSheet} edges={["bottom"]}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.noteTitle}>Maxsus istak yoki eslatma</Text>
-            <Text style={styles.noteSubtitle}>
-              Masalan: “Achchiq bo‘lmasin”, “Piyoz solinmasin”, “Cola ham qo‘shing”
-            </Text>
-
-            <TextInput
-              value={customNoteInput}
-              onChangeText={setCustomNoteInput}
-              placeholder="Eslatmani yozing..."
-              placeholderTextColor="#737B95"
-              multiline
-              maxLength={300}
-              style={styles.noteModalInput}
-            />
-
-            <View style={styles.noteModalActions}>
-              <Pressable
-                onPress={() => setAddNoteModalVisible(false)}
-                style={styles.noteCancelButton}
-              >
-                <Text style={styles.noteCancelText}>Bekor qilish</Text>
-              </Pressable>
-              <Pressable
-                disabled={!customNoteInput.trim()}
-                onPress={handleAddNote}
-                style={[
-                  styles.noteSubmitButton,
-                  !customNoteInput.trim() && styles.noteSubmitDisabled,
-                ]}
-              >
-                <Text style={styles.noteSubmitText}>Saqlash</Text>
-              </Pressable>
-            </View>
-          </SafeAreaView>
-        </KeyboardAvoidingView>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -1080,12 +992,14 @@ const styles = StyleSheet.create({
   userMessage: {
     alignSelf: "flex-end",
     maxWidth: "84%",
-    marginVertical: 7,
+    marginVertical: 6,
     paddingHorizontal: 15,
-    paddingVertical: 11,
-    borderRadius: 19,
-    borderBottomRightRadius: 6,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderBottomRightRadius: 4,
     backgroundColor: "#315CFF",
+    flexGrow: 0,
+    flexShrink: 1,
   },
   userMessageText: { color: "#FFFFFF", fontSize: 14, lineHeight: 20 },
   assistantMessage: {
@@ -1155,20 +1069,6 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     paddingTop: 12,
     paddingBottom: 10,
-  },
-  plusButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(124,103,255,0.14)",
-    marginRight: 6,
-    marginBottom: 2,
-  },
-  plusButtonPressed: {
-    backgroundColor: "rgba(124,103,255,0.28)",
-    transform: [{ scale: 0.94 }],
   },
   sendButton: {
     width: 46,
@@ -1370,77 +1270,4 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(70,211,123,0.08)",
   },
   reportSuccessText: { color: "#D9FBE6", fontSize: 13, textAlign: "center" },
-  noteModalRoot: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  noteSheet: {
-    paddingHorizontal: 22,
-    paddingTop: 10,
-    paddingBottom: 24,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: "rgba(126,134,165,0.28)",
-    backgroundColor: "#0C1021",
-  },
-  noteTitle: {
-    color: "#F6F7FB",
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  noteSubtitle: {
-    color: "#8890A6",
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 4,
-  },
-  noteModalInput: {
-    minHeight: 100,
-    marginTop: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(126,134,165,0.26)",
-    backgroundColor: "#13182B",
-    color: "#F6F7FB",
-    fontSize: 14,
-    textAlignVertical: "top",
-  },
-  noteModalActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-  },
-  noteCancelButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: "rgba(126,134,165,0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  noteCancelText: {
-    color: "#B4BCD0",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  noteSubmitButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: "#5645EC",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  noteSubmitDisabled: {
-    opacity: 0.45,
-  },
-  noteSubmitText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
 });
