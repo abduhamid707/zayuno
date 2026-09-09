@@ -39,7 +39,23 @@ import {
 } from "../../src/components/InteractionCards";
 import { ProviderPickerCard } from "../../src/components/food/ProviderPickerCard";
 import { InChatCatalogWidget } from "../../src/components/food/InChatCatalogWidget";
-import { ContextTrayDock } from "../../src/components/food/ContextTrayDock";
+import {
+  ContextTrayDock,
+  ContextTrayHandle,
+} from "../../src/components/food/ContextTrayDock";
+import {
+  CartFlightOverlay,
+  CartFlightHandle,
+} from "../../src/components/food/CartFlightOverlay";
+import type { CartFlightOrigin } from "../../src/components/food/FoodProductCard";
+import {
+  addOffering,
+  composerHint,
+  MAX_CART_QUANTITY,
+  offeringKey,
+  trayOrderText,
+  updateTrayQuantity,
+} from "../../src/lib/cart";
 import { AccountSheet } from "../../src/components/AccountSheet";
 import { useAuthStore } from "../../src/store/authStore";
 import { analytics } from "../../src/lib/analytics";
@@ -159,6 +175,8 @@ export default function HomeScreen() {
     [],
   );
   const [trayItems, setTrayItems] = useState<TrayItem[]>([]);
+  const trayRef = useRef<ContextTrayHandle>(null);
+  const flightRef = useRef<CartFlightHandle>(null);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [accountVisible, setAccountVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
@@ -213,40 +231,23 @@ export default function HomeScreen() {
     }).catch(() => undefined);
   };
 
-  const handleAddToCart = (offering: CatalogOfferingItem) => {
+  const handleAddToCart = (
+    offering: CatalogOfferingItem,
+    origin?: CartFlightOrigin,
+  ) => {
+    if (isLoading) return;
+    const existing = trayItems.find(
+      (item) =>
+        item.type === "offering" && offeringKey(item) === offeringKey(offering),
+    );
+    if (existing?.type === "offering" && existing.quantity >= MAX_CART_QUANTITY)
+      return;
     trackSuggestion("CLICKED", "offering", offering.offeringId, offering.title);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
       () => undefined,
     );
-    setTrayItems((current) => {
-      const existingIndex = current.findIndex(
-        (item) =>
-          item.type === "offering" && item.offeringId === offering.offeringId,
-      );
-      if (existingIndex >= 0) {
-        const updated = [...current];
-        const existing = updated[existingIndex] as any;
-        updated[existingIndex] = {
-          ...existing,
-          quantity: (existing.quantity || 1) + 1,
-        };
-        return updated;
-      }
-      return [
-        ...current,
-        {
-          type: "offering",
-          id: `tray_offering_${Date.now()}_${offering.offeringId}`,
-          offeringId: offering.offeringId,
-          providerSlug: offering.providerSlug,
-          title: offering.title,
-          price: offering.price,
-          currency: offering.currency,
-          imageUrl: offering.imageUrl,
-          quantity: 1,
-        },
-      ];
-    });
+    setTrayItems((current) => addOffering(current, offering));
+    flightRef.current?.fly(offering, origin);
     analytics.trackFoodItemAdded({
       itemId: offering.offeringId,
       name: offering.title,
@@ -258,6 +259,16 @@ export default function HomeScreen() {
   const handleRemoveTrayItem = (id: string) => {
     analytics.trackFoodItemRemoved({ itemId: id });
     setTrayItems((current) => current.filter((item) => item.id !== id));
+  };
+
+  const handleQuantityChange = (id: string, quantity: number) => {
+    if (quantity <= 0) analytics.trackFoodItemRemoved({ itemId: id });
+    setTrayItems((current) => updateTrayQuantity(current, id, quantity));
+    void Haptics.selectionAsync().catch(() => undefined);
+  };
+  const clearTray = () => {
+    flightRef.current?.clear();
+    setTrayItems([]);
   };
 
   const handleSelectProvider = (provider: ProviderCardItem) => {
@@ -280,6 +291,26 @@ export default function HomeScreen() {
   const historySessions = useMemo(
     () => sessions.filter((session) => session.messages.length > 0),
     [sessions],
+  );
+  const trayQuantities = useMemo(
+    () =>
+      Object.fromEntries(
+        trayItems
+          .filter(
+            (item): item is Extract<TrayItem, { type: "offering" }> =>
+              item.type === "offering",
+          )
+          .map((item) => [offeringKey(item), item.quantity]),
+      ),
+    [trayItems],
+  );
+  const latestInteraction =
+    streamingInteraction ||
+    [...messages].reverse().find((message) => message.role === "assistant")
+      ?.interaction;
+  const inputPlaceholder = composerHint(
+    latestInteraction,
+    trayItems.length > 0,
   );
   const suggestionRefreshBucket = useMemo(
     () =>
@@ -395,7 +426,12 @@ export default function HomeScreen() {
     );
     const notesText = noteItems.map((n) => n.text).join(". ");
 
-    const selectionText = allChoices.map(choiceLabel).join(", ");
+    const selectionText = [
+      choices.map(choiceLabel).join(", "),
+      trayOrderText(currentTray),
+    ]
+      .filter(Boolean)
+      .join(", ");
     const promptParts = [selectionText, notesText, value.trim()].filter(
       Boolean,
     );
@@ -424,6 +460,7 @@ export default function HomeScreen() {
     setInput("");
     setSelectedChoices([]);
     setTrayItems([]);
+    flightRef.current?.clear();
     setLastFailed(null);
     setStreamingText("");
     setStreamingInteraction(null);
@@ -654,6 +691,7 @@ export default function HomeScreen() {
                 categories={item.interaction.categories || []}
                 sections={item.interaction.sections || []}
                 onAddToCart={handleAddToCart}
+                quantities={trayQuantities}
                 disabled={isLoading}
               />
             ) : (
@@ -669,6 +707,7 @@ export default function HomeScreen() {
   };
 
   const openSession = (session: ChatSession) => {
+    clearTray();
     selectSession(session.id);
     setSelectedChoices([]);
     setInput("");
@@ -676,6 +715,7 @@ export default function HomeScreen() {
   };
 
   const startNewChat = () => {
+    clearTray();
     analytics.trackNewChat();
     newChat();
     setSelectedChoices([]);
@@ -806,6 +846,7 @@ export default function HomeScreen() {
                           categories={streamingInteraction.categories || []}
                           sections={streamingInteraction.sections || []}
                           onAddToCart={handleAddToCart}
+                          quantities={trayQuantities}
                           disabled
                         />
                       ) : (
@@ -848,67 +889,74 @@ export default function HomeScreen() {
         />
 
         <View style={styles.composerShell}>
-          <ContextTrayDock
-            items={trayItems}
-            onRemoveItem={handleRemoveTrayItem}
-          />
           {selectedChoices.length > 0 && trayItems.length === 0 ? (
             <SelectionTray choices={selectedChoices} onRemove={removeChoice} />
           ) : null}
 
           <View style={styles.composer}>
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              placeholder="Xabar yozing…"
-              placeholderTextColor={theme.colors.mutedText}
-              style={styles.input}
-              multiline
-              submitBehavior="submit"
-              onSubmitEditing={() => sendMessage()}
-              maxLength={1200}
-              accessibilityLabel="Zayunoga xabar yozish"
+            <ContextTrayDock
+              ref={trayRef}
+              items={trayItems}
+              onRemoveItem={handleRemoveTrayItem}
+              onQuantityChange={handleQuantityChange}
+              onClear={clearTray}
             />
+            <View style={styles.composerInputRow}>
+              <TextInput
+                value={input}
+                onChangeText={setInput}
+                placeholder={inputPlaceholder}
+                placeholderTextColor={theme.colors.mutedText}
+                style={styles.input}
+                multiline
+                submitBehavior="newline"
+                blurOnSubmit={false}
+                returnKeyType="default"
+                maxLength={1200}
+                accessibilityLabel="Zayunoga xabar yozish"
+              />
 
-            <Pressable
-              accessibilityLabel={
-                isLoading ? "Javobni to‘xtatish" : "Xabarni yuborish"
-              }
-              disabled={
-                !isLoading &&
-                !input.trim() &&
-                !selectedChoices.length &&
-                !trayItems.length
-              }
-              onPress={() =>
-                isLoading ? abortRef.current?.abort() : sendMessage()
-              }
-              style={({ pressed }) => [
-                styles.sendButton,
-                !isLoading &&
+              <Pressable
+                accessibilityLabel={
+                  isLoading ? "Javobni to‘xtatish" : "Xabarni yuborish"
+                }
+                disabled={
+                  !isLoading &&
                   !input.trim() &&
                   !selectedChoices.length &&
-                  !trayItems.length &&
-                  styles.sendDisabled,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Ionicons
-                name={isLoading ? "stop" : "paper-plane"}
-                size={20}
-                color={
-                  isLoading ||
-                  input.trim() ||
-                  selectedChoices.length ||
-                  trayItems.length
-                    ? "#FFFFFF"
-                    : "#657087"
+                  !trayItems.length
                 }
-              />
-            </Pressable>
+                onPress={() =>
+                  isLoading ? abortRef.current?.abort() : sendMessage()
+                }
+                style={({ pressed }) => [
+                  styles.sendButton,
+                  !isLoading &&
+                    !input.trim() &&
+                    !selectedChoices.length &&
+                    !trayItems.length &&
+                    styles.sendDisabled,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons
+                  name={isLoading ? "stop" : "paper-plane"}
+                  size={20}
+                  color={
+                    isLoading ||
+                    input.trim() ||
+                    selectedChoices.length ||
+                    trayItems.length
+                      ? "#FFFFFF"
+                      : "#657087"
+                  }
+                />
+              </Pressable>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
+      <CartFlightOverlay ref={flightRef} targetRef={trayRef} />
 
       <Modal
         visible={historyVisible}
@@ -1309,13 +1357,15 @@ const styles = StyleSheet.create({
   },
   composer: {
     minHeight: 61,
-    maxHeight: 122,
     borderRadius: 29,
     borderWidth: 1,
     borderColor: "rgba(126,134,165,0.42)",
     backgroundColor: "rgba(20,25,44,0.88)",
+  },
+  composerInputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
+    maxHeight: 122,
     paddingLeft: 18,
     paddingRight: 7,
     paddingVertical: 6,

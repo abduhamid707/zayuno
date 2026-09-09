@@ -239,6 +239,20 @@ export const analytics = {
     }
   },
 
+  trackAuthSession: (
+    action: "restore_started" | "restore_succeeded" | "restore_failed",
+    properties?: Record<string, unknown>,
+  ) => {
+    try {
+      posthogClient.capture(
+        `auth_session_${action}`,
+        cleanProperties(properties || {}),
+      );
+    } catch (e) {
+      console.warn("[Analytics] Auth session track error:", e);
+    }
+  },
+
   trackError: (error: unknown, context?: string) => {
     try {
       posthogClient.captureException(

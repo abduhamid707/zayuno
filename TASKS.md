@@ -80,8 +80,8 @@
     notification opt-in/out va admin demand monitoring oqimlariga ulash; raw
     prompt/chat va PII’ni analytics propertylardan chiqarish, user ID’ni backend
     eventlarda pseudonym qilish va session replay input/image maskingni yoqish.
-  - [ ] PostHog OAuth qayta ulangandan keyin production dashboard, insight,
-    funnel va retention viewlarini event taxonomy asosida yaratish.
+  - [x] PostHog production dashboard, insight, funnel va retention viewlarini
+    event taxonomy asosida yaratish (`Zayuno Product Intelligence`, 10 insight).
 
 > Maqsad foydalanuvchini yashirin kuzatish emas, uning roziligi bilan foydali
 > xotira yaratish. Personalization o‘chirilganda ilovaning asosiy buyurtma oqimi

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,7 +13,9 @@ import {
   CatalogSectionItem,
 } from "../../lib/interaction";
 import { CategoryRibbon } from "./CategoryRibbon";
-import { FoodProductCard } from "./FoodProductCard";
+import { FoodProductCard, CartFlightOrigin } from "./FoodProductCard";
+import { offeringKey } from "../../lib/cart";
+import { useReducedMotion } from "./useReducedMotion";
 
 type InChatCatalogWidgetProps = {
   providerSlug: string;
@@ -21,7 +24,11 @@ type InChatCatalogWidgetProps = {
   locationName?: string;
   categories: CategoryRibbonItem[];
   sections: CatalogSectionItem[];
-  onAddToCart: (offering: CatalogOfferingItem) => void;
+  onAddToCart: (
+    offering: CatalogOfferingItem,
+    origin?: CartFlightOrigin,
+  ) => void;
+  quantities?: Record<string, number>;
   disabled?: boolean;
 };
 
@@ -29,9 +36,17 @@ export function InChatCatalogWidget({
   categories,
   sections,
   onAddToCart,
+  quantities = {},
   disabled,
 }: InChatCatalogWidgetProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
+    "all",
+  );
+  const { width, fontScale } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
+  const cardWidth = Math.round(
+    Math.max(150, Math.min(180, (width - 54) / 2)) * Math.min(fontScale, 1.3),
+  );
 
   const filteredSections = useMemo(() => {
     if (!selectedCategory || selectedCategory === "all") return sections;
@@ -49,7 +64,7 @@ export function InChatCatalogWidget({
         }}
       />
 
-      {/* 2. Categorized Horizontal Carousels */}
+      <Text style={styles.hint}>Mahsulotni bosing · savatga qo‘shiladi</Text>
       <View style={styles.sections}>
         {filteredSections.map((section) => (
           <View key={section.categorySlug} style={styles.sectionBlock}>
@@ -64,6 +79,9 @@ export function InChatCatalogWidget({
 
             <ScrollView
               horizontal
+              keyboardShouldPersistTaps="handled"
+              decelerationRate="fast"
+              snapToInterval={cardWidth + 10}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.carouselContent}
             >
@@ -72,6 +90,9 @@ export function InChatCatalogWidget({
                   key={offering.id || offering.offeringId}
                   offering={offering}
                   onAddToCart={onAddToCart}
+                  quantity={quantities[offeringKey(offering)] || 0}
+                  width={cardWidth}
+                  reducedMotion={reducedMotion}
                   disabled={disabled}
                 />
               ))}
@@ -82,7 +103,9 @@ export function InChatCatalogWidget({
         {filteredSections.length === 0 ? (
           <View style={styles.emptyResults}>
             <Ionicons name="fast-food-outline" size={24} color="#6C7693" />
-            <Text style={styles.emptyText}>Ushbu bo‘limda taomlar mavjud emas</Text>
+            <Text style={styles.emptyText}>
+              Ushbu bo‘limda taomlar mavjud emas
+            </Text>
           </View>
         ) : null}
       </View>
@@ -97,7 +120,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   sections: {
-    gap: 14,
+    gap: 18,
     marginTop: 2,
   },
   sectionBlock: {
@@ -111,7 +134,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: "#F3F5FB",
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "700",
   },
   countBadge: {
@@ -122,7 +145,7 @@ const styles = StyleSheet.create({
   },
   countText: {
     color: "#A99CFF",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "600",
   },
   carouselContent: {
@@ -130,6 +153,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     paddingRight: 10,
   },
+  hint: { color: "#9098B1", fontSize: 11, lineHeight: 16, paddingLeft: 2 },
   emptyResults: {
     paddingVertical: 24,
     alignItems: "center",
@@ -140,4 +164,3 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
-

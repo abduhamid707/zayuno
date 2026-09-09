@@ -388,6 +388,94 @@ async function main() {
     "an empty demo provider must not label real provider results as demo",
   );
 
+  const parsedReportedSelection = (
+    dynamicFoodChat as any
+  ).parseExplicitItemRequests(
+    "Xusnorik kombosi (2 ta), Tohir Sodiqov kombosi 1",
+  );
+  assert.deepEqual(parsedReportedSelection, [
+    { query: "Xusnorik kombosi", quantity: 2 },
+    { query: "Tohir Sodiqov kombosi 1", quantity: 1 },
+  ]);
+
+  const evosOfferings = [
+    {
+      id: "evos-xusnorik",
+      title: "Xusnorik kombosi",
+      basePrice: 62_000,
+      currency: "UZS",
+      isAvailable: true,
+    },
+    {
+      id: "evos-tohir-1",
+      title: "Tohir Sodiqov kombosi 1",
+      basePrice: 83_000,
+      currency: "UZS",
+      isAvailable: true,
+    },
+  ];
+  const reportedFlowChat = new ConsumerChatService(
+    {
+      listProviders: async () => [
+        {
+          slug: "evos",
+          name: "EVOS Fast Food",
+          type: "DELIVERY",
+          category: "food_delivery",
+          fulfillmentMode: "DELIVERY",
+          capabilities: ["CATALOG", "SEARCH", "QUOTE", "ACTION_CREATE"],
+        },
+      ],
+    } as any,
+    {
+      searchOfferings: async (_slug: string, query: string) =>
+        evosOfferings.filter((offering) =>
+          (dynamicFoodChat as any).textSimilarity(query, offering.title),
+        ),
+      getCatalog: async () => ({ offerings: evosOfferings }),
+      getOffering: async (_slug: string, offeringId: string) => ({
+        ...evosOfferings.find((offering) => offering.id === offeringId),
+        variants: [],
+        optionGroups: [],
+      }),
+    } as any,
+    {} as any,
+    {} as any,
+    redis as any,
+  );
+  (reportedFlowChat as any).planWithAi = async () => ({
+    intent: "food_browse",
+    needsCatalog: true,
+    providerScope: "explicit",
+    providerSlugs: ["evos"],
+    query: "kombolar",
+    quantity: 1,
+    limit: 10,
+    page: 0,
+    itemRequests: [],
+    allowCatalogFallback: true,
+    excludedOfferingIds: [],
+  });
+  const reportedFlow = await (reportedFlowChat as any).prepareChat({
+    prompt: "Xusnorik kombosi (2 ta), Tohir Sodiqov kombosi 1",
+    messages: [
+      { role: "user", content: "EVOS" },
+      {
+        role: "assistant",
+        content: "EVOS Fast Food menyusidan tanlang 👇",
+      },
+    ],
+    userId: "reported-flow-user",
+    userEmail: "customer@example.com",
+    conversationId: "reported-flow-chat",
+  });
+  assert.equal(reportedFlow.plan.intent, "food_selection");
+  assert.deepEqual(reportedFlow.plan.itemRequests, parsedReportedSelection);
+  assert.match(reportedFlow.directAnswer, /Xusnorik kombosi\*\* × 2/);
+  assert.match(reportedFlow.directAnswer, /Tohir Sodiqov kombosi 1\*\* × 1/);
+  assert.match(reportedFlow.directAnswer, /telefon raqamingiz/);
+  assert.doesNotMatch(reportedFlow.directAnswer, /Menyuda hozir mavjud/);
+
   // Re-mock planWithAi for capabilities, provider listing, and off-topic tests
   (dynamicFoodChat as any).planWithAi = async (prompt: string) => {
     if (/python|ob-havo|matematika|yangilik/i.test(prompt)) {
@@ -635,6 +723,9 @@ async function main() {
     if (prompt === "2") return { intent: "provide_details", choice: "2" };
     if (prompt === "1") return { intent: "provide_details", choice: "1" };
     if (prompt === "achchiq") return { intent: "provide_details", choice: "achchiq" };
+    if (/promo/i.test(prompt)) return { intent: "ask_question" };
+    if (prompt === "995557755") return { intent: "provide_details", phone: "995557755" };
+    if (prompt === "Toshkent, Chilonzor 5") return { intent: "provide_details", address: "Toshkent, Chilonzor 5" };
     if (prompt.includes("+998")) return { intent: "provide_details", phone: "+998901234567", address: "Toshkent, Chilonzor 5", fulfillmentType: "DELIVERY" };
     if (/tasdiq|ha\b|confirm/i.test(prompt)) return { intent: "confirm" };
     if (/bekor|yo'q|cancel/i.test(prompt)) return { intent: "cancel" };
@@ -688,10 +779,66 @@ async function main() {
   );
   assert.match(contactPrompt, /telefon raqamingiz/i);
 
+  const storedBeforeContact = JSON.parse(
+    orderStore.get("consumer:chat:pending-order:order-user")!,
+  );
+  assert.equal(
+    orderInternals.extractPendingContactDetails(
+      "Toshkent, Chilonzor tumani, 5-mavze, 12-uy",
+      storedBeforeContact,
+    ).address,
+    "Toshkent, Chilonzor tumani, 5-mavze, 12-uy",
+    "an address may arrive before the phone number",
+  );
+  assert.equal(
+    orderInternals.extractPromoCode("Promo code bormi?"),
+    undefined,
+    "a promo question must not be mistaken for a promo code",
+  );
+  assert.equal(orderInternals.extractPromoCode("promo: ZAYUNO10"), "ZAYUNO10");
+  assert.deepEqual(
+    orderInternals.parseExplicitItemRequests(
+      "Detroyt seti, 26 dona, Dudlangan lososli MINIROLL 6 dona, Gril lososli miniroll, 6 dona (4 ta)",
+    ),
+    [
+      { query: "Detroyt seti, 26 dona", quantity: 1 },
+      { query: "Dudlangan lososli MINIROLL 6 dona", quantity: 1 },
+      { query: "Gril lososli miniroll, 6 dona", quantity: 4 },
+    ],
+    "pack sizes in provider titles must remain intact while parenthesized order quantities are applied",
+  );
+
+  const promoAnswer = await orderInternals.handlePendingOrder(
+    "order-user",
+    "customer@example.com",
+    "Promo code bormi?",
+  );
+  assert.match(promoAnswer, /ommaviy promo-kod/i);
+  assert.match(promoAnswer, /telefon raqamingiz/i);
+  assert.equal(quoteCalls, 0, "a side question must preserve the pending order");
+
+  const addressOnlyPrompt = await orderInternals.handlePendingOrder(
+    "order-user",
+    "customer@example.com",
+    "995557755",
+  );
+  assert.match(addressOnlyPrompt, /yetkazish manzilingiz/i);
+  assert.doesNotMatch(
+    addressOnlyPrompt,
+    /telefon raqamingiz/i,
+    "a separately supplied phone must be persisted and not requested again",
+  );
+  assert.equal(
+    JSON.parse(
+      orderStore.get("consumer:chat:pending-order:order-user")!,
+    ).phone,
+    "+998995557755",
+  );
+
   const confirmationPrompt = await orderInternals.handlePendingOrder(
     "order-user",
     "customer@example.com",
-    "+998901234567 | Toshkent, Chilonzor 5",
+    "Toshkent, Chilonzor 5",
   );
   assert.equal(quoteCalls, 1, "contact details must request a live quote once");
   assert.equal(actionCalls, 0, "quote must not create an action");

@@ -23,6 +23,7 @@ type SessionResponse = {
   accessToken?: string;
   refreshToken?: string;
   token?: string;
+  expiresIn?: number;
   user: { id: string; name?: string; email?: string; avatarUrl?: string };
 };
 
@@ -44,6 +45,7 @@ async function createConsumerSession(
     accessToken,
     refreshToken: session.refreshToken,
     user: session.user,
+    expiresIn: session.expiresIn,
   });
   Haptics.notificationAsync(
     Haptics.NotificationFeedbackType.Success,

@@ -15,6 +15,7 @@ const authController = read(
 const authStore = read("apps/mobile/src/store/authStore.ts");
 const apiClient = read("apps/mobile/src/lib/api.ts");
 const rootLayout = read("apps/mobile/app/_layout.tsx");
+const mobileComposer = read("apps/mobile/app/(app)/index.tsx");
 const historyService = read(
   "apps/api/src/modules/consumer/history/consumer-history.service.ts",
 );
@@ -43,12 +44,24 @@ assert.ok(
 );
 assert.match(authStore, /let refreshInFlight: Promise<boolean> \| null/);
 assert.match(authStore, /if \(refreshInFlight\) return refreshInFlight/);
+assert.match(authStore, /let initInFlight: Promise<void> \| null/);
+assert.match(authStore, /ACCESS_TOKEN_EXPIRES_AT_KEY/);
+assert.match(authStore, /for \(let attempt = 0; attempt < 3/);
+assert.doesNotMatch(
+  authStore,
+  /catch \{\s*await clearStoredSession\(\)/,
+  "Transient SecureStore reads must never erase a valid session.",
+);
 assert.match(
   authStore,
-  /if \(\[400, 401, 403\]\.includes\(response\.status\)\)/,
+  /if \(\[401, 403\]\.includes\(response\.status\)\)/,
 );
 assert.match(apiClient, /response\.status === 401[\s\S]*refreshSession/);
+assert.match(apiClient, /refreshSession\(true\)/);
 assert.match(rootLayout, /AppState\.addEventListener\("change"/);
+assert.match(mobileComposer, /submitBehavior="newline"/);
+assert.match(mobileComposer, /blurOnSubmit=\{false\}/);
+assert.doesNotMatch(mobileComposer, /onSubmitEditing=\{\(\) => sendMessage\(\)\}/);
 
 assert.match(historyController, /@UseGuards\(JwtAuthGuard\)/);
 assert.match(historyService, /where: \{ userId \}/);

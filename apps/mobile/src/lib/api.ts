@@ -38,7 +38,7 @@ export async function apiFetch<T>(
     response.status === 401 &&
     useAuthStore.getState().refreshToken
   ) {
-    const refreshed = await useAuthStore.getState().refreshSession();
+    const refreshed = await useAuthStore.getState().refreshSession(true);
     if (refreshed) response = await execute();
   }
 
@@ -208,7 +208,7 @@ export async function streamChat(
       error.status === 401 &&
       useAuthStore.getState().refreshToken
     ) {
-      const refreshed = await useAuthStore.getState().refreshSession();
+      const refreshed = await useAuthStore.getState().refreshSession(true);
       if (refreshed) {
         return executeChatStream(
           prompt,
