@@ -134,6 +134,137 @@ model User {
   actions      Action[]
   apiKeys      ApiKey[]
   reports      UserReport[]
+  consumerSessions ConsumerSession[]
+  chatSessions     ConsumerChatSession[]
+  memoryProfile    ConsumerMemoryProfile?
+  memorySignals    ConsumerMemorySignal[]
+  memoryJobs       ConsumerMemoryJob[]
+  suggestionEvents ConsumerSuggestionEvent[]
+}
+
+model ConsumerSession {
+  id         String    @id
+  familyId   String
+  userId     String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  lastUsedAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([familyId, revokedAt])
+  @@index([expiresAt])
+}
+
+model ConsumerChatSession {
+  id        String   @id
+  userId    String
+  title     String
+  createdAt DateTime
+  updatedAt DateTime @updatedAt
+
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ConsumerChatMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model ConsumerChatMessage {
+  id          String   @id
+  sessionId   String
+  role        String
+  content     String   @db.Text
+  latencyMs   Int?
+  interaction Json?
+  selections  Json?
+  createdAt   DateTime
+
+  session ConsumerChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+model ConsumerMemoryProfile {
+  userId                    String    @id
+  enabled                   Boolean   @default(false)
+  consentVersion            String?
+  consentedAt               DateTime?
+  revokedAt                 DateTime?
+  schemaVersion             Int       @default(1)
+  summary                   Json      @default("{}")
+  analyzedUserMessageCount  Int       @default(0)
+  lastAnalyzedMessageAt     DateTime?
+  lastAnalyzedMessageId     String?
+  lastAnalysisAt            DateTime?
+  analysisLeaseUntil        DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ConsumerMemorySignal {
+  id                 String    @id @default(uuid())
+  userId             String
+  kind               String
+  key                String
+  label              String
+  value              Json
+  confidence         Float
+  source             String    @default("AI_EXTRACTED")
+  evidenceMessageIds String[]
+  firstSeenAt        DateTime  @default(now())
+  lastSeenAt         DateTime  @default(now())
+  expiresAt          DateTime?
+  status             String    @default("ACTIVE")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, key])
+  @@index([userId, status, expiresAt])
+  @@index([userId, lastSeenAt])
+}
+
+model ConsumerMemoryJob {
+  id          String    @id @default(uuid())
+  userId      String
+  status      String    @default("QUEUED")
+  attempts    Int       @default(0)
+  messageCount Int
+  runAfter    DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  errorCode   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAfter])
+  @@index([userId, status])
+}
+
+model ConsumerSuggestionEvent {
+  id             String   @id @default(uuid())
+  userId         String
+  sessionId      String?
+  event          String
+  suggestionType String
+  suggestionKey  String
+  suggestionText String
+  context        Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, suggestionKey, event])
 }
 
 model UserReport {

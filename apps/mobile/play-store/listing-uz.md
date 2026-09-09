@@ -20,7 +20,8 @@ Asosiy imkoniyatlar:
 - Menyu va narxlarni qulay ko‘rish
 - Tanlangan mahsulotlarni jamlash
 - Buyurtma ma’lumotlarini aniqlashtirish
-- Oldingi chatlarni qurilmada ko‘rish
+- Oldingi chatlarni hisobingiz orqali qayta tiklash
+- Rozilik asosidagi aqlli tavsiyalar va boshqariladigan Zayuno xotirasi
 - Muammo haqida screenshot va chat konteksti bilan supportga xabar berish
 
 Zayuno karta raqami, CVV yoki bank parolini chatda so‘ramaydi. To‘lov mavjud bo‘lsa, providerning xavfsiz sahifasida amalga oshiriladi.

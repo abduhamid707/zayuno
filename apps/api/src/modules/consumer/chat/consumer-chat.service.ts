@@ -11,6 +11,7 @@ import { QuotesService } from "../../quotes/quotes.service";
 import { ActionsService } from "../../actions/actions.service";
 import { RedisService } from "../../../common/services/redis.service";
 import { createHash, randomUUID } from "crypto";
+import { ConsumerMemoryService } from "../memory/consumer-memory.service";
 
 type ConversationMessage = {
   role: "user" | "assistant";
@@ -225,14 +226,25 @@ type PreparedChat = {
   liveContext: unknown[];
   directAnswer?: string;
   interaction?: ChatInteraction;
+  personalizationContext?: string;
 };
 
 @Injectable()
 export class ConsumerChatService {
   private readonly logger = new Logger(ConsumerChatService.name);
-  private readonly model: { name: string; client: any; jsonClient?: any } | null;
-  private readonly inFlightStreams = new Map<string, Promise<ChatExecutionResult>>();
-  private readonly memoryPendingOrders = new Map<string, { state: PendingConsumerOrder; expiresAt: number }>();
+  private readonly model: {
+    name: string;
+    client: any;
+    jsonClient?: any;
+  } | null;
+  private readonly inFlightStreams = new Map<
+    string,
+    Promise<ChatExecutionResult>
+  >();
+  private readonly memoryPendingOrders = new Map<
+    string,
+    { state: PendingConsumerOrder; expiresAt: number }
+  >();
   private readonly memoryOffTopicAttempts = new Map<
     string,
     { count: number; expiresAt: number }
@@ -244,6 +256,7 @@ export class ConsumerChatService {
     private readonly quotesService: QuotesService,
     private readonly actionsService: ActionsService,
     private readonly redisService: RedisService,
+    private readonly memoryService: ConsumerMemoryService,
   ) {
     const systemInstruction = `You are Zayuno Food, a precise AI assistant for restaurant and fast-food discovery, menu browsing, delivery quotes, ordering, payment handoff and order tracking in Uzbekistan.
 Answer in fluent, polite Uzbek Latin and address only the user's latest food-ordering request.
@@ -261,7 +274,8 @@ STRICT RULES:
 10. Move the customer toward a useful food result quickly: restaurant → menu item → required variant/add-on → delivery or pickup → verified quote → explicit confirmation.`;
 
     const key = process.env.GEMINI_API_KEY?.trim();
-    const modelName = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
+    const modelName =
+      process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
     const gemini = key ? new GoogleGenerativeAI(key) : null;
     this.model = gemini
       ? {
@@ -288,7 +302,10 @@ STRICT RULES:
   async processMessage(input: ChatRequest): Promise<ChatExecutionResult> {
     const prepared = await this.prepareChat(input);
     if (prepared.directAnswer !== undefined) {
-      return { content: prepared.directAnswer, interaction: prepared.interaction };
+      return {
+        content: prepared.directAnswer,
+        interaction: prepared.interaction,
+      };
     }
     const content = await this.writeAnswer(prepared);
     return { content, interaction: prepared.interaction };
@@ -330,7 +347,10 @@ STRICT RULES:
       if (prepared.directAnswer) {
         onDelta(prepared.directAnswer);
       }
-      return { content: prepared.directAnswer, interaction: prepared.interaction };
+      return {
+        content: prepared.directAnswer,
+        interaction: prepared.interaction,
+      };
     }
     const instruction = this.buildInstruction(prepared);
 
@@ -378,7 +398,9 @@ STRICT RULES:
     const raw = prompt.toLowerCase().trim();
     // 1. Capabilities / "What can you do?"
     if (
-      /^(nima|nimalar)\s*(qila|qila\s*ola|qilas|qila\s*olasiz|qilaolasan|qilaolasiz|qilsa\s*bo['`]?ladi|bilasiz|mumkin)/i.test(raw) ||
+      /^(nima|nimalar)\s*(qila|qila\s*ola|qilas|qila\s*olasiz|qilaolasan|qilaolasiz|qilsa\s*bo['`]?ladi|bilasiz|mumkin)/i.test(
+        raw,
+      ) ||
       /qanday\s*(xizmat|servis|imkoniyat|yordam)/i.test(raw) ||
       /imkoniyatlaring\s*(nima|qanday)/i.test(raw) ||
       /qanaqa\s*(xizmat|servis)/i.test(raw) ||
@@ -404,9 +426,15 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     // 3. Restaurant / Fast-food listing questions or requests
     const norm = this.normalizeLookupText(prompt);
     if (
-      /^(r[ae]st[ao]r[a-z]*|fast\s*food[a-z]*|kafe[a-z]*|brend[a-z]*|oshxona[a-z]*|food[a-z]*|ovqat[a-z]*|taom[a-z]*)(\s+.*)?$/i.test(norm) ||
-      /(r[ae]st[ao]r[a-z]*|fast\s*food|fastfood|kafe|oshxona|food|ovqat|taom|pitsa|pizza|lavash|burger|sushi|donar|menyu|katalog)/i.test(norm) &&
-      /(ko['‘’`]?rsat|chiqar|bor|bormi|qanday|qaysi|qayerda|ro['‘’`]?yxat|mavjud|buyurtma|zakaz|tanlash|och)/i.test(norm)
+      /^(r[ae]st[ao]r[a-z]*|fast\s*food[a-z]*|kafe[a-z]*|brend[a-z]*|oshxona[a-z]*|food[a-z]*|ovqat[a-z]*|taom[a-z]*)(\s+.*)?$/i.test(
+        norm,
+      ) ||
+      (/(r[ae]st[ao]r[a-z]*|fast\s*food|fastfood|kafe|oshxona|food|ovqat|taom|pitsa|pizza|lavash|burger|sushi|donar|menyu|katalog)/i.test(
+        norm,
+      ) &&
+        /(ko['‘’`]?rsat|chiqar|bor|bormi|qanday|qaysi|qayerda|ro['‘’`]?yxat|mavjud|buyurtma|zakaz|tanlash|och)/i.test(
+          norm,
+        ))
     ) {
       return `Quyidagi mashhur restoran va fast-food tarmoqlaridan buyurtma berishingiz mumkin.\nKerakli restoranni tanlang 👇`;
     }
@@ -457,12 +485,19 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     }
 
     const history = this.normalizeHistory(input.messages);
-    const providers = (await this.providersService.listProviders())
-      .filter((provider: any) => this.isFoodProvider(provider))
-      .sort(
-        (left: any, right: any) =>
-          this.providerPriority(left.slug) - this.providerPriority(right.slug),
-      );
+    const personalizationContext = await this.memoryService
+      .getPromptContext(input.userId)
+      .catch(() => "");
+    const providers = this.memoryService.rankProviders(
+      (await this.providersService.listProviders())
+        .filter((provider: any) => this.isFoodProvider(provider))
+        .sort(
+          (left: any, right: any) =>
+            this.providerPriority(left.slug) -
+            this.providerPriority(right.slug),
+        ),
+      personalizationContext,
+    );
     const fastAnswer = this.matchFastIntentAnswer(prompt, history);
     if (fastAnswer) {
       return {
@@ -498,11 +533,19 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         plan,
         liveContext,
         directAnswer: `${directProvider.name} menyusidan tanlang 👇`,
-        interaction: await this.getCachedOrCuratedCatalogInteraction(plan, liveContext),
+        interaction: await this.getCachedOrCuratedCatalogInteraction(
+          plan,
+          liveContext,
+        ),
       };
     }
 
-    const aiPlan = await this.planWithAi(prompt, history, providers);
+    const aiPlan = await this.planWithAi(
+      prompt,
+      history,
+      providers,
+      personalizationContext,
+    );
     let plan: LiveContextPlan;
     if (aiPlan) {
       plan = aiPlan;
@@ -510,7 +553,10 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       this.logger.warn(
         `AI planner returned null, activating resilient fallback for: "${prompt}"`,
       );
-      const rawParts = prompt.split(/[,;\n]+/).map((s) => s.trim()).filter((s) => s.length >= 2);
+      const rawParts = prompt
+        .split(/[,;\n]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length >= 2);
       const isMultiItem = rawParts.length >= 2;
       const mentionedSlugs = this.findMentionedProviderSlugs(
         prompt,
@@ -663,10 +709,13 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         history,
         plan,
         liveContext,
-        directAnswer: "Quyidagi restoran va taomlardan birini tanlashingiz mumkin 👇",
+        directAnswer:
+          "Quyidagi restoran va taomlardan birini tanlashingiz mumkin 👇",
         interaction:
-          (await this.getCachedOrCuratedCatalogInteraction(plan, liveContext)) ||
-          this.buildProviderInteraction(providers),
+          (await this.getCachedOrCuratedCatalogInteraction(
+            plan,
+            liveContext,
+          )) || this.buildProviderInteraction(providers),
       };
     }
 
@@ -676,7 +725,11 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       plan,
       liveContext,
       directAnswer: groundedAnswer,
-      interaction: await this.getCachedOrCuratedCatalogInteraction(plan, liveContext),
+      interaction: await this.getCachedOrCuratedCatalogInteraction(
+        plan,
+        liveContext,
+      ),
+      personalizationContext,
     };
   }
 
@@ -743,7 +796,9 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     providers: any[],
     plan?: LiveContextPlan,
   ): ChatInteraction | undefined {
-    let candidates = providers.filter((provider) => this.isFoodProvider(provider));
+    let candidates = providers.filter((provider) =>
+      this.isFoodProvider(provider),
+    );
     if (plan?.providerSlugs.length) {
       candidates = providers.filter((provider) =>
         plan.providerSlugs.includes(provider.slug),
@@ -759,7 +814,9 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
             score: terms.reduce(
               (score, term) =>
                 score +
-                (this.normalizeLookupText(this.providerIdentity(provider)).includes(term)
+                (this.normalizeLookupText(
+                  this.providerIdentity(provider),
+                ).includes(term)
                   ? 1
                   : 0),
               0,
@@ -832,7 +889,9 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
   private isCapabilityRequest(prompt: string): boolean {
     const raw = prompt.toLowerCase().trim();
     return (
-      /^(nima|nimalar)\s*(qila|qila\s*ola|qilas|qila\s*olasiz|qilaolasan|qilaolasiz|qilsa\s*bo['`]?ladi|bilasiz|mumkin)/i.test(raw) ||
+      /^(nima|nimalar)\s*(qila|qila\s*ola|qilas|qila\s*olasiz|qilaolasan|qilaolasiz|qilsa\s*bo['`]?ladi|bilasiz|mumkin)/i.test(
+        raw,
+      ) ||
       /qanday\s*(xizmat|servis|imkoniyat|yordam)/i.test(raw) ||
       /imkoniyatlaring\s*(nima|qanday)/i.test(raw) ||
       /qanaqa\s*(xizmat|servis)/i.test(raw) ||
@@ -861,7 +920,11 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         const cached = await this.redisService.get(cacheKey);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (parsed && parsed.kind === "catalog_menu" && parsed.sections?.length > 0) {
+          if (
+            parsed &&
+            parsed.kind === "catalog_menu" &&
+            parsed.sections?.length > 0
+          ) {
             return parsed;
           }
         }
@@ -893,15 +956,25 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
           (offering: any) => ({ context, offering }),
         ),
     );
-    const available = entries.filter(({ offering }) => offering?.id && offering?.title);
+    const available = entries.filter(
+      ({ offering }) => offering?.id && offering?.title,
+    );
     if (!available.length) return undefined;
 
     const firstContext = liveContext[0] || entries[0]?.context;
 
-    const sectionsMap = new Map<string, { categorySlug: string; categoryTitle: string; offerings: CatalogOfferingItem[] }>();
+    const sectionsMap = new Map<
+      string,
+      {
+        categorySlug: string;
+        categoryTitle: string;
+        offerings: CatalogOfferingItem[];
+      }
+    >();
     for (const { context, offering } of available) {
       const catSlug = offering.categorySlug || "general";
-      const catTitle = offering.categoryTitle || offering.categoryName || catSlug;
+      const catTitle =
+        offering.categoryTitle || offering.categoryName || catSlug;
       if (!sectionsMap.has(catSlug)) {
         sectionsMap.set(catSlug, {
           categorySlug: catSlug,
@@ -934,10 +1007,16 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         price: resolvedPrice,
         currency: offering.currency || "UZS",
         imageUrl: this.safeInteractionImage(
-          offering.imageUrl || offering.media?.[0]?.url || offering.metadata?.imageUrl,
+          offering.imageUrl ||
+            offering.media?.[0]?.url ||
+            offering.metadata?.imageUrl,
         ),
-        variantsCount: Array.isArray(offering.variants) ? offering.variants.length : 0,
-        optionsCount: Array.isArray(offering.optionGroups) ? offering.optionGroups.length : 0,
+        variantsCount: Array.isArray(offering.variants)
+          ? offering.variants.length
+          : 0,
+        optionsCount: Array.isArray(offering.optionGroups)
+          ? offering.optionGroups.length
+          : 0,
       });
     }
 
@@ -948,7 +1027,9 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     const categoriesRibbon: CategoryRibbonItem[] = (
       rawCategories.length > 0
         ? rawCategories
-            .filter((c: any) => (sectionsMap.get(c.slug)?.offerings?.length ?? 0) > 0)
+            .filter(
+              (c: any) => (sectionsMap.get(c.slug)?.offerings?.length ?? 0) > 0,
+            )
             .map((c: any) => ({
               id: c.id || c.slug,
               slug: c.slug,
@@ -989,7 +1070,8 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
   ): ChatInteraction | undefined {
     if (!state) return undefined;
     const requirement = this.nextOrderRequirement(state);
-    if (!requirement || requirement.kind === "delivery_contact") return undefined;
+    if (!requirement || requirement.kind === "delivery_contact")
+      return undefined;
 
     const rawChoices = Array.isArray(requirement.choices)
       ? requirement.choices
@@ -1000,32 +1082,36 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       typeof requirement.itemIndex === "number"
         ? state.items[requirement.itemIndex]
         : undefined;
-    const choices = rawChoices.map((choice: any, index: number): InteractionChoice => {
-      const label = this.cleanMarkdownText(
-        this.fulfillmentLabel(String(choice?.name ?? choice?.title ?? choice?.id ?? choice)),
-      );
-      const price =
-        requirement.kind === "variant"
-          ? Number(choice?.basePrice)
-          : Number(choice?.priceDelta);
-      return {
-        id: `choice:${choice?.id || index}`,
-        kind: requirement.kind === "variant" ? "variant" : "option",
-        title: label,
-        subtitle:
+    const choices = rawChoices.map(
+      (choice: any, index: number): InteractionChoice => {
+        const label = this.cleanMarkdownText(
+          this.fulfillmentLabel(
+            String(choice?.name ?? choice?.title ?? choice?.id ?? choice),
+          ),
+        );
+        const price =
           requirement.kind === "variant"
-            ? currentItem?.offeringTitle
-            : requirement.title,
-        price: Number.isFinite(price) && price > 0 ? price : undefined,
-        currency: "UZS",
-        prompt: label,
-        groupId,
-        offeringId: currentItem?.offeringId,
-        multiSelect:
-          requirement.kind === "option" &&
-          Number(requirement.maxSelections || 1) > 1,
-      };
-    });
+            ? Number(choice?.basePrice)
+            : Number(choice?.priceDelta);
+        return {
+          id: `choice:${choice?.id || index}`,
+          kind: requirement.kind === "variant" ? "variant" : "option",
+          title: label,
+          subtitle:
+            requirement.kind === "variant"
+              ? currentItem?.offeringTitle
+              : requirement.title,
+          price: Number.isFinite(price) && price > 0 ? price : undefined,
+          currency: "UZS",
+          prompt: label,
+          groupId,
+          offeringId: currentItem?.offeringId,
+          multiSelect:
+            requirement.kind === "option" &&
+            Number(requirement.maxSelections || 1) > 1,
+        };
+      },
+    );
 
     return {
       version: 1,
@@ -1053,14 +1139,18 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
   private safeInteractionImage(value: unknown): string | undefined {
     try {
       const url = new URL(String(value || ""));
-      if (url.protocol !== "https:" || url.username || url.password) return undefined;
+      if (url.protocol !== "https:" || url.username || url.password)
+        return undefined;
       return url.toString();
     } catch {
       return undefined;
     }
   }
 
-  private truncateInteractionText(value: string, maxLength: number): string | undefined {
+  private truncateInteractionText(
+    value: string,
+    maxLength: number,
+  ): string | undefined {
     if (!value) return undefined;
     return value.length > maxLength
       ? `${value.slice(0, Math.max(maxLength - 1, 1)).trim()}…`
@@ -1069,7 +1159,8 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
 
   private providerEmoji(provider: any): string | undefined {
     const identity = this.providerIdentity(provider);
-    if (/food|restaurant|cafe|coffee|fast.?food|ovqat|taom/.test(identity)) return "🍽️";
+    if (/food|restaurant|cafe|coffee|fast.?food|ovqat|taom/.test(identity))
+      return "🍽️";
     return "🍴";
   }
 
@@ -1093,15 +1184,20 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
 
     if (plan.providerSlugs.length > 0) {
       candidateProviders = candidateProviders.filter((p) =>
-        plan.providerSlugs.includes(p.slug)
+        plan.providerSlugs.includes(p.slug),
       );
     } else if (plan.query) {
-      const queryTerms = this.normalizeLookupText(plan.query).split(/\s+/).filter((t) => t.length >= 3);
+      const queryTerms = this.normalizeLookupText(plan.query)
+        .split(/\s+/)
+        .filter((t) => t.length >= 3);
       if (queryTerms.length > 0) {
         candidateProviders = candidateProviders
           .map((p) => {
             const identity = this.normalizeLookupText(this.providerIdentity(p));
-            const score = queryTerms.reduce((sum, term) => sum + (identity.includes(term) ? 1 : 0), 0);
+            const score = queryTerms.reduce(
+              (sum, term) => sum + (identity.includes(term) ? 1 : 0),
+              0,
+            );
             return { p, score };
           })
           .filter((x) => x.score > 0)
@@ -1132,7 +1228,7 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       (provider) =>
         `- **${this.cleanMarkdownText(provider.name)}** — ${this.describeProvider(provider)}`,
     );
-    
+
     if (plan.query || plan.providerSlugs.length > 0) {
       return `Sizga mos restoranlar:\n\n${rows.join("\n")}\n\nQaysi birining menyusini ochamiz?`;
     }
@@ -1153,9 +1249,8 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     const productionProviders = foodProviders.filter(
       (provider) => !this.isDemoProvider(provider),
     );
-    const visible = (productionProviders.length
-      ? productionProviders
-      : foodProviders
+    const visible = (
+      productionProviders.length ? productionProviders : foodProviders
     ).slice(0, 8);
     if (!visible.length) {
       return "Hozir ovqat buyurtmasini qabul qiladigan hamkor topilmadi.";
@@ -1184,9 +1279,14 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     // 2. Extract specialty dish keywords from provider description
     const desc = provider.description || meta.description;
     if (desc && typeof desc === "string") {
-      const sentences = desc.split(/[.!?]+/).map((s: string) => s.trim()).filter(Boolean);
+      const sentences = desc
+        .split(/[.!?]+/)
+        .map((s: string) => s.trim())
+        .filter(Boolean);
       for (const sentence of sentences) {
-        const cleaned = sentence.replace(/^[A-Za-z0-9\s—–-]+\s*—\s*/, "").trim();
+        const cleaned = sentence
+          .replace(/^[A-Za-z0-9\s—–-]+\s*—\s*/, "")
+          .trim();
         if (
           /(lavash|burger|shaurma|pitsa|pizza|sushi|roll|wok|gazak|snek|kombo|taom|ichimlik|qanot)/i.test(
             cleaned,
@@ -1204,8 +1304,14 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     if (Array.isArray(rawCategories) && rawCategories.length > 0) {
       const cleanCats = rawCategories
         .map((c: any) => (typeof c === "string" ? c : c.title || c.name || ""))
-        .map((t: string) => t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "").trim())
-        .filter((t: string) => t.length >= 2 && !/combo|set|xit|aksiy|yangi|super|box|mini/i.test(t))
+        .map((t: string) =>
+          t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "").trim(),
+        )
+        .filter(
+          (t: string) =>
+            t.length >= 2 &&
+            !/combo|set|xit|aksiy|yangi|super|box|mini/i.test(t),
+        )
         .slice(0, 3);
       if (cleanCats.length > 0) {
         return cleanCats.join(", ");
@@ -1215,12 +1321,19 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     // 4. Specific known fallback based on provider slug or identity
     const slug = String(provider.slug || "").toLowerCase();
     if (slug.includes("evos")) return "Lavash, burger, shaurma va kombolar";
-    if (slug.includes("maxway")) return "Katta burgerlar, klabb-lavash va sneklar";
-    if (slug.includes("bellissimo")) return "Issiq pitsalar, gazaklar va kombolar";
-    if (slug.includes("chopar")) return "Sharqona va yevropacha pitsalar, sneklar";
-    if (slug.includes("yaponamama")) return "Sushi to‘plamlari, rollar va WOK taomlar";
+    if (slug.includes("maxway"))
+      return "Katta burgerlar, klabb-lavash va sneklar";
+    if (slug.includes("bellissimo"))
+      return "Issiq pitsalar, gazaklar va kombolar";
+    if (slug.includes("chopar"))
+      return "Sharqona va yevropacha pitsalar, sneklar";
+    if (slug.includes("yaponamama"))
+      return "Sushi to‘plamlari, rollar va WOK taomlar";
 
-    return this.cleanMarkdownText(provider.description) || "Taom va ichimliklar menyusi";
+    return (
+      this.cleanMarkdownText(provider.description) ||
+      "Taom va ichimliklar menyusi"
+    );
   }
 
   private isDemoProvider(provider: any): boolean {
@@ -1356,7 +1469,8 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     liveContext: any[],
     conversationId?: string,
   ): Promise<string | undefined> {
-    if (plan.intent !== "food_selection" && plan.itemRequests.length === 0) return undefined;
+    if (plan.intent !== "food_selection" && plan.itemRequests.length === 0)
+      return undefined;
     const candidates = liveContext
       .flatMap((context) =>
         Array.isArray(context?.offerings)
@@ -1509,14 +1623,19 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
   }
 
   private textSimilarity(left: unknown, right: unknown): number {
-    const rawLeft = String(left || "").toLowerCase().trim();
-    const rawRight = String(right || "").toLowerCase().trim();
+    const rawLeft = String(left || "")
+      .toLowerCase()
+      .trim();
+    const rawRight = String(right || "")
+      .toLowerCase()
+      .trim();
     if (!rawLeft || !rawRight) return 0;
     if (rawRight.includes(rawLeft) || rawLeft.includes(rawRight)) return 1.0;
 
     const normLeft = this.normalizeLookupText(rawLeft).replace(/c/g, "k");
     const normRight = this.normalizeLookupText(rawRight).replace(/c/g, "k");
-    if (normRight.includes(normLeft) || normLeft.includes(normRight)) return 1.0;
+    if (normRight.includes(normLeft) || normLeft.includes(normRight))
+      return 1.0;
 
     const stopWords = new Set([
       "dan",
@@ -1576,7 +1695,12 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
 
     if (state.stage === "collecting_requirements") {
       if (requirement) {
-        const captured = this.applyPendingTurn(state, requirement, turn, prompt);
+        const captured = this.applyPendingTurn(
+          state,
+          requirement,
+          turn,
+          prompt,
+        );
         if (!captured) return this.formatRequirementPrompt(state, requirement);
       } else if (
         turn.intent === "ask_support" ||
@@ -1642,8 +1766,13 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       paymentOptions = await this.actionsService.getPaymentOptions(action.id, {
         id: userId,
       });
-      if (!paymentUrl && Array.isArray(paymentOptions) && paymentOptions.length > 0) {
-        const option = paymentOptions.find((o: any) => o?.checkoutUrl) || paymentOptions[0];
+      if (
+        !paymentUrl &&
+        Array.isArray(paymentOptions) &&
+        paymentOptions.length > 0
+      ) {
+        const option =
+          paymentOptions.find((o: any) => o?.checkoutUrl) || paymentOptions[0];
         paymentUrl = this.safeHttpUrl(option?.checkoutUrl);
       }
     } catch {
@@ -1670,7 +1799,9 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       for (const opt of paymentOptions) {
         const optUrl = this.safeHttpUrl(opt.checkoutUrl);
         if (optUrl) {
-          paymentLinks.push(`💳 [${this.cleanMarkdownText(opt.name)}](${optUrl})`);
+          paymentLinks.push(
+            `💳 [${this.cleanMarkdownText(opt.name)}](${optUrl})`,
+          );
         } else if (opt.type === "CASH_ON_DELIVERY") {
           paymentLinks.push(`💵 ${this.cleanMarkdownText(opt.name)}`);
         }
@@ -1786,7 +1917,10 @@ USER=${JSON.stringify(prompt)}`;
       let value: any = turn.choice;
       if ((value === undefined || value === "") && prompt) {
         const trimmed = prompt.trim();
-        if (trimmed && !["ha", "yo'q", "tasdiqlayman"].includes(trimmed.toLowerCase())) {
+        if (
+          trimmed &&
+          !["ha", "yo'q", "tasdiqlayman"].includes(trimmed.toLowerCase())
+        ) {
           value = trimmed;
         }
       }
@@ -2002,7 +2136,8 @@ USER=${JSON.stringify(prompt)}`;
     const choices = Array.isArray(requirement.choices)
       ? requirement.choices
           .map((choice: any, index: number) => {
-            const rawLabel = choice?.name ?? choice?.title ?? choice?.id ?? choice;
+            const rawLabel =
+              choice?.name ?? choice?.title ?? choice?.id ?? choice;
             const label = this.cleanMarkdownText(
               this.fulfillmentLabel(String(rawLabel)),
             );
@@ -2202,7 +2337,11 @@ USER=${JSON.stringify(prompt)}`;
     prompt: string,
   ): Promise<"status" | "support" | "other"> {
     const normalized = prompt.toLowerCase().trim();
-    if (/to[‘'`]?ladi|to[‘'`]?lov|holat|status|yetib|kelyapti|qayerda|buyurtma.*nima/i.test(normalized)) {
+    if (
+      /to[‘'`]?ladi|to[‘'`]?lov|holat|status|yetib|kelyapti|qayerda|buyurtma.*nima/i.test(
+        normalized,
+      )
+    ) {
       return "status";
     }
     if (/support|yordam|telefon|aloqa|bog[‘'`]?lanish/i.test(normalized)) {
@@ -2298,6 +2437,7 @@ USER=${JSON.stringify(prompt)}`;
     prompt: string,
     history: ConversationMessage[],
     providers: any[],
+    personalizationContext = "",
   ): Promise<LiveContextPlan | null> {
     if (!this.model) return null;
 
@@ -2338,6 +2478,7 @@ Rules:
 
 PROVIDERS=${JSON.stringify(directory)}
 HISTORY=${JSON.stringify(recentHistory)}
+PERSONALIZATION=${personalizationContext || "[]"}
 USER=${JSON.stringify(prompt)}`;
 
     try {
@@ -2417,9 +2558,9 @@ USER=${JSON.stringify(prompt)}`;
         excludedOfferingIds: [],
         directAnswer:
           !needsCatalog && typeof parsed.answer === "string"
-            ? (parsed.intent === "general"
-                ? undefined
-                : parsed.answer.trim().slice(0, 1200))
+            ? parsed.intent === "general"
+              ? undefined
+              : parsed.answer.trim().slice(0, 1200)
             : undefined,
       };
     } catch (error) {
@@ -2908,9 +3049,27 @@ USER=${JSON.stringify(prompt)}`;
     const raw = this.normalizeLookupText(prompt);
     if (!raw || raw.length > 80) return null;
     const genericWords = new Set([
-      "food", "fast", "fast food", "restoran", "restaurant", "kafe", "cafe",
-      "menu", "menyu", "pizza", "pitsa", "lavash", "burger", "oshxona",
-      "market", "shop", "store", "dostavka", "yetkazish", "zakaz", "buyurtma",
+      "food",
+      "fast",
+      "fast food",
+      "restoran",
+      "restaurant",
+      "kafe",
+      "cafe",
+      "menu",
+      "menyu",
+      "pizza",
+      "pitsa",
+      "lavash",
+      "burger",
+      "oshxona",
+      "market",
+      "shop",
+      "store",
+      "dostavka",
+      "yetkazish",
+      "zakaz",
+      "buyurtma",
     ]);
     if (genericWords.has(raw)) return null;
 
@@ -2936,35 +3095,125 @@ USER=${JSON.stringify(prompt)}`;
 
     // 1. Direct vertical semantic keywords mapping for 25 providers
     const KEYWORD_MAP: Array<{ regex: RegExp; slug: string | string[] }> = [
-      { regex: /\b(tish|stomatolog|dental|plomba|breket|implant|tishlar)\b/i, slug: "dental-one" },
-      { regex: /\b(ko‘z|ko`z|koz|oftalmolog|glaz|linza|katarakta|lasik|nova\s*eye|nova\s*clinic)\b/i, slug: "nova-clinic" },
-      { regex: /\b(yurak|kardiolog|ekg|holter|qon\s*bosim|cardio)\b/i, slug: "cardio-life" },
-      { regex: /\b(tahlil|analiz|diagnostika|mrt|kt|uzi|medline|laboratoriya)\b/i, slug: "medline" },
-      { regex: /\b(teri|dermatolog|kosmetolog|derma|prp|botoks)\b/i, slug: "derma-care" },
-      { regex: /\b(shifokor|shifoxona|klinika|kasalxona|doktor|vrach|sog‘liq|salomatlik|medisina|tibbiyot)\b/i, slug: ["dental-one", "nova-clinic", "cardio-life", "medline", "derma-care"] },
-      { regex: /\b(gul|gullar|guldasta|atirgul|lola|kelinchak|flowerlab)\b/i, slug: "flowerlab" },
-      { regex: /\b(kitob|kitoblar|roman|badiiy|bookly|adabiyot)\b/i, slug: "bookly" },
-      { regex: /\b(telefon|smartfon|iphone|samsung|macbook|ipad|airpods|dyson|smartgadget)\b/i, slug: "smart-gadget" },
-      { regex: /\b(poyezd|poezd|vagon|vokzal|afrosiyob|sharq|plaskart|kupe|temir\s*yo‘l|temir\s*yol|uzrailways)\b/i, slug: "uzrailways" },
-      { regex: /\b(samolyot|avia|uchmoq|uchmoqchiman|uchish|uchishga|uchishni|reys|parvoz|parvozlar|aviachipta|havo\s*yo‘li|airways)\b/i, slug: "uzbekistan-airways" },
+      {
+        regex: /\b(tish|stomatolog|dental|plomba|breket|implant|tishlar)\b/i,
+        slug: "dental-one",
+      },
+      {
+        regex:
+          /\b(ko‘z|ko`z|koz|oftalmolog|glaz|linza|katarakta|lasik|nova\s*eye|nova\s*clinic)\b/i,
+        slug: "nova-clinic",
+      },
+      {
+        regex: /\b(yurak|kardiolog|ekg|holter|qon\s*bosim|cardio)\b/i,
+        slug: "cardio-life",
+      },
+      {
+        regex:
+          /\b(tahlil|analiz|diagnostika|mrt|kt|uzi|medline|laboratoriya)\b/i,
+        slug: "medline",
+      },
+      {
+        regex: /\b(teri|dermatolog|kosmetolog|derma|prp|botoks)\b/i,
+        slug: "derma-care",
+      },
+      {
+        regex:
+          /\b(shifokor|shifoxona|klinika|kasalxona|doktor|vrach|sog‘liq|salomatlik|medisina|tibbiyot)\b/i,
+        slug: [
+          "dental-one",
+          "nova-clinic",
+          "cardio-life",
+          "medline",
+          "derma-care",
+        ],
+      },
+      {
+        regex: /\b(gul|gullar|guldasta|atirgul|lola|kelinchak|flowerlab)\b/i,
+        slug: "flowerlab",
+      },
+      {
+        regex: /\b(kitob|kitoblar|roman|badiiy|bookly|adabiyot)\b/i,
+        slug: "bookly",
+      },
+      {
+        regex:
+          /\b(telefon|smartfon|iphone|samsung|macbook|ipad|airpods|dyson|smartgadget)\b/i,
+        slug: "smart-gadget",
+      },
+      {
+        regex:
+          /\b(poyezd|poezd|vagon|vokzal|afrosiyob|sharq|plaskart|kupe|temir\s*yo‘l|temir\s*yol|uzrailways)\b/i,
+        slug: "uzrailways",
+      },
+      {
+        regex:
+          /\b(samolyot|avia|uchmoq|uchmoqchiman|uchish|uchishga|uchishni|reys|parvoz|parvozlar|aviachipta|havo\s*yo‘li|airways)\b/i,
+        slug: "uzbekistan-airways",
+      },
       { regex: /\b(avtobus|fastbus|marshrutka)\b/i, slug: "fastbus" },
-      { regex: /\b(chipta|chiptalar|bilet|biletlar)\b/i, slug: ["uzrailways", "uzbekistan-airways", "silk-road-tours", "fastbus"] },
-      { regex: /\b(toshkent\s*(dan)?\s*(buxoro|samarqand|andijon|namangan|farg‘ona|termiz|urganch|nukus|qarshi|navoiy|guliston)|buxoro\s*(dan)?\s*toshkent|samarqand\s*(dan)?\s*toshkent)\b/i, slug: ["uzrailways", "silk-road-tours", "uzbekistan-airways"] },
-      { regex: /\b(yuk\s*tashish|kargo|cargo|fura|gazel|citycargo)\b/i, slug: "city-cargo" },
-      { regex: /\b(ijara|arenda|prokat|rentcar|onix|tracker|malibu|tahoe|mashina\s*ijara)\b/i, slug: "rentcar-express" },
-      { regex: /\b(umra|haj|ziyorat|makka|madina|safar\s*umrah)\b/i, slug: "umrah-travel" },
-      { regex: /\b(dubay|dubai|antaliya|misr|sharm|dubaigo)\b/i, slug: "dubaigo" },
-      { regex: /\b(sayohat|sayohatlar|turizm|tur\b|sayr|ekskursiya|tarixiy|silk\s*road)\b/i, slug: ["silk-road-tours", "dubaigo", "umrah-travel"] },
-      { regex: /\b(mchj|firma\s*ochish|biznes|bizreg|buxgalteriya)\b/i, slug: "bizreg" },
-      { regex: /\b(notarius|apostil|ishonchnoma|tarjima\s*markazi|notarius\s*express)\b/i, slug: "notarius-express" },
+      {
+        regex: /\b(chipta|chiptalar|bilet|biletlar)\b/i,
+        slug: [
+          "uzrailways",
+          "uzbekistan-airways",
+          "silk-road-tours",
+          "fastbus",
+        ],
+      },
+      {
+        regex:
+          /\b(toshkent\s*(dan)?\s*(buxoro|samarqand|andijon|namangan|farg‘ona|termiz|urganch|nukus|qarshi|navoiy|guliston)|buxoro\s*(dan)?\s*toshkent|samarqand\s*(dan)?\s*toshkent)\b/i,
+        slug: ["uzrailways", "silk-road-tours", "uzbekistan-airways"],
+      },
+      {
+        regex: /\b(yuk\s*tashish|kargo|cargo|fura|gazel|citycargo)\b/i,
+        slug: "city-cargo",
+      },
+      {
+        regex:
+          /\b(ijara|arenda|prokat|rentcar|onix|tracker|malibu|tahoe|mashina\s*ijara)\b/i,
+        slug: "rentcar-express",
+      },
+      {
+        regex: /\b(umra|haj|ziyorat|makka|madina|safar\s*umrah)\b/i,
+        slug: "umrah-travel",
+      },
+      {
+        regex: /\b(dubay|dubai|antaliya|misr|sharm|dubaigo)\b/i,
+        slug: "dubaigo",
+      },
+      {
+        regex:
+          /\b(sayohat|sayohatlar|turizm|tur\b|sayr|ekskursiya|tarixiy|silk\s*road)\b/i,
+        slug: ["silk-road-tours", "dubaigo", "umrah-travel"],
+      },
+      {
+        regex: /\b(mchj|firma\s*ochish|biznes|bizreg|buxgalteriya)\b/i,
+        slug: "bizreg",
+      },
+      {
+        regex:
+          /\b(notarius|apostil|ishonchnoma|tarjima\s*markazi|notarius\s*express)\b/i,
+        slug: "notarius-express",
+      },
       { regex: /\b(klining|tozalash|uborka|cleanpro)\b/i, slug: "cleanpro" },
-      { regex: /\b(sport\s*zali|trenajyor|fitnes|fitness|basseyn|abonement)\b/i, slug: "fitness-hub" },
+      {
+        regex: /\b(sport\s*zali|trenajyor|fitnes|fitness|basseyn|abonement)\b/i,
+        slug: "fitness-hub",
+      },
       { regex: /\b(lavash|shaurma|donar|evos)\b/i, slug: "evos" },
       { regex: /\b(burger|chizburger|maxway|strips)\b/i, slug: "maxway" },
-      { regex: /\b(pitsa|pizza|bellissimo)\b/i, slug: ["bellissimo", "chopar"] },
+      {
+        regex: /\b(pitsa|pizza|bellissimo)\b/i,
+        slug: ["bellissimo", "chopar"],
+      },
       { regex: /\b(chopar)\b/i, slug: "chopar" },
       { regex: /\b(sushi|roll|yaponamama)\b/i, slug: "yaponamama" },
-      { regex: /\b(qahva|kofe|cappuccino|latte|americano|coffee\s*time)\b/i, slug: "coffee-time" },
+      {
+        regex: /\b(qahva|kofe|cappuccino|latte|americano|coffee\s*time)\b/i,
+        slug: "coffee-time",
+      },
     ];
 
     const matchedFromKeywords: string[] = [];
@@ -3008,7 +3257,9 @@ USER=${JSON.stringify(prompt)}`;
 
     // 3. Match from recent history if assistant suggested specific providers or routes
     if (history && history.length > 0) {
-      const lastAssistant = [...history].reverse().find((m) => m.role === "assistant");
+      const lastAssistant = [...history]
+        .reverse()
+        .find((m) => m.role === "assistant");
       if (lastAssistant) {
         const assistantText = lastAssistant.content.toLowerCase();
 
@@ -3028,12 +3279,20 @@ USER=${JSON.stringify(prompt)}`;
         const activeProviders = providers.filter((p) => {
           const s = p.slug.toLowerCase().replace(/-/g, " ");
           const n = p.name.toLowerCase();
-          return assistantText.includes(p.slug.toLowerCase()) || assistantText.includes(s) || assistantText.includes(n);
+          return (
+            assistantText.includes(p.slug.toLowerCase()) ||
+            assistantText.includes(s) ||
+            assistantText.includes(n)
+          );
         });
         if (activeProviders.length > 0) {
           if (
-            /\b(toshkent|samarqand|buxoro|guliston|navoiy|andijon|namangan|farg‘ona|termiz|urganch|nukus|qarshi|jizzax)\b/i.test(prompt) ||
-            /\b(1|2|3|4|5|bir|ikki|uch|shu|shuni|buni|variant|chipta|bilet|qatnov|jo‘nash|jonash|narx|qancha|olmoqchiman|buyurtma)\b/i.test(prompt)
+            /\b(toshkent|samarqand|buxoro|guliston|navoiy|andijon|namangan|farg‘ona|termiz|urganch|nukus|qarshi|jizzax)\b/i.test(
+              prompt,
+            ) ||
+            /\b(1|2|3|4|5|bir|ikki|uch|shu|shuni|buni|variant|chipta|bilet|qatnov|jo‘nash|jonash|narx|qancha|olmoqchiman|buyurtma)\b/i.test(
+              prompt,
+            )
           ) {
             return activeProviders.map((p) => p.slug);
           }
@@ -3224,7 +3483,11 @@ USER=${JSON.stringify(prompt)}`;
     plan?: LiveContextPlan;
     liveContext?: unknown[];
   }): string {
-    if (input.plan?.needsCatalog && Array.isArray(input.liveContext) && input.liveContext.length > 0) {
+    if (
+      input.plan?.needsCatalog &&
+      Array.isArray(input.liveContext) &&
+      input.liveContext.length > 0
+    ) {
       const first = input.liveContext[0] as any;
       return `${first?.name || "Restoran"} menyusi quyida keltirilgan. Taomlarni tanlashingiz mumkin 👇`;
     }
@@ -3306,7 +3569,11 @@ USER=${JSON.stringify(prompt)}`;
       const timeoutMs =
         attempt === 0 ? Math.min(8_000, remaining) : Math.min(4_000, remaining);
       try {
-        return await this.withTimeout(operation(timeoutMs), timeoutMs + 200, operationName);
+        return await this.withTimeout(
+          operation(timeoutMs),
+          timeoutMs + 200,
+          operationName,
+        );
       } catch (error) {
         lastError = error;
         if (attempt > 0 || !this.isTransientGeminiError(error)) break;
@@ -3323,15 +3590,16 @@ USER=${JSON.stringify(prompt)}`;
 
   private assertCompleteGeminiResponse(response: any): void {
     const candidate = response?.candidates?.[0];
-    const finishReason = String(
-      candidate?.finishReason || "",
-    ).toUpperCase();
+    const finishReason = String(candidate?.finishReason || "").toUpperCase();
     if (
       finishReason &&
       finishReason !== "STOP" &&
       finishReason !== "FINISH_REASON_UNSPECIFIED"
     ) {
-      const text = candidate?.content?.parts?.map((p: any) => p?.text || "").join("").trim();
+      const text = candidate?.content?.parts
+        ?.map((p: any) => p?.text || "")
+        .join("")
+        .trim();
       if (finishReason === "MAX_TOKENS" && text) {
         this.logger.warn(
           `Gemini response reached MAX_TOKENS but generated ${text.length} chars. Continuing with partial output.`,
@@ -3362,6 +3630,7 @@ USER=${JSON.stringify(prompt)}`;
     history: ConversationMessage[];
     plan: LiveContextPlan;
     liveContext: unknown[];
+    personalizationContext?: string;
   }) {
     let contextStr = `\n[CURRENT_TASK]: ${JSON.stringify({
       intent: input.plan.intent,
@@ -3371,6 +3640,9 @@ USER=${JSON.stringify(prompt)}`;
     })}`;
     if (input.liveContext && input.liveContext.length > 0) {
       contextStr += `\n[LIVE_DATA]: ${JSON.stringify(input.liveContext)}`;
+    }
+    if (input.personalizationContext) {
+      contextStr += `\n[PERSONALIZATION]: ${input.personalizationContext}\nUse personalization only to rank equally valid options. The current request always wins. Never mention hidden profile data or reveal why it was inferred.`;
     }
 
     let historyStr = "";

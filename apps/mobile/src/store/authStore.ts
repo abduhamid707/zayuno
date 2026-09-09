@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { getApiBaseUrl } from "../lib/config";
+import { analytics } from "../lib/analytics";
 
 const ACCESS_TOKEN_KEY = "zayuno_consumer_access_token";
 const REFRESH_TOKEN_KEY = "zayuno_consumer_refresh_token";
@@ -11,7 +12,9 @@ const storage = {
   getItem: async (key: string): Promise<string | null> => {
     if (Platform.OS === "web") {
       try {
-        return typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+        return typeof window !== "undefined"
+          ? window.localStorage.getItem(key)
+          : null;
       } catch {
         return null;
       }
@@ -25,7 +28,8 @@ const storage = {
   setItem: async (key: string, value: string): Promise<void> => {
     if (Platform.OS === "web") {
       try {
-        if (typeof window !== "undefined") window.localStorage.setItem(key, value);
+        if (typeof window !== "undefined")
+          window.localStorage.setItem(key, value);
       } catch {}
       return;
     }
@@ -107,6 +111,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: hasStoredSession,
         isLoading: Boolean(refreshToken),
       });
+      if (user) analytics.identifyUser(user);
       if (refreshToken) {
         // Refresh on launch so an expired 15-minute access token never sends a
         // returning customer back through Google sign-in.
@@ -129,9 +134,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setSession: async ({ accessToken, refreshToken, user }) => {
     const persistedRefreshToken = refreshToken || get().refreshToken;
     const persistedUser = user || get().user;
-    await storage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    if (persistedUser) analytics.identifyUser(persistedUser);
+    // Persist the newly rotated refresh token first. If Android kills the app
+    // between writes, the next cold start can still obtain a fresh access token.
     if (persistedRefreshToken)
       await storage.setItem(REFRESH_TOKEN_KEY, persistedRefreshToken);
+    await storage.setItem(ACCESS_TOKEN_KEY, accessToken);
     if (persistedUser)
       await storage.setItem(USER_KEY, JSON.stringify(persistedUser));
     set({
@@ -203,6 +211,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }).catch(() => undefined);
     }
     await clearStoredSession();
+    analytics.resetUser();
     set({
       accessToken: null,
       refreshToken: null,

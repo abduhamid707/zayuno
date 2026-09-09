@@ -1678,8 +1678,8 @@ ${schemaScriptTags}
           <span class="lang-en">Privacy Policy</span>
         </h1>
         <p class="text-xs text-slate-400 mt-2 font-mono">
-          <span class="lang-uz">Kuchga kirish sanasi: 2026-yil 20-avgust</span>
-          <span class="lang-en">Effective Date: August 20, 2026</span>
+          <span class="lang-uz">Kuchga kirish sanasi: 2026-yil 9-sentabr</span>
+          <span class="lang-en">Effective Date: September 9, 2026</span>
         </p>
       </div>
 
@@ -1706,6 +1706,10 @@ ${schemaScriptTags}
           <p class="lang-uz">AI agent orqali xizmat yoki quote so‘ralganda, buyurtmani bajarish uchun minimal zarur ma’lumotlar qayta ishlanadi:</p>
           <p class="lang-en">When an AI agent executes an action or requests a quote on your behalf, Zayuno processes minimal operational data necessary for fulfillment:</p>
           <ul class="list-disc pl-5 space-y-1.5 text-slate-300">
+            <li class="lang-uz"><strong>Hisob ma’lumotlari:</strong> Google orqali kirilganda foydalanuvchi ID, ism va email.</li>
+            <li class="lang-en"><strong>Account Information:</strong> User ID, name, and email when signing in with Google.</li>
+            <li class="lang-uz"><strong>Chat tarixi:</strong> Suhbat matni va tanlovlar hisobga bog‘langan holda saqlanadi, shunda boshqa sessiyada yoki qayta kirganda tarix tiklanadi.</li>
+            <li class="lang-en"><strong>Chat History:</strong> Conversation text and selections are stored with the account so history can be restored across sessions and sign-ins.</li>
             <li class="lang-uz"><strong>Aloqa ma’lumotlari:</strong> Ism, telefon raqami yoki xizmatni bajarish uchun taqdim etilgan kontakt.</li>
             <li class="lang-en"><strong>Customer Contact Details:</strong> Name, phone number, and optional email provided for action fulfillment.</li>
             <li class="lang-uz"><strong>Buyurtma parametrlari:</strong> Tanlangan xizmat yoki mahsulot, miqdor va manzil.</li>
@@ -1746,12 +1750,31 @@ ${schemaScriptTags}
           <p class="lang-en">
             Contact details and action parameters are transmitted strictly to the designated provider adapter chosen by the user. We do not monetize personal information.
           </p>
+          <p class="lang-uz">
+            Chat so‘rovining javob yaratish uchun zarur qismi Zayuno nomidan ishlovchi AI provayderiga uzatilishi mumkin. Saqlangan chatlar reklama maqsadida sotilmaydi.
+          </p>
+          <p class="lang-en">
+            The portion of a chat request needed to generate a response may be sent to an AI provider acting for Zayuno. Stored chats are not sold for advertising.
+          </p>
         </section>
 
         <section class="space-y-3">
           <h2 class="text-lg font-bold text-white tracking-tight">
-            <span class="lang-uz">5. Aloqa va murojaat</span>
-            <span class="lang-en">5. Contact & Inquiries</span>
+            <span class="lang-uz">5. Ixtiyoriy personalization xotirasi</span>
+            <span class="lang-en">5. Optional Personalization Memory</span>
+          </h2>
+          <p class="lang-uz">Aqlli tavsiyalar faqat foydalanuvchi ilova ichida aniq rozilik berganidan keyin ishlaydi. Har 10 ta yangi xabardan keyin taom/restoran afzalligi, budjet, buyurtma usuli, til va umumiy faol vaqt kabi foydali signallar yangilanadi. Har bir signal manba dalili, ishonchlilik darajasi va amal qilish muddati bilan saqlanadi.</p>
+          <p class="lang-en">Smart recommendations operate only after explicit in-app consent. After each 10 new messages, useful signals such as food or restaurant preferences, budget, fulfillment preference, language, and broad activity window may be refreshed. Each signal is stored with provenance, confidence, and an expiry.</p>
+          <p class="lang-uz">Zayuno personalization uchun jins, xarakter, kayfiyat, sog‘liq, din, siyosiy qarash, aniq manzil, telefon, email yoki to‘lov ma’lumotlarini avtomatik profil qilmaydi. Hosil qilingan xotirani ilovada ko‘rish, tuzatish, alohida unutish, eksport qilish yoki to‘liq o‘chirish mumkin. Personalization o‘chirilsa, hosil qilingan profil darhol o‘chadi; asosiy chat va buyurtma funksiyalari ishlashda davom etadi.</p>
+          <p class="lang-en">Zayuno does not automatically profile gender, personality, mood, health, religion, political views, precise address, phone, email, or payment information for personalization. Derived memory can be viewed, corrected, individually forgotten, exported, or fully deleted in the app. Disabling personalization immediately removes the derived profile while core chat and ordering remain available.</p>
+          <p class="lang-uz">Memory signallari ko‘pi bilan 365 kun, suggestion interactionlari 180 kun va texnik analysis joblari 30 kun saqlanadi. Chat tarixi foydalanuvchi o‘chirguncha yoki hisob o‘chirilguncha saqlanadi. Chat matni bazada shifrlangan holda saqlanadi.</p>
+          <p class="lang-en">Memory signals are retained for no more than 365 days, suggestion interactions for 180 days, and technical analysis jobs for 30 days. Chat history remains until the user deletes it or deletes the account. Chat text is encrypted at rest.</p>
+        </section>
+
+        <section class="space-y-3">
+          <h2 class="text-lg font-bold text-white tracking-tight">
+            <span class="lang-uz">6. Aloqa va murojaat</span>
+            <span class="lang-en">6. Contact & Inquiries</span>
           </h2>
           <p class="lang-uz">Maxfiylik bo‘yicha savollar va murojaatlar uchun:</p>
           <p class="lang-en">For questions or privacy requests regarding the platform, contact our desk at:</p>

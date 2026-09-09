@@ -27,6 +27,7 @@
     "test:dynamic-provider-context": "tsx tests/test-dynamic-provider-context.ts",
     "test:sensitive-dynamic-parameters": "tsx tests/test-sensitive-dynamic-parameters.ts",
     "test:docs-contract": "tsx tests/test-docs-contract.ts",
+    "test:consumer-auth-persistence": "tsx tests/test-consumer-auth-persistence.ts",
     "test:provider-operations": "tsx tests/test-provider-operations-guardrails.ts",
     "test:e2e": "turbo run test:e2e",
     "db:generate": "pnpm --filter @zayuno/database run generate",

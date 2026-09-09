@@ -40,6 +40,14 @@ export class ConsumerAuthController {
     await this.authService.revokeSession(body.refreshToken);
   }
 
+  @Post("revoke-all")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Revoke all consumer sessions for this account" })
+  async revokeAll(@Req() req: any) {
+    await this.authService.revokeAllSessions(req.user.id);
+  }
+
   @Get("me")
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)

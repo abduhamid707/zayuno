@@ -11,7 +11,6 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -41,7 +40,9 @@ import {
 import { ProviderPickerCard } from "../../src/components/food/ProviderPickerCard";
 import { InChatCatalogWidget } from "../../src/components/food/InChatCatalogWidget";
 import { ContextTrayDock } from "../../src/components/food/ContextTrayDock";
-import { publicLinks } from "../../src/lib/config";
+import { AccountSheet } from "../../src/components/AccountSheet";
+import { useAuthStore } from "../../src/store/authStore";
+import { analytics } from "../../src/lib/analytics";
 import {
   ChatInteraction,
   InteractionChoice,
@@ -51,7 +52,13 @@ import {
   ProviderCardItem,
 } from "../../src/lib/interaction";
 
-const suggestions = [
+type QuickSuggestion = {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+};
+
+const defaultSuggestions: QuickSuggestion[] = [
   {
     label: "Restoranlarni ko‘rsat",
     icon: "restaurant-outline" as const,
@@ -86,7 +93,13 @@ function formatTime(value: string) {
   return date.toLocaleDateString("uz-UZ", { day: "2-digit", month: "short" });
 }
 
-function BrandHeader({ onOpenHistory }: { onOpenHistory: () => void }) {
+function BrandHeader({
+  onOpenHistory,
+  onOpenAccount,
+}: {
+  onOpenHistory: () => void;
+  onOpenAccount: () => void;
+}) {
   return (
     <View style={styles.header}>
       <Pressable
@@ -109,9 +122,16 @@ function BrandHeader({ onOpenHistory }: { onOpenHistory: () => void }) {
         <Text style={styles.brandName}>Z A Y U N O</Text>
       </View>
 
-      <View style={styles.headerButton}>
+      <Pressable
+        accessibilityLabel="Profil va sozlamalarni ochish"
+        onPress={onOpenAccount}
+        style={({ pressed }) => [
+          styles.headerButton,
+          pressed && styles.pressed,
+        ]}
+      >
         <Ionicons name="person-circle-outline" size={29} color="#838CA5" />
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -138,6 +158,7 @@ export default function HomeScreen() {
   );
   const [trayItems, setTrayItems] = useState<TrayItem[]>([]);
   const [historyVisible, setHistoryVisible] = useState(false);
+  const [accountVisible, setAccountVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [reportText, setReportText] = useState("");
   const [reportScreenshot, setReportScreenshot] = useState<string | null>(null);
@@ -145,15 +166,17 @@ export default function HomeScreen() {
   const [reportSending, setReportSending] = useState(false);
   const [reportSentId, setReportSentId] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [quickSuggestions, setQuickSuggestions] =
+    useState<QuickSuggestion[]>(defaultSuggestions);
   const screenRef = useRef<View>(null);
   const lastShakeRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const user = useAuthStore((state) => state.user);
   const {
     sessions,
     activeSessionId,
     isLoading,
-    isHydrated,
     hydrate,
     newChat,
     selectSession,
@@ -162,11 +185,33 @@ export default function HomeScreen() {
     setLoading,
   } = useChatStore();
 
+  const trackSuggestion = (
+    event: "CLICKED" | "DISMISSED",
+    type: string,
+    key: string,
+    text: string,
+  ) => {
+    void apiFetch("/api/v1/consumer/memory/suggestion-events", {
+      method: "POST",
+      body: JSON.stringify({
+        event,
+        type,
+        key,
+        text,
+        sessionId: activeSessionId,
+      }),
+    }).catch(() => undefined);
+  };
+
   const handleAddToCart = (offering: CatalogOfferingItem) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    trackSuggestion("CLICKED", "offering", offering.offeringId, offering.title);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+      () => undefined,
+    );
     setTrayItems((current) => {
       const existingIndex = current.findIndex(
-        (item) => item.type === "offering" && item.offeringId === offering.offeringId,
+        (item) =>
+          item.type === "offering" && item.offeringId === offering.offeringId,
       );
       if (existingIndex >= 0) {
         const updated = [...current];
@@ -192,13 +237,26 @@ export default function HomeScreen() {
         },
       ];
     });
+    analytics.trackFoodItemAdded({
+      itemId: offering.offeringId,
+      name: offering.title,
+      price: offering.price,
+      providerId: offering.providerSlug,
+    });
   };
 
   const handleRemoveTrayItem = (id: string) => {
+    analytics.trackFoodItemRemoved({ itemId: id });
     setTrayItems((current) => current.filter((item) => item.id !== id));
   };
 
   const handleSelectProvider = (provider: ProviderCardItem) => {
+    trackSuggestion("CLICKED", "provider", provider.slug, provider.name);
+    analytics.trackProviderSelected({
+      providerId: provider.slug,
+      name: provider.name,
+      cuisine: provider.cuisine,
+    });
     sendMessage(provider.name);
   };
 
@@ -215,8 +273,30 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    if (!isHydrated) hydrate();
-  }, [hydrate, isHydrated]);
+    if (user?.id) void hydrate(user.id);
+  }, [hydrate, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    void apiFetch<{
+      suggestions?: Array<{ key: string; label: string; type: string }>;
+    }>("/api/v1/consumer/memory/suggestions")
+      .then((result) => {
+        const personalized = (result.suggestions || []).map((item, index) => ({
+          label: item.label,
+          icon: (index === 0
+            ? "sparkles-outline"
+            : "restaurant-outline") as keyof typeof Ionicons.glyphMap,
+          color: index === 0 ? "#A996FF" : "#46D37B",
+        }));
+        setQuickSuggestions(
+          personalized.length
+            ? [...personalized, ...defaultSuggestions].slice(0, 3)
+            : defaultSuggestions,
+        );
+      })
+      .catch(() => setQuickSuggestions(defaultSuggestions));
+  }, [user?.id]);
 
   useEffect(() => {
     if (!messages.length) return;
@@ -252,7 +332,8 @@ export default function HomeScreen() {
     currentTray: TrayItem[] = trayItems,
   ) => {
     const offeringTrayItems = currentTray.filter(
-      (i): i is Extract<TrayItem, { type: "offering" }> => i.type === "offering",
+      (i): i is Extract<TrayItem, { type: "offering" }> =>
+        i.type === "offering",
     );
     const trayChoices: InteractionChoice[] = offeringTrayItems.map((item) => ({
       id: `offering:${item.providerSlug}:${item.offeringId}`,
@@ -274,15 +355,25 @@ export default function HomeScreen() {
     const notesText = noteItems.map((n) => n.text).join(". ");
 
     const selectionText = allChoices.map(choiceLabel).join(", ");
-    const promptParts = [selectionText, notesText, value.trim()].filter(Boolean);
+    const promptParts = [selectionText, notesText, value.trim()].filter(
+      Boolean,
+    );
     const prompt = promptParts.join(". ");
     if (!prompt || isLoading) return;
 
     const submittedChoices = [...allChoices];
-    const itemsSummary = offeringTrayItems.length > 0
-      ? offeringTrayItems.map((item) => `${item.title}${item.quantity > 1 ? ` (${item.quantity} ta)` : ""}`).join(", ")
-      : allChoices.map((c) => c.title).join(", ");
-    const userTextParts = [itemsSummary, notesText, value.trim()].filter(Boolean);
+    const itemsSummary =
+      offeringTrayItems.length > 0
+        ? offeringTrayItems
+            .map(
+              (item) =>
+                `${item.title}${item.quantity > 1 ? ` (${item.quantity} ta)` : ""}`,
+            )
+            .join(", ")
+        : allChoices.map((c) => c.title).join(", ");
+    const userTextParts = [itemsSummary, notesText, value.trim()].filter(
+      Boolean,
+    );
     const visibleUserContent = userTextParts.join("\n") || selectionText;
 
     const conversation = messages.slice(-16).map(({ role, content }) => ({
@@ -296,6 +387,11 @@ export default function HomeScreen() {
     setStreamingText("");
     setStreamingInteraction(null);
     Keyboard.dismiss();
+    analytics.trackMessageSent({
+      prompt,
+      length: prompt.length,
+      source: submittedChoices.length ? "tray_selection" : "composer",
+    });
     const conversationId = addMessage({
       role: "user",
       content: visibleUserContent,
@@ -334,6 +430,7 @@ export default function HomeScreen() {
       setStreamingInteraction(null);
       const latencyMs = Date.now() - startTime;
       if (error?.name !== "AbortError") {
+        analytics.trackError(error, "chat_stream");
         setLastFailed(prompt);
         setSelectedChoices(submittedChoices);
         addMessage({
@@ -355,6 +452,15 @@ export default function HomeScreen() {
     if (isLoading) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
       () => undefined,
+    );
+    const wasSelected = selectedChoices.some(
+      (item) => item.groupId === choice.groupId && item.id === choice.id,
+    );
+    trackSuggestion(
+      wasSelected ? "DISMISSED" : "CLICKED",
+      choice.kind,
+      choice.id,
+      choice.title,
     );
     setSelectedChoices((current) => {
       const existing = current.some(
@@ -502,7 +608,10 @@ export default function HomeScreen() {
                 disabled={isLoading}
               />
             ) : (
-              <InteractionCards interaction={item.interaction} onSelect={selectChoice} />
+              <InteractionCards
+                interaction={item.interaction}
+                onSelect={selectChoice}
+              />
             )}
           </View>
         ) : null}
@@ -518,6 +627,7 @@ export default function HomeScreen() {
   };
 
   const startNewChat = () => {
+    analytics.trackNewChat();
     newChat();
     setSelectedChoices([]);
     setInput("");
@@ -536,7 +646,7 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.suggestionList}>
-        {suggestions.map((suggestion) => (
+        {quickSuggestions.map((suggestion) => (
           <Pressable
             key={suggestion.label}
             onPress={() => sendMessage(suggestion.label)}
@@ -571,7 +681,13 @@ export default function HomeScreen() {
       style={styles.safe}
       edges={["top", "bottom"]}
     >
-      <BrandHeader onOpenHistory={() => setHistoryVisible(true)} />
+      <BrandHeader
+        onOpenHistory={() => {
+          analytics.trackDrawerOpened();
+          setHistoryVisible(true);
+        }}
+        onOpenAccount={() => setAccountVisible(true)}
+      />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -589,7 +705,9 @@ export default function HomeScreen() {
                   <View style={styles.assistantMessage}>
                     <AssistantAvatar />
                     <View style={styles.assistantContentWrap}>
-                      {streamingText ? <ChatMarkdown content={streamingText} /> : null}
+                      {streamingText ? (
+                        <ChatMarkdown content={streamingText} />
+                      ) : null}
                       {streamingDuration !== null ? (
                         <View style={styles.latencyBadge}>
                           <Ionicons
@@ -616,8 +734,12 @@ export default function HomeScreen() {
                         />
                       ) : streamingInteraction.kind === "catalog_menu" ? (
                         <InChatCatalogWidget
-                          providerSlug={streamingInteraction.providerSlug || "evos"}
-                          providerName={streamingInteraction.providerName || "Restoran"}
+                          providerSlug={
+                            streamingInteraction.providerSlug || "evos"
+                          }
+                          providerName={
+                            streamingInteraction.providerName || "Restoran"
+                          }
                           providerLogoUrl={streamingInteraction.providerLogoUrl}
                           locationName={streamingInteraction.locationName}
                           categories={streamingInteraction.categories || []}
@@ -824,28 +946,38 @@ export default function HomeScreen() {
               </View>
               <Ionicons name="chevron-forward" size={18} color="#687085" />
             </Pressable>
-            <View style={styles.legalLinks}>
-              <Pressable
-                accessibilityRole="link"
-                accessibilityLabel="Maxfiylik siyosatini ochish"
-                onPress={() => void Linking.openURL(publicLinks.privacy)}
-                style={({ pressed }) => [styles.legalLink, pressed && styles.pressed]}
-              >
-                <Text style={styles.legalLinkText}>Maxfiylik</Text>
-              </Pressable>
-              <View style={styles.legalDot} />
-              <Pressable
-                accessibilityRole="link"
-                accessibilityLabel="Hisob va ma’lumotlarni o‘chirish"
-                onPress={() => void Linking.openURL(publicLinks.accountDeletion)}
-                style={({ pressed }) => [styles.legalLink, pressed && styles.pressed]}
-              >
-                <Text style={styles.legalLinkDanger}>Hisobni o‘chirish</Text>
-              </Pressable>
-            </View>
+            <Pressable
+              accessibilityLabel="Profil va sozlamalarni ochish"
+              onPress={() => {
+                setHistoryVisible(false);
+                setAccountVisible(true);
+              }}
+              style={({ pressed }) => [
+                styles.accountEntry,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={styles.accountEntryIcon}>
+                <Ionicons name="person-outline" size={19} color="#9B8DFF" />
+              </View>
+              <View style={styles.reportEntryText}>
+                <Text style={styles.reportEntryTitle}>
+                  Profil va sozlamalar
+                </Text>
+                <Text style={styles.reportEntryCopy}>
+                  Sessiya, maxfiylik va hisob boshqaruvi
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#687085" />
+            </Pressable>
           </SafeAreaView>
         </View>
       </Modal>
+
+      <AccountSheet
+        visible={accountVisible}
+        onClose={() => setAccountVisible(false)}
+      />
 
       <Modal
         visible={reportVisible}
@@ -952,7 +1084,6 @@ export default function HomeScreen() {
           </SafeAreaView>
         </KeyboardAvoidingView>
       </Modal>
-
     </SafeAreaView>
   );
 }
@@ -1246,19 +1377,25 @@ const styles = StyleSheet.create({
   reportEntryText: { flex: 1 },
   reportEntryTitle: { color: "#F1F2F7", fontSize: 13, fontWeight: "600" },
   reportEntryCopy: { color: "#838BA3", fontSize: 11, marginTop: 3 },
-  legalLinks: {
-    minHeight: 38,
-    marginHorizontal: 20,
-    marginBottom: 12,
+  accountEntry: {
+    minHeight: 58,
+    marginHorizontal: 16,
+    marginBottom: 13,
+    paddingHorizontal: 14,
+    borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
+    gap: 11,
+    backgroundColor: "rgba(255,255,255,0.025)",
   },
-  legalLink: { paddingHorizontal: 4, paddingVertical: 8 },
-  legalLinkText: { color: "#8D95AA", fontSize: 11 },
-  legalLinkDanger: { color: "#D38B99", fontSize: 11 },
-  legalDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: "#4A5268" },
+  accountEntryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(107,87,255,0.12)",
+  },
   reportModalRoot: { flex: 1, justifyContent: "flex-end" },
   reportBackdrop: {
     ...StyleSheet.absoluteFill,

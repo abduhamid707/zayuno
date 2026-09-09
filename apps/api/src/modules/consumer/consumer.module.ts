@@ -10,6 +10,10 @@ import { ConsumerChatController } from "./chat/consumer-chat.controller";
 import { ConsumerChatService } from "./chat/consumer-chat.service";
 import { ConsumerReportsController } from "./reports/consumer-reports.controller";
 import { ConsumerReportsService } from "./reports/consumer-reports.service";
+import { ConsumerHistoryController } from "./history/consumer-history.controller";
+import { ConsumerHistoryService } from "./history/consumer-history.service";
+import { ConsumerMemoryController } from "./memory/consumer-memory.controller";
+import { ConsumerMemoryService } from "./memory/consumer-memory.service";
 
 @Module({
   imports: [
@@ -23,8 +27,16 @@ import { ConsumerReportsService } from "./reports/consumer-reports.service";
     ConsumerAuthController,
     ConsumerChatController,
     ConsumerReportsController,
+    ConsumerHistoryController,
+    ConsumerMemoryController,
   ],
-  providers: [ConsumerAuthService, ConsumerChatService, ConsumerReportsService],
-  exports: [ConsumerAuthService, ConsumerChatService],
+  providers: [
+    ConsumerAuthService,
+    ConsumerChatService,
+    ConsumerReportsService,
+    ConsumerHistoryService,
+    ConsumerMemoryService,
+  ],
+  exports: [ConsumerAuthService, ConsumerChatService, ConsumerMemoryService],
 })
 export class ConsumerModule {}

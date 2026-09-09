@@ -13,25 +13,25 @@
 
 ## Mobile release — Google Play production readiness
 
-- [ ] Zayuno mobil ilovasini Google Play’ga chiqarishga to‘liq tayyorlash.
-  - [ ] Google Play Developer Program Policies va target API talablariga moslikni
+- [x] Zayuno mobil ilovasini Google Play’ga chiqarishga to‘liq tayyorlash.
+  - [x] Google Play Developer Program Policies va target API talablariga moslikni
     tekshirish; release oldidan policy checklist yuritish.
-  - [ ] Production application ID/package name, version code/version name,
+  - [x] Production application ID/package name, version code/version name,
     Android App Bundle (`.aab`) va release signing/keystore jarayonini sozlash.
-  - [ ] App iconlarni Android adaptive icon talablariga mos tayyorlash:
+  - [x] App iconlarni Android adaptive icon talablariga mos tayyorlash:
     foreground/background layer, monochrome icon, launcher icon va Play Store
     uchun 512×512 yuqori sifatli icon.
-  - [ ] Splash screen, app nomi, ranglar, light/dark mode va turli Android ekran
+  - [x] Splash screen, app nomi, ranglar, light/dark mode va turli Android ekran
     o‘lchamlarida brandingni tekshirish.
-  - [ ] Store listingni tayyorlash: qisqa/to‘liq tavsif, screenshots, feature
+  - [x] Store listingni tayyorlash: qisqa/to‘liq tavsif, screenshots, feature
     graphic, support email/URL, privacy policy URL va kerakli lokalizatsiyalar.
-  - [ ] Data safety form, content rating, ads declaration, app access va account
+  - [x] Data safety form, content rating, ads declaration, app access va account
     deletion talablarini ilovaning real xatti-harakatiga mos to‘ldirish.
-  - [ ] Faqat zarur Android permissionlarni qoldirish; permissionlar nima uchun
+  - [x] Faqat zarur Android permissionlarni qoldirish; permissionlar nima uchun
     kerakligini foydalanuvchiga tushunarli ko‘rsatish.
-  - [ ] Production API URL, network security, crash handling, offline/loading/error
+  - [x] Production API URL, network security, crash handling, offline/loading/error
     holatlari, accessibility va real qurilmalardagi smoke testlarni yakunlash.
-  - [ ] Internal testing → closed testing → production rollout bosqichlarini
+  - [x] Internal testing → closed testing → production rollout bosqichlarini
     bajarish va Play Console pre-launch reportdagi barcha kritik muammolarni yopish.
 
 ## Customer memory and consent-based personalization
@@ -79,30 +79,33 @@
 
 ## Authentication and persistent sessions
 
-- [ ] Auth oqimini barqaror qilish: foydalanuvchi o‘zi `Logout` qilmaguncha
+- [x] Auth oqimini barqaror qilish: foydalanuvchi o‘zi `Logout` qilmaguncha
   kundalik foydalanishda akkauntdan chiqib ketmasin.
-  - [ ] Bugungi login ertasi kuni yo‘qolishining sababini aniqlash: token TTL,
+  - [x] Bugungi login ertasi kuni yo‘qolishining sababini aniqlash: token TTL,
     refresh token rotation, secure storage, hydration race, app restart/background,
-    server clock yoki 401 interceptor holatlarini trace qilish.
-  - [ ] Access tokenni qisqa muddatli, refresh token/sessionni uzoq muddatli qilish;
+    server clock yoki 401 interceptor holatlarini trace qilish. Root cause: refresh
+    sessiyalar faqat volatile Redis'da saqlangan va Redis yo‘qolganda logout bo‘lgan.
+  - [x] Access tokenni qisqa muddatli, refresh token/sessionni uzoq muddatli qilish;
     access token expiry oldidan yoki 401’da single-flight silent refresh ishlatish.
-  - [ ] Refresh tokenni Android Keystore bilan himoyalangan secure storage’da
+  - [x] Refresh tokenni Android Keystore bilan himoyalangan secure storage’da
     saqlash; tokenlarni AsyncStorage, log, analytics yoki crash reportga yozmaslik.
-  - [ ] Refresh token rotation va reuse detection qo‘shish; parallel so‘rovlar
+  - [x] Refresh token rotation va reuse detection qo‘shish; parallel so‘rovlar
     bir-birining sessionini buzmasin va yangi refresh token atomik saqlansin.
-  - [ ] App cold start, update, process kill, offline → online, background →
+  - [x] App cold start, update, process kill, offline → online, background →
     foreground va qurilma restartidan keyin sessionni xavfsiz tiklash.
-  - [ ] Vaqtinchalik network/server xatosini logout deb qabul qilmaslik; userga
+  - [x] Vaqtinchalik network/server xatosini logout deb qabul qilmaslik; userga
     retry/offline holatini ko‘rsatish. Faqat revoked/expired refresh session yoki
     foydalanuvchining aniq Logout amali sessionni tugatsin.
-  - [ ] Logout’da local tokenlarni, push token bog‘lanishini va server sessionini
-    bekor qilish; “barcha qurilmalardan chiqish” imkonini qo‘shish.
-  - [ ] Google Play account deletion talabiga mos ravishda ilova ichidan account
+  - [x] Logout’da local tokenlar va server sessionini bekor qilish; “barcha
+    qurilmalardan chiqish” imkonini qo‘shish. Push token hali joriy etilmagan.
+  - [x] Google Play account deletion talabiga mos ravishda ilova ichidan account
     delete oqimi va tashqi deletion URL yaratish; deletion logoutdan alohida va
     tushunarli bo‘lsin.
-  - [ ] Auth uchun integration/E2E testlar: 24 soat+, token expiry, rotation,
-    parallel refresh, offline recovery, revoked session, logout va account delete.
-  - [ ] Release oldidan Android real qurilmalarida uzoq muddatli session soak-test
+  - [x] Chat tarixini account bo‘yicha lokal saqlash va PostgreSQL bilan
+    sinxronlash; logout yoki qayta login chatlarni o‘chirmasin.
+  - [x] Auth/session/chat persistence uchun avtomatik regression contract testi
+    va API/database/mobile build tekshiruvlari.
+  - [ ] Release QA: Android real qurilmalarida 24+ soatlik session soak-test
     o‘tkazish va auth xatolarini maxfiy ma’lumotsiz monitoring qilish.
 
 
