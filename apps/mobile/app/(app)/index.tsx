@@ -464,12 +464,25 @@ export default function HomeScreen() {
     }
 
     return (
-      <View style={styles.assistantMessage}>
-        <AssistantAvatar />
-        <View style={styles.assistantContentWrap}>
-          <ChatMarkdown content={item.content} />
-          {item.interaction ? (
-            item.interaction.kind === "provider_list" ? (
+      <View style={styles.assistantBlock}>
+        <View style={styles.assistantMessage}>
+          <AssistantAvatar />
+          <View style={styles.assistantContentWrap}>
+            <ChatMarkdown content={item.content} />
+            {item.latencyMs !== undefined ? (
+              <View style={styles.latencyBadge}>
+                <Ionicons name="timer-outline" size={12} color="#7E86A5" />
+                <Text style={styles.latencyText}>
+                  {(item.latencyMs / 1000).toFixed(2)}s
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
+        {item.interaction ? (
+          <View style={styles.interactionBlock}>
+            {item.interaction.kind === "provider_list" ? (
               <ProviderPickerCard
                 providers={item.interaction.providers || []}
                 title={item.interaction.title}
@@ -490,17 +503,9 @@ export default function HomeScreen() {
               />
             ) : (
               <InteractionCards interaction={item.interaction} onSelect={selectChoice} />
-            )
-          ) : null}
-          {item.latencyMs !== undefined ? (
-            <View style={styles.latencyBadge}>
-              <Ionicons name="timer-outline" size={12} color="#7E86A5" />
-              <Text style={styles.latencyText}>
-                {(item.latencyMs / 1000).toFixed(2)}s
-              </Text>
-            </View>
-          ) : null}
-        </View>
+            )}
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -580,12 +585,28 @@ export default function HomeScreen() {
           ListFooterComponent={
             isLoading ? (
               streamingText || streamingInteraction ? (
-                <View style={styles.assistantMessage}>
-                  <AssistantAvatar />
-                  <View style={styles.assistantContentWrap}>
-                    {streamingText ? <ChatMarkdown content={streamingText} /> : null}
-                    {streamingInteraction ? (
-                      streamingInteraction.kind === "provider_list" ? (
+                <View style={styles.assistantBlock}>
+                  <View style={styles.assistantMessage}>
+                    <AssistantAvatar />
+                    <View style={styles.assistantContentWrap}>
+                      {streamingText ? <ChatMarkdown content={streamingText} /> : null}
+                      {streamingDuration !== null ? (
+                        <View style={styles.latencyBadge}>
+                          <Ionicons
+                            name="timer-outline"
+                            size={12}
+                            color="#7E86A5"
+                          />
+                          <Text style={styles.latencyText}>
+                            {streamingDuration.toFixed(1)}s…
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                  {streamingInteraction ? (
+                    <View style={styles.interactionBlock}>
+                      {streamingInteraction.kind === "provider_list" ? (
                         <ProviderPickerCard
                           providers={streamingInteraction.providers || []}
                           title={streamingInteraction.title}
@@ -610,21 +631,9 @@ export default function HomeScreen() {
                           onSelect={selectChoice}
                           disabled
                         />
-                      )
-                    ) : null}
-                    {streamingDuration !== null ? (
-                      <View style={styles.latencyBadge}>
-                        <Ionicons
-                          name="timer-outline"
-                          size={12}
-                          color="#7E86A5"
-                        />
-                        <Text style={styles.latencyText}>
-                          {streamingDuration.toFixed(1)}s…
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
+                      )}
+                    </View>
+                  ) : null}
                 </View>
               ) : (
                 <View style={styles.thinking}>
@@ -954,7 +963,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.72 },
   header: {
     height: 70,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -974,7 +983,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: 5,
   },
-  list: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 12 },
+  list: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 },
   emptyList: { flexGrow: 1 },
   emptyState: { flex: 1, justifyContent: "flex-end" },
   hero: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -1036,9 +1045,13 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   userMessageText: { color: "#FFFFFF", fontSize: 14, lineHeight: 20 },
+  assistantBlock: {
+    width: "100%",
+    marginVertical: 4,
+  },
   assistantMessage: {
     width: "100%",
-    paddingVertical: 12,
+    paddingVertical: 4,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
@@ -1060,6 +1073,11 @@ const styles = StyleSheet.create({
     resizeMode: "contain",
   },
   assistantContentWrap: { flex: 1 },
+  interactionBlock: {
+    width: "100%",
+    marginTop: 8,
+    marginBottom: 4,
+  },
   latencyBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -1092,7 +1110,7 @@ const styles = StyleSheet.create({
   },
   retryText: { color: "#8B7CFF", fontSize: 12 },
   composerShell: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingTop: 7,
     paddingBottom: 8,
     backgroundColor: "#060916",
