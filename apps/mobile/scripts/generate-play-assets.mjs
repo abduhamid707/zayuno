@@ -167,19 +167,9 @@ try {
       .toFile(path.join(targetDir, "ic_launcher_foreground.webp"));
   }
 
-  // Create adaptive icon XML in mipmap-anydpi-v26
+  // Remove mipmap-anydpi-v26 to ensure direct raster webp icons are used by all package installers
   const anydpiDir = path.join(androidResDir, "mipmap-anydpi-v26");
-  await fs.mkdir(anydpiDir, { recursive: true });
-
-  const adaptiveXml = `<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/iconBackground"/>
-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-</adaptive-icon>
-`;
-
-  await fs.writeFile(path.join(anydpiDir, "ic_launcher.xml"), adaptiveXml, "utf8");
-  await fs.writeFile(path.join(anydpiDir, "ic_launcher_round.xml"), adaptiveXml, "utf8");
+  await fs.rm(anydpiDir, { recursive: true, force: true });
 
   // Ensure colors.xml has iconBackground = #050816
   const colorsPath = path.join(androidResDir, "values", "colors.xml");
