@@ -408,7 +408,7 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       /(r[ae]st[ao]r[a-z]*|fast\s*food|fastfood|kafe|oshxona|food|ovqat|taom|pitsa|pizza|lavash|burger|sushi|donar|menyu|katalog)/i.test(norm) &&
       /(ko['‘’`]?rsat|chiqar|bor|bormi|qanday|qaysi|qayerda|ro['‘’`]?yxat|mavjud|buyurtma|zakaz|tanlash|och)/i.test(norm)
     ) {
-      return `Quyidagi mashhur restoran va fast-food tarmoqlaridan buyurtma berishingiz mumkin. Menyu va narxlarni ko‘rish uchun birortasini tanlang 👇`;
+      return `Quyidagi mashhur restoran va fast-food tarmoqlaridan buyurtma berishingiz mumkin.\nKerakli restoranni tanlang 👇`;
     }
 
     return undefined;
@@ -777,32 +777,38 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     const visible = (production.length ? production : candidates).slice(0, 10);
     if (!visible.length) return undefined;
 
-    const choices = visible.map((provider): InteractionChoice => ({
-      id: `provider:${provider.slug}`,
-      kind: "provider",
-      title: this.cleanMarkdownText(provider.name),
-      subtitle: this.describeProvider(provider),
-      imageUrl: this.safeInteractionImage(provider.logoUrl),
-      emoji: this.providerEmoji(provider),
-      providerSlug: provider.slug,
-      prompt: this.cleanMarkdownText(provider.name),
-      groupId: "providers",
-    }));
+    const choices = visible.map((provider): InteractionChoice => {
+      const displayName = this.cleanProviderDisplayName(provider.name);
+      return {
+        id: `provider:${provider.slug}`,
+        kind: "provider",
+        title: displayName,
+        subtitle: this.describeProvider(provider),
+        imageUrl: this.safeInteractionImage(provider.logoUrl),
+        emoji: this.providerEmoji(provider),
+        providerSlug: provider.slug,
+        prompt: displayName,
+        groupId: "providers",
+      };
+    });
 
-    const providerCards: ProviderCardItem[] = visible.map((provider) => ({
-      id: `provider:${provider.slug}`,
-      slug: provider.slug,
-      name: this.cleanMarkdownText(provider.name),
-      logoUrl: this.safeInteractionImage(provider.logoUrl),
-      cuisine: this.describeProvider(provider),
-      prompt: this.cleanMarkdownText(provider.name),
-    }));
+    const providerCards: ProviderCardItem[] = visible.map((provider) => {
+      const displayName = this.cleanProviderDisplayName(provider.name);
+      return {
+        id: `provider:${provider.slug}`,
+        slug: provider.slug,
+        name: displayName,
+        logoUrl: this.safeInteractionImage(provider.logoUrl),
+        cuisine: this.describeProvider(provider),
+        prompt: displayName,
+      };
+    });
 
     return {
       version: 1,
       kind: "provider_list",
-      title: "Assalomu alaykum! Qaysi fast-fooddan buyurtma qilmoqchisiz?",
-      subtitle: "Quyidagilardan birini bosing — xabar avtomatik yuboriladi.",
+      title: "",
+      subtitle: "",
       providers: providerCards,
       groups: [
         {
@@ -813,6 +819,14 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         },
       ],
     };
+  }
+
+  private cleanProviderDisplayName(name: string): string {
+    const cleaned = this.cleanMarkdownText(name);
+    return cleaned
+      .replace(/\s+Fast\s+Food$/i, "")
+      .replace(/\s+&\s+Sushi$/i, "")
+      .trim();
   }
 
   private isCapabilityRequest(prompt: string): boolean {
@@ -1155,16 +1169,58 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
   private describeProvider(provider: any): string {
     const identity = this.providerIdentity(provider);
     if (/recruit|headhunter|vakansi|jobs?/.test(identity)) {
-      return "jonli ish vakansiyalari";
+      return "Jonli ish vakansiyalari";
     }
-    if (
-      /food|ovqat|taom|restaurant|restoran|cafe|kafe|coffee|fast.?food/.test(
-        identity,
-      )
-    ) {
-      return "taom va ichimliklar katalogi";
+
+    // 1. Check if provider has explicit cuisine or cuisineSummary in metadata
+    const meta = provider.metadata || {};
+    if (meta.cuisine && typeof meta.cuisine === "string") {
+      return this.cleanMarkdownText(meta.cuisine);
     }
-    return this.cleanMarkdownText(provider.description) || "taom va ichimliklar menyusi";
+    if (meta.cuisineSummary && typeof meta.cuisineSummary === "string") {
+      return this.cleanMarkdownText(meta.cuisineSummary);
+    }
+
+    // 2. Extract specialty dish keywords from provider description
+    const desc = provider.description || meta.description;
+    if (desc && typeof desc === "string") {
+      const sentences = desc.split(/[.!?]+/).map((s: string) => s.trim()).filter(Boolean);
+      for (const sentence of sentences) {
+        const cleaned = sentence.replace(/^[A-Za-z0-9\s—–-]+\s*—\s*/, "").trim();
+        if (
+          /(lavash|burger|shaurma|pitsa|pizza|sushi|roll|wok|gazak|snek|kombo|taom|ichimlik|qanot)/i.test(
+            cleaned,
+          ) &&
+          cleaned.length >= 10 &&
+          cleaned.length <= 60
+        ) {
+          return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+        }
+      }
+    }
+
+    // 3. Extract from catalog categories if present
+    const rawCategories = provider.categories || meta.categories;
+    if (Array.isArray(rawCategories) && rawCategories.length > 0) {
+      const cleanCats = rawCategories
+        .map((c: any) => (typeof c === "string" ? c : c.title || c.name || ""))
+        .map((t: string) => t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "").trim())
+        .filter((t: string) => t.length >= 2 && !/combo|set|xit|aksiy|yangi|super|box|mini/i.test(t))
+        .slice(0, 3);
+      if (cleanCats.length > 0) {
+        return cleanCats.join(", ");
+      }
+    }
+
+    // 4. Specific known fallback based on provider slug or identity
+    const slug = String(provider.slug || "").toLowerCase();
+    if (slug.includes("evos")) return "Lavash, burger, shaurma va kombolar";
+    if (slug.includes("maxway")) return "Katta burgerlar, klabb-lavash va sneklar";
+    if (slug.includes("bellissimo")) return "Issiq pitsalar, gazaklar va kombolar";
+    if (slug.includes("chopar")) return "Sharqona va yevropacha pitsalar, sneklar";
+    if (slug.includes("yaponamama")) return "Sushi to‘plamlari, rollar va WOK taomlar";
+
+    return this.cleanMarkdownText(provider.description) || "Taom va ichimliklar menyusi";
   }
 
   private isDemoProvider(provider: any): boolean {

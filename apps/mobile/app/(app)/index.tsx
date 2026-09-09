@@ -109,7 +109,20 @@ function BrandHeader({ onOpenHistory }: { onOpenHistory: () => void }) {
         <Text style={styles.brandName}>Z A Y U N O</Text>
       </View>
 
-      <View style={styles.headerSpacer} />
+      <View style={styles.headerButton}>
+        <Ionicons name="person-circle-outline" size={29} color="#838CA5" />
+      </View>
+    </View>
+  );
+}
+
+function AssistantAvatar() {
+  return (
+    <View style={styles.assistantAvatarBadge}>
+      <Image
+        source={require("../../assets/brand/logo2.png")}
+        style={styles.assistantAvatarImage}
+      />
     </View>
   );
 }
@@ -452,7 +465,7 @@ export default function HomeScreen() {
 
     return (
       <View style={styles.assistantMessage}>
-        <Ionicons name="sparkles" size={17} color="#8376FF" />
+        <AssistantAvatar />
         <View style={styles.assistantContentWrap}>
           <ChatMarkdown content={item.content} />
           {item.interaction ? (
@@ -568,7 +581,7 @@ export default function HomeScreen() {
             isLoading ? (
               streamingText || streamingInteraction ? (
                 <View style={styles.assistantMessage}>
-                  <Ionicons name="sparkles" size={17} color="#8376FF" />
+                  <AssistantAvatar />
                   <View style={styles.assistantContentWrap}>
                     {streamingText ? <ChatMarkdown content={streamingText} /> : null}
                     {streamingInteraction ? (
@@ -1029,6 +1042,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
+  },
+  assistantAvatarBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: "rgba(20, 24, 44, 0.95)",
+    borderWidth: 1,
+    borderColor: "rgba(120, 104, 246, 0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  assistantAvatarImage: {
+    width: 17,
+    height: 17,
+    resizeMode: "contain",
   },
   assistantContentWrap: { flex: 1 },
   latencyBadge: {

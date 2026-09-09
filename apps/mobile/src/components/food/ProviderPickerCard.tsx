@@ -17,11 +17,80 @@ type ProviderPickerCardProps = {
   disabled?: boolean;
 };
 
-// Fallback visual logos when network image is slow or missing
+// Styled brand badges matching official design guidelines
 function ProviderLogo({ provider }: { provider: ProviderCardItem }) {
-  const slug = provider.slug.toLowerCase();
+  const slug = (provider.slug || "").toLowerCase();
 
-  if (provider.logoUrl) {
+  // 1. EVOS Brand Logo Badge
+  if (slug.includes("evos")) {
+    return (
+      <View style={[styles.logoContainer, { backgroundColor: "#FFFFFF" }]}>
+        <Text style={{ color: "#E02626", fontWeight: "900", fontSize: 14, letterSpacing: 0.5 }}>
+          EVOS
+        </Text>
+      </View>
+    );
+  }
+
+  // 2. MaxWay Brand Logo Badge
+  if (slug.includes("maxway")) {
+    return (
+      <View style={[styles.logoContainer, { backgroundColor: "#111319" }]}>
+        <Text style={{ color: "#FFD200", fontWeight: "900", fontSize: 16, lineHeight: 18 }}>
+          M
+        </Text>
+        <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 7.5, lineHeight: 9, letterSpacing: 0.3 }}>
+          MaxWay
+        </Text>
+      </View>
+    );
+  }
+
+  // 3. Bellissimo Pizza Brand Logo Badge
+  if (slug.includes("bellissimo")) {
+    return (
+      <View style={[styles.logoContainer, { backgroundColor: "#E31E24" }]}>
+        <Ionicons name="pizza" size={16} color="#FFFFFF" style={{ marginBottom: 1 }} />
+        <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 7, letterSpacing: 0.2 }}>
+          Bellissimo
+        </Text>
+      </View>
+    );
+  }
+
+  // 4. Chopar Pizza Brand Logo Badge
+  if (slug.includes("chopar")) {
+    return (
+      <View style={[styles.logoContainer, { backgroundColor: "#121418" }]}>
+        <Ionicons name="flame" size={15} color="#FF6E00" style={{ marginBottom: 1 }} />
+        <Text style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 7, letterSpacing: 0.5 }}>
+          CHOPAR
+        </Text>
+      </View>
+    );
+  }
+
+  // 5. Yaponamama Brand Logo Badge
+  if (slug.includes("yaponamama")) {
+    return (
+      <View style={[styles.logoContainer, { backgroundColor: "#FFFFFF" }]}>
+        <Ionicons name="restaurant" size={13} color="#D8232A" />
+        <Text style={{ color: "#111111", fontWeight: "900", fontSize: 6.5, lineHeight: 8, marginTop: 1 }}>
+          Yaponamama
+        </Text>
+        <Text style={{ color: "#D8232A", fontWeight: "800", fontSize: 5, lineHeight: 7 }}>
+          PAN-ASIAN
+        </Text>
+      </View>
+    );
+  }
+
+  // Remote logoUrl for other 3rd party providers
+  if (
+    provider.logoUrl &&
+    !provider.logoUrl.includes("delever.uz") &&
+    !provider.logoUrl.includes("selstorage.ru")
+  ) {
     return (
       <View style={styles.logoContainer}>
         <Image
@@ -29,43 +98,6 @@ function ProviderLogo({ provider }: { provider: ProviderCardItem }) {
           style={styles.logoImage}
           resizeMode="cover"
         />
-      </View>
-    );
-  }
-
-  // Styled Brand Badge Fallback
-  if (slug.includes("evos")) {
-    return (
-      <View style={[styles.logoContainer, { backgroundColor: "#000000" }]}>
-        <Text style={{ color: "#FFE600", fontWeight: "900", fontSize: 13 }}>EVOS</Text>
-      </View>
-    );
-  }
-  if (slug.includes("maxway")) {
-    return (
-      <View style={[styles.logoContainer, { backgroundColor: "#FFE600" }]}>
-        <Text style={{ color: "#000000", fontWeight: "900", fontSize: 13 }}>MW</Text>
-      </View>
-    );
-  }
-  if (slug.includes("bellissimo")) {
-    return (
-      <View style={[styles.logoContainer, { backgroundColor: "#D32F2F" }]}>
-        <Ionicons name="pizza" size={22} color="#FFFFFF" />
-      </View>
-    );
-  }
-  if (slug.includes("chopar")) {
-    return (
-      <View style={[styles.logoContainer, { backgroundColor: "#2E7D32" }]}>
-        <Ionicons name="pizza-outline" size={22} color="#FFFFFF" />
-      </View>
-    );
-  }
-  if (slug.includes("yaponamama")) {
-    return (
-      <View style={[styles.logoContainer, { backgroundColor: "#C62828" }]}>
-        <Ionicons name="fish-outline" size={22} color="#FFFFFF" />
       </View>
     );
   }
@@ -79,8 +111,8 @@ function ProviderLogo({ provider }: { provider: ProviderCardItem }) {
 
 export function ProviderPickerCard({
   providers,
-  title = "Assalomu alaykum! Qaysi fast-fooddan buyurtma qilmoqchisiz?",
-  subtitle = "Quyidagilardan birini bosing — xabar avtomatik yuboriladi.",
+  title,
+  subtitle,
   onSelectProvider,
   disabled,
 }: ProviderPickerCardProps) {
@@ -194,8 +226,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   cuisine: {
-    color: "#7E87A0",
-    fontSize: 11,
-    marginTop: 2,
+    color: "#838CA5",
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 3,
   },
 });

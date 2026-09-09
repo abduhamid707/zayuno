@@ -57,11 +57,11 @@ if (!fs.existsSync(releaseApkPath)) {
 
 // 4. Copy to friendly paths
 const rootApkPath = path.join(rootDir, "zayuno.apk");
-const rootApkV3Path = path.join(rootDir, "zayuno-v3.apk");
+const rootApkV4Path = path.join(rootDir, "zayuno-v4.apk");
 const mobileApkPath = path.join(mobileDir, "zayuno.apk");
 
 fs.copyFileSync(releaseApkPath, rootApkPath);
-fs.copyFileSync(releaseApkPath, rootApkV3Path);
+fs.copyFileSync(releaseApkPath, rootApkV4Path);
 fs.copyFileSync(releaseApkPath, mobileApkPath);
 
 const stat = fs.statSync(rootApkPath);
