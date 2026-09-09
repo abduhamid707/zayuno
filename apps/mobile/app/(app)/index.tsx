@@ -11,6 +11,7 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -40,6 +41,7 @@ import {
 import { ProviderPickerCard } from "../../src/components/food/ProviderPickerCard";
 import { InChatCatalogWidget } from "../../src/components/food/InChatCatalogWidget";
 import { ContextTrayDock } from "../../src/components/food/ContextTrayDock";
+import { publicLinks } from "../../src/lib/config";
 import {
   ChatInteraction,
   InteractionChoice,
@@ -800,6 +802,25 @@ export default function HomeScreen() {
               </View>
               <Ionicons name="chevron-forward" size={18} color="#687085" />
             </Pressable>
+            <View style={styles.legalLinks}>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="Maxfiylik siyosatini ochish"
+                onPress={() => void Linking.openURL(publicLinks.privacy)}
+                style={({ pressed }) => [styles.legalLink, pressed && styles.pressed]}
+              >
+                <Text style={styles.legalLinkText}>Maxfiylik</Text>
+              </Pressable>
+              <View style={styles.legalDot} />
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="Hisob va ma’lumotlarni o‘chirish"
+                onPress={() => void Linking.openURL(publicLinks.accountDeletion)}
+                style={({ pressed }) => [styles.legalLink, pressed && styles.pressed]}
+              >
+                <Text style={styles.legalLinkDanger}>Hisobni o‘chirish</Text>
+              </Pressable>
+            </View>
           </SafeAreaView>
         </View>
       </Modal>
@@ -1178,6 +1199,19 @@ const styles = StyleSheet.create({
   reportEntryText: { flex: 1 },
   reportEntryTitle: { color: "#F1F2F7", fontSize: 13, fontWeight: "600" },
   reportEntryCopy: { color: "#838BA3", fontSize: 11, marginTop: 3 },
+  legalLinks: {
+    minHeight: 38,
+    marginHorizontal: 20,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  legalLink: { paddingHorizontal: 4, paddingVertical: 8 },
+  legalLinkText: { color: "#8D95AA", fontSize: 11 },
+  legalLinkDanger: { color: "#D38B99", fontSize: 11 },
+  legalDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: "#4A5268" },
   reportModalRoot: { flex: 1, justifyContent: "flex-end" },
   reportBackdrop: {
     ...StyleSheet.absoluteFill,

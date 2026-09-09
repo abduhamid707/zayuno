@@ -11,6 +11,100 @@
 > business signal borligini tekshir. Hozirgi maqsad: scope’ni kengaytirish emas,
 > tanlangan asosiy oqimni ishlaydigan va isbotlangan holatga olib kelish.
 
+## Mobile release — Google Play production readiness
+
+- [ ] Zayuno mobil ilovasini Google Play’ga chiqarishga to‘liq tayyorlash.
+  - [ ] Google Play Developer Program Policies va target API talablariga moslikni
+    tekshirish; release oldidan policy checklist yuritish.
+  - [ ] Production application ID/package name, version code/version name,
+    Android App Bundle (`.aab`) va release signing/keystore jarayonini sozlash.
+  - [ ] App iconlarni Android adaptive icon talablariga mos tayyorlash:
+    foreground/background layer, monochrome icon, launcher icon va Play Store
+    uchun 512×512 yuqori sifatli icon.
+  - [ ] Splash screen, app nomi, ranglar, light/dark mode va turli Android ekran
+    o‘lchamlarida brandingni tekshirish.
+  - [ ] Store listingni tayyorlash: qisqa/to‘liq tavsif, screenshots, feature
+    graphic, support email/URL, privacy policy URL va kerakli lokalizatsiyalar.
+  - [ ] Data safety form, content rating, ads declaration, app access va account
+    deletion talablarini ilovaning real xatti-harakatiga mos to‘ldirish.
+  - [ ] Faqat zarur Android permissionlarni qoldirish; permissionlar nima uchun
+    kerakligini foydalanuvchiga tushunarli ko‘rsatish.
+  - [ ] Production API URL, network security, crash handling, offline/loading/error
+    holatlari, accessibility va real qurilmalardagi smoke testlarni yakunlash.
+  - [ ] Internal testing → closed testing → production rollout bosqichlarini
+    bajarish va Play Console pre-launch reportdagi barcha kritik muammolarni yopish.
+
+## Customer memory and consent-based personalization
+
+- [ ] Kelajakdagi kuchli suggestionlar uchun foydalanuvchi xotirasi va
+  personalization tizimini loyihalash va bosqichma-bosqich joriy qilish.
+  - [ ] Foydalanuvchi akkaunti, chat session, message, order/action tarixi,
+    tanlovlar, yoqtirilgan provider/taomlar, faol vaqt oralig‘i va suggestion
+    interactionlarini tenant/user bo‘yicha DB’da bog‘lab saqlash.
+  - [ ] Chatlarni yashirin profillashdan oldin aniq opt-in rozilik olish va
+    foydalanuvchiga qaysi ma’lumot nima maqsadda ishlatilishini tushuntirish.
+  - [ ] Har 10 ta yangi chatdan keyin yoki yetarli yangi signal paydo bo‘lganda
+    background summarization job ishga tushirish; barcha raw chatni doimiy ravishda
+    modelga qayta yuborish o‘rniga yangi chatlar + avvalgi profile summary asosida
+    inkremental yangilash.
+  - [ ] AI faqat mahsulot uchun zarur va dalilga tayangan maydonlarni chiqarsin:
+    qiziqishlar, taom/provider afzalliklari, odatiy buyurtmalar, budjet diapazoni,
+    faol vaqtlar, til/uslub preference va ishonchlilik darajasi.
+  - [ ] Jins, xarakter, kayfiyat, nega ranjigan/xursand bo‘lgani kabi nozik yoki
+    taxminiy ma’lumotni fakt sifatida saqlamaslik. Faqat foydalanuvchi o‘zi aytgan
+    yoki aniq interactiondan chiqqan signalni manbasi, timestampi, confidence’i
+    va expiry muddati bilan saqlash; product uchun zarur bo‘lmasa umuman yig‘maslik.
+  - [ ] Raw messages va derived profile’ni alohida saqlash; profile schema version,
+    provenance/source message IDs, `lastUpdatedAt`, confidence va conflict
+    resolution maydonlarini kiritish.
+  - [ ] PII va maxfiy ma’lumotlarni minimallashtirish: payment/card/OTP/tokenlarni
+    hech qachon saqlamaslik, telefon/manzil kabi zarur ma’lumotlarni shifrlash,
+    log va AI promptlarida redakt qilish.
+  - [ ] Retention siyosati va avtomatik o‘chirish muddatlarini belgilash; userga
+    “Men haqimda nimalarni bilasan?”, memory’ni tahrirlash, o‘chirish,
+    personalizationni o‘chirish va barcha ma’lumotni eksport/delete qilish
+    imkonini berish.
+  - [ ] AI provider bilan data processing shartlari, data residency, training
+    opt-out va prompt/log retention sozlamalarini tekshirish; faqat kerakli
+    minimal kontekstni yuborish.
+  - [ ] Suggestion sifati uchun offline evaluation va A/B test qo‘shish; sensitive
+    profiling, noto‘g‘ri inference, eski preference va filter-bubble holatlarini
+    alohida regression testlar bilan tekshirish.
+  - [ ] Privacy policy, Google Play Data safety va account deletion oqimini real
+    yig‘iladigan/saqlanadigan ma’lumotlarga mos yangilash.
+
+> Maqsad foydalanuvchini yashirin kuzatish emas, uning roziligi bilan foydali
+> xotira yaratish. Personalization o‘chirilganda ilovaning asosiy buyurtma oqimi
+> ishlashda davom etishi kerak.
+
+## Authentication and persistent sessions
+
+- [ ] Auth oqimini barqaror qilish: foydalanuvchi o‘zi `Logout` qilmaguncha
+  kundalik foydalanishda akkauntdan chiqib ketmasin.
+  - [ ] Bugungi login ertasi kuni yo‘qolishining sababini aniqlash: token TTL,
+    refresh token rotation, secure storage, hydration race, app restart/background,
+    server clock yoki 401 interceptor holatlarini trace qilish.
+  - [ ] Access tokenni qisqa muddatli, refresh token/sessionni uzoq muddatli qilish;
+    access token expiry oldidan yoki 401’da single-flight silent refresh ishlatish.
+  - [ ] Refresh tokenni Android Keystore bilan himoyalangan secure storage’da
+    saqlash; tokenlarni AsyncStorage, log, analytics yoki crash reportga yozmaslik.
+  - [ ] Refresh token rotation va reuse detection qo‘shish; parallel so‘rovlar
+    bir-birining sessionini buzmasin va yangi refresh token atomik saqlansin.
+  - [ ] App cold start, update, process kill, offline → online, background →
+    foreground va qurilma restartidan keyin sessionni xavfsiz tiklash.
+  - [ ] Vaqtinchalik network/server xatosini logout deb qabul qilmaslik; userga
+    retry/offline holatini ko‘rsatish. Faqat revoked/expired refresh session yoki
+    foydalanuvchining aniq Logout amali sessionni tugatsin.
+  - [ ] Logout’da local tokenlarni, push token bog‘lanishini va server sessionini
+    bekor qilish; “barcha qurilmalardan chiqish” imkonini qo‘shish.
+  - [ ] Google Play account deletion talabiga mos ravishda ilova ichidan account
+    delete oqimi va tashqi deletion URL yaratish; deletion logoutdan alohida va
+    tushunarli bo‘lsin.
+  - [ ] Auth uchun integration/E2E testlar: 24 soat+, token expiry, rotation,
+    parallel refresh, offline recovery, revoked session, logout va account delete.
+  - [ ] Release oldidan Android real qurilmalarida uzoq muddatli session soak-test
+    o‘tkazish va auth xatolarini maxfiy ma’lumotsiz monitoring qilish.
+
 
 ## Before the next production deploy
 

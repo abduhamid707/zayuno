@@ -16,4 +16,7 @@ export const publicLinks = {
   terms: process.env.EXPO_PUBLIC_TERMS_URL?.trim() || "https://zayuno.uz/terms",
   privacy:
     process.env.EXPO_PUBLIC_PRIVACY_URL?.trim() || "https://zayuno.uz/privacy",
+  accountDeletion:
+    process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL?.trim() ||
+    "https://zayuno.uz/delete-account",
 };

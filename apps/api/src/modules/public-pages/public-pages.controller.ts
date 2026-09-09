@@ -181,6 +181,12 @@ Sitemap: https://zayuno.uz/sitemap.xml
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
+  <url>
+    <loc>https://zayuno.uz/delete-account</loc>
+    <lastmod>2026-09-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
 </urlset>`;
 
     res.send(sitemap);
@@ -224,6 +230,16 @@ Sitemap: https://zayuno.uz/sitemap.xml
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.send(this.renderSupportHtml());
+  }
+
+  // Public account deletion page required by Google Play's User Data policy.
+  @Get('delete-account')
+  @ApiExcludeEndpoint()
+  getAccountDeletion(@Res() res: Response) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.send(this.renderAccountDeletionHtml());
   }
 
   // =========================================================================
@@ -1576,6 +1592,55 @@ ${schemaScriptTags}
 
   </main>
 
+  ${this.getSharedFooter()}
+</body>
+</html>`;
+  }
+
+  private renderAccountDeletionHtml(): string {
+    const deletionSchema = {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      name: 'Hisobni o‘chirish — Zayuno',
+      url: 'https://zayuno.uz/delete-account',
+      description: 'Zayuno hisobi va unga bog‘liq shaxsiy ma’lumotlarni o‘chirish tartibi.',
+    };
+
+    return `<!DOCTYPE html>
+<html lang="uz" class="dark">
+<head>
+  ${this.getSharedHead(
+    'Hisobni o‘chirish — Zayuno',
+    'Zayuno hisobi va unga bog‘liq shaxsiy ma’lumotlarni o‘chirish tartibi.',
+    '/delete-account',
+    [deletionSchema],
+  )}
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased lang-uz">
+  ${this.getSharedNavbar()}
+  <main class="flex-grow py-12 lg:py-16">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+        <span class="lang-uz">Zayuno hisobini o‘chirish</span>
+        <span class="lang-en">Delete your Zayuno account</span>
+      </h1>
+      <div class="mt-8 p-6 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 space-y-5 leading-relaxed">
+        <p class="lang-uz">Hisobingizni o‘chirishni so‘rash uchun quyidagi tugmani bosing. Xatni hisobga bog‘langan email manzilidan yuboring va Google orqali kirishda ishlatgan emailingizni ko‘rsating.</p>
+        <p class="lang-en">To request deletion, use the button below. Send the request from the email linked to your account and include the email used for Google sign-in.</p>
+        <a href="mailto:support@zayuno.uz?subject=Zayuno%20hisobini%20o%27chirish%20%2F%20Delete%20my%20account" class="inline-flex px-6 py-3 rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold transition">
+          <span class="lang-uz">O‘chirish so‘rovini yuborish</span>
+          <span class="lang-en">Send deletion request</span>
+        </a>
+        <div class="border-t border-slate-800 pt-5 space-y-3 text-sm">
+          <p class="lang-uz"><strong class="text-white">O‘chiriladi:</strong> profil, identifikatorlar, Zayuno chatlari, buyurtma ma’lumotlari va hisobga bog‘langan boshqa shaxsiy ma’lumotlar.</p>
+          <p class="lang-en"><strong class="text-white">Deleted:</strong> profile, identifiers, Zayuno chats, order information, and other personal data linked to the account.</p>
+          <p class="lang-uz"><strong class="text-white">Muddat:</strong> shaxsni tasdiqlagandan keyin 30 kun ichida. Qonun, firibgarlikning oldini olish yoki moliyaviy hisobot uchun saqlanishi shart bo‘lgan ma’lumotlar talab etilgan muddatgacha alohida saqlanishi mumkin.</p>
+          <p class="lang-en"><strong class="text-white">Timing:</strong> within 30 days after verification. Records required for legal, fraud-prevention, or financial reporting purposes may be retained separately for the required period.</p>
+        </div>
+        <p class="text-xs text-slate-400">Support: <a href="mailto:support@zayuno.uz" class="text-emerald-400 underline">support@zayuno.uz</a></p>
+      </div>
+    </div>
+  </main>
   ${this.getSharedFooter()}
 </body>
 </html>`;
