@@ -7,8 +7,14 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createHash } from "crypto";
 import { ActionStatus, prisma } from "@zayuno/database";
-import { decryptSecret, redactForLogs, scrubSensitiveString } from "@zayuno/shared";
+import {
+  decryptSecret,
+  redactForLogs,
+  scrubSensitiveString,
+} from "@zayuno/shared";
+import { ProductAnalyticsService } from "../../analytics/product-analytics.service";
 
 const CONSENT_VERSION = "consumer-memory-v1";
 const ANALYSIS_BATCH_SIZE = 10;
@@ -24,6 +30,11 @@ const ALLOWED_KINDS = new Set([
   "ACTIVITY_WINDOW",
   "ORDER_PATTERN",
   "DISLIKE",
+  "DECISION_STYLE",
+  "PRICE_SENSITIVITY",
+  "NOVELTY_PREFERENCE",
+  "RESPONSE_STYLE",
+  "FRICTION_PATTERN",
 ]);
 const FORBIDDEN_PROFILE_PATTERN =
   /gender|male|female|jins|erkak|ayol|personality|xarakter|mood|kayfiyat|depress|relig|muslim|christ|politic|ethnic|race|health|kasal|diabet|phone|telefon|email|address|manzil|passport|pinfl|card|karta|cvv|otp|password|parol/i;
@@ -44,7 +55,7 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
   private readonly model: any | null;
   private timer?: NodeJS.Timeout;
 
-  constructor() {
+  constructor(private readonly productAnalytics?: ProductAnalyticsService) {
     const key = process.env.GEMINI_API_KEY?.trim();
     const modelName =
       process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
@@ -61,9 +72,17 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
-    this.timer = setInterval(() => void this.drainJobs(), 30_000);
+    this.timer = setInterval(
+      () =>
+        void this.drainJobs().catch(() =>
+          this.logger.warn("Memory job scan deferred."),
+        ),
+      30_000,
+    );
     this.timer.unref?.();
-    void this.recoverAndDrain();
+    void this.recoverAndDrain().catch(() =>
+      this.logger.warn("Memory job recovery deferred."),
+    );
   }
 
   onModuleDestroy() {
@@ -97,6 +116,7 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
       enabled: Boolean(profile?.enabled),
       consentVersion: profile?.consentVersion || null,
       consentedAt: profile?.consentedAt?.toISOString() || null,
+      suggestionVariant: profile?.suggestionVariant || "balanced",
       summary: profile?.enabled ? profile.summary : {},
       signals: signals.map((signal) => ({
         id: signal.id,
@@ -128,12 +148,14 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
           enabled: true,
           consentVersion: CONSENT_VERSION,
           consentedAt: now,
+          suggestionVariant: this.variantForUser(userId),
         },
         update: {
           enabled: true,
           consentVersion: CONSENT_VERSION,
           consentedAt: now,
           revokedAt: null,
+          suggestionVariant: this.variantForUser(userId),
         },
       });
       await this.maybeEnqueue(userId);
@@ -158,6 +180,11 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
         }),
       ]);
     }
+    this.productAnalytics?.capture("memory_consent_updated", userId, {
+      enabled,
+      consent_version: CONSENT_VERSION,
+      suggestion_variant: enabled ? this.variantForUser(userId) : "disabled",
+    });
     return this.getMemory(userId);
   }
 
@@ -184,6 +211,9 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
         },
       }),
     ]);
+    this.productAnalytics?.capture("memory_cleared", userId, {
+      was_enabled: Boolean(profile?.enabled),
+    });
     return { deleted: true, wasEnabled: Boolean(profile?.enabled) };
   }
 
@@ -225,15 +255,33 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
         expiresAt: null,
       },
     });
+    this.productAnalytics?.capture("memory_signal_edited", userId, {
+      signal_kind: existing.kind,
+      signal_source: existing.source,
+    });
     return this.getMemory(userId);
   }
 
   async deleteSignal(userId: string, id: string) {
+    const existing = await prisma.consumerMemorySignal.findFirst({
+      where: { id, userId },
+      select: { kind: true, source: true },
+    });
     await prisma.consumerMemorySignal.deleteMany({ where: { id, userId } });
+    if (existing) {
+      this.productAnalytics?.capture("memory_signal_deleted", userId, {
+        signal_kind: existing.kind,
+        signal_source: existing.source,
+      });
+    }
   }
 
   async exportMemory(userId: string) {
     const memory = await this.getMemory(userId);
+    this.productAnalytics?.capture("memory_exported", userId, {
+      enabled: memory.enabled,
+      signal_count: memory.signals.length,
+    });
     return {
       exportedAt: new Date().toISOString(),
       schemaVersion: 1,
@@ -278,7 +326,10 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
         (affinity.get(event.suggestionKey) || 0) + delta,
       );
     }
+    const minimumConfidence =
+      profile.suggestionVariant === "precision" ? 0.72 : 0.55;
     const suggestions = signals
+      .filter((signal) => signal.confidence >= minimumConfidence)
       .map((signal) => ({
         key: signal.key,
         type: signal.kind.toLowerCase(),
@@ -301,9 +352,15 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
           suggestionType: suggestion.type,
           suggestionKey: suggestion.key,
           suggestionText: suggestion.label,
+          context: { variant: profile.suggestionVariant },
         })),
       });
     }
+    this.productAnalytics?.capture("personalized_suggestions_generated", userId, {
+      suggestion_count: suggestions.length,
+      suggestion_variant: profile.suggestionVariant,
+      personalized: suggestions.length > 0,
+    });
     return { personalized: suggestions.length > 0, suggestions };
   }
 
@@ -341,7 +398,13 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
         suggestionType: String(input.type || "generic").slice(0, 40),
         suggestionKey,
         suggestionText,
+        context: { variant: profile.suggestionVariant },
       },
+    });
+    this.productAnalytics?.capture("personalized_suggestion_interacted", userId, {
+      interaction: event,
+      suggestion_type: String(input.type || "generic").slice(0, 40),
+      suggestion_variant: profile.suggestionVariant,
     });
     return { recorded: true };
   }
@@ -422,7 +485,14 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
     await prisma.consumerMemoryJob.create({
       data: { userId, messageCount: count },
     });
-    void this.drainJobs();
+    this.productAnalytics?.capture("memory_analysis_queued", userId, {
+      pending_message_count: count,
+      batch_size: ANALYSIS_BATCH_SIZE,
+      suggestion_variant: profile.suggestionVariant,
+    });
+    void this.drainJobs().catch(() =>
+      this.logger.warn("Memory job dispatch deferred."),
+    );
   }
 
   private async drainJobs() {
@@ -526,7 +596,11 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
       const sanitizedMessages = messages.map((message) => ({
         id: message.id,
         text: this.redactMemoryInput(this.decryptStoredText(message.content)),
-        selections: message.selections,
+        selections: this.redactMemoryInput(
+          JSON.stringify(
+            redactForLogs(this.decryptStoredJson(message.selections)),
+          ),
+        ).slice(0, 1000),
         localHour: Number(
           new Intl.DateTimeFormat("en-US", {
             timeZone: "Asia/Tashkent",
@@ -539,7 +613,7 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
 {"summary":"one short Uzbek sentence","signals":[{"kind":"ALLOWED_KIND","key":"stable_lowercase_key","label":"short Uzbek label","value":"string, number, or compact object","confidence":0.0,"evidenceMessageIds":["id"],"expiresInDays":180}]}
 
 Allowed kinds: ${[...ALLOWED_KINDS].join(", ")}.
-Only save facts explicitly stated by the user or directly observed choices/orders. Current messages override old conflicting preferences. Do not infer or store gender, age, personality, mood, health, religion, politics, ethnicity, relationship status, exact location, address, phone, email, identity, payment data, passwords, tokens or secrets. Ignore one-off requests unless repeated or clearly phrased as a preference. Budget, food/provider choices, dietary wishes, delivery/pickup preference, language/style and broad activity window are allowed. Use only supplied message IDs as evidence. Keep at most 8 signals.
+Only save facts explicitly stated by the user or patterns directly supported by observed choices/orders. Current messages override old conflicting preferences. Do not infer or store gender, age, personality, psychological mood, health, religion, politics, ethnicity, relationship status, exact location, address, phone, email, identity, payment data, passwords, tokens or secrets. Ignore one-off requests unless clearly phrased as a preference. Budget, food/provider choices, dietary wishes, delivery/pickup preference, language/style and broad activity window are allowed. Repeated behavioral evidence may produce PRICE_SENSITIVITY (deal/value vs premium), DECISION_STYLE (quick choice vs compares options), NOVELTY_PREFERENCE (new choices vs repeats), RESPONSE_STYLE (short vs detailed answers), or FRICTION_PATTERN (temporary repeated retries/rejections). Behavioral patterns need at least two evidence messages and describe product interaction only, never personality or mental state. Use only supplied message IDs as evidence. Keep at most 8 signals.
 
 EXISTING=${existingContext || "[]"}
 VERIFIED_ORDERS=${JSON.stringify(
@@ -587,6 +661,21 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
           },
         }),
       ]);
+      this.productAnalytics?.capture("memory_analysis_completed", userId, {
+        analyzed_message_count: messages.length,
+        extracted_signal_count: signals.length,
+        behavior_signal_count: signals.filter((signal) =>
+          [
+            "DECISION_STYLE",
+            "PRICE_SENSITIVITY",
+            "NOVELTY_PREFERENCE",
+            "RESPONSE_STYLE",
+            "FRICTION_PATTERN",
+          ].includes(signal.kind),
+        ).length,
+        verified_order_count: recentOrders.length,
+        suggestion_variant: profile.suggestionVariant,
+      });
       await this.maybeEnqueue(userId);
     } catch (error) {
       const job = await prisma.consumerMemoryJob.findUnique({
@@ -612,6 +701,14 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
           },
         }),
       ]);
+      this.productAnalytics?.capture("memory_analysis_failed", userId, {
+        will_retry: retry,
+        attempt_count: job?.attempts || 0,
+        error_code:
+          error instanceof Error && error.message === "AI_UNAVAILABLE"
+            ? "AI_UNAVAILABLE"
+            : "ANALYSIS_FAILED",
+      });
       this.logger.warn(
         `Memory analysis job ${jobId} deferred (${retry ? "retry" : "failed"}).`,
       );
@@ -690,13 +787,14 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
   ) {
     const hourCounts = new Map<string, number>();
     for (const message of messages) {
-      const hour = Number(
-        new Intl.DateTimeFormat("en-US", {
-          timeZone: "Asia/Tashkent",
-          hour: "2-digit",
-          hour12: false,
-        }).format(message.createdAt),
-      );
+      const hour =
+        Number(
+          new Intl.DateTimeFormat("en-US", {
+            timeZone: "Asia/Tashkent",
+            hour: "2-digit",
+            hour12: false,
+          }).format(message.createdAt),
+        ) % 24;
       const key =
         hour < 6
           ? "night"
@@ -743,29 +841,87 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
       });
     }
 
-    const providerCounts = new Map<string, { name: string; count: number; last: Date }>();
+    const providerCounts = new Map<
+      string,
+      { name: string; count: number; last: Date }
+    >();
     for (const order of orders) {
       const current = providerCounts.get(order.provider.slug);
       providerCounts.set(order.provider.slug, {
         name: order.provider.name,
         count: (current?.count || 0) + 1,
-        last: current && current.last > order.createdAt ? current.last : order.createdAt,
+        last:
+          current && current.last > order.createdAt
+            ? current.last
+            : order.createdAt,
       });
     }
-    for (const [slug, data] of [...providerCounts.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 5)) {
+    for (const [slug, data] of [...providerCounts.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 5)) {
       await prisma.consumerMemorySignal.upsert({
-        where: { userId_kind_key: { userId, kind: "PROVIDER_PREFERENCE", key: slug } },
-        create: { userId, kind: "PROVIDER_PREFERENCE", key: slug, label: data.name, value: { providerSlug: slug, orderCount: data.count }, confidence: Math.min(0.99, 0.7 + data.count * 0.06), source: "ORDER_HISTORY", evidenceMessageIds: [], lastSeenAt: data.last, expiresAt: new Date(Date.now() + 365 * 86_400_000) },
-        update: { label: data.name, value: { providerSlug: slug, orderCount: data.count }, confidence: Math.min(0.99, 0.7 + data.count * 0.06), source: "ORDER_HISTORY", lastSeenAt: data.last, expiresAt: new Date(Date.now() + 365 * 86_400_000), status: "ACTIVE" },
+        where: {
+          userId_kind_key: { userId, kind: "PROVIDER_PREFERENCE", key: slug },
+        },
+        create: {
+          userId,
+          kind: "PROVIDER_PREFERENCE",
+          key: slug,
+          label: data.name,
+          value: { providerSlug: slug, orderCount: data.count },
+          confidence: Math.min(0.99, 0.7 + data.count * 0.06),
+          source: "ORDER_HISTORY",
+          evidenceMessageIds: [],
+          lastSeenAt: data.last,
+          expiresAt: new Date(Date.now() + 365 * 86_400_000),
+        },
+        update: {
+          label: data.name,
+          value: { providerSlug: slug, orderCount: data.count },
+          confidence: Math.min(0.99, 0.7 + data.count * 0.06),
+          source: "ORDER_HISTORY",
+          lastSeenAt: data.last,
+          expiresAt: new Date(Date.now() + 365 * 86_400_000),
+          status: "ACTIVE",
+        },
       });
     }
     if (orders.length >= 3) {
-      const average = Math.round(orders.reduce((sum, order) => sum + Number(order.total || 0), 0) / orders.length / 5_000) * 5_000;
+      const average =
+        Math.round(
+          orders.reduce((sum, order) => sum + Number(order.total || 0), 0) /
+            orders.length /
+            5_000,
+        ) * 5_000;
       if (average > 0) {
         await prisma.consumerMemorySignal.upsert({
-          where: { userId_kind_key: { userId, kind: "ORDER_PATTERN", key: "average-order-value" } },
-          create: { userId, kind: "ORDER_PATTERN", key: "average-order-value", label: `Odatda ${average.toLocaleString("en-US")} ${orders[0].currency} atrofida buyurtma`, value: { average, currency: orders[0].currency }, confidence: Math.min(0.95, 0.65 + orders.length * 0.03), source: "ORDER_HISTORY", evidenceMessageIds: [], expiresAt: new Date(Date.now() + 180 * 86_400_000) },
-          update: { label: `Odatda ${average.toLocaleString("en-US")} ${orders[0].currency} atrofida buyurtma`, value: { average, currency: orders[0].currency }, confidence: Math.min(0.95, 0.65 + orders.length * 0.03), source: "ORDER_HISTORY", lastSeenAt: new Date(), expiresAt: new Date(Date.now() + 180 * 86_400_000), status: "ACTIVE" },
+          where: {
+            userId_kind_key: {
+              userId,
+              kind: "ORDER_PATTERN",
+              key: "average-order-value",
+            },
+          },
+          create: {
+            userId,
+            kind: "ORDER_PATTERN",
+            key: "average-order-value",
+            label: `Odatda ${average.toLocaleString("en-US")} ${orders[0].currency} atrofida buyurtma`,
+            value: { average, currency: orders[0].currency },
+            confidence: Math.min(0.95, 0.65 + orders.length * 0.03),
+            source: "ORDER_HISTORY",
+            evidenceMessageIds: [],
+            expiresAt: new Date(Date.now() + 180 * 86_400_000),
+          },
+          update: {
+            label: `Odatda ${average.toLocaleString("en-US")} ${orders[0].currency} atrofida buyurtma`,
+            value: { average, currency: orders[0].currency },
+            confidence: Math.min(0.95, 0.65 + orders.length * 0.03),
+            source: "ORDER_HISTORY",
+            lastSeenAt: new Date(),
+            expiresAt: new Date(Date.now() + 180 * 86_400_000),
+            status: "ACTIVE",
+          },
         });
       }
     }
@@ -776,14 +932,23 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
       select: { id: true },
     });
     if (excess.length) {
-      await prisma.consumerMemorySignal.deleteMany({ where: { id: { in: excess.map((item) => item.id) } } });
+      await prisma.consumerMemorySignal.deleteMany({
+        where: { id: { in: excess.map((item) => item.id) } },
+      });
     }
   }
 
   private async recoverAndDrain() {
     await prisma.consumerMemoryJob.updateMany({
-      where: { status: "RUNNING", startedAt: { lt: new Date(Date.now() - 5 * 60_000) } },
-      data: { status: "QUEUED", runAfter: new Date(), errorCode: "RECOVERED_STALE_JOB" },
+      where: {
+        status: "RUNNING",
+        startedAt: { lt: new Date(Date.now() - 5 * 60_000) },
+      },
+      data: {
+        status: "QUEUED",
+        runAfter: new Date(),
+        errorCode: "RECOVERED_STALE_JOB",
+      },
     });
     await this.drainJobs();
   }
@@ -796,7 +961,9 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
         data: { status: "EXPIRED" },
       }),
       prisma.consumerSuggestionEvent.deleteMany({
-        where: { createdAt: { lt: new Date(now.getTime() - 180 * 86_400_000) } },
+        where: {
+          createdAt: { lt: new Date(now.getTime() - 180 * 86_400_000) },
+        },
       }),
       prisma.consumerMemoryJob.deleteMany({
         where: {
@@ -821,6 +988,7 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
         !ALLOWED_KINDS.has(kind) ||
         !key ||
         !label ||
+        serialized.length > 800 ||
         FORBIDDEN_PROFILE_PATTERN.test(`${key} ${label} ${serialized}`)
       )
         return [];
@@ -828,7 +996,14 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
         1,
         Math.max(0, Number(item?.confidence) || 0),
       );
-      if (confidence < 0.55) return [];
+      const behavioralKinds = new Set([
+        "DECISION_STYLE",
+        "PRICE_SENSITIVITY",
+        "NOVELTY_PREFERENCE",
+        "RESPONSE_STYLE",
+        "FRICTION_PATTERN",
+      ]);
+      if (confidence < (behavioralKinds.has(kind) ? 0.65 : 0.55)) return [];
       const evidenceMessageIds = Array.isArray(item?.evidenceMessageIds)
         ? item.evidenceMessageIds
             .map(String)
@@ -836,6 +1011,14 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
             .slice(0, 10)
         : [];
       if (!evidenceMessageIds.length) return [];
+      if (behavioralKinds.has(kind) && evidenceMessageIds.length < 2) return [];
+      const requestedExpiry = Number(item?.expiresInDays) || 180;
+      const expiresInDays =
+        kind === "FRICTION_PATTERN"
+          ? Math.min(14, Math.max(1, requestedExpiry))
+          : behavioralKinds.has(kind)
+            ? Math.min(180, Math.max(30, requestedExpiry))
+            : Math.min(365, Math.max(30, requestedExpiry));
       return [
         {
           kind,
@@ -844,10 +1027,7 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
           value: item?.value ?? label,
           confidence,
           evidenceMessageIds,
-          expiresInDays: Math.min(
-            365,
-            Math.max(30, Number(item?.expiresInDays) || 180),
-          ),
+          expiresInDays,
         },
       ];
     });
@@ -884,6 +1064,18 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
     return decryptSecret(value.slice(7), key);
   }
 
+  private decryptStoredJson(value: unknown) {
+    if (!value || typeof value !== "object" || !("encrypted" in value))
+      return value;
+    const encrypted = (value as { encrypted?: unknown }).encrypted;
+    if (typeof encrypted !== "string") return null;
+    try {
+      return JSON.parse(this.decryptStoredText(encrypted));
+    } catch {
+      return null;
+    }
+  }
+
   private parseJson(raw: string) {
     try {
       const cleaned = raw
@@ -910,11 +1102,28 @@ NEW_MESSAGES=${JSON.stringify(sanitizedMessages)}`;
       .replace(/[.!?]+$/g, "")
       .trim();
     if (!clean || FORBIDDEN_PROFILE_PATTERN.test(clean)) return "";
+    if (
+      ![
+        "INTEREST",
+        "PROVIDER_PREFERENCE",
+        "OFFERING_PREFERENCE",
+        "BUDGET",
+        "DIETARY_PREFERENCE",
+        "FULFILLMENT_PREFERENCE",
+        "DISLIKE",
+      ].includes(kind)
+    )
+      return "";
     if (kind === "PROVIDER_PREFERENCE") return `${clean} menyusini ko‘rsat`;
     if (kind === "OFFERING_PREFERENCE") return `${clean}ni ko‘rsat`;
     if (kind === "BUDGET") return `${clean} budjetga mos ovqatlarni ko‘rsat`;
     if (kind === "DISLIKE") return `${clean} bo‘lmagan variantlarni ko‘rsat`;
     return `${clean} bo‘yicha variantlarni ko‘rsat`;
+  }
+
+  private variantForUser(userId: string) {
+    const bucket = createHash("sha256").update(userId).digest()[0] % 2;
+    return bucket === 0 ? "precision" : "discovery";
   }
 
   private safeJsonValue(value: unknown): any {

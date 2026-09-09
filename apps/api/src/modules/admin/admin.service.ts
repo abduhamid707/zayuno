@@ -414,15 +414,20 @@ export class AdminService {
     from?: string;
     to?: string;
     category?: string;
+    geography?: string;
+    reasonCode?: string;
   }) {
     if (!this.unmetDemandService) {
       return {
         totalEvents: 0,
         uniquePatterns: 0,
+        uniqueRequesters: 0,
+        notificationSubscribers: 0,
         topMissingCategories: [],
         topMissingGeographies: [],
         topMissingCapabilities: [],
         reasonsBreakdown: [],
+        topCustomerRequests: [],
         recentUnmetDemand: [],
       };
     }

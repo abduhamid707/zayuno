@@ -48,8 +48,8 @@ export class ConsumerHistoryService {
         content: this.decrypt(message.content),
         createdAt: message.createdAt.toISOString(),
         latencyMs: message.latencyMs ?? undefined,
-        interaction: message.interaction ?? undefined,
-        selections: message.selections ?? undefined,
+        interaction: this.decryptJson(message.interaction),
+        selections: this.decryptJson(message.selections),
       })),
     }));
   }
@@ -92,6 +92,8 @@ export class ConsumerHistoryService {
           data: session.messages.map((message) => ({
             ...message,
             content: this.encrypt(message.content),
+            interaction: this.encryptJson(message.interaction),
+            selections: this.encryptJson(message.selections),
             sessionId: session.id,
           })),
         });
@@ -135,12 +137,8 @@ export class ConsumerHistoryService {
           Number.isFinite(message.latencyMs) && Number(message.latencyMs) >= 0
             ? Math.round(Number(message.latencyMs))
             : null,
-        interaction:
-          message.interaction == null
-            ? undefined
-            : (message.interaction as any),
-        selections:
-          message.selections == null ? undefined : (message.selections as any),
+        interaction: this.json(message.interaction),
+        selections: this.json(message.selections),
       };
     });
     return { id, title, createdAt, updatedAt, messages };
@@ -172,6 +170,36 @@ export class ConsumerHistoryService {
       throw new ServiceUnavailableException(
         "Chat tarixini xavfsiz o‘qib bo‘lmadi.",
       );
+    }
+  }
+
+  private encryptJson(value: unknown) {
+    if (value === undefined) return undefined;
+    return { encrypted: this.encrypt(JSON.stringify(value)) };
+  }
+
+  private decryptJson(value: unknown) {
+    if (!value || typeof value !== "object" || !("encrypted" in value))
+      return value ?? undefined;
+    const encrypted = (value as { encrypted?: unknown }).encrypted;
+    if (typeof encrypted !== "string") return undefined;
+    try {
+      return JSON.parse(this.decrypt(encrypted));
+    } catch {
+      return undefined;
+    }
+  }
+
+  private json(value: unknown) {
+    if (value == null) return undefined;
+    try {
+      const serialized = JSON.stringify(value);
+      if (serialized.length > 50_000)
+        throw new BadRequestException("Chat UI metadata is too large.");
+      return JSON.parse(serialized);
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException("Invalid chat UI metadata.");
     }
   }
 

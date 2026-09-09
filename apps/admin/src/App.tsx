@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -35,7 +35,10 @@ import {
   Filter,
   Calendar,
   AlertTriangle,
+  Bell,
+  Users,
 } from 'lucide-react';
+import { adminAnalytics } from './lib/analytics';
 
 const API_BASE =
   (import.meta as any).env?.VITE_API_URL ||
@@ -89,7 +92,7 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'actions' | 'providers' | 'reports' | 'logs'
+    'dashboard' | 'actions' | 'providers' | 'demand' | 'reports' | 'logs'
   >('dashboard');
   const [reportStatus, setReportStatus] = useState('ALL');
   const [reportSearch, setReportSearch] = useState('');
@@ -171,6 +174,7 @@ export default function App() {
     ],
   });
   const queryClient = useQueryClient();
+  const demandViewTracked = useRef(false);
   const logout = () => {
     localStorage.removeItem('zayuno_admin_token');
     setToken('');
@@ -355,6 +359,33 @@ export default function App() {
     },
     enabled: !!token,
   });
+  const {
+    data: unmetDemandData,
+    isLoading: unmetDemandLoading,
+    isFetching: unmetDemandFetching,
+  } = useQuery({
+    queryKey: ['admin-unmet-demand'],
+    queryFn: async () => {
+      const res = await apiFetch('/api/v1/admin/analytics/unmet-demand');
+      return res.json();
+    },
+    enabled: !!token,
+    refetchInterval: 60_000,
+  });
+
+  useEffect(() => {
+    if (activeTab !== 'demand') {
+      demandViewTracked.current = false;
+      return;
+    }
+    if (!unmetDemandData || demandViewTracked.current) return;
+    demandViewTracked.current = true;
+    adminAnalytics.trackDemandView({
+      total_events: unmetDemandData.totalEvents,
+      unique_requesters: unmetDemandData.uniqueRequesters,
+      notification_subscribers: unmetDemandData.notificationSubscribers,
+    });
+  }, [activeTab, unmetDemandData]);
   const exportLogs = async (format: 'json' | 'csv') => {
     const params = new URLSearchParams({ format });
     Object.entries(logFilters).forEach(([key, value]) => {
@@ -858,6 +889,25 @@ export default function App() {
           >
             <Store className="w-4 h-4" />
             <span>Providers & Adapters</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('demand')}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
+              activeTab === 'demand'
+                ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Activity className="w-4 h-4" />
+              <span>Mijoz talablari</span>
+            </div>
+            {(unmetDemandData?.totalEvents || 0) > 0 && (
+              <span className="px-2 py-0.5 text-xs font-bold bg-amber-500/10 text-amber-300 rounded-full">
+                {unmetDemandData.totalEvents}
+              </span>
+            )}
           </button>
 
           <button
@@ -2914,6 +2964,87 @@ export default function App() {
               </div>
             );
           })()}
+
+          {activeTab === 'demand' && (
+            <div className="space-y-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-white">Mijozlar nimani so‘rayapti?</h2>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Zayunoda yo‘q xizmatlar, ularni so‘ragan mijozlar va kelajakdagi notification auditoriyasi.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    adminAnalytics.trackAction('admin_unmet_demand_refreshed');
+                    queryClient.invalidateQueries({ queryKey: ['admin-unmet-demand'] });
+                  }}
+                  className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${unmetDemandFetching ? 'animate-spin' : ''}`} />
+                  Yangilash
+                </button>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ['Jami so‘rovlar', unmetDemandData?.totalEvents || 0, Activity, 'text-amber-300'],
+                  ['Noyob talablar', unmetDemandData?.uniquePatterns || 0, Layers, 'text-indigo-300'],
+                  ['So‘ragan mijozlar', unmetDemandData?.uniqueRequesters || 0, Users, 'text-sky-300'],
+                  ['Xabar kutayotganlar', unmetDemandData?.notificationSubscribers || 0, Bell, 'text-emerald-300'],
+                ].map(([label, value, Icon, color]: any) => (
+                  <div key={label} className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
+                      <span>{label}</span><Icon className={`h-4 w-4 ${color}`} />
+                    </div>
+                    <div className={`mt-2 text-3xl font-black ${color}`}>{Number(value).toLocaleString('uz-UZ')}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                <div className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Eng ko‘p so‘ralgan yo‘nalishlar</div>
+                <div className="flex flex-wrap gap-2">
+                  {(unmetDemandData?.topMissingCategories || []).length ? unmetDemandData.topMissingCategories.slice(0, 12).map((item: any) => (
+                    <span key={item.category} className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200">
+                      {item.category} · {item.count}
+                    </span>
+                  )) : <span className="text-xs text-slate-500">Hali talab ma’lumoti yo‘q.</span>}
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80">
+                <div className="overflow-x-auto">
+                  <table className="min-w-[980px] w-full text-left text-xs">
+                    <thead className="border-b border-slate-800 bg-slate-800/60 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <tr><th className="p-3.5">So‘ralgan xizmat</th><th className="p-3.5">Yo‘nalish</th><th className="p-3.5">Talab</th><th className="p-3.5">Kimlar so‘radi</th><th className="p-3.5">Notification</th><th className="p-3.5 text-right">Oxirgi so‘rov</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {unmetDemandLoading ? (
+                        <tr><td colSpan={6} className="p-10 text-center text-slate-400">Mijoz talablari yuklanmoqda…</td></tr>
+                      ) : (unmetDemandData?.topCustomerRequests || []).length === 0 ? (
+                        <tr><td colSpan={6} className="p-10 text-center text-slate-500">Chatdan kelgan qo‘llanmaydigan xizmat so‘rovlari hali yo‘q.</td></tr>
+                      ) : unmetDemandData.topCustomerRequests.map((item: any) => (
+                        <tr key={item.intentKey} className="align-top transition hover:bg-slate-800/40">
+                          <td className="max-w-sm p-3.5"><div className="font-semibold text-white">{item.queryIntent || item.intentKey}</div><div className="mt-1 font-mono text-[10px] text-slate-600">{item.intentKey}</div></td>
+                          <td className="p-3.5"><span className="rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 font-semibold text-slate-300">{item.category || 'other'}</span></td>
+                          <td className="p-3.5 whitespace-nowrap"><div className="font-bold text-amber-300">{item.requestCount} marta</div><div className="mt-1 text-[10px] text-slate-500">{item.requesterCount} noyob mijoz</div></td>
+                          <td className="max-w-sm p-3.5">
+                            {(item.requesters || []).slice(0, 4).map((requester: any) => (
+                              <div key={requester.userId} className="mb-1.5 flex items-center justify-between gap-3"><span className="truncate text-slate-300">{requester.name || 'Nomsiz'} · <span className="text-slate-500">{requester.email}</span></span><span className="text-[10px] text-slate-600">×{requester.requestCount}</span></div>
+                            ))}
+                            {item.requesterCount > 4 && <div className="text-[10px] text-slate-500">+{item.requesterCount - 4} boshqa mijoz</div>}
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap"><span className={`rounded border px-2 py-1 text-[10px] font-bold ${item.notificationSubscribers > 0 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-700 bg-slate-800 text-slate-500'}`}>{item.notificationSubscribers} kutmoqda</span></td>
+                          <td className="p-3.5 text-right whitespace-nowrap text-slate-500">{new Date(item.lastRequestedAt).toLocaleString('uz-UZ')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
 
           {activeTab === 'logs' && (
             <div className="space-y-4">

@@ -56,6 +56,8 @@ type QuickSuggestion = {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
+  key?: string;
+  type?: string;
 };
 
 const defaultSuggestions: QuickSuggestion[] = [
@@ -190,7 +192,15 @@ export default function HomeScreen() {
     type: string,
     key: string,
     text: string,
+    personalized = false,
+    position?: number,
   ) => {
+    analytics.trackSuggestion({
+      event: event === "CLICKED" ? "clicked" : "dismissed",
+      type,
+      personalized,
+      position,
+    });
     void apiFetch("/api/v1/consumer/memory/suggestion-events", {
       method: "POST",
       body: JSON.stringify({
@@ -271,6 +281,19 @@ export default function HomeScreen() {
     () => sessions.filter((session) => session.messages.length > 0),
     [sessions],
   );
+  const suggestionRefreshBucket = useMemo(
+    () =>
+      Math.floor(
+        sessions.reduce(
+          (count, session) =>
+            count +
+            session.messages.filter((message) => message.role === "user")
+              .length,
+          0,
+        ) / 10,
+      ),
+    [sessions],
+  );
 
   useEffect(() => {
     if (user?.id) void hydrate(user.id);
@@ -278,25 +301,43 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!user?.id) return;
-    void apiFetch<{
-      suggestions?: Array<{ key: string; label: string; type: string }>;
-    }>("/api/v1/consumer/memory/suggestions")
-      .then((result) => {
-        const personalized = (result.suggestions || []).map((item, index) => ({
-          label: item.label,
-          icon: (index === 0
-            ? "sparkles-outline"
-            : "restaurant-outline") as keyof typeof Ionicons.glyphMap,
-          color: index === 0 ? "#A996FF" : "#46D37B",
-        }));
-        setQuickSuggestions(
-          personalized.length
-            ? [...personalized, ...defaultSuggestions].slice(0, 3)
-            : defaultSuggestions,
-        );
-      })
-      .catch(() => setQuickSuggestions(defaultSuggestions));
-  }, [user?.id]);
+    const timer = setTimeout(
+      () => {
+        void apiFetch<{
+          suggestions?: Array<{ key: string; label: string; type: string }>;
+        }>("/api/v1/consumer/memory/suggestions")
+          .then((result) => {
+            const personalized = (result.suggestions || []).map(
+              (item, index) => ({
+                key: item.key,
+                type: item.type,
+                label: item.label,
+                icon: (index === 0
+                  ? "sparkles-outline"
+                  : "restaurant-outline") as keyof typeof Ionicons.glyphMap,
+                color: index === 0 ? "#A996FF" : "#46D37B",
+              }),
+            );
+            setQuickSuggestions(
+              personalized.length
+                ? [...personalized, ...defaultSuggestions].slice(0, 3)
+                : defaultSuggestions,
+            );
+            personalized.forEach((item, position) =>
+              analytics.trackSuggestion({
+                event: "shown",
+                type: item.type || "personalized",
+                personalized: true,
+                position,
+              }),
+            );
+          })
+          .catch(() => setQuickSuggestions(defaultSuggestions));
+      },
+      suggestionRefreshBucket > 0 ? 8_000 : 0,
+    );
+    return () => clearTimeout(timer);
+  }, [suggestionRefreshBucket, user?.id]);
 
   useEffect(() => {
     if (!messages.length) return;
@@ -388,9 +429,10 @@ export default function HomeScreen() {
     setStreamingInteraction(null);
     Keyboard.dismiss();
     analytics.trackMessageSent({
-      prompt,
       length: prompt.length,
       source: submittedChoices.length ? "tray_selection" : "composer",
+      selectionCount: submittedChoices.length,
+      trayItemCount: currentTray.length,
     });
     const conversationId = addMessage({
       role: "user",
@@ -423,6 +465,12 @@ export default function HomeScreen() {
         interaction: result.interaction,
         latencyMs,
       });
+      analytics.trackChatResponse({
+        latencyMs,
+        success: true,
+        interactionKind: result.interaction?.kind,
+        responseLength: result.content.length,
+      });
       setStreamingText("");
       setStreamingInteraction(null);
     } catch (error: any) {
@@ -431,6 +479,7 @@ export default function HomeScreen() {
       const latencyMs = Date.now() - startTime;
       if (error?.name !== "AbortError") {
         analytics.trackError(error, "chat_stream");
+        analytics.trackChatResponse({ latencyMs, success: false });
         setLastFailed(prompt);
         setSelectedChoices(submittedChoices);
         addMessage({
@@ -649,7 +698,19 @@ export default function HomeScreen() {
         {quickSuggestions.map((suggestion) => (
           <Pressable
             key={suggestion.label}
-            onPress={() => sendMessage(suggestion.label)}
+            onPress={() => {
+              if (suggestion.key) {
+                trackSuggestion(
+                  "CLICKED",
+                  suggestion.type || "personalized",
+                  suggestion.key,
+                  suggestion.label,
+                  true,
+                  quickSuggestions.indexOf(suggestion),
+                );
+              }
+              sendMessage(suggestion.label);
+            }}
             style={({ pressed }) => [
               styles.suggestion,
               pressed && styles.suggestionPressed,

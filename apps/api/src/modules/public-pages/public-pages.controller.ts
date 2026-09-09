@@ -1756,15 +1756,23 @@ ${schemaScriptTags}
           <p class="lang-en">
             The portion of a chat request needed to generate a response may be sent to an AI provider acting for Zayuno. Stored chats are not sold for advertising.
           </p>
+          <p class="lang-uz">
+            Mahsulotni yaxshilash uchun PostHog’ga pseudonymous account identifikatori, feature interactionlari, status, count va latency kabi texnik ko‘rsatkichlar yuboriladi. Raw chat yoki prompt matni, ism, email, telefon, manzil va to‘lov ma’lumotlari analytics eventlariga qo‘shilmaydi. Session replay’da matn inputlari va rasmlar maskalanadi, console loglar yozib olinmaydi.
+          </p>
+          <p class="lang-en">
+            To improve the product, Zayuno sends a pseudonymous account identifier, feature interactions, status, counts, and latency metrics to PostHog. Raw chat or prompt text, name, email, phone, address, and payment data are excluded from analytics events. Text inputs and images are masked in session replay, and console logs are not recorded.
+          </p>
         </section>
 
         <section class="space-y-3">
           <h2 class="text-lg font-bold text-white tracking-tight">
-            <span class="lang-uz">5. Ixtiyoriy personalization xotirasi</span>
-            <span class="lang-en">5. Optional Personalization Memory</span>
+            <span class="lang-uz">5. Mahsulot talabi va ixtiyoriy personalization</span>
+            <span class="lang-en">5. Product Demand and Optional Personalization</span>
           </h2>
-          <p class="lang-uz">Aqlli tavsiyalar faqat foydalanuvchi ilova ichida aniq rozilik berganidan keyin ishlaydi. Har 10 ta yangi xabardan keyin taom/restoran afzalligi, budjet, buyurtma usuli, til va umumiy faol vaqt kabi foydali signallar yangilanadi. Har bir signal manba dalili, ishonchlilik darajasi va amal qilish muddati bilan saqlanadi.</p>
-          <p class="lang-en">Smart recommendations operate only after explicit in-app consent. After each 10 new messages, useful signals such as food or restaurant preferences, budget, fulfillment preference, language, and broad activity window may be refreshed. Each signal is stored with provenance, confidence, and an expiry.</p>
+          <p class="lang-uz">Zayunoda hali qo‘llanmaydigan xizmat so‘ralganda, so‘rov mavzusi va uni yuborgan account mahsulot rejalashtirish uchun bog‘langan holda saqlanishi mumkin. Bu bizga nechta noyob mijoz bir xizmatni kutayotganini aniqlashga yordam beradi. Xizmat qo‘shilganda notification yuborish faqat foydalanuvchi “Qo‘shilganda xabar ber” kabi aniq rozilik berganida yoqiladi va uni chat orqali bekor qilish mumkin. Bu talab yozuvlari ko‘pi bilan 365 kun saqlanadi va account o‘chirilsa birga o‘chadi.</p>
+          <p class="lang-en">When a customer asks for a service Zayuno does not yet support, the request topic may be linked to the requesting account for product planning. This lets us measure how many unique customers are waiting for a service. Availability notifications are enabled only after an explicit request such as “notify me when it is added,” can be cancelled in chat, are retained for no more than 365 days, and are deleted with the account.</p>
+          <p class="lang-uz">Aqlli tavsiyalar faqat foydalanuvchi ilova ichida aniq rozilik berganidan keyin ishlaydi. Har 10 ta yangi xabardan keyin taom/restoran afzalligi, budjet, buyurtma usuli, til, umumiy faol vaqt, dalilga tayangan tanlash usuli, narxga munosabat, yangi variantlarga qiziqish, javob formati va vaqtinchalik interaction qiyinchiliklari yangilanishi mumkin. Behavior signali kamida ikki interaction daliliga tayanadi; har bir signal manba dalili, ishonchlilik darajasi va amal qilish muddati bilan saqlanadi.</p>
+          <p class="lang-en">Smart recommendations operate only after explicit in-app consent. After each 10 new messages, useful signals such as food or restaurant preferences, budget, fulfillment preference, language, broad activity window, evidence-based decision style, price sensitivity, novelty preference, response format, and temporary interaction friction may be refreshed. A behavioral signal requires at least two supporting interactions; every signal is stored with provenance, confidence, and an expiry.</p>
           <p class="lang-uz">Zayuno personalization uchun jins, xarakter, kayfiyat, sog‘liq, din, siyosiy qarash, aniq manzil, telefon, email yoki to‘lov ma’lumotlarini avtomatik profil qilmaydi. Hosil qilingan xotirani ilovada ko‘rish, tuzatish, alohida unutish, eksport qilish yoki to‘liq o‘chirish mumkin. Personalization o‘chirilsa, hosil qilingan profil darhol o‘chadi; asosiy chat va buyurtma funksiyalari ishlashda davom etadi.</p>
           <p class="lang-en">Zayuno does not automatically profile gender, personality, mood, health, religion, political views, precise address, phone, email, or payment information for personalization. Derived memory can be viewed, corrected, individually forgotten, exported, or fully deleted in the app. Disabling personalization immediately removes the derived profile while core chat and ordering remain available.</p>
           <p class="lang-uz">Memory signallari ko‘pi bilan 365 kun, suggestion interactionlari 180 kun va texnik analysis joblari 30 kun saqlanadi. Chat tarixi foydalanuvchi o‘chirguncha yoki hisob o‘chirilguncha saqlanadi. Chat matni bazada shifrlangan holda saqlanadi.</p>

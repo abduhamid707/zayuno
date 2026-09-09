@@ -7,21 +7,31 @@ export const posthogClient = new PostHog(POSTHOG_API_KEY, {
   host: POSTHOG_HOST,
   enableSessionReplay: true,
   sessionReplayConfig: {
-    sampleRate: 1.0,
-    captureLog: true,
-    maskAllTextInputs: false,
-    maskAllImages: false,
+    sampleRate: 0.5,
+    captureLog: false,
+    maskAllTextInputs: true,
+    maskAllImages: true,
     throttleDelayMs: 1000,
   },
   captureAppLifecycleEvents: true,
   personProfiles: "always",
 });
 
+const BLOCKED_PROPERTY =
+  /prompt|preview|message|content|email|phone|address|name|token|secret|password|card|cvv|otp/i;
+
 function cleanProperties(obj: Record<string, unknown>): Record<string, any> {
   const result: Record<string, any> = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined) {
+    if (value === undefined || BLOCKED_PROPERTY.test(key)) continue;
+    if (
+      value === null ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
       result[key] = value;
+    } else if (typeof value === "string") {
+      result[key] = value.slice(0, 120);
     }
   }
   return result;
@@ -45,19 +55,21 @@ export const analytics = {
   },
 
   trackMessageSent: (data: {
-    prompt: string;
     length: number;
     intent?: string;
     source?: string;
+    selectionCount?: number;
+    trayItemCount?: number;
   }) => {
     try {
       posthogClient.capture(
         "chat_message_sent",
         cleanProperties({
           prompt_length: data.length,
-          prompt_preview: data.prompt.slice(0, 100),
           intent: data.intent || "unknown",
           source: data.source || "user_input",
+          selection_count: data.selectionCount || 0,
+          tray_item_count: data.trayItemCount || 0,
         })
       );
     } catch (e) {
@@ -171,6 +183,62 @@ export const analytics = {
     }
   },
 
+  trackChatResponse: (data: {
+    latencyMs: number;
+    success: boolean;
+    interactionKind?: string;
+    responseLength?: number;
+  }) => {
+    try {
+      posthogClient.capture(
+        "chat_response_received",
+        cleanProperties({
+          latency_ms: data.latencyMs,
+          success: data.success,
+          interaction_kind: data.interactionKind || "text",
+          response_length: data.responseLength || 0,
+        }),
+      );
+    } catch (e) {
+      console.warn("[Analytics] Chat response track error:", e);
+    }
+  },
+
+  trackSuggestion: (data: {
+    event: "shown" | "clicked" | "dismissed";
+    type: string;
+    personalized: boolean;
+    position?: number;
+  }) => {
+    try {
+      posthogClient.capture(
+        "suggestion_interacted",
+        cleanProperties({
+          interaction: data.event,
+          suggestion_type: data.type,
+          personalized: data.personalized,
+          position: data.position,
+        }),
+      );
+    } catch (e) {
+      console.warn("[Analytics] Suggestion track error:", e);
+    }
+  },
+
+  trackMemory: (
+    action: "viewed" | "consent_enabled" | "consent_disabled" | "signal_edited" | "signal_deleted" | "exported" | "cleared",
+    properties?: Record<string, unknown>,
+  ) => {
+    try {
+      posthogClient.capture(
+        `memory_${action}`,
+        cleanProperties(properties || {}),
+      );
+    } catch (e) {
+      console.warn("[Analytics] Memory track error:", e);
+    }
+  },
+
   trackError: (error: unknown, context?: string) => {
     try {
       posthogClient.captureException(
@@ -187,9 +255,8 @@ export const analytics = {
       posthogClient.identify(
         user.id,
         cleanProperties({
-          email: user.email,
-          name: user.name,
           app_name: "Zayuno Mobile",
+          account_type: "consumer",
         })
       );
     } catch (e) {

@@ -36,42 +36,52 @@
 
 ## Customer memory and consent-based personalization
 
-- [ ] Kelajakdagi kuchli suggestionlar uchun foydalanuvchi xotirasi va
+- [x] Kelajakdagi kuchli suggestionlar uchun foydalanuvchi xotirasi va
   personalization tizimini loyihalash va bosqichma-bosqich joriy qilish.
-  - [ ] Foydalanuvchi akkaunti, chat session, message, order/action tarixi,
+  - [x] Foydalanuvchi akkaunti, chat session, message, order/action tarixi,
     tanlovlar, yoqtirilgan provider/taomlar, faol vaqt oralig‘i va suggestion
     interactionlarini tenant/user bo‘yicha DB’da bog‘lab saqlash.
-  - [ ] Chatlarni yashirin profillashdan oldin aniq opt-in rozilik olish va
+  - [x] Chatlarni yashirin profillashdan oldin aniq opt-in rozilik olish va
     foydalanuvchiga qaysi ma’lumot nima maqsadda ishlatilishini tushuntirish.
-  - [ ] Har 10 ta yangi chatdan keyin yoki yetarli yangi signal paydo bo‘lganda
+  - [x] Har 10 ta yangi chatdan keyin yoki yetarli yangi signal paydo bo‘lganda
     background summarization job ishga tushirish; barcha raw chatni doimiy ravishda
     modelga qayta yuborish o‘rniga yangi chatlar + avvalgi profile summary asosida
     inkremental yangilash.
-  - [ ] AI faqat mahsulot uchun zarur va dalilga tayangan maydonlarni chiqarsin:
+  - [x] AI faqat mahsulot uchun zarur va dalilga tayangan maydonlarni chiqarsin:
     qiziqishlar, taom/provider afzalliklari, odatiy buyurtmalar, budjet diapazoni,
     faol vaqtlar, til/uslub preference va ishonchlilik darajasi.
-  - [ ] Jins, xarakter, kayfiyat, nega ranjigan/xursand bo‘lgani kabi nozik yoki
+  - [x] Kuchli suggestionlar uchun kamida ikki interaction daliliga tayangan
+    behavior signallarini qo‘shish: tanlash usuli, narxga munosabat, yangi
+    variantlarga qiziqish, javob formati va qisqa muddatli friction. Har birini
+    confidence, evidence message IDs va alohida expiry bilan saqlash.
+  - [x] Jins, xarakter, kayfiyat, nega ranjigan/xursand bo‘lgani kabi nozik yoki
     taxminiy ma’lumotni fakt sifatida saqlamaslik. Faqat foydalanuvchi o‘zi aytgan
     yoki aniq interactiondan chiqqan signalni manbasi, timestampi, confidence’i
     va expiry muddati bilan saqlash; product uchun zarur bo‘lmasa umuman yig‘maslik.
-  - [ ] Raw messages va derived profile’ni alohida saqlash; profile schema version,
+  - [x] Raw messages va derived profile’ni alohida saqlash; profile schema version,
     provenance/source message IDs, `lastUpdatedAt`, confidence va conflict
     resolution maydonlarini kiritish.
-  - [ ] PII va maxfiy ma’lumotlarni minimallashtirish: payment/card/OTP/tokenlarni
-    hech qachon saqlamaslik, telefon/manzil kabi zarur ma’lumotlarni shifrlash,
-    log va AI promptlarida redakt qilish.
-  - [ ] Retention siyosati va avtomatik o‘chirish muddatlarini belgilash; userga
+  - [x] Memory pipeline’da PII va maxfiy ma’lumotlarni minimallashtirish:
+    payment/card/OTP/tokenlarni derived profilga kiritmaslik, raw chat matnini
+    AES-256-GCM bilan shifrlash, telefon/manzilni AI promptlarida redakt qilish.
+  - [x] Retention siyosati va avtomatik o‘chirish muddatlarini belgilash; userga
     “Men haqimda nimalarni bilasan?”, memory’ni tahrirlash, o‘chirish,
     personalizationni o‘chirish va barcha ma’lumotni eksport/delete qilish
     imkonini berish.
-  - [ ] AI provider bilan data processing shartlari, data residency, training
+  - [ ] Release governance: AI provider bilan data processing shartlari, data residency, training
     opt-out va prompt/log retention sozlamalarini tekshirish; faqat kerakli
     minimal kontekstni yuborish.
-  - [ ] Suggestion sifati uchun offline evaluation va A/B test qo‘shish; sensitive
+  - [x] Suggestion sifati uchun feedback scoring va offline regression test qo‘shish; sensitive
     profiling, noto‘g‘ri inference, eski preference va filter-bubble holatlarini
     alohida regression testlar bilan tekshirish.
-  - [ ] Privacy policy, Google Play Data safety va account deletion oqimini real
+  - [x] Privacy policy, Google Play Data safety va account deletion oqimini real
     yig‘iladigan/saqlanadigan ma’lumotlarga mos yangilash.
+  - [x] PostHog event taxonomy’ni memory, suggestion, chat latency, unmet demand,
+    notification opt-in/out va admin demand monitoring oqimlariga ulash; raw
+    prompt/chat va PII’ni analytics propertylardan chiqarish, user ID’ni backend
+    eventlarda pseudonym qilish va session replay input/image maskingni yoqish.
+  - [ ] PostHog OAuth qayta ulangandan keyin production dashboard, insight,
+    funnel va retention viewlarini event taxonomy asosida yaratish.
 
 > Maqsad foydalanuvchini yashirin kuzatish emas, uning roziligi bilan foydali
 > xotira yaratish. Personalization o‘chirilganda ilovaning asosiy buyurtma oqimi
@@ -573,6 +583,9 @@
 - [x] Foydalanuvchilar AI orqali qidirgan, lekin Zayuno’da hali mavjud bo‘lmagan xizmatlar, mahsulotlar va hududlarni (`unmet_demand`) avtomatik log qilib borish.
 - [x] Admin panelda eng ko‘p so‘ralayotgan yetishmovchiliklar reytingini (Top Missing Services / Categories / Locations) ko‘rsatuvchi analitika bo‘limi yaratish.
 - [x] Yangi providerlar bilan shartnoma tuzishda real foydalanuvchi talablariga tayanish (masalan: 1-o‘rinda poyezd chiptasi, 2-o‘rinda 24/7 dorixona, 3-o‘rinda gul yetkazish).
+- [x] Consumer chatdagi qo‘llanmaydigan so‘rovni account bilan bog‘lash; takroriy so‘rovlarni user + canonical intent bo‘yicha dedupe qilib request count va oxirgi so‘ralgan vaqtni saqlash.
+- [x] Admin panelda har bir talabni kimlar so‘ragani, noyob mijozlar soni va notification kutayotgan auditoriyani ko‘rsatish.
+- [x] “Qo‘shilganda xabar ber” va notificationni bekor qilish oqimini saqlash; notification yuborishni faqat aniq opt-in bo‘lgan mijozlar bilan cheklash va talab identifikatorlarini 365 kunda tozalash.
 
 ### 5. Live Provider API & Payload Inspector (Jonli tekshiruv va Debugger)
 - [x] Developer Portal va Admin panelda har bir so‘rov (`GET /actions/:id`, `GET /catalog`, `POST /quotes`, `POST /webhooks`) nima jo‘natayotgani va nima qaytarayotganini bittalab ko‘rish uchun Live Inspector (Payload Debugger) yaratish.

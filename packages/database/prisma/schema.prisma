@@ -140,6 +140,7 @@ model User {
   memorySignals    ConsumerMemorySignal[]
   memoryJobs       ConsumerMemoryJob[]
   suggestionEvents ConsumerSuggestionEvent[]
+  unmetDemandRequests UnmetDemandRequester[]
 }
 
 model ConsumerSession {
@@ -192,6 +193,7 @@ model ConsumerMemoryProfile {
   userId                    String    @id
   enabled                   Boolean   @default(false)
   consentVersion            String?
+  suggestionVariant         String    @default("balanced")
   consentedAt               DateTime?
   revokedAt                 DateTime?
   schemaVersion             Int       @default(1)
@@ -452,4 +454,31 @@ model UnmetDemandRecord {
   @@index([geography])
   @@index([reasonCode])
   @@index([createdAt])
+}
+
+model UnmetDemandRequester {
+  id                   String    @id @default(uuid())
+  userId               String
+  intentKey            String
+  queryIntent          String?
+  category             String?
+  geography            String?
+  requestedCapability  String?
+  reasonCode           String
+  source               String    @default("CONSUMER_CHAT")
+  requestCount         Int       @default(1)
+  notifyWhenAvailable  Boolean   @default(false)
+  notificationStatus   String    @default("NOT_REQUESTED")
+  firstRequestedAt     DateTime  @default(now())
+  lastRequestedAt      DateTime  @default(now())
+  notifiedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, intentKey])
+  @@index([intentKey, lastRequestedAt])
+  @@index([category, lastRequestedAt])
+  @@index([notifyWhenAvailable, notificationStatus])
 }

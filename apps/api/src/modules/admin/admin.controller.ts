@@ -188,10 +188,12 @@ export class AdminController {
   })
   async getUnmetDemandAnalytics(
     @Query('category') category?: string,
+    @Query('geography') geography?: string,
+    @Query('reasonCode') reasonCode?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.adminService.getUnmetDemandAnalytics({ category, from, to });
+    return this.adminService.getUnmetDemandAnalytics({ category, geography, reasonCode, from, to });
   }
 
   @Get('logs/events')

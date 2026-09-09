@@ -2,6 +2,25 @@ import posthog from 'posthog-js';
 
 export const POSTHOG_PROJECT_TOKEN = 'phc_zcCoK32AfWUoqbBLE63NHDrxycvKrtzKQFmsqECviw4G';
 export const POSTHOG_HOST = 'https://us.i.posthog.com';
+const BLOCKED_PROPERTY =
+  /prompt|preview|message|content|email|phone|address|token|secret|password|card|cvv|otp/i;
+
+function cleanProperties(properties?: Record<string, unknown>) {
+  const safe: Record<string, string | number | boolean | null> = {};
+  for (const [key, value] of Object.entries(properties || {})) {
+    if (BLOCKED_PROPERTY.test(key) || value === undefined) continue;
+    if (
+      value === null ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      safe[key] = value;
+    } else if (typeof value === 'string') {
+      safe[key] = value.slice(0, 120);
+    }
+  }
+  return safe;
+}
 
 export function initAdminAnalytics() {
   if (typeof window === 'undefined') return;
@@ -13,8 +32,10 @@ export function initAdminAnalytics() {
       autocapture: true,
       capture_pageview: true,
       capture_pageleave: true,
+      mask_all_text: true,
+      mask_all_element_attributes: true,
       session_recording: {
-        maskAllInputs: false,
+        maskAllInputs: true,
       },
       loaded: (ph) => {
         ph.register({
@@ -36,17 +57,31 @@ export const adminAnalytics = {
     try {
       posthog.capture(action, {
         source: 'admin_portal',
-        ...properties,
+        ...cleanProperties(properties),
       });
     } catch (e) {
       console.warn('[Analytics] Failed to track action:', e);
     }
   },
 
-  identifyAdmin: (adminId: string, email?: string, role?: string) => {
+  trackDemandView: (properties?: Record<string, unknown>) => {
+    try {
+      posthog.capture('admin_unmet_demand_viewed', {
+        source: 'admin_portal',
+        total_events: Number(properties?.total_events || 0),
+        unique_requesters: Number(properties?.unique_requesters || 0),
+        notification_subscribers: Number(
+          properties?.notification_subscribers || 0,
+        ),
+      });
+    } catch (e) {
+      console.warn('[Analytics] Failed to track demand view:', e);
+    }
+  },
+
+  identifyAdmin: (adminId: string, _email?: string, role?: string) => {
     try {
       posthog.identify(adminId, {
-        email,
         role: role || 'admin',
         app_type: 'web_admin',
       });

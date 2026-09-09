@@ -46,8 +46,10 @@
       posthog.init('phc_zcCoK32AfWUoqbBLE63NHDrxycvKrtzKQFmsqECviw4G', {
         api_host: 'https://us.i.posthog.com',
         person_profiles: 'always',
+        mask_all_text: true,
+        mask_all_element_attributes: true,
         session_recording: {
-          maskAllInputs: false,
+          maskAllInputs: true,
         },
       });
     </script>

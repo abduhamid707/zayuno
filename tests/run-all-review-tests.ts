@@ -47,6 +47,7 @@ const testSuites = [
   'tests/test-production-health-and-lease-real-e2e.ts',
   'tests/test-provider-cache-and-consumer-chat.ts',
   'tests/test-consumer-auth-persistence.ts',
+  'tests/test-consumer-memory-personalization.ts',
   'tests/test-openai-plugin-mcp-contract.ts',
   'apps/mcp/tests/test-chat-only.ts'
 ];

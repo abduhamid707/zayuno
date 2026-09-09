@@ -12,6 +12,7 @@ import { ActionsService } from "../../actions/actions.service";
 import { RedisService } from "../../../common/services/redis.service";
 import { createHash, randomUUID } from "crypto";
 import { ConsumerMemoryService } from "../memory/consumer-memory.service";
+import { UnmetDemandService } from "../../analytics/unmet-demand.service";
 
 type ConversationMessage = {
   role: "user" | "assistant";
@@ -256,7 +257,8 @@ export class ConsumerChatService {
     private readonly quotesService: QuotesService,
     private readonly actionsService: ActionsService,
     private readonly redisService: RedisService,
-    private readonly memoryService: ConsumerMemoryService,
+    private readonly memoryService?: ConsumerMemoryService,
+    private readonly unmetDemandService?: UnmetDemandService,
   ) {
     const systemInstruction = `You are Zayuno Food, a precise AI assistant for restaurant and fast-food discovery, menu browsing, delivery quotes, ordering, payment handoff and order tracking in Uzbekistan.
 Answer in fluent, polite Uzbek Latin and address only the user's latest food-ordering request.
@@ -485,19 +487,54 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     }
 
     const history = this.normalizeHistory(input.messages);
-    const personalizationContext = await this.memoryService
-      .getPromptContext(input.userId)
-      .catch(() => "");
-    const providers = this.memoryService.rankProviders(
-      (await this.providersService.listProviders())
+    if (this.isDemandNotificationOptOut(prompt)) {
+      const demand = this.unmetDemandService
+        ? await this.unmetDemandService
+            .optOutLatestNotification(input.userId)
+            .catch(() => null)
+        : null;
+      if (demand) {
+        return {
+          prompt,
+          history,
+          plan: this.emptyPlan("general"),
+          liveContext: [],
+          directAnswer: `Tayyor — **${demand.queryIntent || "so‘ragan xizmatingiz"}** bo‘yicha notification bekor qilindi.`,
+        };
+      }
+    }
+    if (this.isDemandNotificationOptIn(prompt)) {
+      const demand = this.unmetDemandService
+        ? await this.unmetDemandService
+            .optInLatestNotification(input.userId)
+            .catch(() => null)
+        : null;
+      if (demand) {
+        return {
+          prompt,
+          history,
+          plan: this.emptyPlan("general"),
+          liveContext: [],
+          directAnswer: `Tayyor — **${demand.queryIntent || "so‘ragan xizmatingiz"}** Zayunoga qo‘shilganda sizga xabar berish uchun belgilandi.`,
+        };
+      }
+    }
+    const personalizationContext = this.memoryService
+      ? await this.memoryService.getPromptContext(input.userId).catch(() => "")
+      : "";
+    const availableProviders = (await this.providersService.listProviders())
         .filter((provider: any) => this.isFoodProvider(provider))
         .sort(
           (left: any, right: any) =>
             this.providerPriority(left.slug) -
             this.providerPriority(right.slug),
-        ),
-      personalizationContext,
-    );
+        );
+    const providers = this.memoryService
+      ? this.memoryService.rankProviders(
+          availableProviders,
+          personalizationContext,
+        )
+      : availableProviders;
     const fastAnswer = this.matchFastIntentAnswer(prompt, history);
     if (fastAnswer) {
       return {
@@ -618,13 +655,24 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     }
 
     if (plan.intent === "general") {
+      if (this.unmetDemandService) {
+        await this.unmetDemandService.recordUnmetDemand({
+          queryIntent: prompt,
+          reasonCode: "CAPABILITY_UNSUPPORTED",
+          source: "CONSUMER_CHAT",
+          userId: input.userId,
+        });
+      }
       const scopeAnswer = await this.enforceFoodScope(input);
+      const demandAnswer = scopeAnswer.startsWith("Hozir Zayuno")
+        ? `${scopeAnswer}\n\nSo‘rovingiz mahsulot jamoasi uchun saqlandi. Shu xizmat qo‘shilganda xabar olish uchun **“Qo‘shilganda xabar ber”** deb yozing.`
+        : scopeAnswer;
       return {
         prompt,
         history,
         plan,
         liveContext: [],
-        directAnswer: scopeAnswer,
+        directAnswer: demandAnswer,
       };
     }
 
@@ -748,6 +796,25 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       return "Bu savol food buyurtmasiga tegishli emas. Restoran, taom, ichimlik, yetkazib berish yoki buyurtma holati haqida so‘rashingiz mumkin.";
     }
     return "Hozir Zayuno faqat restoran va fast-food buyurtmalariga yordam beradi. Taom, restoran yoki budjetingizni yozing.";
+  }
+
+  private isDemandNotificationOptIn(prompt: string) {
+    const normalized = prompt.toLowerCase();
+    return (
+      /(qo['‘’`]?shilganda|mavjud bo['‘’`]?lganda|chiqqanda).*(xabar|habar|bildir)/i.test(
+        normalized,
+      ) ||
+      /(xabar|habar|bildir).*(qo['‘’`]?shilganda|mavjud bo['‘’`]?lganda|chiqqanda)/i.test(
+        normalized,
+      )
+    );
+  }
+
+  private isDemandNotificationOptOut(prompt: string) {
+    const normalized = prompt.toLowerCase();
+    return /(xabar|habar|notification).*(kerak emas|berma|bermang|o['‘’`]?chir|bekor)/i.test(
+      normalized,
+    );
   }
 
   private async incrementOffTopicAttempts(
@@ -2471,6 +2538,7 @@ Rules:
 - Put the most relevant provider slug first. The query must express the user's actual need, without conversational filler.
 - For food_selection, preserve each exact requested menu item and quantity in itemRequests.
 - Budget, spice level, dietary preference, category and delivery speed belong in query.
+- PERSONALIZATION contains optional preference hints. Use it only to rank equally valid choices; the current USER request always overrides it. Never mention or expose the stored profile.
 - A greeting uses greeting. A question about what Zayuno can do uses capabilities and must not request catalog data.
 - For greeting, capabilities and food_clarification write one short natural Uzbek answer. For catalog intents answer must be empty.
 - If the user's message is unrelated to food ordering, restaurants, menus, dishes, drinks, or delivery (for example: programming, coding, math, science, politics, weather, news, essays, or general chitchat), set intent to "general".

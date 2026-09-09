@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "./primitives/Text";
 import { apiFetch } from "../lib/api";
+import { analytics } from "../lib/analytics";
 
 type Signal = {
   id: string;
@@ -29,6 +30,7 @@ type Signal = {
 
 type MemoryResponse = {
   enabled: boolean;
+  suggestionVariant?: string;
   summary?: { text?: string };
   signals: Signal[];
   stats: {
@@ -54,6 +56,11 @@ const KIND_LABELS: Record<string, string> = {
   ACTIVITY_WINDOW: "Faol vaqt",
   ORDER_PATTERN: "Buyurtma odati",
   DISLIKE: "Yoqtirmaydi",
+  DECISION_STYLE: "Tanlash usuli",
+  PRICE_SENSITIVITY: "Narxga munosabat",
+  NOVELTY_PREFERENCE: "Yangi variantlarga qiziqish",
+  RESPONSE_STYLE: "Javob formati",
+  FRICTION_PATTERN: "Vaqtinchalik qiyinchilik",
 };
 
 export function MemorySheet({ visible, onClose }: Props) {
@@ -78,7 +85,10 @@ export function MemorySheet({ visible, onClose }: Props) {
   };
 
   useEffect(() => {
-    if (visible) void load();
+    if (visible) {
+      analytics.trackMemory("viewed");
+      void load();
+    }
   }, [visible]);
 
   const changeConsent = (enabled: boolean) => {
@@ -87,7 +97,7 @@ export function MemorySheet({ visible, onClose }: Props) {
         ? "Aqlli tavsiyalarni yoqasizmi?"
         : "Aqlli tavsiyalarni o‘chirasizmi?",
       enabled
-        ? "Rozilik bersangiz, Zayuno chat va tanlovlaringizdan taom, restoran, budjet va foydalanish odatlarini o‘rganadi. Karta, OTP, parol, telefon va aniq manzil memory profiliga kiritilmaydi. Istalgan payt ko‘rish va o‘chirish mumkin."
+        ? "Rozilik bersangiz, Zayuno chat va tanlovlaringizdan taom, restoran, budjet, faol vaqt, tanlash usuli, narxga munosabat, yangi variantlarga qiziqish va sizga qulay javob formatini o‘rganadi. Har bir xulosa dalil, ishonchlilik va amal qilish muddati bilan saqlanadi. Karta, OTP, parol, telefon va aniq manzil memory profiliga kiritilmaydi. Istalgan payt ko‘rish, tuzatish yoki o‘chirish mumkin."
         : "Personalization to‘xtaydi va hosil qilingan memory profili o‘chiriladi. Chat tarixingiz saqlanib qoladi.",
       [
         { text: "Bekor qilish", style: "cancel" },
@@ -100,7 +110,16 @@ export function MemorySheet({ visible, onClose }: Props) {
               method: "PUT",
               body: JSON.stringify({ enabled }),
             })
-              .then(setMemory)
+              .then((next) => {
+                setMemory(next);
+                analytics.trackMemory(
+                  enabled ? "consent_enabled" : "consent_disabled",
+                  {
+                    signal_count: next.signals.length,
+                    suggestion_variant: next.suggestionVariant,
+                  },
+                );
+              })
               .catch(() => Alert.alert("Xatolik", "Sozlamani saqlab bo‘lmadi."))
               .finally(() => setBusy(false));
           },
@@ -123,7 +142,12 @@ export function MemorySheet({ visible, onClose }: Props) {
               method: "DELETE",
             },
           )
-            .then(load)
+            .then(() => {
+              analytics.trackMemory("signal_deleted", {
+                signal_kind: signal.kind,
+              });
+              return load();
+            })
             .finally(() => setBusy(false));
         },
       },
@@ -145,6 +169,9 @@ export function MemorySheet({ visible, onClose }: Props) {
     )
       .then((next) => {
         setMemory(next);
+        analytics.trackMemory("signal_edited", {
+          signal_kind: editing.kind,
+        });
         setEditing(null);
       })
       .catch(() =>
@@ -168,7 +195,10 @@ export function MemorySheet({ visible, onClose }: Props) {
           onPress: () => {
             setBusy(true);
             void apiFetch("/api/v1/consumer/memory", { method: "DELETE" })
-              .then(load)
+              .then(() => {
+                analytics.trackMemory("cleared");
+                return load();
+              })
               .finally(() => setBusy(false));
           },
         },
@@ -179,12 +209,15 @@ export function MemorySheet({ visible, onClose }: Props) {
   const exportMemory = () => {
     setBusy(true);
     void apiFetch<Record<string, unknown>>("/api/v1/consumer/memory/export")
-      .then((data) =>
-        Share.share({
+      .then((data) => {
+        analytics.trackMemory("exported", {
+          signal_count: memory?.signals.length || 0,
+        });
+        return Share.share({
           title: "Zayuno xotiram",
           message: JSON.stringify(data, null, 2),
-        }),
-      )
+        });
+      })
       .catch(() =>
         Alert.alert("Eksport tayyorlanmadi", "Qayta urinib ko‘ring."),
       )
@@ -375,9 +408,10 @@ export function MemorySheet({ visible, onClose }: Props) {
                   <View style={styles.infoCard}>
                     <Text style={styles.infoTitle}>Siz boshqarasiz</Text>
                     <Text style={styles.infoText}>
-                      Yoqilganda Zayuno takroriy tanlovlaringizni eslab, mos
-                      restoran va taomlarni yuqoriroq chiqaradi. Sensitive
-                      ma’lumot va yashirin xarakter tahlili qilinmaydi.
+                      Yoqilganda Zayuno takroriy tanlovlaringiz, budjetingiz,
+                      tanlash usulingiz va sizga qulay javob formatini eslab,
+                      natijalarni yaxshiroq saralaydi. Har bir signalni shu yerda
+                      ko‘rish, tuzatish va unutish mumkin.
                     </Text>
                   </View>
                 )}

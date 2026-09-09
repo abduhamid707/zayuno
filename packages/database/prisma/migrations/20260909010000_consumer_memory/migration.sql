@@ -2,6 +2,7 @@ CREATE TABLE "ConsumerMemoryProfile" (
     "userId" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT false,
     "consentVersion" TEXT,
+    "suggestionVariant" TEXT NOT NULL DEFAULT 'balanced',
     "consentedAt" TIMESTAMP(3),
     "revokedAt" TIMESTAMP(3),
     "schemaVersion" INTEGER NOT NULL DEFAULT 1,
