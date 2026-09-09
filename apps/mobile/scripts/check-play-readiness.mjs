@@ -17,6 +17,10 @@ if (eas.build?.production?.android?.buildType !== "app-bundle") errors.push("pro
 
 const buildProperties = app.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === "expo-build-properties");
 if (buildProperties?.[1]?.android?.targetSdkVersion !== 36) errors.push("targetSdkVersion must be 36");
+const requiredBuildArchs = ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"];
+if (!requiredBuildArchs.every((arch) => buildProperties?.[1]?.android?.buildArchs?.includes(arch))) {
+  errors.push("all supported Android ABIs must be configured");
+}
 if (buildProperties?.[1]?.android?.usesCleartextTraffic !== false) errors.push("cleartext traffic must be disabled");
 
 for (const [relativePath, width, height] of [

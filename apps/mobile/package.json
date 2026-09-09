@@ -49,6 +49,7 @@
         "export:android": "expo export --platform android",
         "play:assets": "node scripts/generate-play-assets.mjs",
         "play:check": "node scripts/check-play-readiness.mjs",
+        "build:apk": "node scripts/build-apk.mjs",
         "build:android:preview": "eas build --platform android --profile preview",
         "build:android:production": "eas build --platform android --profile production",
         "submit:android": "eas submit --platform android --profile production",

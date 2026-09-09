@@ -22,9 +22,15 @@
             "compileSdkVersion": 36,
             "targetSdkVersion": 36,
             "buildToolsVersion": "36.0.0",
+            "buildArchs": [
+              "armeabi-v7a",
+              "arm64-v8a",
+              "x86",
+              "x86_64"
+            ],
             "usesCleartextTraffic": false,
-            "enableMinifyInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
           }
         }
       ],
@@ -45,11 +51,15 @@
     "scheme": "zayuno",
     "android": {
       "package": "uz.zayuno.mobile",
-      "versionCode": 1,
+      "versionCode": 2,
       "allowBackup": false,
       "blockedPermissions": [
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_MEDIA_VIDEO"
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
