@@ -16,7 +16,19 @@ if (!fs.existsSync(androidDir)) {
   process.exit(1);
 }
 
-// 2. Ensure assets and Android mipmaps are generated
+// 2. Sync versionCode from app.json to android/app/build.gradle
+const appJsonPath = path.join(mobileDir, "app.json");
+const buildGradlePath = path.join(androidDir, "app", "build.gradle");
+if (fs.existsSync(appJsonPath) && fs.existsSync(buildGradlePath)) {
+  const appJson = JSON.parse(fs.readFileSync(appJsonPath, "utf8"));
+  const targetVersionCode = appJson.expo?.android?.versionCode || 4;
+  let gradleContent = fs.readFileSync(buildGradlePath, "utf8");
+  gradleContent = gradleContent.replace(/versionCode\s+\d+/, `versionCode ${targetVersionCode}`);
+  fs.writeFileSync(buildGradlePath, gradleContent, "utf8");
+  console.log(`🔢 Synchronized versionCode to ${targetVersionCode}`);
+}
+
+// 3. Ensure assets and Android mipmaps are generated
 console.log("🎨 Ensuring latest Zayuno icons and mipmaps are generated...");
 execSync("node scripts/generate-play-assets.mjs", {
   cwd: mobileDir,
