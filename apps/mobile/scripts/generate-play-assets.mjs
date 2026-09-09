@@ -129,4 +129,71 @@ await sharp(featureSvg)
   .png({ compressionLevel: 9 })
   .toFile(path.join(storeDir, "feature-graphic-1024x500.png"));
 
+// Generate Android native mipmap icons if android directory exists
+const androidResDir = path.join(mobileDir, "android", "app", "src", "main", "res");
+try {
+  await fs.access(androidResDir);
+  const densities = [
+    { name: "mipmap-mdpi", launcher: 48, foreground: 108 },
+    { name: "mipmap-hdpi", launcher: 72, foreground: 162 },
+    { name: "mipmap-xhdpi", launcher: 96, foreground: 216 },
+    { name: "mipmap-xxhdpi", launcher: 144, foreground: 324 },
+    { name: "mipmap-xxxhdpi", launcher: 192, foreground: 432 },
+  ];
+
+  const launcherPng = path.join(assetsDir, "icon.png");
+  const foregroundPng = path.join(assetsDir, "android-icon-foreground.png");
+
+  for (const d of densities) {
+    const targetDir = path.join(androidResDir, d.name);
+    await fs.mkdir(targetDir, { recursive: true });
+
+    // ic_launcher.webp
+    await sharp(launcherPng)
+      .resize(d.launcher, d.launcher)
+      .webp({ quality: 95 })
+      .toFile(path.join(targetDir, "ic_launcher.webp"));
+
+    // ic_launcher_round.webp
+    await sharp(launcherPng)
+      .resize(d.launcher, d.launcher)
+      .webp({ quality: 95 })
+      .toFile(path.join(targetDir, "ic_launcher_round.webp"));
+
+    // ic_launcher_foreground.webp
+    await sharp(foregroundPng)
+      .resize(d.foreground, d.foreground)
+      .webp({ quality: 95 })
+      .toFile(path.join(targetDir, "ic_launcher_foreground.webp"));
+  }
+
+  // Create adaptive icon XML in mipmap-anydpi-v26
+  const anydpiDir = path.join(androidResDir, "mipmap-anydpi-v26");
+  await fs.mkdir(anydpiDir, { recursive: true });
+
+  const adaptiveXml = `<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/iconBackground"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+`;
+
+  await fs.writeFile(path.join(anydpiDir, "ic_launcher.xml"), adaptiveXml, "utf8");
+  await fs.writeFile(path.join(anydpiDir, "ic_launcher_round.xml"), adaptiveXml, "utf8");
+
+  // Ensure colors.xml has iconBackground = #050816
+  const colorsPath = path.join(androidResDir, "values", "colors.xml");
+  const colorsXml = `<resources>
+  <color name="splashscreen_background">#050816</color>
+  <color name="iconBackground">#050816</color>
+  <color name="colorPrimary">#087DFF</color>
+  <color name="activityBackground">#050816</color>
+</resources>
+`;
+  await fs.writeFile(colorsPath, colorsXml, "utf8");
+  console.log("Android mipmap icons and adaptive XML generated successfully!");
+} catch (err) {
+  // android directory may not exist in pure expo managed workflow
+}
+
 console.log(`Play assets generated from ${path.relative(repoDir, sourcePath)}`);

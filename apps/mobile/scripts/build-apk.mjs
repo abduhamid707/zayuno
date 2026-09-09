@@ -16,7 +16,14 @@ if (!fs.existsSync(androidDir)) {
   process.exit(1);
 }
 
-// 2. Run gradlew assembleRelease
+// 2. Ensure assets and Android mipmaps are generated
+console.log("🎨 Ensuring latest Zayuno icons and mipmaps are generated...");
+execSync("node scripts/generate-play-assets.mjs", {
+  cwd: mobileDir,
+  stdio: "inherit",
+});
+
+// 3. Run gradlew assembleRelease
 const isWindows = process.platform === "win32";
 const gradlewCmd = isWindows ? ".\\gradlew.bat" : "./gradlew";
 
