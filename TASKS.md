@@ -1,5 +1,31 @@
 # Deferred tasks
 
+## Joriy ish — tabiiy pizza/budjet so‘rovini actionga aylantirish, 2026-09-10
+
+- [x] Reportdagi so‘rov nega exact-product fallbackga tushganini aniqlash.
+- [x] Niyat, odam soni, kategoriya va budjetli so‘rovlarni katalog discovery/action oqimiga yo‘naltirish.
+- [x] Xuddi shu report matni uchun regression test qo‘shish.
+- [x] API typecheck va tegishli testlarni o‘tkazish.
+- [x] Full review testlari: 38/38 suite o‘tdi.
+- [x] Backend/mobile fixlarni commit qilib `origin/main`ga push qilish.
+- [ ] CI orqali API deploy yakunini tasdiqlash; mobile fix uchun keyingi APK build/install kerak.
+
+**Report:** `Bugun kechqurun 2 kishiga pizza kerak, 150 mingdan oshmasin.` so‘roviga katalogdagi aniq nomni qayta yozish talab qilingan. Kutilgan xulq: mavjud pizzalarni narx/budjet bo‘yicha topib, tanlanadigan katalog yoki aniq mos variantlar qaytarish.
+**Tasdiqlangan sabab:** Gemini ayrim urinishda kategoriya/budjet so‘rovini `food_selection` deb qaytargan va butun gapni `itemRequests`ga joylagan. `startOrderSelection` uni exact mahsulot nomi deb qidirib, unmatched fallback bergan.
+**Natija:** planner qoidasi aniqlashtirildi va deterministic backend guard qo‘shildi. Kategoriya + kishi/budjet so‘rovi `food_browse`ga o‘tadi, `itemRequests` tozalanadi, pitsa/pizza sinonimlari bilan live katalog qidiriladi va mavjud bo‘lsa budjetdan qimmat mahsulotlar chiqarilmaydi. Aniq `Pepperoni pizza 2 ta` kabi mahsulot esa `food_selection` bo‘lib qoladi. Report matni endi `catalog_menu` action/card interaction qaytarishi regressionda tasdiqlandi. `test-provider-cache-and-consumer-chat.ts`, API typecheck, `git diff --check` va full `pnpm test:review` (38/38, 70.33s) o‘tdi. O‘zgargan backend/test: `consumer-chat.service.ts`, `test-provider-cache-and-consumer-chat.ts`; oldingi mobile suggestion fix ham shu commitga kiritildi. Pushdan keyin backend CI orqali deploy bo‘ladi; mobile o‘zgarish qurilmaga yangi APK bilan kiradi.
+
+## Joriy ish — bosh ekrandagi suggestionlar almashib ketishi, 2026-09-10
+
+- [x] Birinchi va ikkinchi ko‘rinish qayerdan kelayotganini aniqlash.
+- [x] Server suggestionlari yuklanayotganda noto‘g‘ri default ro‘yxatni ko‘rsatmaslik.
+- [x] Mobile typecheck va diff tekshiruvi.
+- [x] Mobile suggestion fixni backend fix bilan birga commit/push qilish.
+- [ ] Yangi APK build/install qilish.
+
+**Sabab:** `quickSuggestions` birinchi renderda `defaultSuggestions` bilan ochiladi; `/consumer/memory/suggestions` javobi kelgach personalized ro‘yxat bilan almashtiriladi. Shu sabab foydalanuvchi taxminan 1 soniya ichida ikki xil tanlovni ko‘radi.
+**Maqsad:** birinchi paintda yolg‘on/default tanlovlarni chiqarmaslik; API natijasi bo‘lsa personalized ro‘yxatni, API ishlamasa default ro‘yxatni faqat yakuniy holat sifatida ko‘rsatish.
+**Natija:** `quickSuggestions` endi `null` holatdan boshlanadi. Personalized so‘rov tugamaguncha eski default matnlar render qilinmaydi; list uchun 3 qatorlik joy oldindan band, shuning uchun hero ham sakramaydi. Success/empty/error holatlarida yakuniy ro‘yxat 3 ta bo‘ladi. `pnpm --filter mobile run typecheck` va `git diff --check` o‘tdi. O‘zgargan fayllar: `TASKS.md`, `apps/mobile/app/(app)/index.tsx`; pushdan keyin qurilmaga yetishi uchun yangi APK kerak.
+
 ## Joriy ish — v10 dan keyin ham qaytalangan login, 2026-09-10
 
 - [x] Yangi PostHog auth hodisalari va qurilmadagi build/session holatidan aniq sababni topish.

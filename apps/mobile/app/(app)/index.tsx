@@ -99,6 +99,8 @@ const defaultSuggestions: QuickSuggestion[] = [
   },
 ];
 
+const fallbackSuggestions = defaultSuggestions.slice(0, 3);
+
 function formatTime(value: string) {
   const date = new Date(value);
   const today = new Date();
@@ -198,8 +200,9 @@ export default function HomeScreen() {
   const [reportSending, setReportSending] = useState(false);
   const [reportSentId, setReportSentId] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
-  const [quickSuggestions, setQuickSuggestions] =
-    useState<QuickSuggestion[]>(defaultSuggestions);
+  const [quickSuggestions, setQuickSuggestions] = useState<
+    QuickSuggestion[] | null
+  >(null);
   const screenRef = useRef<View>(null);
   const lastShakeRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -368,6 +371,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!user?.id) return;
+    setQuickSuggestions(null);
     const timer = setTimeout(
       () => {
         void apiFetch<{
@@ -388,7 +392,7 @@ export default function HomeScreen() {
             setQuickSuggestions(
               personalized.length
                 ? [...personalized, ...defaultSuggestions].slice(0, 3)
-                : defaultSuggestions,
+                : fallbackSuggestions,
             );
             personalized.forEach((item, position) =>
               analytics.trackSuggestion({
@@ -399,7 +403,7 @@ export default function HomeScreen() {
               }),
             );
           })
-          .catch(() => setQuickSuggestions(defaultSuggestions));
+          .catch(() => setQuickSuggestions(fallbackSuggestions));
       },
       suggestionRefreshBucket > 0 ? 8_000 : 0,
     );
@@ -789,7 +793,7 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.suggestionList}>
-        {quickSuggestions.map((suggestion) => (
+        {(quickSuggestions || []).map((suggestion) => (
           <Pressable
             key={suggestion.label}
             onPress={() => {
@@ -800,7 +804,7 @@ export default function HomeScreen() {
                   suggestion.key,
                   suggestion.label,
                   true,
-                  quickSuggestions.indexOf(suggestion),
+                  quickSuggestions?.indexOf(suggestion),
                 );
               }
               sendMessage(suggestion.label);
@@ -1304,7 +1308,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1.5,
   },
-  suggestionList: { gap: 9, paddingBottom: 8 },
+  suggestionList: { minHeight: 200, gap: 9, paddingBottom: 8 },
   suggestion: {
     height: 58,
     paddingHorizontal: 16,

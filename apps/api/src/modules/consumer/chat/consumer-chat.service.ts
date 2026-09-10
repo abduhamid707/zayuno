@@ -669,6 +669,8 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       }
     }
 
+    plan = this.normalizeBroadFoodDiscoveryPlan(prompt, plan);
+
     if (plan.intent === "general") {
       if (this.unmetDemandService) {
         await this.unmetDemandService.recordUnmetDemand({
@@ -1772,6 +1774,89 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       page: 0,
       allowCatalogFallback: true,
       excludedOfferingIds: [],
+    };
+  }
+
+  private normalizeBroadFoodDiscoveryPlan(
+    prompt: string,
+    plan: LiveContextPlan,
+  ): LiveContextPlan {
+    if (plan.intent !== "food_selection") return plan;
+
+    const normalized = this.normalizeLookupText(prompt);
+    const hasCategory =
+      /\b(pitsa|pizza|burger|lavash|shaurma|donar|sushi|roll|wok|ichimlik|ovqat|taom)\b/i.test(
+        normalized,
+      );
+    const hasDiscoveryConstraint =
+      /\b\d+\s*(?:kishi|kishiga|kishilik|odam|odamga|ming|mingdan|k)\b/i.test(
+        normalized,
+      ) ||
+      /\b(budjet|budget|oshmasin|gacha|arzon|qimmat|achchiq|vegetarian|vegan)\b/i.test(
+        normalized,
+      );
+    if (!hasCategory || !hasDiscoveryConstraint) return plan;
+
+    const genericWords = new Set([
+      "bugun",
+      "kechqurun",
+      "ertalab",
+      "ertaga",
+      "tushlik",
+      "uchun",
+      "kerak",
+      "xohlayman",
+      "xohlaymiz",
+      "top",
+      "topib",
+      "ber",
+      "bering",
+      "korsat",
+      "ko",
+      "rsat",
+      "pitsa",
+      "pizza",
+      "burger",
+      "lavash",
+      "shaurma",
+      "donar",
+      "sushi",
+      "roll",
+      "wok",
+      "ichimlik",
+      "ovqat",
+      "taom",
+      "kishi",
+      "kishiga",
+      "kishilik",
+      "odam",
+      "odamga",
+      "ming",
+      "mingdan",
+      "som",
+      "so",
+      "m",
+      "mdan",
+      "mgacha",
+      "uzs",
+      "budjet",
+      "budget",
+      "oshmasin",
+      "gacha",
+    ]);
+    const concreteTerms = normalized
+      .split(" ")
+      .filter(Boolean)
+      .filter((term) => !/^\d+$/.test(term) && !genericWords.has(term));
+    if (concreteTerms.length > 0) return plan;
+
+    return {
+      ...plan,
+      intent: "food_browse",
+      itemRequests: [],
+      quantity: 1,
+      limit: Math.max(plan.limit, 6),
+      allowCatalogFallback: true,
     };
   }
 
@@ -2942,6 +3027,7 @@ Rules:
 - A broad wish such as "ovqat xohlayman" without restaurant, dish or useful preference is food_clarification.
 - Menu browsing, dish search, availability and comparisons are food_browse.
 - Buying, ordering or selecting a concrete menu item is food_selection.
+- A category-level wish with constraints (for example "2 kishiga pizza, 150 mingdan oshmasin") is food_browse, even when the user says "kerak". Keep itemRequests empty and search/rank suitable catalog items. Use food_selection only for a concrete menu item name or a product selected from prior catalog context.
 - Keep a restaurant already selected in HISTORY. Otherwise select every genuinely relevant provider from PROVIDERS; never mix in an irrelevant restaurant merely to pad results.
 - Set needsCatalog=true whenever browsing or ordering from a provider.
 - Put the most relevant provider slug first. The query must express the user's actual need, without conversational filler.
@@ -3134,6 +3220,7 @@ USER=${JSON.stringify(prompt)}`;
     ]) {
       if (t.includes(product)) synonyms.push(product);
     }
+    if (/\b(pitsa|pizza)\b/i.test(t)) synonyms.push("pitsa", "pizza");
 
     if (/web\s*dastur|veb\s*dastur|sayt|web/i.test(t)) {
       synonyms.push(
@@ -3441,8 +3528,10 @@ USER=${JSON.stringify(prompt)}`;
             parametersSchema: catalogParametersSchema,
             locationId: catalogLocationId,
             offeringsCount: rawOfferings.length,
-            offerings: rawOfferings
-              .filter((item) => item.isAvailable !== false)
+            offerings: this.filterOfferingsForBudget(
+              rawOfferings.filter((item) => item.isAvailable !== false),
+              plan.query,
+            )
               .slice(0, plan.limit)
               .map((item) => ({
                 id: item.id,
@@ -3793,12 +3882,21 @@ USER=${JSON.stringify(prompt)}`;
     const query = this.normalizeLookupText(plan.query);
     if (!query) return offerings;
 
+    const maximumBudget = this.extractMaximumBudget(plan.query);
+    const affordable = maximumBudget
+      ? offerings.filter((item) => {
+          const price = Number(item?.basePrice || item?.price || 0);
+          return Number.isFinite(price) && price > 0 && price <= maximumBudget;
+        })
+      : [];
+    const candidates = affordable.length > 0 ? affordable : offerings;
+
     const terms = this.expandSearchTerms(query)
       .flatMap((term) => this.normalizeLookupText(term).split(/\s+/))
       .filter((term) => term.length >= 3);
     if (terms.length === 0) return offerings;
 
-    return offerings
+    return candidates
       .map((item, index) => {
         const searchable = [
           item?.title,
@@ -3821,6 +3919,32 @@ USER=${JSON.stringify(prompt)}`;
         (left, right) => right.score - left.score || left.index - right.index,
       )
       .map(({ item }) => item);
+  }
+
+  private extractMaximumBudget(value: string): number | undefined {
+    const normalized = String(value || "")
+      .toLowerCase()
+      .replace(/,/g, ".");
+    const thousands = normalized.match(
+      /\b(\d+(?:\.\d+)?)\s*(?:ming(?:dan)?|k)\b/i,
+    );
+    if (thousands) return Math.round(Number(thousands[1]) * 1_000);
+
+    const fullAmount = normalized.match(
+      /(\d{1,3}(?:[\s\u00a0]\d{3})+|\d{5,9})/,
+    );
+    if (fullAmount) return Number(fullAmount[1].replace(/\s|\u00a0/g, ""));
+    return undefined;
+  }
+
+  private filterOfferingsForBudget(offerings: any[], query: string): any[] {
+    const maximumBudget = this.extractMaximumBudget(query);
+    if (!maximumBudget) return offerings;
+    const affordable = offerings.filter((item) => {
+      const price = Number(item?.basePrice || item?.price || 0);
+      return Number.isFinite(price) && price > 0 && price <= maximumBudget;
+    });
+    return affordable.length > 0 ? affordable : offerings;
   }
 
   private normalizeLookupText(value: unknown): string {

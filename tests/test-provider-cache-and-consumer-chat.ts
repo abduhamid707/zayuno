@@ -216,6 +216,13 @@ async function main() {
               currency: "UZS",
               isAvailable: true,
             },
+            {
+              id: "pizza-premium",
+              title: "Premium Pizza",
+              basePrice: 170_000,
+              currency: "UZS",
+              isAvailable: true,
+            },
           ],
         };
       },
@@ -310,6 +317,74 @@ async function main() {
     rankedCatalog[0].id,
     "burger",
     "matching offerings should only move to the top",
+  );
+
+  const reportedBudgetPrompt =
+    "Bugun kechqurun 2 kishiga pizza kerak, 150 mingdan oshmasin.";
+  (dynamicFoodChat as any).planWithAi = async () => ({
+    intent: "food_selection",
+    needsCatalog: true,
+    providerScope: "selected",
+    providerSlugs: ["maxifood-express"],
+    query: reportedBudgetPrompt,
+    quantity: 1,
+    limit: 6,
+    page: 0,
+    itemRequests: [{ query: reportedBudgetPrompt, quantity: 1 }],
+    allowCatalogFallback: true,
+    excludedOfferingIds: [],
+  });
+  const reportedBudgetFlow = await (dynamicFoodChat as any).prepareChat({
+    prompt: reportedBudgetPrompt,
+    messages: [],
+    userId: "budget-pizza-user",
+  });
+  assert.equal(
+    reportedBudgetFlow.plan.intent,
+    "food_browse",
+    "category + people + budget must be treated as discovery, not an exact item selection",
+  );
+  assert.deepEqual(reportedBudgetFlow.plan.itemRequests, []);
+  assert.match(reportedBudgetFlow.directAnswer, /Pepperoni Pizza/);
+  assert.doesNotMatch(reportedBudgetFlow.directAnswer, /Premium Pizza/);
+  assert.doesNotMatch(
+    reportedBudgetFlow.directAnswer,
+    /Nomini katalogdagidek aniqlashtirib yozing/i,
+  );
+  assert.equal(
+    reportedBudgetFlow.interaction?.kind,
+    "catalog_menu",
+    "a natural constrained request must return actionable product cards",
+  );
+  const budgetRanked = (dynamicFoodChat as any).rankCatalogForPlan(
+    [
+      { id: "within", title: "Oilaviy pitsa", basePrice: 145_000 },
+      { id: "over", title: "Premium pitsa", basePrice: 175_000 },
+    ],
+    reportedBudgetFlow.plan,
+  );
+  assert.deepEqual(
+    budgetRanked.map((item: any) => item.id),
+    ["within"],
+    "explicit maximum budget must exclude more expensive catalog items when affordable matches exist",
+  );
+  assert.equal(
+    (dynamicFoodChat as any).extractMaximumBudget(
+      "2 kishilik pitsa 150 000 so‘mdan oshmasin",
+    ),
+    150_000,
+  );
+  const concretePizzaPlan = (
+    dynamicFoodChat as any
+  ).normalizeBroadFoodDiscoveryPlan("Pepperoni pizza 2 ta kerak", {
+    ...reportedBudgetFlow.plan,
+    intent: "food_selection",
+    itemRequests: [{ query: "Pepperoni pizza", quantity: 2 }],
+  });
+  assert.equal(
+    concretePizzaPlan.intent,
+    "food_selection",
+    "a concrete named menu item must remain an actionable order selection",
   );
 
   delete (dynamicFoodChat as any).planWithAi;
