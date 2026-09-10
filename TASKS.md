@@ -1,12 +1,26 @@
 # Deferred tasks
 
+## Joriy ish — v10 dan keyin ham qaytalangan login, 2026-09-10
+
+- [x] Yangi PostHog auth hodisalari va qurilmadagi build/session holatidan aniq sababni topish.
+- [x] Sababni tuzatish va uni takrorlaydigan regression testini qo‘shish.
+- [x] API typecheck, auth regressionlar va full review: 38/38 suite muvaffaqiyatli o'tdi.
+- [x] Fixni commit qilib `origin/main`ga push qilish; CI deployni shu commitdan boshlaydi (yangi APK kerak emas).
+- [ ] Production image SHA, refresh HTTP 200 va USB telefonda sessiya saqlanishini tasdiqlash.
+**Tasdiqlangan sabab:** ishlab turgan API (69f623b) logida 2026-09-10 07:37:57 va 07:57:47 UTC `/consumer/auth/refresh` 401 `Consumer account is unavailable`. Reportdagi akkaunt bazada faol SUPER_ADMIN. Google upsert mavjud rolni saqlaydi, refresh/getProfile esa faqat API_CONSUMER qabul qilgan. Tokenlar 15 daqiqadan keyin bekor bo‘lib mobile welcome’ga qaytgan. PostHog v10: 1 refresh_rejected va 1 no_stored_session. USB Samsung SM_A346E, versionCode 10 tasdiqlandi.
+**O‘zgarish:** consumer-auth.service.ts da normal/recovered refresh va profile uchun role cheklovi olib tashlandi; active user, session ownership, expiry/revocation tekshiruvlari saqlangan. DB roli o‘zgarmaydi. Regression SUPER_ADMIN/PROVIDER_OWNER/consumer + disabled-user holatlari qo‘shildi, fixdan oldin SUPER_ADMIN refresh 401 bilan qayta ishlab berildi.
+**Keyingi qadam:** shu regression + API typecheck, so‘ng mavjud CI orqali scoped API release va real qurilmada restart/refresh tekshiruvi. APK o‘zgarishi kerak emas: muammo serverda. Action tugmalarini qaytarmaslik.
+**Checkpoint (limit uchun):** barcha yuqoridagi auth testlari va API tsc o'tdi. `pnpm test:review` YAKUNLANDI: 38/38 suite, exit 0, 88.33s; log `work/auth-role-review.log`. Eski exec session 57700 yakunlangan, qayta poll kerak emas. Push qilinadigan ish 3 faylda: TASKS.md, apps/api/src/modules/consumer/auth/consumer-auth.service.ts, tests/test-consumer-refresh-recovery.ts. Keyingi agent: main CI auto-release yakunini tekshirish; production image SHA va haqiqiy refresh HTTP 200 ni tasdiqlash. Immediate restart bilan cheklanmaslik: access token 15 daqiqadan keyin yangilanishi ham ishlashi kerak.
+**Deploy:** `.github/workflows/build-images.yml` main pushdan build, `.github/workflows/deploy-production.yml` successful builddan auto deploy. SSH `root@158.220.100.58`, project `/root/zayuno`, container `zayuno-api`, hozirgi image yuqoridagi 69f623b SHA. DBdagi SUPER_ADMIN rolni o'zgartirmaslik; fix faol multi-role akkauntning consumer sessiyasini yangilaydi, ownership/expiry/revocation tekshiruvlari saqlangan. Sirlar yoki tokenlarni outputga chiqarmaslik.
+**Telefon:** `D:/AndroidSdk/platform-tools/adb.exe`, serial RRCW5071L9F, Samsung SM_A346E, package uz.zayuno.mobile, versionCode 10. Oxirgi UI welcome/Google login. User USB testga ruxsat berdi. `adb shell am start -n uz.zayuno.mobile/.MainActivity`. App datani clear/uninstall qilmaslik. Yangi APK kerak emas. PostHog project 601107, auth_session_restore_failed va $app_build=10 orqali kuzatish. Action tugmalarini qaytarmaslik.
+
 ## Joriy ish — tasdiqlash/bekor qilish tugmalarini to'liq olib tashlash, 2026-09-10
 
 - [x] Frontend: `ChatActionRow.tsx` komponentini olib tashlash, `app/(app)/index.tsx`, `api.ts`, `interaction.ts` dagi actionId va ChatAction qismlarini tozalash (savat animatsiyasi, card UI va boshqa qismlarga tegilmaydi; mobile tsc 0 xato).
 - [x] Backend: `chat-actions.ts` ni olib tashlash, `consumer-chat.service.ts` va `consumer-chat.controller.ts` dagi actionId va action suggestions qismlarini tozalash (auth, memory, order logikasi saqlanadi; API tsc 0 xato).
 - [x] Testlar: `test-consumer-chat-actions.ts` ni olib tashlash, `run-all-review-tests.ts` ni yangilash, barcha testlar va typecheck (`tsc --noEmit`) to'liq o'tishini tekshirish (38/38 test suite o'tdi).
-- [ ] Git commit va origin/main ga push qilish.
-- [ ] zayuno-v10.apk build qilish va USB orqali telefonga o'rnatish.
+- [x] Git commit va origin/main ga push qilish. (commit 69f623b, allaqachon bajarilgan)
+- [x] zayuno-v10.apk build qilish va USB orqali telefonga o'rnatish. (2026-09-10, RRCW5071L9F, Success)
 **Keyingi qadam:** Frontend va backenddan action tugmalarini xavfsiz olib tashlash va typecheck qilish.
 
 ## Oldingi ish — dinamik AI actionlar va savat animatsiyasi, 2026-09-10

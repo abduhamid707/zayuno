@@ -154,7 +154,7 @@ export class ConsumerAuthService {
         const user = await prisma.user.findUnique({
           where: { id: payload.sub },
         });
-        if (!user || !user.isActive || user.role !== UserRole.API_CONSUMER)
+        if (!user || !user.isActive)
           throw new UnauthorizedException("Consumer account is unavailable.");
         return this.recoverSession(user, successor);
       }
@@ -168,7 +168,10 @@ export class ConsumerAuthService {
       throw new UnauthorizedException("Refresh session is no longer active.");
     }
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user || !user.isActive || user.role !== UserRole.API_CONSUMER)
+    // Google login reuses existing users, including portal owners and admins.
+    // The verified consumer-session record establishes mobile access; database
+    // role still governs portal permissions and must not cause a forced logout.
+    if (!user || !user.isActive)
       throw new UnauthorizedException("Consumer account is unavailable.");
     return this.rotateSession(user, session.id, session.familyId);
   }
@@ -216,10 +219,11 @@ export class ConsumerAuthService {
         email: true,
         name: true,
         role: true,
+        isActive: true,
         createdAt: true,
       },
     });
-    if (!user || user.role !== UserRole.API_CONSUMER)
+    if (!user || !user.isActive)
       throw new UnauthorizedException("Consumer account not found.");
     return user;
   }

@@ -91,6 +91,53 @@ async function main() {
     /no longer active/,
     "logout must also revoke a successor from a lost response",
   );
+  // Existing portal/admin accounts can also sign into the consumer app using
+  // Google. Their database role must not invalidate the mobile device session.
+  process.env.GOOGLE_CLIENT_ID = "test-google-client";
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => ({
+    ok: true,
+    json: async () => ({
+      aud: "test-google-client",
+      iss: "accounts.google.com",
+      email_verified: true,
+      email: user.email,
+      name: user.name,
+    }),
+  })) as any;
+  prisma.user.upsert = (async ({ update }: any) => {
+    assert.equal(
+      update.role,
+      undefined,
+      "Google login must not overwrite the existing account role",
+    );
+    return user;
+  }) as any;
+  for (const role of ["SUPER_ADMIN", "PROVIDER_OWNER", "API_CONSUMER"]) {
+    user.role = role;
+    const signedIn = await service.verifyGoogleToken("fixture-google-id");
+    const renewed = await service.refreshSession(signedIn.refreshToken);
+    assert.equal(JSON.parse(renewed.accessToken).role, role);
+    const retry = await service.refreshSession(signedIn.refreshToken);
+    assert.equal(
+      JSON.parse(retry.refreshToken).jti,
+      JSON.parse(renewed.refreshToken).jti,
+    );
+    assert.equal((await service.getProfile(user.id)).id, user.id);
+    assert.equal(
+      user.role,
+      role,
+      "using the mobile app must preserve portal/admin roles",
+    );
+    user.isActive = false;
+    await assert.rejects(
+      service.refreshSession(renewed.refreshToken),
+      /unavailable/,
+    );
+    await assert.rejects(service.getProfile(user.id), /not found/);
+    user.isActive = true;
+  }
+  globalThis.fetch = originalFetch;
   delete process.env.CONSUMER_REFRESH_TOKEN_SECRET;
   await assert.rejects(
     service.refreshSession(initial.refreshToken),
