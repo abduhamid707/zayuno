@@ -48,7 +48,6 @@ const testSuites = [
   "tests/test-provider-cache-and-consumer-chat.ts",
   "tests/test-consumer-auth-persistence.ts",
   "tests/test-consumer-refresh-recovery.ts",
-  "tests/test-consumer-chat-actions.ts",
   "tests/test-mobile-auth-runtime.ts",
   "tests/test-mobile-cart.ts",
   "tests/test-consumer-memory-personalization.ts",

@@ -1,6 +1,15 @@
 # Deferred tasks
 
-## Joriy ish — dinamik AI actionlar va savat animatsiyasi, 2026-09-10
+## Joriy ish — tasdiqlash/bekor qilish tugmalarini to'liq olib tashlash, 2026-09-10
+
+- [x] Frontend: `ChatActionRow.tsx` komponentini olib tashlash, `app/(app)/index.tsx`, `api.ts`, `interaction.ts` dagi actionId va ChatAction qismlarini tozalash (savat animatsiyasi, card UI va boshqa qismlarga tegilmaydi; mobile tsc 0 xato).
+- [x] Backend: `chat-actions.ts` ni olib tashlash, `consumer-chat.service.ts` va `consumer-chat.controller.ts` dagi actionId va action suggestions qismlarini tozalash (auth, memory, order logikasi saqlanadi; API tsc 0 xato).
+- [x] Testlar: `test-consumer-chat-actions.ts` ni olib tashlash, `run-all-review-tests.ts` ni yangilash, barcha testlar va typecheck (`tsc --noEmit`) to'liq o'tishini tekshirish (38/38 test suite o'tdi).
+- [ ] Git commit va origin/main ga push qilish.
+- [ ] zayuno-v10.apk build qilish va USB orqali telefonga o'rnatish.
+**Keyingi qadam:** Frontend va backenddan action tugmalarini xavfsiz olib tashlash va typecheck qilish.
+
+## Oldingi ish — dinamik AI actionlar va savat animatsiyasi, 2026-09-10
 
 - [x] Mavjud chat, buyurtma holati va animatsiya yo‘lini ko‘rib chiqish.
 - [x] AI javobi/joriy holatga bog‘langan action contract; tasdiqlash va bekor qilishni eski buyurtmaga qo‘llamaslik.

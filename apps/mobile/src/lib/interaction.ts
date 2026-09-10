@@ -72,20 +72,9 @@ export type CatalogSectionItem = {
   offerings: CatalogOfferingItem[];
 };
 
-export type ChatAction = {
-  id: string;
-  kind: "confirm" | "cancel" | "continue" | "reply";
-  label: string;
-  prompt: string;
-  appearance: "primary" | "secondary";
-  expiresAt: string;
-};
-
 export type ChatInteraction = {
   version: 1;
-  kind:
-    "choice_cards" | "provider_list" | "catalog_menu" | "action_suggestions";
-  actions?: ChatAction[];
+  kind: "choice_cards" | "provider_list" | "catalog_menu";
   title?: string;
   subtitle?: string;
   groups?: InteractionGroup[];

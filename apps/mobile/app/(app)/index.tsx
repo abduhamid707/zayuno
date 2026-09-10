@@ -33,7 +33,6 @@ import {
 import { apiFetch, streamChat } from "../../src/lib/api";
 import { theme } from "../../src/theme";
 import { ChatMarkdown } from "../../src/components/ChatMarkdown";
-import { ChatActionRow } from "../../src/components/ChatActionRow";
 import {
   InteractionCards,
   SelectionTray,
@@ -62,7 +61,6 @@ import { useAuthStore } from "../../src/store/authStore";
 import { analytics } from "../../src/lib/analytics";
 import {
   ChatInteraction,
-  ChatAction,
   InteractionChoice,
   choiceLabel,
   TrayItem,
@@ -170,9 +168,6 @@ function AssistantAvatar() {
 export default function HomeScreen() {
   const [input, setInput] = useState("");
   const [lastFailed, setLastFailed] = useState<string | null>(null);
-  const [lastFailedAction, setLastFailedAction] = useState<
-    ChatAction | undefined
-  >();
   const sendLockRef = useRef(false);
   const sendMessageRef = useRef<(value: string) => void>(() => undefined);
   const [streamingText, setStreamingText] = useState("");
@@ -443,7 +438,6 @@ export default function HomeScreen() {
     value = input,
     choices: InteractionChoice[] = selectedChoices,
     currentTray: TrayItem[] = trayItems,
-    action?: ChatAction,
   ) => {
     const offeringTrayItems = currentTray.filter(
       (i): i is Extract<TrayItem, { type: "offering" }> =>
@@ -505,7 +499,6 @@ export default function HomeScreen() {
     setTrayItems([]);
     flightRef.current?.clear();
     setLastFailed(null);
-    setLastFailedAction(undefined);
     setStreamingText("");
     setStreamingInteraction(null);
     Keyboard.dismiss();
@@ -538,7 +531,6 @@ export default function HomeScreen() {
         (interaction) => setStreamingInteraction(interaction),
         submittedChoices,
         controller.signal,
-        action?.id,
       );
       const latencyMs = Date.now() - startTime;
       addMessage({
@@ -563,7 +555,6 @@ export default function HomeScreen() {
         analytics.trackError(error, "chat_stream");
         analytics.trackChatResponse({ latencyMs, success: false });
         setLastFailed(prompt);
-        setLastFailedAction(action);
         setSelectedChoices(submittedChoices);
         addMessage({
           role: "assistant",
@@ -727,8 +718,7 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {item.interaction &&
-          item.interaction.kind !== "action_suggestions" ? (
+          {item.interaction ? (
             <View style={styles.interactionBlock}>
               {item.interaction.kind === "provider_list" ? (
                 <ProviderPickerCard
@@ -887,8 +877,7 @@ export default function HomeScreen() {
                       ) : null}
                     </View>
                   </View>
-                  {streamingInteraction &&
-                  streamingInteraction.kind !== "action_suggestions" ? (
+                  {streamingInteraction ? (
                     <View style={styles.interactionBlock}>
                       {streamingInteraction.kind === "provider_list" ? (
                         <ProviderPickerCard
@@ -937,11 +926,7 @@ export default function HomeScreen() {
               )
             ) : lastFailed ? (
               <Pressable
-                onPress={() =>
-                  lastFailedAction
-                    ? sendMessage(lastFailed, [], [], lastFailedAction)
-                    : sendMessage(lastFailed)
-                }
+                onPress={() => sendMessage(lastFailed)}
                 style={styles.retry}
               >
                 <Ionicons name="refresh" size={16} color="#8B7CFF" />
@@ -958,25 +943,6 @@ export default function HomeScreen() {
         />
 
         <View style={styles.composerShell}>
-          {!isLoading &&
-          !input.trim() &&
-          !trayItems.length &&
-          !selectedChoices.length &&
-          messages.at(-1)?.role === "assistant" &&
-          messages.at(-1)?.interaction?.actions?.length ? (
-            <ChatActionRow
-              actions={messages.at(-1)!.interaction!.actions!}
-              onSelect={(action) => {
-                if (sendLockRef.current) return;
-                analytics.trackSuggestion({
-                  event: "clicked",
-                  type: `chat_action_${action.kind}`,
-                  personalized: false,
-                });
-                void sendMessage(action.prompt, [], [], action);
-              }}
-            />
-          ) : null}
           {selectedChoices.length > 0 && trayItems.length === 0 ? (
             <SelectionTray choices={selectedChoices} onRemove={removeChoice} />
           ) : null}
