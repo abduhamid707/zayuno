@@ -29,6 +29,7 @@ type ChatSelection = {
 
 type ChatBody = {
   prompt: string;
+  actionId?: string;
   messages?: ConversationMessage[];
   conversationId?: string;
   selections?: ChatSelection[];
@@ -53,6 +54,7 @@ export class ConsumerChatController {
     try {
       return await this.chatService.processMessage({
         prompt: body.prompt,
+        actionId: body.actionId,
         messages: body.messages,
         conversationId: body.conversationId,
         selections: body.selections,
@@ -60,7 +62,9 @@ export class ConsumerChatController {
         userEmail: req.user.email,
       });
     } catch (error: any) {
-      this.logger.warn(`Consumer chat failed: ${String(error?.message || error)}`);
+      this.logger.warn(
+        `Consumer chat failed: ${String(error?.message || error)}`,
+      );
       return {
         content: this.publicErrorMessage(error),
       };
@@ -90,6 +94,7 @@ export class ConsumerChatController {
       await this.chatService.streamMessage(
         {
           prompt: body.prompt,
+          actionId: body.actionId,
           messages: body.messages,
           conversationId: body.conversationId,
           selections: body.selections,
@@ -105,7 +110,9 @@ export class ConsumerChatController {
         },
         (interaction) => {
           if (!res.destroyed) {
-            res.write(`data: ${JSON.stringify({ type: "ui", interaction })}\n\n`);
+            res.write(
+              `data: ${JSON.stringify({ type: "ui", interaction })}\n\n`,
+            );
           }
         },
       );
@@ -115,7 +122,9 @@ export class ConsumerChatController {
     } catch (error: any) {
       // Provider contracts, infrastructure details and internal exception text
       // must never be exposed in the customer chat.
-      this.logger.warn(`Consumer chat stream failed: ${String(error?.message || error)}`);
+      this.logger.warn(
+        `Consumer chat stream failed: ${String(error?.message || error)}`,
+      );
       const message = this.publicErrorMessage(error);
       if (!res.destroyed) {
         res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);

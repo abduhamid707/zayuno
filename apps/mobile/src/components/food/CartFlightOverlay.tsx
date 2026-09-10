@@ -1,5 +1,7 @@
 import React, {
   forwardRef,
+  memo,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -24,7 +26,7 @@ export type CartFlightHandle = {
   clear: () => void;
 };
 
-function FlyingProduct({
+const FlyingProduct = memo(function FlyingProduct({
   flight,
   onLand,
 }: {
@@ -44,13 +46,14 @@ function FlyingProduct({
       if (finished) onLand(flight.id);
     });
     return () => animation.stop();
-  }, [flight.id, progress]);
+  }, [flight.id, progress, onLand]);
   const sx = flight.from.x + flight.from.width / 2 - 34;
   const sy = flight.from.y + flight.from.height / 2 - 34;
   const tx = flight.to.x + flight.to.width / 2 - 34;
   const ty = flight.to.y + flight.to.height / 2 - 34;
   return (
     <Animated.View
+      renderToHardwareTextureAndroid
       style={[
         styles.product,
         {
@@ -90,89 +93,109 @@ function FlyingProduct({
       <ProductImage uri={flight.uri} />
     </Animated.View>
   );
-}
-
-export const CartFlightOverlay = forwardRef<
-  CartFlightHandle,
-  {
-    targetRef: React.RefObject<ContextTrayHandle | null>;
-  }
->(function CartFlightOverlay({ targetRef }, ref) {
-  const root = useRef<View>(null);
-  const sequence = useRef(0);
-  const epoch = useRef(0);
-  const [flights, setFlights] = useState<Flight[]>([]);
-  const reduced = useReducedMotion();
-  useEffect(
-    () => () => {
-      epoch.current += 1;
-    },
-    [],
-  );
-  useEffect(() => {
-    if (reduced) {
-      epoch.current += 1;
-      setFlights([]);
-    }
-  }, [reduced]);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      clear() {
-        epoch.current += 1;
-        setFlights([]);
-      },
-      fly(offering, from) {
-        if (reduced || !from) {
-          targetRef.current?.land();
-          return;
-        }
-        const version = epoch.current;
-        // Wait for the first selected thumbnail and composer height to commit.
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            if (version !== epoch.current) return;
-            root.current?.measureInWindow((ox, oy) => {
-              targetRef.current?.measureTarget(offeringKey(offering), (to) => {
-                if (version !== epoch.current || !to.height) return;
-                const flight = {
-                  id: ++sequence.current,
-                  uri: offering.imageUrl,
-                  from: { ...from, x: from.x - ox, y: from.y - oy },
-                  to: { ...to, x: to.x - ox, y: to.y - oy },
-                };
-                setFlights((current) => [...current.slice(-7), flight]);
-              });
-            });
-          }),
-        );
-      },
-    }),
-    [reduced, targetRef],
-  );
-  const land = (id: number) => {
-    setFlights((current) => current.filter((flight) => flight.id !== id));
-    targetRef.current?.land();
-  };
-  return (
-    <View
-      ref={root}
-      collapsable={false}
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={styles.overlay}
-    >
-      {flights.map((flight) => (
-        <FlyingProduct key={flight.id} flight={flight} onLand={land} />
-      ))}
-    </View>
-  );
 });
 
+export const CartFlightOverlay = memo(
+  forwardRef<
+    CartFlightHandle,
+    {
+      targetRef: React.RefObject<ContextTrayHandle | null>;
+    }
+  >(function CartFlightOverlay({ targetRef }, ref) {
+    const root = useRef<View>(null);
+    const sequence = useRef(0);
+    const epoch = useRef(0);
+    const [flights, setFlights] = useState<Flight[]>([]);
+    const reduced = useReducedMotion();
+    useEffect(
+      () => () => {
+        epoch.current += 1;
+      },
+      [],
+    );
+    useEffect(() => {
+      if (reduced) {
+        epoch.current += 1;
+        setFlights([]);
+      }
+    }, [reduced]);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        clear() {
+          epoch.current += 1;
+          setFlights([]);
+        },
+        fly(offering, from) {
+          if (reduced || !from) {
+            targetRef.current?.land();
+            return;
+          }
+          const version = epoch.current;
+          // Wait for the first selected thumbnail and composer height to commit.
+          requestAnimationFrame(() => {
+            if (version !== epoch.current) return;
+            let offset: { x: number; y: number } | undefined;
+            let target: CartFlightOrigin | undefined;
+            const start = () => {
+              if (
+                !offset ||
+                !target ||
+                version !== epoch.current ||
+                !target.height
+              )
+                return;
+              const { x: ox, y: oy } = offset;
+              const to = target;
+              const flight = {
+                id: ++sequence.current,
+                uri: offering.imageUrl,
+                from: { ...from, x: from.x - ox, y: from.y - oy },
+                to: { ...to, x: to.x - ox, y: to.y - oy },
+              };
+              // Bound overdraw during bursts without dropping cart additions.
+              setFlights((current) => [...current.slice(-3), flight]);
+            };
+            root.current?.measureInWindow((x, y) => {
+              offset = { x, y };
+              start();
+            });
+            targetRef.current?.measureTarget(offeringKey(offering), (to) => {
+              target = to;
+              start();
+            });
+          });
+        },
+      }),
+      [reduced, targetRef],
+    );
+    const land = useCallback(
+      (id: number) => {
+        setFlights((current) => current.filter((flight) => flight.id !== id));
+        targetRef.current?.land();
+      },
+      [targetRef],
+    );
+    return (
+      <View
+        ref={root}
+        collapsable={false}
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={styles.overlay}
+      >
+        {flights.map((flight) => (
+          <FlyingProduct key={flight.id} flight={flight} onLand={land} />
+        ))}
+      </View>
+    );
+  }),
+);
+
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFill, zIndex: 100, elevation: 30 },
+  overlay: { ...StyleSheet.absoluteFill, zIndex: 100 },
   product: {
     position: "absolute",
     top: 0,
@@ -185,9 +208,9 @@ const styles = StyleSheet.create({
     borderColor: "#B1A2FF",
     backgroundColor: "#20203C",
     shadowColor: "#9078FF",
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 14,
+    elevation: 3,
   },
 });

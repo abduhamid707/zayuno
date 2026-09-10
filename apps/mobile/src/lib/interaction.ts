@@ -72,9 +72,20 @@ export type CatalogSectionItem = {
   offerings: CatalogOfferingItem[];
 };
 
+export type ChatAction = {
+  id: string;
+  kind: "confirm" | "cancel" | "continue" | "reply";
+  label: string;
+  prompt: string;
+  appearance: "primary" | "secondary";
+  expiresAt: string;
+};
+
 export type ChatInteraction = {
   version: 1;
-  kind: "choice_cards" | "provider_list" | "catalog_menu";
+  kind:
+    "choice_cards" | "provider_list" | "catalog_menu" | "action_suggestions";
+  actions?: ChatAction[];
   title?: string;
   subtitle?: string;
   groups?: InteractionGroup[];
@@ -123,4 +134,3 @@ export function choiceLabel(choice: InteractionChoice) {
   const price = formatMoney(choice.price, choice.currency);
   return price ? `${choice.title} — ${price}` : choice.title;
 }
-

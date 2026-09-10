@@ -99,10 +99,12 @@ export class ConsumerAuthService {
   async refreshSession(refreshToken: string) {
     if (!refreshToken)
       throw new UnauthorizedException("Refresh token is required.");
+    // A configuration outage is a 503, not evidence that the user's token is bad.
+    const refreshSecret = this.getRefreshSecret();
     let payload: ConsumerJwt;
     try {
       payload = await this.jwtService.verifyAsync<ConsumerJwt>(refreshToken, {
-        secret: this.getRefreshSecret(),
+        secret: refreshSecret,
       });
     } catch {
       throw new UnauthorizedException("Refresh token is invalid or expired.");
@@ -130,21 +132,39 @@ export class ConsumerAuthService {
       }
     }
 
+    // A response may be lost after the DB transaction committed (network loss,
+    // process kill). Recover only the immediate, still-active successor. Never
+    // rotate twice or revoke a healthy family just because the client retried.
+    if (
+      session?.revokedAt &&
+      session.replacedBy &&
+      session.userId === payload.sub &&
+      session.expiresAt > new Date()
+    ) {
+      const successor = await prisma.consumerSession.findUnique({
+        where: { id: session.replacedBy },
+      });
+      if (
+        successor &&
+        successor.familyId === session.familyId &&
+        successor.userId === payload.sub &&
+        !successor.revokedAt &&
+        successor.expiresAt > new Date()
+      ) {
+        const user = await prisma.user.findUnique({
+          where: { id: payload.sub },
+        });
+        if (!user || !user.isActive || user.role !== UserRole.API_CONSUMER)
+          throw new UnauthorizedException("Consumer account is unavailable.");
+        return this.recoverSession(user, successor);
+      }
+    }
     if (
       !session ||
       session.userId !== payload.sub ||
       session.revokedAt ||
       session.expiresAt <= new Date()
     ) {
-      if (
-        session?.revokedAt &&
-        Date.now() - session.revokedAt.getTime() > 10_000
-      ) {
-        await prisma.consumerSession.updateMany({
-          where: { familyId: session.familyId, revokedAt: null },
-          data: { revokedAt: new Date() },
-        });
-      }
       throw new UnauthorizedException("Refresh session is no longer active.");
     }
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
@@ -159,14 +179,23 @@ export class ConsumerAuthService {
         refreshToken,
         { ignoreExpiration: true, secret: this.getRefreshSecret() },
       );
-      if (payload.type === "refresh" && payload.jti)
+      if (payload.type === "refresh" && payload.jti) {
+        const session = await prisma.consumerSession.findUnique({
+          where: { id: payload.jti },
+        });
+        if (!session || session.userId !== payload.sub) return;
         await Promise.all([
           this.redis.del(`consumer:refresh:${payload.jti}`),
           prisma.consumerSession.updateMany({
-            where: { id: payload.jti, revokedAt: null },
+            where: {
+              familyId: session.familyId,
+              userId: payload.sub,
+              revokedAt: null,
+            },
             data: { revokedAt: new Date() },
           }),
         ]);
+      }
     } catch {
       // Revocation is intentionally idempotent and does not disclose token validity.
     }
@@ -255,23 +284,76 @@ export class ConsumerAuthService {
     ]);
     const now = new Date();
     const expiresAt = new Date(now.getTime() + REFRESH_TTL_SECONDS * 1000);
-    await prisma.$transaction(async (tx) => {
-      const revoked = await tx.consumerSession.updateMany({
-        where: { id: previousId, userId: user.id, revokedAt: null },
-        data: { revokedAt: now, replacedBy: nextId, lastUsedAt: now },
+    try {
+      await prisma.$transaction(async (tx) => {
+        const revoked = await tx.consumerSession.updateMany({
+          where: { id: previousId, userId: user.id, revokedAt: null },
+          data: { revokedAt: now, replacedBy: nextId, lastUsedAt: now },
+        });
+        if (revoked.count !== 1)
+          throw new UnauthorizedException(
+            "Refresh session was already rotated.",
+          );
+        await tx.consumerSession.create({
+          data: { id: nextId, familyId, userId: user.id, expiresAt },
+        });
       });
-      if (revoked.count !== 1)
-        throw new UnauthorizedException("Refresh session was already rotated.");
-      await tx.consumerSession.create({
-        data: { id: nextId, familyId, userId: user.id, expiresAt },
+    } catch (error) {
+      if (!(error instanceof UnauthorizedException)) throw error;
+      const previous = await prisma.consumerSession.findUnique({
+        where: { id: previousId },
       });
-    });
+      const successor = previous?.replacedBy
+        ? await prisma.consumerSession.findUnique({
+            where: { id: previous.replacedBy },
+          })
+        : null;
+      if (
+        !successor ||
+        successor.userId !== user.id ||
+        successor.familyId !== familyId ||
+        successor.revokedAt ||
+        successor.expiresAt <= new Date()
+      )
+        throw error;
+      return this.recoverSession(user, successor);
+    }
     await Promise.all([
       this.redis.del(`consumer:refresh:${previousId}`),
       this.redis.set(
         `consumer:refresh:${nextId}`,
         user.id,
         REFRESH_TTL_SECONDS,
+      ),
+    ]);
+    return {
+      accessToken,
+      refreshToken,
+      token: accessToken,
+      expiresIn: 900,
+      user: { id: user.id, email: user.email, name: user.name || undefined },
+    };
+  }
+
+  private async recoverSession(
+    user: { id: string; email: string; name: string | null; role: UserRole },
+    session: { id: string; familyId: string; expiresAt: Date },
+  ) {
+    const base = { sub: user.id, email: user.email, role: user.role };
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(
+        { ...base, type: "access" },
+        { expiresIn: "15m" },
+      ),
+      this.jwtService.signAsync(
+        {
+          ...base,
+          type: "refresh",
+          jti: session.id,
+          familyId: session.familyId,
+          exp: Math.floor(session.expiresAt.getTime() / 1000),
+        },
+        { secret: this.getRefreshSecret() },
       ),
     ]);
     return {

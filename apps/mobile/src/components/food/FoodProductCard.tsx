@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../primitives/Text";
@@ -25,7 +25,7 @@ type FoodProductCardProps = {
   disabled?: boolean;
 };
 
-export function FoodProductCard({
+export const FoodProductCard = memo(function FoodProductCard({
   offering,
   onAddToCart,
   quantity = 0,
@@ -34,6 +34,7 @@ export function FoodProductCard({
   disabled,
 }: FoodProductCardProps) {
   const imageRef = useRef<View>(null);
+  const originRef = useRef<CartFlightOrigin | undefined>(undefined);
   const scale = useRef(new Animated.Value(1)).current;
   const unavailable = disabled || quantity >= MAX_CART_QUANTITY;
   useEffect(() => () => scale.stopAnimation(), [scale]);
@@ -44,25 +45,12 @@ export function FoodProductCard({
       speed: 24,
       bounciness: 8,
       useNativeDriver: Platform.OS !== "web",
+      isInteraction: false,
     }).start();
   };
   const add = () => {
     if (unavailable) return;
-    let committed = false;
-    const commit = (origin?: CartFlightOrigin) => {
-      if (committed) return;
-      committed = true;
-      onAddToCart(offering, origin);
-    };
-    imageRef.current?.measureInWindow((x, y, imageWidth, height) => {
-      commit(
-        imageWidth > 0 && height > 0
-          ? { x, y, width: imageWidth, height }
-          : undefined,
-      );
-    });
-    // Measurement is cosmetic: an unmounted native view must never lose a tap.
-    setTimeout(() => commit(), 80);
+    onAddToCart(offering, originRef.current);
   };
   return (
     <Animated.View style={{ width, transform: [{ scale }] }}>
@@ -73,11 +61,19 @@ export function FoodProductCard({
         accessibilityState={{ disabled: unavailable, selected: quantity > 0 }}
         disabled={unavailable}
         onPressIn={() => {
+          // Measure while the finger is down, not after the cart update.
+          originRef.current = undefined;
+          if (!reducedMotion)
+            imageRef.current?.measureInWindow((x, y, w, h) => {
+              if (w > 0 && h > 0)
+                originRef.current = { x, y, width: w, height: h };
+            });
           if (!reducedMotion)
             Animated.timing(scale, {
               toValue: 0.965,
               duration: 90,
               useNativeDriver: Platform.OS !== "web",
+              isInteraction: false,
             }).start();
         }}
         onPressOut={settle}
@@ -113,7 +109,7 @@ export function FoodProductCard({
       </Pressable>
     </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

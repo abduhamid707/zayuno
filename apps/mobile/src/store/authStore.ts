@@ -83,6 +83,7 @@ interface AuthState {
   user: ConsumerUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  restoreError: boolean;
   initAuth: () => Promise<void>;
   setSession: (session: SessionPayload) => Promise<void>;
   refreshSession: (force?: boolean) => Promise<boolean>;
@@ -91,6 +92,13 @@ interface AuthState {
 
 let refreshInFlight: Promise<boolean> | null = null;
 let initInFlight: Promise<void> | null = null;
+let sessionRevision = 0;
+let storageWrites: Promise<unknown> = Promise.resolve();
+function writeSessionStorage(operation: () => Promise<void>): Promise<void> {
+  const task = storageWrites.then(operation, operation);
+  storageWrites = task.catch(() => undefined);
+  return task;
+}
 
 async function clearStoredSession() {
   await Promise.all([
@@ -109,9 +117,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isLoading: true,
   isAuthenticated: false,
+  restoreError: false,
 
   initAuth: async () => {
     if (initInFlight) return initInFlight;
+    if (get().isAuthenticated) return;
+    const revision = sessionRevision;
+    set({ isLoading: true, restoreError: false });
     initInFlight = (async () => {
       analytics.trackAuthSession("restore_started");
       try {
@@ -122,13 +134,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             storage.getItem(USER_KEY),
             storage.getItem(ACCESS_TOKEN_EXPIRES_AT_KEY),
           ]);
+        if (revision !== sessionRevision) return;
         let user: ConsumerUser | null = null;
         try {
           user = userJson ? JSON.parse(userJson) : null;
         } catch {
           // A damaged profile cache must never destroy otherwise valid tokens.
         }
-        const parsedExpiresAt = Number(expiresAtJson);
+        const parsedExpiresAt = expiresAtJson ? Number(expiresAtJson) : NaN;
         const accessTokenExpiresAt = Number.isFinite(parsedExpiresAt)
           ? parsedExpiresAt
           : null;
@@ -145,9 +158,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (user) analytics.identifyUser(user);
         const refreshAttempted = Boolean(
           refreshToken &&
-            (!accessToken ||
-              !accessTokenExpiresAt ||
-              accessTokenExpiresAt <= Date.now() + REFRESH_EARLY_MS),
+          (!accessToken ||
+            !accessTokenExpiresAt ||
+            accessTokenExpiresAt <= Date.now() + REFRESH_EARLY_MS),
         );
         const refreshSucceeded = refreshToken
           ? await get().refreshSession()
@@ -156,7 +169,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         analytics.trackAuthSession(
           restored ? "restore_succeeded" : "restore_failed",
           {
-            reason: restored ? "stored_session" : "refresh_rejected",
+            reason: restored
+              ? "stored_session"
+              : hasStoredSession
+                ? "refresh_rejected"
+                : "no_stored_session",
             has_access: Boolean(get().accessToken),
             has_refresh: Boolean(get().refreshToken),
             refresh_attempted: refreshAttempted,
@@ -164,20 +181,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           },
         );
       } catch (error) {
+        if (revision !== sessionRevision) return;
         // A transient Android keystore read failure is not evidence that the
         // account session is invalid. Keep disk data and retry next launch.
         analytics.trackAuthSession("restore_failed", {
           reason: "secure_storage_read",
         });
         analytics.trackError(error, "auth_restore");
-        set({
-          accessToken: null,
-          accessTokenExpiresAt: null,
-          refreshToken: null,
-          token: null,
-          user: null,
-          isAuthenticated: false,
-        });
+        set({ restoreError: true });
       } finally {
         set({ isLoading: false });
         initInFlight = null;
@@ -187,24 +198,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setSession: async ({ accessToken, refreshToken, user, expiresIn }) => {
+    if (typeof accessToken !== "string" || !accessToken.trim())
+      throw new Error("Session token missing");
+    const revision = ++sessionRevision;
     const persistedRefreshToken = refreshToken || get().refreshToken;
     const persistedUser = user || get().user;
     const accessTokenExpiresAt =
       Date.now() +
       Math.max(Number(expiresIn) || DEFAULT_ACCESS_TOKEN_TTL_SECONDS, 60) *
         1000;
-    if (persistedUser) analytics.identifyUser(persistedUser);
     // Persist the newly rotated refresh token first. If Android kills the app
     // between writes, the next cold start can still obtain a fresh access token.
-    if (persistedRefreshToken)
-      await storage.setItem(REFRESH_TOKEN_KEY, persistedRefreshToken);
-    await storage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    await storage.setItem(
-      ACCESS_TOKEN_EXPIRES_AT_KEY,
-      String(accessTokenExpiresAt),
-    );
-    if (persistedUser)
-      await storage.setItem(USER_KEY, JSON.stringify(persistedUser));
+    await writeSessionStorage(async () => {
+      if (revision !== sessionRevision) return;
+      if (persistedRefreshToken)
+        await storage.setItem(REFRESH_TOKEN_KEY, persistedRefreshToken);
+      await storage.setItem(ACCESS_TOKEN_KEY, accessToken);
+      await storage.setItem(
+        ACCESS_TOKEN_EXPIRES_AT_KEY,
+        String(accessTokenExpiresAt),
+      );
+      if (persistedUser)
+        await storage.setItem(USER_KEY, JSON.stringify(persistedUser));
+    });
+    if (revision !== sessionRevision) return;
+    if (persistedUser) analytics.identifyUser(persistedUser);
     set({
       accessToken,
       accessTokenExpiresAt,
@@ -213,6 +231,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: persistedUser || null,
       isAuthenticated: true,
       isLoading: false,
+      restoreError: false,
     });
   },
 
@@ -227,10 +246,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return true;
     }
     if (refreshInFlight) return refreshInFlight;
+    const revision = sessionRevision;
+    const refreshToken = current.refreshToken;
+    const baseUrl = getApiBaseUrl();
+    if (!refreshToken || !baseUrl) return false;
     refreshInFlight = (async () => {
-      const refreshToken = get().refreshToken;
-      const baseUrl = getApiBaseUrl();
-      if (!refreshToken || !baseUrl) return false;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      analytics.trackAuthSession("refresh_started");
       try {
         const response = await fetch(
           `${baseUrl}/api/v1/consumer/auth/refresh`,
@@ -238,13 +261,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ refreshToken }),
+            signal: controller.signal,
           },
         );
         if (!response.ok) {
+          const problem = await response.json().catch(() => null);
+          if (
+            revision !== sessionRevision ||
+            get().refreshToken !== refreshToken
+          )
+            return false;
           // Only an explicit auth rejection invalidates a persisted session.
           // Network errors and temporary 5xx responses must not log users out.
-          if ([401, 403].includes(response.status)) {
-            await clearStoredSession();
+          if (
+            [401, 403].includes(response.status) &&
+            problem?.statusCode === response.status
+          ) {
+            sessionRevision += 1;
+            await writeSessionStorage(clearStoredSession);
             set({
               accessToken: null,
               accessTokenExpiresAt: null,
@@ -252,23 +286,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               token: null,
               user: null,
               isAuthenticated: false,
+              restoreError: false,
+            });
+            analytics.trackAuthSession("refresh_rejected", {
+              status: response.status,
+            });
+          } else {
+            analytics.trackAuthSession("refresh_unavailable", {
+              status: response.status,
             });
           }
           return false;
         }
         const session = await response.json();
+        if (revision !== sessionRevision || get().refreshToken !== refreshToken)
+          return false;
         await get().setSession({
           accessToken: session.accessToken,
           refreshToken: session.refreshToken,
           user: session.user || get().user || undefined,
           expiresIn: session.expiresIn,
         });
+        analytics.trackAuthSession("refresh_succeeded");
         return true;
       } catch {
+        analytics.trackAuthSession("refresh_unavailable", {
+          reason: controller.signal.aborted ? "timeout" : "network_or_storage",
+        });
         // Keep the last known session while offline or while production is
         // temporarily unavailable. The next authenticated request retries it.
         return false;
       } finally {
+        clearTimeout(timeout);
         refreshInFlight = null;
       }
     })();
@@ -276,6 +325,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    const revision = ++sessionRevision;
     const refreshToken = get().refreshToken;
     const baseUrl = getApiBaseUrl();
     if (refreshToken && baseUrl) {
@@ -285,7 +335,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         body: JSON.stringify({ refreshToken }),
       }).catch(() => undefined);
     }
-    await clearStoredSession();
+    await writeSessionStorage(clearStoredSession);
+    // A late refresh/login write cannot resurrect a deliberately signed-out account.
+    if (revision !== sessionRevision) return;
     analytics.resetUser();
     set({
       accessToken: null,
@@ -295,6 +347,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      restoreError: false,
     });
   },
 }));

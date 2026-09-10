@@ -1,10 +1,5 @@
-import React, { useMemo, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import React, { memo, useMemo, useState } from "react";
+import { FlatList, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../primitives/Text";
 import {
@@ -32,7 +27,7 @@ type InChatCatalogWidgetProps = {
   disabled?: boolean;
 };
 
-export function InChatCatalogWidget({
+export const InChatCatalogWidget = memo(function InChatCatalogWidget({
   categories,
   sections,
   onAddToCart,
@@ -77,15 +72,25 @@ export function InChatCatalogWidget({
               </View>
             </View>
 
-            <ScrollView
+            <FlatList
               horizontal
+              data={section.offerings}
+              extraData={quantities}
+              keyExtractor={(offering) => offeringKey(offering)}
+              initialNumToRender={4}
+              maxToRenderPerBatch={4}
+              windowSize={5}
+              getItemLayout={(_, index) => ({
+                length: cardWidth + 10,
+                offset: (cardWidth + 10) * index,
+                index,
+              })}
               keyboardShouldPersistTaps="handled"
               decelerationRate="fast"
               snapToInterval={cardWidth + 10}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.carouselContent}
-            >
-              {section.offerings.map((offering) => (
+              renderItem={({ item: offering }) => (
                 <FoodProductCard
                   key={offering.id || offering.offeringId}
                   offering={offering}
@@ -95,8 +100,8 @@ export function InChatCatalogWidget({
                   reducedMotion={reducedMotion}
                   disabled={disabled}
                 />
-              ))}
-            </ScrollView>
+              )}
+            />
           </View>
         ))}
 
@@ -111,7 +116,7 @@ export function InChatCatalogWidget({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: {

@@ -33,6 +33,7 @@ import {
 import { apiFetch, streamChat } from "../../src/lib/api";
 import { theme } from "../../src/theme";
 import { ChatMarkdown } from "../../src/components/ChatMarkdown";
+import { ChatActionRow } from "../../src/components/ChatActionRow";
 import {
   InteractionCards,
   SelectionTray,
@@ -61,6 +62,7 @@ import { useAuthStore } from "../../src/store/authStore";
 import { analytics } from "../../src/lib/analytics";
 import {
   ChatInteraction,
+  ChatAction,
   InteractionChoice,
   choiceLabel,
   TrayItem,
@@ -168,13 +170,28 @@ function AssistantAvatar() {
 export default function HomeScreen() {
   const [input, setInput] = useState("");
   const [lastFailed, setLastFailed] = useState<string | null>(null);
+  const [lastFailedAction, setLastFailedAction] = useState<
+    ChatAction | undefined
+  >();
+  const sendLockRef = useRef(false);
+  const sendMessageRef = useRef<(value: string) => void>(() => undefined);
   const [streamingText, setStreamingText] = useState("");
   const [streamingInteraction, setStreamingInteraction] =
     useState<ChatInteraction | null>(null);
   const [selectedChoices, setSelectedChoices] = useState<InteractionChoice[]>(
     [],
   );
-  const [trayItems, setTrayItems] = useState<TrayItem[]>([]);
+  const [trayItems, setTrayItemsState] = useState<TrayItem[]>([]);
+  const trayItemsRef = useRef<TrayItem[]>([]);
+  const setTrayItems = useCallback(
+    (update: React.SetStateAction<TrayItem[]>) => {
+      const next =
+        typeof update === "function" ? update(trayItemsRef.current) : update;
+      trayItemsRef.current = next;
+      setTrayItemsState(next);
+    },
+    [],
+  );
   const trayRef = useRef<ContextTrayHandle>(null);
   const flightRef = useRef<CartFlightHandle>(null);
   const [historyVisible, setHistoryVisible] = useState(false);
@@ -205,81 +222,105 @@ export default function HomeScreen() {
     setLoading,
   } = useChatStore();
 
-  const trackSuggestion = (
-    event: "CLICKED" | "DISMISSED",
-    type: string,
-    key: string,
-    text: string,
-    personalized = false,
-    position?: number,
-  ) => {
-    analytics.trackSuggestion({
-      event: event === "CLICKED" ? "clicked" : "dismissed",
-      type,
-      personalized,
-      position,
-    });
-    void apiFetch("/api/v1/consumer/memory/suggestion-events", {
-      method: "POST",
-      body: JSON.stringify({
-        event,
+  const trackSuggestion = useCallback(
+    (
+      event: "CLICKED" | "DISMISSED",
+      type: string,
+      key: string,
+      text: string,
+      personalized = false,
+      position?: number,
+    ) => {
+      analytics.trackSuggestion({
+        event: event === "CLICKED" ? "clicked" : "dismissed",
         type,
-        key,
-        text,
-        sessionId: activeSessionId,
-      }),
-    }).catch(() => undefined);
-  };
+        personalized,
+        position,
+      });
+      void apiFetch("/api/v1/consumer/memory/suggestion-events", {
+        method: "POST",
+        body: JSON.stringify({
+          event,
+          type,
+          key,
+          text,
+          sessionId: activeSessionId,
+        }),
+      }).catch(() => undefined);
+    },
+    [activeSessionId],
+  );
 
-  const handleAddToCart = (
-    offering: CatalogOfferingItem,
-    origin?: CartFlightOrigin,
-  ) => {
-    if (isLoading) return;
-    const existing = trayItems.find(
-      (item) =>
-        item.type === "offering" && offeringKey(item) === offeringKey(offering),
-    );
-    if (existing?.type === "offering" && existing.quantity >= MAX_CART_QUANTITY)
-      return;
-    trackSuggestion("CLICKED", "offering", offering.offeringId, offering.title);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-      () => undefined,
-    );
-    setTrayItems((current) => addOffering(current, offering));
-    flightRef.current?.fly(offering, origin);
-    analytics.trackFoodItemAdded({
-      itemId: offering.offeringId,
-      name: offering.title,
-      price: offering.price,
-      providerId: offering.providerSlug,
-    });
-  };
+  const handleAddToCart = useCallback(
+    (offering: CatalogOfferingItem, origin?: CartFlightOrigin) => {
+      if (isLoading) return;
+      const existing = trayItemsRef.current.find(
+        (item) =>
+          item.type === "offering" &&
+          offeringKey(item) === offeringKey(offering),
+      );
+      if (
+        existing?.type === "offering" &&
+        existing.quantity >= MAX_CART_QUANTITY
+      )
+        return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+        () => undefined,
+      );
+      setTrayItems((current) => addOffering(current, offering));
+      flightRef.current?.fly(offering, origin);
+      // Let the native animation start before serializing analytics requests.
+      setTimeout(() => {
+        trackSuggestion(
+          "CLICKED",
+          "offering",
+          offering.offeringId,
+          offering.title,
+        );
+        analytics.trackFoodItemAdded({
+          itemId: offering.offeringId,
+          name: offering.title,
+          price: offering.price,
+          providerId: offering.providerSlug,
+        });
+      }, 700);
+    },
+    [isLoading, trackSuggestion, setTrayItems],
+  );
 
-  const handleRemoveTrayItem = (id: string) => {
-    analytics.trackFoodItemRemoved({ itemId: id });
-    setTrayItems((current) => current.filter((item) => item.id !== id));
-  };
+  const handleRemoveTrayItem = useCallback(
+    (id: string) => {
+      analytics.trackFoodItemRemoved({ itemId: id });
+      setTrayItems((current) => current.filter((item) => item.id !== id));
+    },
+    [setTrayItems],
+  );
 
-  const handleQuantityChange = (id: string, quantity: number) => {
-    if (quantity <= 0) analytics.trackFoodItemRemoved({ itemId: id });
-    setTrayItems((current) => updateTrayQuantity(current, id, quantity));
-    void Haptics.selectionAsync().catch(() => undefined);
-  };
-  const clearTray = () => {
+  const handleQuantityChange = useCallback(
+    (id: string, quantity: number) => {
+      if (quantity <= 0) analytics.trackFoodItemRemoved({ itemId: id });
+      setTrayItems((current) => updateTrayQuantity(current, id, quantity));
+      void Haptics.selectionAsync().catch(() => undefined);
+    },
+    [setTrayItems],
+  );
+  const clearTray = useCallback(() => {
     flightRef.current?.clear();
     setTrayItems([]);
-  };
+  }, [setTrayItems]);
 
-  const handleSelectProvider = (provider: ProviderCardItem) => {
-    trackSuggestion("CLICKED", "provider", provider.slug, provider.name);
-    analytics.trackProviderSelected({
-      providerId: provider.slug,
-      name: provider.name,
-      cuisine: provider.cuisine,
-    });
-    sendMessage(provider.name);
-  };
+  const handleSelectProvider = useCallback(
+    (provider: ProviderCardItem) => {
+      trackSuggestion("CLICKED", "provider", provider.slug, provider.name);
+      analytics.trackProviderSelected({
+        providerId: provider.slug,
+        name: provider.name,
+        cuisine: provider.cuisine,
+      });
+      sendMessageRef.current(provider.name);
+    },
+    [trackSuggestion],
+  );
 
   const messages = useMemo(
     () =>
@@ -402,6 +443,7 @@ export default function HomeScreen() {
     value = input,
     choices: InteractionChoice[] = selectedChoices,
     currentTray: TrayItem[] = trayItems,
+    action?: ChatAction,
   ) => {
     const offeringTrayItems = currentTray.filter(
       (i): i is Extract<TrayItem, { type: "offering" }> =>
@@ -436,7 +478,8 @@ export default function HomeScreen() {
       Boolean,
     );
     const prompt = promptParts.join(". ");
-    if (!prompt || isLoading) return;
+    if (!prompt || isLoading || sendLockRef.current) return;
+    sendLockRef.current = true;
 
     const submittedChoices = [...allChoices];
     const itemsSummary =
@@ -462,6 +505,7 @@ export default function HomeScreen() {
     setTrayItems([]);
     flightRef.current?.clear();
     setLastFailed(null);
+    setLastFailedAction(undefined);
     setStreamingText("");
     setStreamingInteraction(null);
     Keyboard.dismiss();
@@ -494,6 +538,7 @@ export default function HomeScreen() {
         (interaction) => setStreamingInteraction(interaction),
         submittedChoices,
         controller.signal,
+        action?.id,
       );
       const latencyMs = Date.now() - startTime;
       addMessage({
@@ -518,6 +563,7 @@ export default function HomeScreen() {
         analytics.trackError(error, "chat_stream");
         analytics.trackChatResponse({ latencyMs, success: false });
         setLastFailed(prompt);
+        setLastFailedAction(action);
         setSelectedChoices(submittedChoices);
         addMessage({
           role: "assistant",
@@ -531,41 +577,49 @@ export default function HomeScreen() {
       abortRef.current = null;
       streamStartRef.current = null;
       setLoading(false);
+      sendLockRef.current = false;
     }
   };
+  sendMessageRef.current = (value) => {
+    void sendMessage(value);
+  };
 
-  const selectChoice = (choice: InteractionChoice) => {
-    if (isLoading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-      () => undefined,
-    );
-    const wasSelected = selectedChoices.some(
-      (item) => item.groupId === choice.groupId && item.id === choice.id,
-    );
-    trackSuggestion(
-      wasSelected ? "DISMISSED" : "CLICKED",
-      choice.kind,
-      choice.id,
-      choice.title,
-    );
-    setSelectedChoices((current) => {
-      const existing = current.some(
+  const selectChoice = useCallback(
+    (choice: InteractionChoice) => {
+      if (isLoading) return;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
+        () => undefined,
+      );
+      const wasSelected = selectedChoices.some(
         (item) => item.groupId === choice.groupId && item.id === choice.id,
       );
-      if (existing) {
-        return current.filter(
-          (item) => !(item.groupId === choice.groupId && item.id === choice.id),
+      trackSuggestion(
+        wasSelected ? "DISMISSED" : "CLICKED",
+        choice.kind,
+        choice.id,
+        choice.title,
+      );
+      setSelectedChoices((current) => {
+        const existing = current.some(
+          (item) => item.groupId === choice.groupId && item.id === choice.id,
         );
-      }
-      if (!choice.multiSelect) {
-        return [
-          ...current.filter((item) => item.groupId !== choice.groupId),
-          choice,
-        ];
-      }
-      return [...current, choice];
-    });
-  };
+        if (existing) {
+          return current.filter(
+            (item) =>
+              !(item.groupId === choice.groupId && item.id === choice.id),
+          );
+        }
+        if (!choice.multiSelect) {
+          return [
+            ...current.filter((item) => item.groupId !== choice.groupId),
+            choice,
+          ];
+        }
+        return [...current, choice];
+      });
+    },
+    [isLoading, selectedChoices, trackSuggestion],
+  );
 
   const removeChoice = (choice: InteractionChoice) => {
     setSelectedChoices((current) =>
@@ -645,66 +699,76 @@ export default function HomeScreen() {
     }
   };
 
-  const renderMessage = ({ item }: { item: ChatMessage }) => {
-    const mine = item.role === "user";
-    if (mine) {
+  const renderMessage = useCallback(
+    ({ item }: { item: ChatMessage }) => {
+      const mine = item.role === "user";
+      if (mine) {
+        return (
+          <View style={styles.userMessage}>
+            <Text style={styles.userMessageText}>{item.content}</Text>
+          </View>
+        );
+      }
+
       return (
-        <View style={styles.userMessage}>
-          <Text style={styles.userMessageText}>{item.content}</Text>
+        <View style={styles.assistantBlock}>
+          <View style={styles.assistantMessage}>
+            <AssistantAvatar />
+            <View style={styles.assistantContentWrap}>
+              <ChatMarkdown content={item.content} />
+              {item.latencyMs !== undefined ? (
+                <View style={styles.latencyBadge}>
+                  <Ionicons name="timer-outline" size={12} color="#7E86A5" />
+                  <Text style={styles.latencyText}>
+                    {(item.latencyMs / 1000).toFixed(2)}s
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+
+          {item.interaction &&
+          item.interaction.kind !== "action_suggestions" ? (
+            <View style={styles.interactionBlock}>
+              {item.interaction.kind === "provider_list" ? (
+                <ProviderPickerCard
+                  providers={item.interaction.providers || []}
+                  title={item.interaction.title}
+                  subtitle={item.interaction.subtitle}
+                  onSelectProvider={handleSelectProvider}
+                  disabled={isLoading}
+                />
+              ) : item.interaction.kind === "catalog_menu" ? (
+                <InChatCatalogWidget
+                  providerSlug={item.interaction.providerSlug || "evos"}
+                  providerName={item.interaction.providerName || "Restoran"}
+                  providerLogoUrl={item.interaction.providerLogoUrl}
+                  locationName={item.interaction.locationName}
+                  categories={item.interaction.categories || []}
+                  sections={item.interaction.sections || []}
+                  onAddToCart={handleAddToCart}
+                  quantities={trayQuantities}
+                  disabled={isLoading}
+                />
+              ) : (
+                <InteractionCards
+                  interaction={item.interaction}
+                  onSelect={selectChoice}
+                />
+              )}
+            </View>
+          ) : null}
         </View>
       );
-    }
-
-    return (
-      <View style={styles.assistantBlock}>
-        <View style={styles.assistantMessage}>
-          <AssistantAvatar />
-          <View style={styles.assistantContentWrap}>
-            <ChatMarkdown content={item.content} />
-            {item.latencyMs !== undefined ? (
-              <View style={styles.latencyBadge}>
-                <Ionicons name="timer-outline" size={12} color="#7E86A5" />
-                <Text style={styles.latencyText}>
-                  {(item.latencyMs / 1000).toFixed(2)}s
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-
-        {item.interaction ? (
-          <View style={styles.interactionBlock}>
-            {item.interaction.kind === "provider_list" ? (
-              <ProviderPickerCard
-                providers={item.interaction.providers || []}
-                title={item.interaction.title}
-                subtitle={item.interaction.subtitle}
-                onSelectProvider={handleSelectProvider}
-                disabled={isLoading}
-              />
-            ) : item.interaction.kind === "catalog_menu" ? (
-              <InChatCatalogWidget
-                providerSlug={item.interaction.providerSlug || "evos"}
-                providerName={item.interaction.providerName || "Restoran"}
-                providerLogoUrl={item.interaction.providerLogoUrl}
-                locationName={item.interaction.locationName}
-                categories={item.interaction.categories || []}
-                sections={item.interaction.sections || []}
-                onAddToCart={handleAddToCart}
-                quantities={trayQuantities}
-                disabled={isLoading}
-              />
-            ) : (
-              <InteractionCards
-                interaction={item.interaction}
-                onSelect={selectChoice}
-              />
-            )}
-          </View>
-        ) : null}
-      </View>
-    );
-  };
+    },
+    [
+      isLoading,
+      handleSelectProvider,
+      handleAddToCart,
+      trayQuantities,
+      selectChoice,
+    ],
+  );
 
   const openSession = (session: ChatSession) => {
     clearTray();
@@ -823,7 +887,8 @@ export default function HomeScreen() {
                       ) : null}
                     </View>
                   </View>
-                  {streamingInteraction ? (
+                  {streamingInteraction &&
+                  streamingInteraction.kind !== "action_suggestions" ? (
                     <View style={styles.interactionBlock}>
                       {streamingInteraction.kind === "provider_list" ? (
                         <ProviderPickerCard
@@ -872,7 +937,11 @@ export default function HomeScreen() {
               )
             ) : lastFailed ? (
               <Pressable
-                onPress={() => sendMessage(lastFailed)}
+                onPress={() =>
+                  lastFailedAction
+                    ? sendMessage(lastFailed, [], [], lastFailedAction)
+                    : sendMessage(lastFailed)
+                }
                 style={styles.retry}
               >
                 <Ionicons name="refresh" size={16} color="#8B7CFF" />
@@ -889,6 +958,25 @@ export default function HomeScreen() {
         />
 
         <View style={styles.composerShell}>
+          {!isLoading &&
+          !input.trim() &&
+          !trayItems.length &&
+          !selectedChoices.length &&
+          messages.at(-1)?.role === "assistant" &&
+          messages.at(-1)?.interaction?.actions?.length ? (
+            <ChatActionRow
+              actions={messages.at(-1)!.interaction!.actions!}
+              onSelect={(action) => {
+                if (sendLockRef.current) return;
+                analytics.trackSuggestion({
+                  event: "clicked",
+                  type: `chat_action_${action.kind}`,
+                  personalized: false,
+                });
+                void sendMessage(action.prompt, [], [], action);
+              }}
+            />
+          ) : null}
           {selectedChoices.length > 0 && trayItems.length === 0 ? (
             <SelectionTray choices={selectedChoices} onRemove={removeChoice} />
           ) : null}

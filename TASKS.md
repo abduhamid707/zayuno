@@ -1,5 +1,55 @@
 # Deferred tasks
 
+## Joriy ish — dinamik AI actionlar va savat animatsiyasi, 2026-09-10
+
+- [x] Mavjud chat, buyurtma holati va animatsiya yo‘lini ko‘rib chiqish.
+- [x] AI javobi/joriy holatga bog‘langan action contract; tasdiqlash va bekor qilishni eski buyurtmaga qo‘llamaslik.
+- [x] Input ustida rasmdagidek ixcham primary/outline actionlar; bosish orqali keyingi xabarni yuborish.
+- [x] Savatga uchish effektidagi ortiqcha render va o‘lchashlarni kamaytirish.
+- [x] Qayta ochishda login sahifasiga tushish: PostHog hodisalari va native session restore/route guard sababini topib tuzatish (foydalanuvchi qayta xabar berdi).
+- [x] Tegishli regression testlar va typecheck; bajarilgan va qolgan ishlarni qayd etish (39/39 review/regression testlar o'tdi).
+- [x] Git commit va origin/main ga push qilish (backend va mobile).
+- [ ] zayuno-v9.apk build qilish va USB orqali telefonga o'rnatish.
+**Keyingi qadam:** action/animatsiya typecheck va regression, so‘ng PostHog bilan auth muammosini aniqlash va tuzatish.
+**Chegara:** providerlar uchun umumiy API contract hozir faqat muhokama; deploy va fizik Android FPS sinovi hali bajarilmadi.
+
+**Oraliq tekshiruv:** mobile va API `tsc --noEmit` o‘tdi. Action/pills, card/markdown/image memo, horizontal virtualization, parallel measurements va native-driver flight qo‘shildi. Regression va vizual tekshiruv hali qolgan.
+**Auth dalil:** PostHog project 601107 (ilova capture key bilan mos), 2026-09-09—10 UTC: welcome 15, chat 20, Application Opened 6; auth restore eventlari schema’da yo‘q. Bu sonlar logout sababini aniqlamaydi. Mahalliy v8 APK ichida restore/refresh kod belgilari bor. Kodda javobi yo‘qolgan refresh rotation eski tokenni rad etishi aniqlandi; tuzatilmoqda.
+
+### Handoff — joriy aniq holat (ish davom etmoqda)
+
+**Bajarilgan kod:**
+- `apps/api/src/modules/consumer/chat/chat-actions.ts`: AI actionlarini normalizatsiya qilish; faqat holatda mumkin bo‘lgan confirm/cancel/continue/reply.
+- `consumer-chat.service.ts`, `consumer-chat.controller.ts`: Gemini action copy, Redis offer ID, user/conversation/state/expiry tekshiruvi, SSE UI payload. Eski quote tugmasi yangi buyurtmani yubormaydi. AI suggestions uchun 1.8s timeout; xatoda oddiy javob saqlanadi.
+- `apps/mobile/src/components/ChatActionRow.tsx`, `src/lib/interaction.ts`, `src/lib/api.ts`, `app/(app)/index.tsx`: dynamic pill row, actionId yuborish, double-tap lock, faqat eng oxirgi javob actionlari, expiry va draft/savat holatida yashirish.
+- `ChatMarkdown.tsx`, `food/{FoodProductCard,ProductImage,InChatCatalogWidget,CartFlightOverlay,ContextTrayDock}.tsx`: memo, horizontal list virtualization, press-in measurement, bitta frame kutish, parallel destination o‘lchash, maksimal 4 ghost, native driver; eski sakrash/uchish effekti saqlangan.
+- `apps/api/src/modules/consumer/auth/consumer-auth.service.ts`: yo‘qolgan refresh javobi uchun darhol keyingi aktiv sessionni qaytarish; concurrent retry; eski token healthy family’ni avtomatik revoke qilmaydi; logout family’ni revoke qiladi; refresh secret konfiguratsiya xatosi 503.
+- `apps/mobile/src/store/authStore.ts`, `app/_layout.tsx`, `src/lib/analytics.ts`: storage read xatosiga retry holati, session revision + navbatlangan storage writes, late refresh logoutni bekor qilmasligi, fetch timeout, refresh diagnostics; auth tugamasidan welcome screen event hisoblanmaydi.
+
+**Tekshiruvlar:** mobile `pnpm --filter mobile exec tsc --noEmit` va API `pnpm --filter @zayuno/api exec tsc --noEmit --incremental false` o‘tdi. Auth/AI real qurilmada hali tasdiqlanmagan.
+
+**Yangilangan tekshiruv holati:**
+- [x] `test-consumer-refresh-recovery.ts`: import to‘g‘rilandi; lost response, parallel refresh, stale replay, logout/revocation, 503 konfiguratsiya testlari o‘tdi.
+- [x] `test-consumer-chat-actions.ts`: dynamic payload/SSE callback, confirm/cancel, replay, stale price, cross-user/chat, missing details va AI failure testlari o‘tdi. Optional addonlar mavjud flow’da avtomatik o‘tkaziladi; ortiqcha continue qadamini majburlamaydi.
+- [x] `test-mobile-auth-runtime.ts` yaratildi va o‘tdi: native SecureStore mock bilan haqiqiy Zustand store cold launch, keystore retry, offline/gateway, revocation, refresh/logout va hydration/login race bajarildi.
+- [x] Oldingi `test-provider-cache-and-consumer-chat.ts` va `test-mobile-cart.ts` o‘tdi.
+- [ ] `test-consumer-auth-persistence.ts` eski source-regex assertion yangilandi; qayta ishga tushirish kerak. O‘zgarish 401/403 yonidagi qo‘shimcha JSON validation sharti tufayli.
+
+**Ayni keyingi qadamlar:** tegishli fayllarni formatlash, so‘ng auth-persistence + mobile/API typecheck; real komponentlarning vizual tekshiruvi; yangi APK build (v8 fayllar oldingi kod). Backend deploy hali bajarilmagan.
+
+**Qolgan cheklov:** foydalanuvchining telefoniga ulanish yo‘q (`adb` PATH’da topilmadi); Android qayta ochish va real FPS uchun qurilma sinovi kerak. PostHog root cause tasdig‘i yo‘q, faqat screen counts mavjud. Yangi runtime diagnostics chiqqach aniq sabab ajraladi. Hozircha “auth production’da to‘liq tuzaldi” deb belgilamaslik.
+
+## Agentlar uchun davom ettirish holati — 2026-09-10
+
+- [x] Product card va inputdagi savat UI ishi: foydalanuvchi boshqa AI agent
+  davomini yakunlaganini tasdiqladi. Yangi so‘rovsiz bu ishni qayta boshlamaslik.
+- [x] Ish boshlanishida checklist yozish va har bosqichdan so‘ng `[x]` / `[ ]`
+  holatini yangilash qoidasi root `AGENTS.md`ga yozildi.
+
+**Bu yangilanish:** faqat `AGENTS.md` va `TASKS.md`; ilova kodi o‘zgartirilmadi.
+**Keyingi qadam:** navbatdagi foydalanuvchi vazifasi kelganda uning rejasini shu
+faylga yozish va bajarilgan/qolgan ishlarni bosqichma-bosqich qayd etish.
+
 ## Founder reminder — overthinking nazorati
 
 > Bu loyiha quruvchisi sifatida yangi feature, universal platforma va katta

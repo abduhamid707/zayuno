@@ -79,6 +79,7 @@ function executeChatStream(
   onInteraction: (interaction: ChatInteraction) => void,
   selections: InteractionChoice[],
   signal?: AbortSignal,
+  actionId?: string,
 ): Promise<StreamChatResult> {
   const baseUrl = getApiBaseUrl();
   if (!baseUrl) {
@@ -171,13 +172,16 @@ function executeChatStream(
         prompt,
         messages,
         conversationId,
-        selections: selections.map(({ id, kind, title, providerSlug, offeringId }) => ({
-          id,
-          kind,
-          title,
-          providerSlug,
-          offeringId,
-        })),
+        actionId,
+        selections: selections.map(
+          ({ id, kind, title, providerSlug, offeringId }) => ({
+            id,
+            kind,
+            title,
+            providerSlug,
+            offeringId,
+          }),
+        ),
       }),
     );
   });
@@ -191,6 +195,7 @@ export async function streamChat(
   onInteraction: (interaction: ChatInteraction) => void,
   selections: InteractionChoice[] = [],
   signal?: AbortSignal,
+  actionId?: string,
 ): Promise<StreamChatResult> {
   try {
     return await executeChatStream(
@@ -201,6 +206,7 @@ export async function streamChat(
       onInteraction,
       selections,
       signal,
+      actionId,
     );
   } catch (error) {
     if (
@@ -218,6 +224,7 @@ export async function streamChat(
           onInteraction,
           selections,
           signal,
+          actionId,
         );
       }
     }

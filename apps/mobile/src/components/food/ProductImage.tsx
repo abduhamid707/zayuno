@@ -1,8 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-export function ProductImage({ uri }: { uri?: string }) {
+export const ProductImage = memo(function ProductImage({
+  uri,
+}: {
+  uri?: string;
+}) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [uri]);
   return uri && !failed ? (
@@ -17,7 +21,7 @@ export function ProductImage({ uri }: { uri?: string }) {
       <Ionicons name="bag-handle-outline" size={26} color="#9E92EC" />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   image: { width: "100%", height: "100%" },

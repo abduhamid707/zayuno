@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { Linking, StyleSheet, Text as RNText, View } from "react-native";
 
 type ChatMarkdownProps = {
@@ -135,7 +135,9 @@ function InlineContent({ text }: { text: string }) {
   return <>{nodes}</>;
 }
 
-export function ChatMarkdown({ content }: ChatMarkdownProps) {
+export const ChatMarkdown = memo(function ChatMarkdown({
+  content,
+}: ChatMarkdownProps) {
   const lines = normalizeMarkdown(content).split(/\r?\n/);
 
   return (
@@ -218,7 +220,7 @@ export function ChatMarkdown({ content }: ChatMarkdownProps) {
       })}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: { gap: 3 },

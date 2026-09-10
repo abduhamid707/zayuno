@@ -1,5 +1,7 @@
 import React, {
   forwardRef,
+  memo,
+  useMemo,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -38,8 +40,8 @@ type Props = {
   onClear: () => void;
 };
 
-export const ContextTrayDock = forwardRef<ContextTrayHandle, Props>(
-  function ContextTrayDock(
+export const ContextTrayDock = memo(
+  forwardRef<ContextTrayHandle, Props>(function ContextTrayDock(
     { items, onRemoveItem, onQuantityChange, onClear },
     ref,
   ) {
@@ -51,17 +53,16 @@ export const ContextTrayDock = forwardRef<ContextTrayHandle, Props>(
     const reducedMotion = useReducedMotion();
     const insets = useSafeAreaInsets();
     const { height, width, fontScale } = useWindowDimensions();
-    const { quantity, totalLabel } = summarizeTray(items);
+    const { quantity, totalLabel } = useMemo(
+      () => summarizeTray(items),
+      [items],
+    );
     const compactSummary = width < 360 || fontScale > 1.2;
     const itemCount = items.length;
-    const previousCount = useRef(itemCount);
 
     useEffect(() => {
       if (itemCount === 0) setExpanded(false);
-      if (itemCount > previousCount.current)
-        scrollRef.current?.scrollToEnd({ animated: !reducedMotion });
-      previousCount.current = itemCount;
-    }, [itemCount, reducedMotion]);
+    }, [itemCount]);
     useEffect(() => () => pulse.stopAnimation(), [pulse]);
 
     useImperativeHandle(
@@ -70,19 +71,24 @@ export const ContextTrayDock = forwardRef<ContextTrayHandle, Props>(
         measureTarget(key, callback) {
           // Keep the target inside the visible strip even if that item is offscreen.
           const thumb = thumbRefs.current.get(key);
+          let summary: CartFlightOrigin | undefined;
+          let thumbnail: CartFlightOrigin | undefined;
+          const measured = () => {
+            if (!summary || (thumb && !thumbnail)) return;
+            const visible =
+              thumbnail &&
+              thumbnail.width > 0 &&
+              thumbnail.x >= 12 &&
+              thumbnail.x + thumbnail.width <= summary.x;
+            callback(visible ? thumbnail! : { ...summary, width: 44 });
+          };
           summaryRef.current?.measureInWindow((x, y, w, h) => {
-            const fallback = { x, y, width: 44, height: h };
-            if (!thumb) {
-              callback(fallback);
-              return;
-            }
-            thumb.measureInWindow((tx, ty, tw, th) => {
-              callback(
-                tw > 0 && tx >= 12 && tx + tw <= x
-                  ? { x: tx, y: ty, width: tw, height: th }
-                  : fallback,
-              );
-            });
+            summary = { x, y, width: w, height: h };
+            measured();
+          });
+          thumb?.measureInWindow((x, y, w, h) => {
+            thumbnail = { x, y, width: w, height: h };
+            measured();
           });
         },
         land() {
@@ -94,6 +100,7 @@ export const ContextTrayDock = forwardRef<ContextTrayHandle, Props>(
             speed: 22,
             bounciness: 14,
             useNativeDriver: Platform.OS !== "web",
+            isInteraction: false,
           }).start();
         },
       }),
@@ -117,7 +124,7 @@ export const ContextTrayDock = forwardRef<ContextTrayHandle, Props>(
             contentContainerStyle={styles.thumbnails}
             onContentSizeChange={() => {
               if (itemCount > 1)
-                scrollRef.current?.scrollToEnd({ animated: !reducedMotion });
+                scrollRef.current?.scrollToEnd({ animated: false });
             }}
           >
             {items.map((item) => {
@@ -197,172 +204,180 @@ export const ContextTrayDock = forwardRef<ContextTrayHandle, Props>(
           </View>
         </Animated.View>
 
-        <Modal
-          visible={expanded}
-          transparent
-          animationType={reducedMotion ? "none" : "slide"}
-          onRequestClose={() => setExpanded(false)}
-        >
-          <View style={styles.modalRoot}>
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={() => setExpanded(false)}
-              accessibilityRole="button"
-              accessibilityLabel="Savatni yopish"
-            />
-            <View
-              style={[
-                styles.sheet,
-                {
-                  maxHeight: height * 0.75,
-                  paddingBottom: Math.max(insets.bottom, 16),
-                },
-              ]}
-            >
-              <View style={styles.handle} />
-              <View style={styles.sheetHeading}>
-                <View style={styles.headingCopy}>
-                  <Text style={styles.sheetTitle}>Sizning tanlovingiz</Text>
-                  <Text style={styles.sheetSubtitle}>
-                    Miqdorlarni shu yerda o‘zgartiring
-                  </Text>
-                </View>
-                <Pressable
-                  style={styles.iconButton}
-                  onPress={() => setExpanded(false)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Savatni yopish"
-                >
-                  <Ionicons name="close" size={23} color="#CED1E2" />
-                </Pressable>
-              </View>
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={styles.detailList}
+        {expanded ? (
+          <Modal
+            visible={expanded}
+            transparent
+            animationType={reducedMotion ? "none" : "slide"}
+            onRequestClose={() => setExpanded(false)}
+          >
+            <View style={styles.modalRoot}>
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => setExpanded(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Savatni yopish"
+              />
+              <View
+                style={[
+                  styles.sheet,
+                  {
+                    maxHeight: height * 0.75,
+                    paddingBottom: Math.max(insets.bottom, 16),
+                  },
+                ]}
               >
-                {items.map((item) => (
-                  <View key={item.id} style={styles.detailRow}>
-                    <View style={styles.detailImage}>
-                      {item.type === "note" ? (
-                        <Ionicons
-                          name="document-text-outline"
-                          size={24}
-                          color="#B2A3FF"
-                        />
-                      ) : (
-                        <ProductImage
-                          uri={
-                            item.type === "offering" ? item.imageUrl : item.uri
-                          }
-                        />
-                      )}
-                    </View>
-                    <View style={styles.detailBody}>
-                      <Text style={styles.detailTitle}>
-                        {item.type === "offering"
-                          ? item.title
-                          : item.type === "note"
-                            ? item.text
-                            : item.title || "Rasm"}
-                      </Text>
-                      {item.type === "offering" ? (
-                        <>
-                          <Text style={styles.detailPrice}>
-                            {formatMoney(
-                              item.price * item.quantity,
-                              item.currency,
-                            )}
-                          </Text>
-                          <View style={styles.quantityRow}>
-                            <Pressable
-                              style={styles.stepper}
-                              onPress={() =>
-                                onQuantityChange(item.id, item.quantity - 1)
-                              }
-                              accessibilityRole="button"
-                              accessibilityLabel={`${item.title}: bittaga kamaytirish`}
-                            >
-                              <Ionicons
-                                name={
-                                  item.quantity === 1
-                                    ? "trash-outline"
-                                    : "remove"
-                                }
-                                size={18}
-                                color="#C5B9FF"
-                              />
-                            </Pressable>
-                            <Text
-                              accessibilityLiveRegion="polite"
-                              style={styles.quantityText}
-                            >
-                              {item.quantity}
-                            </Text>
-                            <Pressable
-                              style={[
-                                styles.stepper,
-                                item.quantity >= MAX_CART_QUANTITY &&
-                                  styles.disabled,
-                              ]}
-                              disabled={item.quantity >= MAX_CART_QUANTITY}
-                              onPress={() =>
-                                onQuantityChange(item.id, item.quantity + 1)
-                              }
-                              accessibilityRole="button"
-                              accessibilityLabel={`${item.title}: bittaga oshirish`}
-                            >
-                              <Ionicons name="add" size={19} color="#C5B9FF" />
-                            </Pressable>
-                          </View>
-                        </>
-                      ) : (
-                        <Pressable
-                          style={styles.removeNote}
-                          onPress={() => onRemoveItem(item.id)}
-                          accessibilityRole="button"
-                        >
-                          <Text style={styles.secondaryAction}>
-                            Olib tashlash
-                          </Text>
-                        </Pressable>
-                      )}
-                    </View>
+                <View style={styles.handle} />
+                <View style={styles.sheetHeading}>
+                  <View style={styles.headingCopy}>
+                    <Text style={styles.sheetTitle}>Sizning tanlovingiz</Text>
+                    <Text style={styles.sheetSubtitle}>
+                      Miqdorlarni shu yerda o‘zgartiring
+                    </Text>
                   </View>
-                ))}
-              </ScrollView>
-              <View style={styles.sheetTotal}>
-                <Text style={styles.sheetSubtitle}>{countLabel}</Text>
-                <Text style={styles.sheetTotalText}>{totalLabel}</Text>
-              </View>
-              <Text style={styles.estimate}>
-                Yetkazib berish va yakuniy narx keyingi qadamda hisoblanadi.
-              </Text>
-              <View style={styles.sheetActions}>
-                <Pressable
-                  onPress={() => {
-                    onClear();
-                    setExpanded(false);
-                  }}
-                  style={styles.clearButton}
-                  accessibilityRole="button"
+                  <Pressable
+                    style={styles.iconButton}
+                    onPress={() => setExpanded(false)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Savatni yopish"
+                  >
+                    <Ionicons name="close" size={23} color="#CED1E2" />
+                  </Pressable>
+                </View>
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={styles.detailList}
                 >
-                  <Text style={styles.secondaryAction}>Tozalash</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setExpanded(false)}
-                  style={styles.doneButton}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.doneText}>Tayyor</Text>
-                  <Ionicons name="checkmark" size={19} color="#FFF" />
-                </Pressable>
+                  {items.map((item) => (
+                    <View key={item.id} style={styles.detailRow}>
+                      <View style={styles.detailImage}>
+                        {item.type === "note" ? (
+                          <Ionicons
+                            name="document-text-outline"
+                            size={24}
+                            color="#B2A3FF"
+                          />
+                        ) : (
+                          <ProductImage
+                            uri={
+                              item.type === "offering"
+                                ? item.imageUrl
+                                : item.uri
+                            }
+                          />
+                        )}
+                      </View>
+                      <View style={styles.detailBody}>
+                        <Text style={styles.detailTitle}>
+                          {item.type === "offering"
+                            ? item.title
+                            : item.type === "note"
+                              ? item.text
+                              : item.title || "Rasm"}
+                        </Text>
+                        {item.type === "offering" ? (
+                          <>
+                            <Text style={styles.detailPrice}>
+                              {formatMoney(
+                                item.price * item.quantity,
+                                item.currency,
+                              )}
+                            </Text>
+                            <View style={styles.quantityRow}>
+                              <Pressable
+                                style={styles.stepper}
+                                onPress={() =>
+                                  onQuantityChange(item.id, item.quantity - 1)
+                                }
+                                accessibilityRole="button"
+                                accessibilityLabel={`${item.title}: bittaga kamaytirish`}
+                              >
+                                <Ionicons
+                                  name={
+                                    item.quantity === 1
+                                      ? "trash-outline"
+                                      : "remove"
+                                  }
+                                  size={18}
+                                  color="#C5B9FF"
+                                />
+                              </Pressable>
+                              <Text
+                                accessibilityLiveRegion="polite"
+                                style={styles.quantityText}
+                              >
+                                {item.quantity}
+                              </Text>
+                              <Pressable
+                                style={[
+                                  styles.stepper,
+                                  item.quantity >= MAX_CART_QUANTITY &&
+                                    styles.disabled,
+                                ]}
+                                disabled={item.quantity >= MAX_CART_QUANTITY}
+                                onPress={() =>
+                                  onQuantityChange(item.id, item.quantity + 1)
+                                }
+                                accessibilityRole="button"
+                                accessibilityLabel={`${item.title}: bittaga oshirish`}
+                              >
+                                <Ionicons
+                                  name="add"
+                                  size={19}
+                                  color="#C5B9FF"
+                                />
+                              </Pressable>
+                            </View>
+                          </>
+                        ) : (
+                          <Pressable
+                            style={styles.removeNote}
+                            onPress={() => onRemoveItem(item.id)}
+                            accessibilityRole="button"
+                          >
+                            <Text style={styles.secondaryAction}>
+                              Olib tashlash
+                            </Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+                <View style={styles.sheetTotal}>
+                  <Text style={styles.sheetSubtitle}>{countLabel}</Text>
+                  <Text style={styles.sheetTotalText}>{totalLabel}</Text>
+                </View>
+                <Text style={styles.estimate}>
+                  Yetkazib berish va yakuniy narx keyingi qadamda hisoblanadi.
+                </Text>
+                <View style={styles.sheetActions}>
+                  <Pressable
+                    onPress={() => {
+                      onClear();
+                      setExpanded(false);
+                    }}
+                    style={styles.clearButton}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.secondaryAction}>Tozalash</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setExpanded(false)}
+                    style={styles.doneButton}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.doneText}>Tayyor</Text>
+                    <Ionicons name="checkmark" size={19} color="#FFF" />
+                  </Pressable>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
+          </Modal>
+        ) : null}
       </>
     );
-  },
+  }),
 );
 
 const styles = StyleSheet.create({

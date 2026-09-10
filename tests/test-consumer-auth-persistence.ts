@@ -32,7 +32,7 @@ assert.match(authService, /prisma\.consumerSession\.findUnique/);
 assert.match(authService, /prisma\.\$transaction/);
 assert.match(
   authService,
-  /where: \{ familyId: session\.familyId, revokedAt: null \}/,
+  /where:\s*\{\s*familyId:\s*session\.familyId,\s*userId:\s*payload\.sub,\s*revokedAt:\s*null,?\s*\}/,
 );
 assert.match(authController, /@Post\("revoke-all"\)/);
 
@@ -52,16 +52,16 @@ assert.doesNotMatch(
   /catch \{\s*await clearStoredSession\(\)/,
   "Transient SecureStore reads must never erase a valid session.",
 );
-assert.match(
-  authStore,
-  /if \(\[401, 403\]\.includes\(response\.status\)\)/,
-);
+assert.match(authStore, /\[401, 403\]\.includes\(response\.status\)/);
 assert.match(apiClient, /response\.status === 401[\s\S]*refreshSession/);
 assert.match(apiClient, /refreshSession\(true\)/);
 assert.match(rootLayout, /AppState\.addEventListener\("change"/);
 assert.match(mobileComposer, /submitBehavior="newline"/);
 assert.match(mobileComposer, /blurOnSubmit=\{false\}/);
-assert.doesNotMatch(mobileComposer, /onSubmitEditing=\{\(\) => sendMessage\(\)\}/);
+assert.doesNotMatch(
+  mobileComposer,
+  /onSubmitEditing=\{\(\) => sendMessage\(\)\}/,
+);
 
 assert.match(historyController, /@UseGuards\(JwtAuthGuard\)/);
 assert.match(historyService, /where: \{ userId \}/);

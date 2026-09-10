@@ -1,6 +1,7 @@
 import { PostHog } from "posthog-react-native";
 
-export const POSTHOG_API_KEY = "phc_zcCoK32AfWUoqbBLE63NHDrxycvKrtzKQFmsqECviw4G";
+export const POSTHOG_API_KEY =
+  "phc_zcCoK32AfWUoqbBLE63NHDrxycvKrtzKQFmsqECviw4G";
 export const POSTHOG_HOST = "https://us.i.posthog.com";
 
 export const posthogClient = new PostHog(POSTHOG_API_KEY, {
@@ -47,7 +48,7 @@ export const analytics = {
         cleanProperties({
           app_name: "Zayuno Mobile",
           ...properties,
-        })
+        }),
       );
     } catch (e) {
       console.warn("[Analytics] Screen tracking error:", e);
@@ -70,7 +71,7 @@ export const analytics = {
           source: data.source || "user_input",
           selection_count: data.selectionCount || 0,
           tray_item_count: data.trayItemCount || 0,
-        })
+        }),
       );
     } catch (e) {
       console.warn("[Analytics] Message track error:", e);
@@ -89,7 +90,7 @@ export const analytics = {
           provider_id: data.providerId || "unknown",
           provider_name: data.name,
           cuisine: data.cuisine || "unknown",
-        })
+        }),
       );
     } catch (e) {
       console.warn("[Analytics] Provider track error:", e);
@@ -110,7 +111,7 @@ export const analytics = {
           item_name: data.name,
           item_price: data.price,
           provider_id: data.providerId || "unknown",
-        })
+        }),
       );
     } catch (e) {
       console.warn("[Analytics] Item added track error:", e);
@@ -139,7 +140,7 @@ export const analytics = {
           provider_id: data.providerId || "unknown",
           items_count: data.itemsCount,
           total_amount: data.totalAmount || 0,
-        })
+        }),
       );
     } catch (e) {
       console.warn("[Analytics] Order initiated track error:", e);
@@ -160,7 +161,7 @@ export const analytics = {
           provider_name: data.provider || "unknown",
           total_amount: data.totalAmount,
           payment_method: data.paymentMethod || "standard",
-        })
+        }),
       );
     } catch (e) {
       console.warn("[Analytics] Order completed track error:", e);
@@ -226,7 +227,14 @@ export const analytics = {
   },
 
   trackMemory: (
-    action: "viewed" | "consent_enabled" | "consent_disabled" | "signal_edited" | "signal_deleted" | "exported" | "cleared",
+    action:
+      | "viewed"
+      | "consent_enabled"
+      | "consent_disabled"
+      | "signal_edited"
+      | "signal_deleted"
+      | "exported"
+      | "cleared",
     properties?: Record<string, unknown>,
   ) => {
     try {
@@ -240,7 +248,14 @@ export const analytics = {
   },
 
   trackAuthSession: (
-    action: "restore_started" | "restore_succeeded" | "restore_failed",
+    action:
+      | "restore_started"
+      | "restore_succeeded"
+      | "restore_failed"
+      | "refresh_started"
+      | "refresh_succeeded"
+      | "refresh_rejected"
+      | "refresh_unavailable",
     properties?: Record<string, unknown>,
   ) => {
     try {
@@ -257,7 +272,7 @@ export const analytics = {
     try {
       posthogClient.captureException(
         error instanceof Error ? error : new Error(String(error)),
-        cleanProperties({ context: context || "general" })
+        cleanProperties({ context: context || "general" }),
       );
     } catch (e) {
       console.warn("[Analytics] Error track error:", e);
@@ -271,7 +286,7 @@ export const analytics = {
         cleanProperties({
           app_name: "Zayuno Mobile",
           account_type: "consumer",
-        })
+        }),
       );
     } catch (e) {
       console.warn("[Analytics] Identify error:", e);
