@@ -14,6 +14,7 @@ import {
   ScrollView,
   BackHandler,
   useWindowDimensions,
+  ImageBackground,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -272,26 +273,18 @@ export default function WelcomeScreen() {
   }, [auth.step, focused]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}><Image source={require("../../assets/images/bgOnboarding.png")} style={StyleSheet.absoluteFill} resizeMode="cover" /><SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           <View style={styles.header}>
             {(auth.step === "code" || compact) && <Pressable accessibilityRole="button" accessibilityLabel="Orqaga" onPress={back} hitSlop={10} style={styles.back}><Ionicons name="arrow-back" size={24} color="#C6C5C1" /></Pressable>}
-            <View style={styles.brand}>
-              <Image source={brandAssets.logoGlow} style={styles.logo} resizeMode="contain" />
-              <Text style={styles.wordmark}>Zayuno</Text>
-            </View>
+            
           </View>
 
           <Animated.View style={[styles.stage, { opacity: reveal, transform: [{ translateY: reveal.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }]}>
             {auth.step === "email" ? (
               <View style={styles.emailStage}>
-                <View style={[styles.hero, compact && styles.heroCompact]}>
-                  <Animated.View style={{ height: collapse.interpolate({ inputRange: [0, 1], outputRange: [Math.min(230, height * 0.29), 105] }), width: "100%", alignItems: "center", justifyContent: "center" }}>
-                    <Animated.Image source={brandAssets.logoGlow} resizeMode="contain" style={{ width: 170, height: 170, borderRadius: 40, transform: [{ scale: collapse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] }) }] }} />
-                  </Animated.View>
-                  <Text style={[styles.headline, compact && styles.headlineCompact]}>Istagingizni ayting.{"\n"}Qolganini Zayuno qiladi.</Text>
-                </View>
+                <View style={[styles.hero, compact && styles.heroCompact]}><Text style={[styles.headline, compact && styles.headlineCompact]}>Xizmatlar{"\n"}<Text style={{ color: "#315CFF" }}>yaqinroq.</Text></Text><Text style={styles.subtitle}>Bir so'rov. Ming imkoniyat.</Text></View>
                 <View style={styles.form}>
                   <View style={compact ? styles.hidden : undefined}>
                     {clientReady ? (Platform.OS === "android"
@@ -304,7 +297,7 @@ export default function WelcomeScreen() {
                     <TextInput ref={emailInput} accessibilityLabel="Email manzilingiz" style={styles.input} placeholder="Email manzilingiz" placeholderTextColor="#979791" value={auth.email}
                       onChangeText={auth.setEmail} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
                       autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="emailAddress" autoComplete="email"
-                      returnKeyType="go" onSubmitEditing={auth.sendCode} editable={!auth.busy} selectionColor="#A798F5" />
+                      returnKeyType="go" onSubmitEditing={auth.sendCode} editable={!auth.busy} selectionColor="#315CFF" />
                     {(compact || auth.email.length > 0) && <Pressable accessibilityRole="button" accessibilityLabel="Kirish kodini yuborish" onPress={auth.sendCode} disabled={Boolean(auth.busy) || !validLoginEmail(auth.email)} style={({ pressed }) => [styles.inputArrow, pressed && styles.pressed, (!validLoginEmail(auth.email) || Boolean(auth.busy)) && styles.disabled]}>
                       {auth.busy === "send" ? <ActivityIndicator color="#161616" /> : <Ionicons name="arrow-forward" size={23} color="#161616" />}
                     </Pressable>}
@@ -322,8 +315,8 @@ export default function WelcomeScreen() {
                   <TextInput ref={codeInput} accessibilityLabel="5 xonali kirish kodi" style={[styles.input, styles.codeInput]} placeholder="Kod" placeholderTextColor="#979791"
                     value={auth.code} onChangeText={auth.changeCode} keyboardType="number-pad" textContentType="oneTimeCode" autoComplete="one-time-code"
                     autoCorrect={false} autoCapitalize="none" returnKeyType="done" onSubmitEditing={() => auth.verifyCode()} editable={!auth.busy}
-                    selectionColor="#A798F5" onFocus={() => setFocused(true)} />
-                  {auth.busy ? <View style={styles.codeStatus}><ActivityIndicator color="#B5A8FF" /></View>
+                    selectionColor="#315CFF" onFocus={() => setFocused(true)} />
+                  {auth.busy ? <View style={styles.codeStatus}><ActivityIndicator color="#315CFF" /></View>
                     : auth.code.length === 5 && auth.error ? <Pressable accessibilityRole="button" accessibilityLabel="Kodni qayta tekshirish" onPress={() => auth.verifyCode()} style={styles.inputArrow}><Ionicons name="arrow-forward" size={23} color="#161616" /></Pressable> : null}
                 </View>
                 {auth.error ? <Text accessibilityRole="alert" style={styles.error}>{auth.error}</Text> : null}
@@ -342,13 +335,15 @@ export default function WelcomeScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   hidden: { display: "none" },
-  safeArea: { flex: 1, backgroundColor: "#141414" },
+  container: { flex: 1, backgroundColor: "#0A0A0A" },
+  safeArea: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 18, maxWidth: 520, width: "100%", alignSelf: "center" },
   header: { height: 65, alignItems: "center", justifyContent: "center", marginBottom: 6 },
   brand: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -359,8 +354,9 @@ const styles = StyleSheet.create({
   emailStage: { flex: 1, justifyContent: "space-between" },
   hero: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingVertical: 20, gap: 14 },
   heroCompact: { flexGrow: 0, paddingTop: 0, paddingBottom: 18, gap: 0 },
-  headline: { color: "#F4F3EF", fontFamily: Platform.select({ ios: "Georgia", android: "serif", web: "Georgia" }), fontSize: 32, lineHeight: 40, letterSpacing: -0.8, textAlign: "center" },
-  headlineCompact: { fontSize: 24, lineHeight: 29, letterSpacing: -0.4 },
+  headline: { color: "#F4F3EF", fontSize: 40, fontWeight: "700", lineHeight: 46, letterSpacing: -0.8, textAlign: "center" },
+  subtitle: { color: "#9CA3AF", fontSize: 16, marginTop: 12, textAlign: "center" },
+  headlineCompact: { fontSize: 32, lineHeight: 38 },
   form: { paddingTop: 16, gap: 0 },
   googleButton: { height: 55, borderRadius: 30, backgroundColor: "#FAFAF8", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, paddingHorizontal: 14 },
   googleText: { color: "#202020", fontSize: 17, fontWeight: "600" },
@@ -370,14 +366,14 @@ const styles = StyleSheet.create({
   line: { flex: 1, height: 1, backgroundColor: "#353532" },
   dividerText: { color: "#9C9C94", fontSize: 14 },
   inputFrame: { minHeight: 62, borderRadius: 15, borderWidth: 1.5, borderColor: "#454540", backgroundColor: "#222220", flexDirection: "row", alignItems: "center", padding: 6 },
-  inputFocused: { borderColor: "#AA97F4", borderWidth: 2 },
+  inputFocused: { borderColor: "#315CFF", borderWidth: 2 },
   inputError: { borderColor: "#E49A89" },
   input: { flex: 1, minWidth: 0, paddingHorizontal: 10, paddingVertical: 10, fontSize: 19, color: "#F6F5F0", textAlign: "center", outlineStyle: "none" } as any,
   inputArrow: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#F7F6F2", alignItems: "center", justifyContent: "center" },
   error: { color: "#EDAB9A", fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 10, marginBottom: 6 },
   legal: { fontSize: 13, lineHeight: 20, color: "#91918A", textAlign: "center", marginTop: 18, paddingHorizontal: 7 },
   legalLink: { color: "#CFCEC7", textDecorationLine: "underline" },
-  codeStage: { paddingTop: 60, paddingBottom: 12, gap: 0 },
+  codeStage: { paddingTop: 20, paddingBottom: 12, gap: 0, flex: 1, justifyContent: "center" },
   codeTitle: { color: "#EEEDE8", fontWeight: "600", fontSize: 17, lineHeight: 24, textAlign: "center", marginBottom: 25 },
   codeInput: { letterSpacing: 7, fontSize: 25, paddingLeft: 17 },
   codeStatus: { width: 38, alignItems: "center" },
@@ -385,8 +381,8 @@ const styles = StyleSheet.create({
   sentCopy: { fontSize: 16, color: "#D4D3CD", textAlign: "center" },
   sentEmail: { marginTop: 5, fontSize: 17, lineHeight: 24, fontWeight: "700", textAlign: "center", color: "#FAF9F5", flexShrink: 1 },
   envelope: { marginTop: 16, alignItems: "center" },
-  seal: { position: "absolute", top: 26, width: 18, height: 18, borderRadius: 9, backgroundColor: "#8D77DB", alignItems: "center", justifyContent: "center" },
+  seal: { position: "absolute", top: 26, width: 18, height: 18, borderRadius: 9, backgroundColor: "#315CFF", alignItems: "center", justifyContent: "center" },
   textAction: { minHeight: 42, alignItems: "center", justifyContent: "center", padding: 8 },
-  link: { color: "#AAA2EC", fontSize: 15, fontWeight: "500", marginTop: 14 },
+  link: { color: "#315CFF", fontSize: 15, fontWeight: "500", marginTop: 14 },
   resend: { color: "#999A92", fontSize: 13 },
 });
