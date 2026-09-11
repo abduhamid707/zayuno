@@ -33,6 +33,47 @@
 - `pnpm test:review` (`tsx tests/run-all-review-tests.ts`) → **39 / 39 test suites PASSED** (100% clean pass).
 **Keyingi qadam:** CI orqali avtomatik deployment monitoringi.
 
+## Joriy ish — Pro System Health & Infrastructure Monitoring va AI Agent Incident Snapshot, 2026-09-11
+
+- [x] Backend: `@zayuno/observability` paketida p95, p99, error rate va request rate hisoblash metodlarini kengaytirish.
+- [x] Backend: `SystemHealthService` va `GET /api/v1/admin/system/health` endpointini yaratish:
+  - [x] Hardware/OS: CPU %, RAM % (total, used, free), Node heap & RSS, Disk % (total, used, free), Uptime.
+  - [x] Database: Postgres connection pool (total, active, idle, idle in transaction, max, latency).
+  - [x] Cache & Messaging: Redis (status, latency, memory, clients), NATS (status, connected).
+  - [x] API Network: p50/p95/p99 latency, error rate (15m window), requests/min.
+  - [x] Zayuno Business & Ops: active orders, pending payment, failed/deadletter webhooks.
+  - [x] Server-side 5 soniyalik kesh va zero-leak xavfsizlik (SUPER_ADMIN / ADMIN).
+- [x] AI Agent Incident Snapshot Generator:
+  - [x] Bitta bosishda to'liq tizimli diagnostika xulosasini tayyorlash: Health Score (0-100), Active Red Flags / Anomalies, Bottlenecks, Root Cause Hypotheses va Recommended Actions for AI.
+  - [x] Claude, ChatGPT, Cursor, Codex uchun maxsus formatlangan Markdown nusxalash imkoniyati.
+- [x] Admin UI (`apps/admin`):
+  - [x] Sidebar'ga yangi `System Health & Infra` tabini qo'shish.
+  - [x] Modern Pro UI: Tizim statusi (Normal, Warning, Critical), threshold badges, auto-refresh (5s, 10s, 30s, Pause), manual refresh.
+  - [x] 1-Click "AI Agent uchun nusxalash" tugmasi va chiroyli toast.
+  - [x] Subsystems & Container grid (API, Postgres, Redis, NATS, Action Orchestrator, Webhook Dispatcher).
+  - [x] Real-time AI Diagnostic Insights panel.
+- [x] Testlar va tekshiruv:
+  - [x] Yangi `tests/test-admin-system-health.ts` testini yozish (metrics, cache, auth gate, AI snapshot formati).
+  - [x] `pnpm test:review` (40 ta test suitlari) va typecheck/buildlarni to'liq o'tkazish (40/40 PASS).
+
+**Scope:** `apps/api/src/modules/admin`, `@zayuno/observability`, `apps/admin/src/App.tsx`, `tests/test-admin-system-health.ts`.
+**Holat:** Ish 100% yakunlandi. Production-grade tizim telemetriyasi, hardware (CPU/RAM/Disk), PostgreSQL connection pool, Redis, NATS, p50/p95/p99 kechikishlar, xatolik foizlari, va 1-bosishda AI agentlar (Claude Code, Cursor, Codex, ChatGPT) uchun mo'ljallangan incident snapshot generatori to'liq ishga tushirildi.
+**O'zgargan fayllar:**
+- `packages/observability/src/metrics.ts` — p50/p95/p99, error rate, request rate va HTTP status breakdown funksiyalari qo'shildi.
+- `apps/api/src/modules/admin/system-health.service.ts` — to'liq hardware, DB pool, kesh, navbat, alertlar, 5s kesh va AI snapshot generatori.
+- `apps/api/src/modules/admin/admin.module.ts` — `SystemHealthService` provayder va export sifatida ulandi.
+- `apps/api/src/modules/admin/admin.controller.ts` — `GET /api/v1/admin/system/health` himoyalangan endpointi ochildi.
+- `apps/admin/src/App.tsx` — "System & Infra" yangi bo'limi, KPI kartalari, subsystem matritsasi, auto-refresh va 1-click AI snapshot nusxalash tugmasi/toasti o'rnatildi.
+- `tests/test-admin-system-health.ts` — maxsus 5 bosqichli test suiti yaratildi.
+- `tests/run-all-review-tests.ts` — yangi test review ro'yxatiga kiritildi.
+**Tekshiruv natijalari:**
+- `pnpm --filter @zayuno/api build` -> **0 xato (PASS)**
+- `pnpm --filter @zayuno/admin build` -> **0 xato (PASS)**
+- `pnpm exec tsx tests/test-admin-system-health.ts` -> **PASS**
+- `pnpm test:review` (`tsx tests/run-all-review-tests.ts`) -> **40 / 40 test suites PASSED (100% CLEAN)**.
+**Keyingi qadam:** Foydalanuvchiga to'liq natijalarni ko'rsatish va istalsa commit qilish.
+
+
 ## Product strategy — transaction network moat, 2026-09-10
 
 - [x] Investor/product stress-testdagi barcha fikrlarni amaliy roadmapga ajratish.

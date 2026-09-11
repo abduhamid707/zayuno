@@ -14,6 +14,7 @@ import {
 import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
+import { SystemHealthService } from './system-health.service';
 import { ProvidersService } from '../providers/providers.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -29,7 +30,17 @@ export class AdminController {
   constructor(
     private adminService: AdminService,
     private providersService: ProvidersService,
+    private systemHealthService: SystemHealthService,
   ) {}
+
+  @Get('system/health')
+  @ApiOperation({
+    summary:
+      'Get pro system health, hardware metrics, container status, and AI incident snapshot',
+  })
+  async getSystemHealth(@Query('refresh') refresh?: string) {
+    return this.systemHealthService.getHealthReport(refresh === 'true');
+  }
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Get live KPI metrics (GMV, orders, latency)' })

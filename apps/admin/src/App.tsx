@@ -37,6 +37,13 @@ import {
   AlertTriangle,
   Bell,
   Users,
+  Server,
+  HardDrive,
+  Database,
+  Sparkles,
+  Gauge,
+  Radio,
+  Info,
 } from 'lucide-react';
 import { adminAnalytics } from './lib/analytics';
 
@@ -92,8 +99,11 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'actions' | 'providers' | 'demand' | 'reports' | 'logs'
+    'dashboard' | 'actions' | 'providers' | 'demand' | 'reports' | 'logs' | 'system'
   >('dashboard');
+  const [systemRefreshInterval, setSystemRefreshInterval] = useState<number | false>(10000);
+  const [copiedAiSnapshot, setCopiedAiSnapshot] = useState(false);
+  const [showAiSnapshotPreview, setShowAiSnapshotPreview] = useState(false);
   const [reportStatus, setReportStatus] = useState('ALL');
   const [reportSearch, setReportSearch] = useState('');
   const [reportDateRange, setReportDateRange] = useState<'ALL' | 'TODAY' | '7DAYS' | '30DAYS'>('ALL');
@@ -234,6 +244,38 @@ export default function App() {
     },
     enabled: !!token,
   });
+
+  const {
+    data: systemHealth,
+    isLoading: systemLoading,
+    isRefetching: systemRefetching,
+    refetch: refetchSystemHealth,
+  } = useQuery({
+    queryKey: ['admin-system-health'],
+    queryFn: async () => {
+      const res = await apiFetch('/api/v1/admin/system/health');
+      return res.json();
+    },
+    refetchInterval: systemRefreshInterval,
+    enabled: !!token,
+  });
+
+  const handleForceRefreshSystem = async () => {
+    try {
+      const res = await apiFetch('/api/v1/admin/system/health?refresh=true');
+      const data = await res.json();
+      queryClient.setQueryData(['admin-system-health'], data);
+    } catch (e) {
+      console.error('Failed to force refresh system health:', e);
+    }
+  };
+
+  const copyAiSnapshot = () => {
+    if (!systemHealth?.aiIncidentSnapshotMarkdown) return;
+    navigator.clipboard.writeText(systemHealth.aiIncidentSnapshotMarkdown);
+    setCopiedAiSnapshot(true);
+    setTimeout(() => setCopiedAiSnapshot(false), 3500);
+  };
 
   const {
     data: reportsData,
@@ -937,6 +979,33 @@ export default function App() {
             {reportsData?.length > 0 && (
               <span className="px-2 py-0.5 text-xs font-bold bg-slate-800 text-slate-300 rounded-full">
                 {reportsData.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('system')}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition ${
+              activeTab === 'system'
+                ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20'
+                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Cpu className="w-4 h-4" />
+              <span>System & Infra</span>
+            </div>
+            {systemHealth?.healthScore !== undefined && (
+              <span
+                className={`px-2 py-0.5 text-xs font-bold rounded-full border ${
+                  systemHealth.healthScore >= 80
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : systemHealth.healthScore >= 50
+                    ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                }`}
+              >
+                {systemHealth.healthScore}%
               </span>
             )}
           </button>
@@ -3260,6 +3329,672 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* 7. SYSTEM HEALTH & INFRASTRUCTURE MONITOR */}
+          {activeTab === 'system' && (
+            <div className="space-y-6">
+              {/* Header & Controls */}
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-slate-900/90 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
+                <div className="flex items-start sm:items-center gap-4">
+                  <div className="p-3 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-2xl flex-shrink-0 shadow-inner">
+                    <Cpu className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <h2 className="text-xl font-bold text-white tracking-tight">
+                        System Health & Infrastructure
+                      </h2>
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                          systemHealth?.overallStatus === 'HEALTHY'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : systemHealth?.overallStatus === 'WARNING'
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        }`}
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            systemHealth?.overallStatus === 'HEALTHY'
+                              ? 'bg-emerald-400 animate-pulse'
+                              : systemHealth?.overallStatus === 'WARNING'
+                              ? 'bg-amber-400 animate-ping'
+                              : 'bg-rose-500 animate-ping'
+                          }`}
+                        />
+                        {systemHealth?.overallStatus === 'HEALTHY'
+                          ? 'HEALTHY'
+                          : systemHealth?.overallStatus === 'WARNING'
+                          ? 'WARNING'
+                          : 'CRITICAL'}
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                          (systemHealth?.healthScore ?? 0) >= 80
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : (systemHealth?.healthScore ?? 0) >= 50
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        }`}
+                      >
+                        Score: {systemHealth?.healthScore ?? 0}/100
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
+                      <span>Uptime: <strong className="text-slate-200">{systemHealth?.uptimeFormatted || 'N/A'}</strong></span>
+                      <span>•</span>
+                      <span>OS & Core: <span className="font-mono text-cyan-300">{systemHealth?.hardware?.cpu?.cores || 0} cores</span></span>
+                      <span>•</span>
+                      <span className="text-[11px] font-mono text-slate-500">
+                        {systemHealth?.cached ? 'Keshda (5s TTL)' : 'Jonli telemetriya'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Auto-refresh interval selector */}
+                  <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl px-2.5 py-1 text-xs text-slate-300">
+                    <Clock className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+                    <span className="text-[11px] text-slate-500 mr-2">Yangilanish:</span>
+                    <select
+                      value={systemRefreshInterval === false ? 'pause' : String(systemRefreshInterval)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSystemRefreshInterval(val === 'pause' ? false : Number(val));
+                      }}
+                      className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer"
+                    >
+                      <option value="5000" className="bg-slate-900 text-slate-200">5 soniya</option>
+                      <option value="10000" className="bg-slate-900 text-slate-200">10 soniya</option>
+                      <option value="30000" className="bg-slate-900 text-slate-200">30 soniya</option>
+                      <option value="pause" className="bg-slate-900 text-slate-200">Pauza</option>
+                    </select>
+                  </div>
+
+                  {/* Manual Refresh Button */}
+                  <button
+                    onClick={handleForceRefreshSystem}
+                    disabled={systemRefetching}
+                    title="Darhol yangilash"
+                    className="p-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-xl transition border border-slate-700/50 flex items-center justify-center cursor-pointer"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${systemRefetching ? 'animate-spin text-cyan-400' : ''}`} />
+                  </button>
+
+                  {/* Toggle Preview Button */}
+                  <button
+                    onClick={() => setShowAiSnapshotPreview((prev) => !prev)}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700/50 flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>{showAiSnapshotPreview ? 'Snapshotni yopish' : 'Preview'}</span>
+                  </button>
+
+                  {/* 1-Click AI Incident Snapshot Button */}
+                  <button
+                    onClick={copyAiSnapshot}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-lg cursor-pointer ${
+                      copiedAiSnapshot
+                        ? 'bg-emerald-600 text-white shadow-emerald-900/30'
+                        : 'bg-gradient-to-r from-cyan-600 via-indigo-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white shadow-cyan-900/30'
+                    }`}
+                  >
+                    {copiedAiSnapshot ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-200" />
+                        <span>Nusxalandi!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-cyan-200 animate-pulse" />
+                        <span>AI Agent uchun nusxalash</span>
+                        <Copy className="w-3.5 h-3.5 ml-0.5 opacity-80" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* AI Diagnostic Alert Banner */}
+              {systemHealth?.alerts?.redFlags && systemHealth.alerts.redFlags.length > 0 ? (
+                <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 sm:p-5 animate-in fade-in">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 bg-rose-500/20 text-rose-400 rounded-xl flex-shrink-0">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-sm text-rose-300">
+                          Kritik anomaliyalar aniqlandi ({systemHealth.alerts.redFlags.length})
+                        </h3>
+                        <span className="text-[11px] font-bold text-rose-400 bg-rose-500/20 px-2 py-0.5 rounded-full uppercase">
+                          Action Required
+                        </span>
+                      </div>
+                      <ul className="space-y-1 text-xs text-rose-200/90 list-disc list-inside">
+                        {systemHealth.alerts.redFlags.map((flag: string, idx: number) => (
+                          <li key={idx} className="leading-relaxed">
+                            {flag}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-[11px] text-rose-300/80 pt-1">
+                        💡 <strong>Tavsiya:</strong> Yuqoridagi <em>"AI Agent uchun nusxalash"</em> tugmasini bosing va olingan Markdown snapshotni Claude Code, Cursor yoki ChatGPT'ga yuboring. U nosozlik manbasini zudlik bilan lokalizatsiya qilib beradi.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : systemHealth?.alerts?.warnings && systemHealth.alerts.warnings.length > 0 ? (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl flex-shrink-0">
+                      <AlertCircle className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <h3 className="font-bold text-sm text-amber-300">
+                        Diqqat talab ogohlantirishlar ({systemHealth.alerts.warnings.length})
+                      </h3>
+                      <ul className="space-y-0.5 text-xs text-amber-200/90 list-disc list-inside">
+                        {systemHealth.alerts.warnings.map((warn: string, idx: number) => (
+                          <li key={idx}>{warn}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl flex-shrink-0">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-xs text-emerald-300">
+                        Barcha subsystemlar barqaror va xavfsiz rejimda ishlamoqda
+                      </h4>
+                      <p className="text-[11px] text-emerald-400/80">
+                        CPU, RAM, Disk, Postgres pool va API latency barcha standart thresholdlar doirasida.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-emerald-400 px-3 py-1 bg-emerald-500/20 rounded-lg">
+                    Score: {systemHealth?.healthScore || 100}%
+                  </span>
+                </div>
+              )}
+
+              {/* Hardware & OS Telemetry Grid (4 Cards) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. CPU Usage */}
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Cpu className="w-4 h-4 text-cyan-400" />
+                        <span className="text-xs font-semibold text-slate-400">CPU Usage</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          (systemHealth?.hardware?.cpu?.usedPercent ?? 0) > 85
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                            : (systemHealth?.hardware?.cpu?.usedPercent ?? 0) > 70
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        }`}
+                      >
+                        {systemHealth?.hardware?.cpu?.status || 'HEALTHY'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-black text-white">
+                        {systemHealth?.hardware?.cpu?.usedPercent ?? 0}%
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        ({systemHealth?.hardware?.cpu?.cores ?? 0} cores)
+                      </span>
+                    </div>
+
+                    {/* Gauge bar */}
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          (systemHealth?.hardware?.cpu?.usedPercent ?? 0) > 85
+                            ? 'bg-rose-500'
+                            : (systemHealth?.hardware?.cpu?.usedPercent ?? 0) > 70
+                            ? 'bg-amber-500'
+                            : 'bg-cyan-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(0, systemHealth?.hardware?.cpu?.usedPercent ?? 0))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Model:</span>
+                      <span className="font-mono text-slate-300 truncate max-w-[130px]" title={systemHealth?.hardware?.cpu?.model}>
+                        {systemHealth?.hardware?.cpu?.model || 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Load (1/5/15m):</span>
+                      <span className="font-mono text-slate-300">
+                        {(systemHealth?.hardware?.cpu?.loadAvg || [0, 0, 0]).join(' · ')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. RAM Memory */}
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Gauge className="w-4 h-4 text-violet-400" />
+                        <span className="text-xs font-semibold text-slate-400">RAM Memory</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          (systemHealth?.hardware?.ram?.usedPercent ?? 0) > 90
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                            : (systemHealth?.hardware?.ram?.usedPercent ?? 0) > 75
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        }`}
+                      >
+                        {systemHealth?.hardware?.ram?.status || 'HEALTHY'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-black text-white">
+                        {systemHealth?.hardware?.ram?.usedPercent ?? 0}%
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {((systemHealth?.hardware?.ram?.usedMb ?? 0) / 1024).toFixed(1)} / {((systemHealth?.hardware?.ram?.totalMb ?? 0) / 1024).toFixed(1)} GB
+                      </span>
+                    </div>
+
+                    {/* Gauge bar */}
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          (systemHealth?.hardware?.ram?.usedPercent ?? 0) > 90
+                            ? 'bg-rose-500'
+                            : (systemHealth?.hardware?.ram?.usedPercent ?? 0) > 75
+                            ? 'bg-amber-500'
+                            : 'bg-violet-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(0, systemHealth?.hardware?.ram?.usedPercent ?? 0))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Node Heap:</span>
+                      <span className="font-mono text-slate-300">
+                        {systemHealth?.hardware?.ram?.heapUsedMb || 0} / {systemHealth?.hardware?.ram?.heapTotalMb || 0} MB
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Node RSS:</span>
+                      <span className="font-mono text-slate-300">
+                        {systemHealth?.hardware?.ram?.rssMb || 0} MB
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Disk Space */}
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <HardDrive className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-semibold text-slate-400">Disk Storage</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          (systemHealth?.hardware?.disk?.usedPercent ?? 0) > 90
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                            : (systemHealth?.hardware?.disk?.usedPercent ?? 0) > 80
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        }`}
+                      >
+                        {systemHealth?.hardware?.disk?.status || 'HEALTHY'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-black text-white">
+                        {systemHealth?.hardware?.disk?.usedPercent ?? 0}%
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {systemHealth?.hardware?.disk?.usedGb ?? 0} / {systemHealth?.hardware?.disk?.totalGb ?? 0} GB
+                      </span>
+                    </div>
+
+                    {/* Gauge bar */}
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          (systemHealth?.hardware?.disk?.usedPercent ?? 0) > 90
+                            ? 'bg-rose-500'
+                            : (systemHealth?.hardware?.disk?.usedPercent ?? 0) > 80
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(0, systemHealth?.hardware?.disk?.usedPercent ?? 0))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Bo'sh joy:</span>
+                      <span className="font-mono text-emerald-400 font-bold">
+                        {systemHealth?.hardware?.disk?.freeGb || 0} GB mavjud
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>FS Status:</span>
+                      <span className="font-mono text-slate-300">Statfs Native</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. PostgreSQL Pool */}
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Database className="w-4 h-4 text-sky-400" />
+                        <span className="text-xs font-semibold text-slate-400">PostgreSQL Pool</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          systemHealth?.database?.status === 'HEALTHY'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : systemHealth?.database?.status === 'WARNING'
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        }`}
+                      >
+                        {systemHealth?.database?.latencyMs ?? 0} ms ping
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-black text-white">
+                        {systemHealth?.database?.connections?.active ?? 0}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        / {systemHealth?.database?.connections?.max ?? 100} faol ulanish
+                      </span>
+                    </div>
+
+                    {/* Gauge bar */}
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          (systemHealth?.database?.connections?.utilizationPercent ?? 0) > 85
+                            ? 'bg-rose-500'
+                            : (systemHealth?.database?.connections?.utilizationPercent ?? 0) > 65
+                            ? 'bg-amber-500'
+                            : 'bg-sky-500'
+                        }`}
+                        style={{ width: `${Math.min(100, Math.max(0, systemHealth?.database?.connections?.utilizationPercent ?? 0))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Total / Idle:</span>
+                      <span className="font-mono text-slate-300">
+                        {systemHealth?.database?.connections?.total || 0} / {systemHealth?.database?.connections?.idle || 0}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Engine:</span>
+                      <span className="font-mono text-slate-300 truncate max-w-[130px]">
+                        {systemHealth?.database?.engine || 'PostgreSQL'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* API Telemetry & Traffic Row (4 Cards) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. API Latency */}
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                        API Latency (p95)
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          (systemHealth?.apiMetrics?.p95Ms ?? 0) > 800
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                            : (systemHealth?.apiMetrics?.p95Ms ?? 0) > 250
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        }`}
+                      >
+                        {(systemHealth?.apiMetrics?.p95Ms ?? 0) <= 250 ? 'Tezkor' : 'Kuzatuv'}
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-white">
+                      {systemHealth?.apiMetrics?.p95Ms ?? 0} <span className="text-xs font-bold text-slate-400">ms</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
+                    <span>p50: {systemHealth?.apiMetrics?.p50Ms ?? 0} ms</span>
+                    <span>p99: {systemHealth?.apiMetrics?.p99Ms ?? 0} ms</span>
+                  </div>
+                </div>
+
+                {/* 2. Error Rate */}
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                        Error Rate (15m)
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          (systemHealth?.apiMetrics?.errorRatePercent ?? 0) > 5
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                            : (systemHealth?.apiMetrics?.errorRatePercent ?? 0) > 1
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        }`}
+                      >
+                        {(systemHealth?.apiMetrics?.errorRatePercent ?? 0) <= 1 ? 'Normal' : 'Yuqori'}
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-white">
+                      {systemHealth?.apiMetrics?.errorRatePercent ?? 0} <span className="text-xs font-bold text-slate-400">%</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                    <span>5xx Server xatolar:</span>
+                    <span className="font-mono text-rose-400 font-bold">
+                      {systemHealth?.apiMetrics?.statusBreakdown?.s5xx ?? 0}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Requests / Minute */}
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                        <Activity className="w-3.5 h-3.5 text-blue-400" />
+                        Throughput
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-500">1 daqiqa</span>
+                    </div>
+                    <div className="text-2xl font-black text-white">
+                      {systemHealth?.apiMetrics?.requestsPerMinute ?? 0}{' '}
+                      <span className="text-xs font-bold text-slate-400">req/min</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                    <span className="text-emerald-400 font-bold">2xx: {systemHealth?.apiMetrics?.statusBreakdown?.s2xx ?? 0}</span>
+                    <span className="text-amber-400 font-bold">4xx: {systemHealth?.apiMetrics?.statusBreakdown?.s4xx ?? 0}</span>
+                    <span className="text-rose-400 font-bold">5xx: {systemHealth?.apiMetrics?.statusBreakdown?.s5xx ?? 0}</span>
+                  </div>
+                </div>
+
+                {/* 4. Business & Operations */}
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                        <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
+                        Operatsiyalar
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                        {systemHealth?.businessAndOps?.activeOrders ?? 0} faol
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-white">
+                      {systemHealth?.businessAndOps?.activeOrders ?? 0}{' '}
+                      <span className="text-xs font-bold text-slate-400">buyurtma</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-0.5">
+                    <div className="flex justify-between">
+                      <span>To'lov kutilmoqda:</span>
+                      <span className="font-mono text-amber-300 font-semibold">{systemHealth?.businessAndOps?.awaitingPaymentOrders ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Webhook xatolari (1s):</span>
+                      <span className={`font-mono font-semibold ${(systemHealth?.businessAndOps?.failedWebhooksLastHour ?? 0) > 0 ? 'text-rose-400' : 'text-slate-300'}`}>
+                        {systemHealth?.businessAndOps?.failedWebhooksLastHour ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subsystems & Infra Matrix Table */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Server className="w-4 h-4 text-cyan-400" />
+                    <h3 className="font-bold text-sm text-white">
+                      Infratuzilma va Xizmatlar Matritsasi (Subsystems)
+                    </h3>
+                  </div>
+                  <span className="text-xs font-mono text-slate-400">
+                    {systemHealth?.subsystems?.length || 0} ta modul
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-950/60 text-slate-400 uppercase font-mono text-[11px] border-b border-slate-800">
+                      <tr>
+                        <th className="p-3.5">Subsystem</th>
+                        <th className="p-3.5">Komponent</th>
+                        <th className="p-3.5">Status</th>
+                        <th className="p-3.5">Latency</th>
+                        <th className="p-3.5">Diagnostik Holat</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {(systemHealth?.subsystems || []).map((sub: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-800/40 transition">
+                          <td className="p-3.5 font-bold text-white whitespace-nowrap flex items-center gap-2">
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                sub.status === 'healthy'
+                                  ? 'bg-emerald-400'
+                                  : sub.status === 'degraded'
+                                  ? 'bg-amber-400 animate-ping'
+                                  : 'bg-rose-500 animate-ping'
+                              }`}
+                            />
+                            {sub.name}
+                          </td>
+                          <td className="p-3.5 font-mono text-slate-400 whitespace-nowrap">
+                            {sub.component}
+                          </td>
+                          <td className="p-3.5 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                                sub.status === 'healthy'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : sub.status === 'degraded'
+                                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                                  : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                              }`}
+                            >
+                              {sub.status}
+                            </span>
+                          </td>
+                          <td className="p-3.5 font-mono text-slate-300 whitespace-nowrap">
+                            {sub.latencyMs != null ? `${sub.latencyMs} ms` : '—'}
+                          </td>
+                          <td className="p-3.5 text-slate-300">
+                            {sub.message || 'Optimal rejimda ishlamoqda'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Collapsible AI Incident Snapshot Preview */}
+              {showAiSnapshotPreview && (
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-3 animate-in fade-in">
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-cyan-400" />
+                      <h3 className="font-bold text-sm text-white">
+                        AI Incident Snapshot — Markdown formati (Preview)
+                      </h3>
+                    </div>
+                    <button
+                      onClick={copyAiSnapshot}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      {copiedAiSnapshot ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Nusxalandi!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Snapshotni nusxalash</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Ushbu matn har qanday AI agent (Claude Code, Cursor, Codex, ChatGPT) ga tashlanganda, u Zayuno infratuzilmasining to'liq holatini, resurs yuklanishini, kesh/nats/postgres parametrlarini va tavsiya etilgan tuzatish bosqichlarini darhol tushunadi. Parollar yoki maxfiy kalitlar chiqarilmaydi (zero-leak).
+                  </p>
+
+                  <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 max-h-96 overflow-y-auto font-mono text-xs text-cyan-200 whitespace-pre-wrap leading-relaxed select-all">
+                    {systemHealth?.aiIncidentSnapshotMarkdown || 'Snapshot ma\'lumotlari generatsiya qilinmoqda...'}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </main>
       </div>
 
@@ -3601,6 +4336,32 @@ export default function App() {
                 {reportConfirmModal.buttonText || 'Confirm'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Incident Snapshot Floating Toast */}
+      {copiedAiSnapshot && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 duration-200">
+          <div className="bg-slate-900/95 border border-emerald-500/40 rounded-2xl p-4 shadow-2xl shadow-emerald-950/50 flex items-center gap-3.5 max-w-md backdrop-blur-md">
+            <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex-shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                <span>AI Incident Snapshot nusxalandi!</span>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+              </div>
+              <p className="text-[11px] text-slate-300 leading-snug">
+                Claude Code, Cursor yoki ChatGPT'ga tashlang. AI agent barcha anomaliya, postgres/redis metriklari va yechim tavsiyalarini darhol o'qiydi.
+              </p>
+            </div>
+            <button
+              onClick={() => setCopiedAiSnapshot(false)}
+              className="p-1 text-slate-400 hover:text-white transition ml-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
