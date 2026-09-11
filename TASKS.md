@@ -7,7 +7,7 @@
 - [x] Mobile product card: rasmsiz/buzilgan rasm, uzun matn va noto‘liq payload uchun barqaror UI.
 - [x] Reportlar: koddagi bo‘sh menyuga yolg‘on intro, 24h UI keshi va restoran tanlashda oldingi so‘rov yo‘qolishi tuzatildi. Yes Cofe quote/cancel matnining o‘zi alohida xatoni isbotlamaydi.
 - [x] Tegishli regression/build tekshiruvlari, docs va handoff.
-- [ ] Foydalanuvchi so‘rovi: tayyor tuzatishlarni commit qilib origin/main ga push qilish.
+- [x] Foydalanuvchi so‘rovi: tayyor tuzatishlarni commit qilib origin/main ga push qilish (`059b91e`).
 - [ ] Release: browserda authenticated onboarding/logo yuklashni va Android kartalarini real qurilmada smoke-test; API/portal deploy va yangi APK.
 
 **Holat:** implementatsiya yozildi. Qadamlar valid biznes → saqlangan API → tayyor sertifikat tartibida ochiladi. Deep link/draft completion ishonchli emas; o‘zgargan konfiguratsiya qayta saqlanishi kerak. Base URL/credential backendda ham talab qilinadi. Logo 384px gacha WebP qilib, 96 KB chegarali raster data URL sifatida mavjud DB logoUrl maydonida saqlanadi yoki HTTPS URL olinadi. Alohida upload servisi talab etilmaydi.
@@ -15,7 +15,7 @@
 **Tekshiruv:** contracts/API/portal build PASS; mobile va portal oxirgi tsc PASS; yangi `test-onboarding-catalog-resilience.ts` PASS (qadamlar, noto‘g‘ri logo/contact/payload, yangi narx, katta pitsa so‘rovi, bo‘sh menyu). `test-provider-cache-and-consumer-chat.ts` PASS. To‘liq review dastlab 38/41: ikki fixture mavjud bo‘lmagan DNS domeniga va credentialsiz ro‘yxatdan o‘tishga tayangan, bir assertion eski inline validation kodini qidirgan. Uchalasining fixture/assertioni yangilandi va alohida qayta ishga tushirilib PASS. Yangi regression review runnerga qo‘shildi (42 suite); 42/42 yagona to‘liq run qayta bajarilmadi. Log: `%TEMP%/zayuno-onboarding-review.log` dastlabki runni saqlaydi. `git diff --check` PASS.
 **Qo‘shimcha:** App yangi accountsiz-provider javobini xato deb ko‘rsatmaydi; wizard backendning canonical supportContact/authMethod maydonlarini o‘qiydi. docs/getting-started.md yangilandi. Logo storage uchun migration kerak emas.
 **Report cheklovi:** a4ee8b8b va 87907888 reportlarida catalog payload/screenshot yo‘q. Yes Cofe mahsulotlari va quote xizmat haqi manbasi live tekshirilmagan; mavjud xotiradagi contact sabab so‘ralmagan bo‘lishi mumkin. Cancel matni o‘zi bug emas. Aniq topilgan noto‘g‘ri UI/cache/intent yo‘llari tuzatildi, reportlar avtomatik CLOSED qilinmadi.
-**Keyingi qadam:** foydalanuvchi push so‘radi — tekshirilgan o‘zgarishlar commit/push qilinmoqda. Release smoke-test, deploy va APK build hali bajarilmagan.
+**Keyingi qadam:** `059b91e` origin/main ga push qilindi. Release smoke-test, deployment holatini tekshirish va APK build hali bajarilmagan; push deployment muvaffaqiyatli bo‘lganini isbotlamaydi.
 
 ## Joriy ish — provider portal UX va developer/agent docs, 2026-09-10
 
