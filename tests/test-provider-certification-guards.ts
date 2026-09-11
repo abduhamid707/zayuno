@@ -57,4 +57,37 @@ const remoteBookingReport = await new ProviderCertificationRunner(remoteBooking)
 assert.equal(remoteBookingReport.missingMandatoryCapabilities.includes(ProviderCapability.LOCATIONS), false);
 assert.equal(remoteBookingReport.tests.some(test => test.testId === 'discovery-readiness'), false);
 
+// Scenario: Provider configured in Zayuno as Food Delivery (type: DELIVERY) + REMOTE fulfillment mode,
+// where remote API returns type: DELIVERY but DOES NOT return fulfillmentMode in /provider-info.
+const remoteFoodDeliveryWithoutModeInApi: ProviderAdapter = {
+  ...metadataOnly('expected-provider'),
+  getProviderInfo: async () => ({
+    ...(await metadataOnly('expected-provider').getProviderInfo!()),
+    type: ProviderType.DELIVERY,
+    fulfillmentMode: undefined
+  }),
+  // Adapter config holds the Zayuno onboarding choice
+  config: {
+    slug: 'expected-provider',
+    metadata: {
+      type: ProviderType.DELIVERY,
+      fulfillmentMode: ProviderFulfillmentMode.REMOTE
+    }
+  }
+} as any;
+
+const remoteFoodDeliveryReport = await new ProviderCertificationRunner(remoteFoodDeliveryWithoutModeInApi).runAllTests();
+assert.equal(remoteFoodDeliveryReport.fulfillmentMode, ProviderFulfillmentMode.REMOTE, 'Should resolve fulfillmentMode from adapter config');
+assert.equal(
+  remoteFoodDeliveryReport.missingMandatoryCapabilities.includes(ProviderCapability.LOCATIONS),
+  false,
+  'REMOTE fulfillment mode must NOT require LOCATIONS capability even if type is DELIVERY'
+);
+assert.equal(
+  remoteFoodDeliveryReport.tests.some(test => test.testId === 'discovery-readiness' && test.status === 'FAIL'),
+  false,
+  'AI Discovery Readiness must NOT fail when fulfillmentMode is REMOTE'
+);
+
 console.log('Provider certification guard tests passed.');
+

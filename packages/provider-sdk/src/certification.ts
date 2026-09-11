@@ -257,17 +257,36 @@ export class ProviderCertificationRunner {
       }, [], 'CONTRACT_READINESS');
     }
 
-    const fulfillmentMode = providerInfo?.fulfillmentMode ||
+    const configuredFulfillmentMode =
+      (this.adapter as any)?.getConfig?.()?.metadata?.fulfillmentMode ||
+      (this.adapter as any)?.getConfig?.()?.config?.fulfillmentMode ||
+      (this.adapter as any)?.config?.metadata?.fulfillmentMode ||
+      (this.adapter as any)?.config?.config?.fulfillmentMode ||
+      (this.adapter as any)?.config?.fulfillmentMode ||
+      (this.adapter as any)?.fulfillmentMode as ProviderFulfillmentMode | undefined;
+
+    const fulfillmentMode =
+      configuredFulfillmentMode ||
+      providerInfo?.fulfillmentMode ||
       (providerInfo?.metadata?.fulfillmentMode as ProviderFulfillmentMode | undefined);
+
+    const configuredType =
+      (this.adapter as any)?.getConfig?.()?.metadata?.type ||
+      (this.adapter as any)?.config?.metadata?.type ||
+      (this.adapter as any)?.providerType ||
+      (this.adapter as any)?.type as ProviderType | undefined;
+
+    const effectiveType = providerInfo?.type || configuredType;
+
     mandatoryForProfile = getMandatoryCapabilitiesForProfile(declaredCaps, {
-      type: providerInfo?.type,
+      type: effectiveType,
       fulfillmentMode
     });
     const missingMandatoryCapabilities = mandatoryForProfile.filter(
       cap => !this.adapter.hasCapability(cap)
     );
 
-    const locationRequired = requiresActiveLocations(providerInfo?.type, fulfillmentMode);
+    const locationRequired = requiresActiveLocations(effectiveType, fulfillmentMode);
     if (locationRequired && !this.adapter.hasCapability(ProviderCapability.LOCATIONS)) {
       results.push({
         testId: 'discovery-readiness',
@@ -644,7 +663,7 @@ export class ProviderCertificationRunner {
       missingMandatoryCapabilities,
       capabilitiesTested: declaredCaps,
       profile,
-      providerType: providerInfo?.type,
+      providerType: effectiveType,
       fulfillmentMode,
       discoveryReadiness: {
         isReady: isProductionReady && discoveryReasons.length === 0,

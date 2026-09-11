@@ -103,18 +103,28 @@ export class ProviderRegistryService implements OnModuleInit {
       throw new Error(`No adapter factory registered for provider "${slug}" with adapterType "${adapterType}".`);
     }
 
+    const effectiveFulfillmentMode = (provider.metadata as any)?.fulfillmentMode ||
+      (provider as any).fulfillmentMode ||
+      (provider.config as any)?.fulfillmentMode;
+
     const adapter = factory({
       slug: provider.slug,
       baseUrl: provider.baseUrl || undefined,
       secret,
       webhookSecret,
       authMethod: (provider.config as any)?.authMethod || (provider as any).authMethod || 'API_KEY',
-      config: (provider.config as Record<string, any>) || {},
+      config: {
+        ...((provider.config as Record<string, any>) || {}),
+        type: provider.type,
+        fulfillmentMode: effectiveFulfillmentMode
+      },
       metadata: {
         ...((provider.metadata as Record<string, any>) || {}),
         // Remote adapters must expose the exact capability set registered in
         // Zayuno rather than silently falling back to a smaller default list.
-        capabilities: provider.capabilities
+        capabilities: provider.capabilities,
+        type: provider.type,
+        fulfillmentMode: effectiveFulfillmentMode
       }
     });
 

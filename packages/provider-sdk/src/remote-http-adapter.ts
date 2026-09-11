@@ -2,6 +2,7 @@ import {
   ProviderAdapter,
   ProviderCapability,
   ProviderInfo,
+  ProviderFulfillmentMode,
   HealthCheckResult,
   Location,
   GetLocationsInput,
@@ -178,7 +179,16 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
 
   async getProviderInfo(): Promise<ProviderInfo> {
     const value = await this.callRemote<unknown>('/provider-info');
-    return validateProviderResponse('/provider-info', 'contract-provider-info', ProviderInfoSchema, value);
+    const validated = validateProviderResponse('/provider-info', 'contract-provider-info', ProviderInfoSchema, value);
+    if (!validated.fulfillmentMode) {
+      const configuredMode = (this.config.metadata?.fulfillmentMode ||
+        this.config.config?.fulfillmentMode ||
+        (this.config as any)?.fulfillmentMode) as ProviderFulfillmentMode | undefined;
+      if (configuredMode) {
+        validated.fulfillmentMode = configuredMode;
+      }
+    }
+    return validated;
   }
 
   async checkHealth(): Promise<HealthCheckResult> {

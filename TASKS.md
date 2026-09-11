@@ -82,6 +82,36 @@
 **Scope:** `apps/provider-portal/src/OnboardingWizard.tsx`.
 **Holat:** Tuzatildi. Logo 44x44px (`w-11 h-11`) o'lchamiga keltirildi, border va shadow qo'yildi. Portal to'liq build bo'ldi va testlar muvaffaqiyatli o'tdi.
 
+## Joriy ish — Onboarding Certification: LOCATIONS vs REMOTE Fulfillment Mode mosligi, 2026-09-11
+
+- [x] `packages/provider-sdk/src/certification.ts`: tashqi API `/provider-info` da `fulfillmentMode` qaytarmasa ham Zayuno adapter konfiguratsiyasidagi `fulfillmentMode` (masalan, `REMOTE`) ni inobatga olish va `effectiveType` ni to'g'ri aniqlash.
+- [x] `packages/provider-sdk/src/base-provider.ts` va `remote-http-adapter.ts`: `getConfig()` metodi qo'shildi va `getProviderInfo` da masofaviy API fulfillmentMode qaytarmasa adapter config'dan default olish ta'minlandi.
+- [x] `apps/api/src/modules/providers/provider-registry.service.ts`: adapter instansiyasiga `fulfillmentMode` va `type` config hamda metadata sifatida aniq berilishi kafolatlandi.
+- [x] Testlar yozish va tekshirish: yangi `tests/test-remote-certification-flow.ts` va `tests/test-provider-certification-guards.ts` ga testlar qo'shildi (Food Delivery + REMOTE rejimida LOCATIONS talab qilinmasligi, ONSITE/DELIVERY rejimlarida esa LOCATIONS talabi qat'iy saqlanishi).
+- [x] Build va review testlari (41 ta test suiti) to'liq o'tishini tekshirish (100% PASS).
+- [x] Foydalanuvchiga nima sababdan bo'lgani va qanday tuzatilganini tushuntirib berish.
+
+**Scope:** `packages/provider-sdk`, `apps/api`, `tests/`.
+**Holat:** Ish to'liq yakunlandi. Agar foydalanuvchi Zayunoda "Remote" fulfillment rejimini tanlagan bo'lsa (masalan, Food Delivery toifasida raqamli vaucher, yetkazishsiz masofaviy xizmat yoki o'zining masofaviy API'si bo'lsa), sertifikatlash moduli tashqi serverning `/provider-info` da fulfillmentMode qaytarmasligiga qaramasdan, Zayunoda tanlangan `REMOTE` rejimini hurmat qiladi va LOCATIONS testida nohaq FAIL bermaydi. Jismoniy yetkazib berish (DELIVERY/ONSITE) uchun esa LOCATIONS talabi xavfsiz holatda qat'iy saqlanib qoladi.
+**O'zgargan fayllar:**
+- `packages/provider-sdk/src/base-provider.ts` — `getConfig()` metodi qo'shildi.
+- `packages/provider-sdk/src/remote-http-adapter.ts` — `getProviderInfo()` da tashqi API fulfillmentMode qaytarmasa config'dan `REMOTE` ni yuklash.
+- `packages/provider-sdk/src/certification.ts` — `configuredFulfillmentMode` va `effectiveType` ni adapter config/metadata orqali o'qib, `requiresActiveLocations` da to'g'ri baholash.
+- `apps/api/src/modules/providers/provider-registry.service.ts` — adapter factory ga `fulfillmentMode` va `type` ni to'g'ridan-to'g'ri uzatish.
+- `tests/test-provider-certification-guards.ts` — adapter config'da REMOTE bo'lganda certification runner guardlarini tekshirish.
+- `tests/test-remote-certification-flow.ts` — to'liq HTTP mock server bilan REMOTE oqimi testi.
+- `tests/run-all-review-tests.ts` — yangi test suiti review ro'yxatiga qo'shildi.
+**Tekshiruv natijalari:**
+- `pnpm --filter @zayuno/provider-sdk build` -> **PASS (0 xato)**
+- `pnpm --filter @zayuno/api build` -> **PASS (0 xato)**
+- `pnpm --filter @zayuno/provider-portal build` -> **PASS (0 xato)**
+- `pnpm exec tsx tests/test-provider-certification-guards.ts` -> **PASS**
+- `pnpm exec tsx tests/test-remote-certification-flow.ts` -> **PASS**
+- `pnpm test:review` (`tsx tests/run-all-review-tests.ts`) -> **41 / 41 test suites PASSED (100% CLEAN)**.
+**Keyingi qadam:** Foydalanuvchiga to'liq javob qaytarish.
+
+
+
 
 ## Product strategy — transaction network moat, 2026-09-10
 

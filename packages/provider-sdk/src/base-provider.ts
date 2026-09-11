@@ -53,6 +53,10 @@ export abstract class BaseProviderAdapter implements ProviderAdapter {
     this.capabilities = new Set(capabilities);
   }
 
+  getConfig(): ProviderAdapterConfig {
+    return this.config;
+  }
+
   getCapabilities(): ProviderCapability[] {
     return Array.from(this.capabilities);
   }
