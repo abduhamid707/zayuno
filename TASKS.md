@@ -73,6 +73,15 @@
 - `pnpm test:review` (`tsx tests/run-all-review-tests.ts`) -> **40 / 40 test suites PASSED (100% CLEAN)**.
 **Keyingi qadam:** Foydalanuvchiga to'liq natijalarni ko'rsatish va istalsa commit qilish.
 
+## Joriy ish — Onboarding Wizard gigant logo bugini tuzatish, 2026-09-11
+
+- [x] `apps/provider-portal/src/OnboardingWizard.tsx`: `/logo.svg` ga o'lcham berilmagani (`brand-mark` klassi bo'shligi) sababli 512px bo'lib chiqayotgan logoni ixcham, chiroyli `w-11 h-11` (`/logo2.webp`) holatga keltirish.
+- [x] Build va visual tekshiruv: `pnpm --filter @zayuno/provider-portal build` va regression testlar.
+- [x] O'zgarishni tasdiqlash va foydalanuvchiga tushuntirish.
+
+**Scope:** `apps/provider-portal/src/OnboardingWizard.tsx`.
+**Holat:** Tuzatildi. Logo 44x44px (`w-11 h-11`) o'lchamiga keltirildi, border va shadow qo'yildi. Portal to'liq build bo'ldi va testlar muvaffaqiyatli o'tdi.
+
 
 ## Product strategy — transaction network moat, 2026-09-10
 

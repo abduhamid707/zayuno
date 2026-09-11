@@ -1079,7 +1079,11 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
-            <img src="/logo.svg" alt="Zayuno" className="brand-mark" />
+            <img
+              src="/logo2.webp"
+              alt="Zayuno"
+              className="w-11 h-11 rounded-xl object-contain shadow-md flex-shrink-0 border border-slate-800"
+            />
             <div>
               <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-semibold">
                 Self-Service Onboarding
