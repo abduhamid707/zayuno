@@ -1,4 +1,27 @@
-# Current Task: Login Page UI Polish (Claude-like) & Push
+# Current Task: Fix GitHub Actions Production Deployment SSH Connection Reset
+- [x] Inspect deploy-production.yml and rollback-production.yml SSH connection handling
+- [x] Implement OpenSSH ControlMaster (multiplexing) to eliminate rapid new connections
+- [x] Add resilient SSH connection parameters (ServerAliveInterval, ConnectTimeout, ConnectionAttempts)
+- [x] Add exponential backoff retry helper for SSH and file synchronization
+- [x] Streamline file transfer into a single atomic tar-over-SSH pipeline
+- [x] Clean up SSH multiplexing socket upon workflow completion
+- [x] Update rollback-production.yml with matching resilient SSH configuration
+- [x] Verify workflow YAML syntax and push to GitHub
+
+**O'zgargan fayllar:**
+- `.github/workflows/deploy-production.yml`
+- `.github/workflows/rollback-production.yml`
+- `TASKS.md`
+
+**Bajarilgan tekshiruvlar va natijalari:**
+- PyYAML linter orqali `.github/workflows/deploy-production.yml` va `.github/workflows/rollback-production.yml` sintaksisi tekshirildi (ikkisi ham VALID).
+- SSH ControlMaster, ConnectionAttempts=5, ConnectTimeout=20 va eksponentsial orqaga chekinish (retry) orqali `kex_exchange_identification: read: Connection reset by peer` muammosi bartaraf qilindi.
+
+**Qolgan ish:** Push qilish va workflow natijasini kuzatish.
+**To'siq:** Yo'q.
+**Navbatdagi qadam:** Git commit va `origin main` ga push.
+
+# Previous Task: Login Page UI Polish (Claude-like) & Push
 - [x] Background remains untouched (`22.jpg`)
 - [x] Dynamic hiding of Google button and dividers on keyboard open
 - [x] Email stage layout positioning improved to rest closer to keyboard

@@ -136,12 +136,31 @@ jobs:
           chmod 700 ~/.ssh
 
           # Write known hosts securely
-          echo "${{ secrets.PROD_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
+          if [ -n "${{ secrets.PROD_KNOWN_HOSTS }}" ]; then
+            echo "${{ secrets.PROD_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+            chmod 644 ~/.ssh/known_hosts
+          fi
 
           # Write SSH private key securely
           echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa_prod
           chmod 600 ~/.ssh/id_rsa_prod
+
+          # Configure resilient SSH options and connection multiplexing (ControlMaster)
+          cat << 'EOF' > ~/.ssh/config
+          Host *
+            IdentityFile ~/.ssh/id_rsa_prod
+            IdentitiesOnly yes
+            ServerAliveInterval 15
+            ServerAliveCountMax 4
+            ConnectTimeout 20
+            ConnectionAttempts 5
+            TCPKeepAlive yes
+            StrictHostKeyChecking accept-new
+            ControlMaster auto
+            ControlPath ~/.ssh/cm-%r@%h:%p
+            ControlPersist 10m
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Sync Deploy Manifest and Scripts to Server
         shell: bash
@@ -150,25 +169,51 @@ jobs:
           PROD_PORT: ${{ secrets.PROD_PORT || '22' }}
           PROD_USER: ${{ secrets.PROD_USER || 'root' }}
         run: |
-          SSH_CMD="ssh -i ~/.ssh/id_rsa_prod -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
-          SCP_CMD="scp -i ~/.ssh/id_rsa_prod -P ${PROD_PORT}"
+          SSH_CMD="ssh -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
 
-          echo "Running pre-flight disk cache cleanup on server..."
-          $SSH_CMD "docker image prune -f >/dev/null 2>&1 || true; journalctl --vacuum-size=100M >/dev/null 2>&1 || true"
+          run_with_retry() {
+            local max_attempts=5
+            local delay=3
+            local attempt=1
+            local exit_code=0
 
-          echo "Ensuring deploy directories on server..."
-          $SSH_CMD "mkdir -p /root/zayuno/deploy /root/zayuno/scripts"
+            while [ $attempt -le $max_attempts ]; do
+              set +e
+              "$@"
+              exit_code=$?
+              set -e
+              if [ $exit_code -eq 0 ]; then
+                return 0
+              fi
+              echo "::warning::Command '$*' failed with exit code $exit_code (attempt $attempt/$max_attempts)."
+              if [ $attempt -lt $max_attempts ]; then
+                echo "Retrying in ${delay}s..."
+                sleep $delay
+                delay=$((delay * 2))
+              fi
+              attempt=$((attempt + 1))
+            done
 
-          echo "Copying docker-compose.prod.yml..."
-          $SCP_CMD docker-compose.prod.yml "${PROD_USER}@${PROD_HOST}:/root/zayuno/docker-compose.prod.yml"
+            echo "::error::Command '$*' failed after $max_attempts attempts."
+            return $exit_code
+          }
 
-          echo "Copying deployment scripts..."
-          $SCP_CMD deploy/health-check.sh "${PROD_USER}@${PROD_HOST}:/root/zayuno/deploy/health-check.sh"
-          $SCP_CMD deploy/deploy-server.sh "${PROD_USER}@${PROD_HOST}:/root/zayuno/deploy/deploy-server.sh"
-          $SCP_CMD deploy/nginx-zayuno.conf "${PROD_USER}@${PROD_HOST}:/root/zayuno/deploy/nginx-zayuno.conf"
-          $SCP_CMD scripts/ecosystem-server.js "${PROD_USER}@${PROD_HOST}:/root/zayuno/scripts/ecosystem-server.js"
+          echo "Preparing remote deploy directories and disk cleanup..."
+          run_with_retry $SSH_CMD "mkdir -p /root/zayuno/deploy /root/zayuno/scripts && (docker image prune -f >/dev/null 2>&1 || true) && (journalctl --vacuum-size=100M >/dev/null 2>&1 || true)"
 
-          $SSH_CMD "chmod +x /root/zayuno/deploy/*.sh"
+          echo "Packaging deployment manifests and scripts into bundle..."
+          tar -czf /tmp/zayuno-deploy-bundle.tar.gz \
+            docker-compose.prod.yml \
+            deploy/health-check.sh \
+            deploy/deploy-server.sh \
+            deploy/nginx-zayuno.conf \
+            scripts/ecosystem-server.js
+
+          echo "Synchronizing deployment bundle to server via SCP..."
+          run_with_retry scp -P "${PROD_PORT}" /tmp/zayuno-deploy-bundle.tar.gz "${PROD_USER}@${PROD_HOST}:/tmp/zayuno-deploy-bundle.tar.gz"
+
+          echo "Extracting bundle on server and ensuring executable permissions..."
+          run_with_retry $SSH_CMD "tar -xzf /tmp/zayuno-deploy-bundle.tar.gz -C /root/zayuno/ && rm -f /tmp/zayuno-deploy-bundle.tar.gz && chmod +x /root/zayuno/deploy/*.sh"
 
       - name: Execute Server-side Zero-Downtime Deployment
         shell: bash
@@ -178,21 +223,44 @@ jobs:
           PROD_USER: ${{ secrets.PROD_USER || 'root' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          SSH_CMD="ssh -i ~/.ssh/id_rsa_prod -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
+          SSH_CMD="ssh -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
+
+          run_with_retry() {
+            local max_attempts=3
+            local delay=3
+            local attempt=1
+            local exit_code=0
+            while [ $attempt -le $max_attempts ]; do
+              set +e
+              "$@"
+              exit_code=$?
+              set -e
+              if [ $exit_code -eq 0 ]; then return 0; fi
+              echo "::warning::Command '$*' failed with exit code $exit_code (attempt $attempt/$max_attempts)."
+              if [ $attempt -lt $max_attempts ]; then
+                echo "Retrying in ${delay}s..."
+                sleep $delay
+                delay=$((delay * 2))
+              fi
+              attempt=$((attempt + 1))
+            done
+            return $exit_code
+          }
 
           if [ -n "$GEMINI_API_KEY" ]; then
             echo "Syncing protected AI runtime configuration..."
-            printf '%s\n' "$GEMINI_API_KEY" | $SSH_CMD 'set -eu; umask 077; IFS= read -r value; env_file=/root/zayuno/.env; tmp_file=$(mktemp /root/zayuno/.env.XXXXXX); grep -v "^GEMINI_API_KEY=" "$env_file" > "$tmp_file" || true; printf "GEMINI_API_KEY=%s\n" "$value" >> "$tmp_file"; chmod 600 "$tmp_file"; mv "$tmp_file" "$env_file"'
+            printf '%s\n' "$GEMINI_API_KEY" | run_with_retry $SSH_CMD 'set -eu; umask 077; IFS= read -r value; env_file=/root/zayuno/.env; tmp_file=$(mktemp /root/zayuno/.env.XXXXXX); grep -v "^GEMINI_API_KEY=" "$env_file" > "$tmp_file" || true; printf "GEMINI_API_KEY=%s\n" "$value" >> "$tmp_file"; chmod 600 "$tmp_file"; mv "$tmp_file" "$env_file"'
           fi
 
           echo "Triggering deployment on remote server..."
           $SSH_CMD "/root/zayuno/deploy/deploy-server.sh '${{ env.TARGET_SHA }}' '${{ env.TARGET_SERVICES }}' '${{ env.IMAGE_PREFIX }}' '${{ env.RUN_MIGRATIONS }}'"
 
-      - name: Cleanup SSH Key
+      - name: Cleanup SSH Key and Connections
         if: always()
         shell: bash
         run: |
-          rm -f ~/.ssh/id_rsa_prod
+          ssh -O exit -p "${{ secrets.PROD_PORT || '22' }}" "${{ secrets.PROD_USER || 'root' }}@${{ secrets.PROD_HOST }}" 2>/dev/null || true
+          rm -f ~/.ssh/id_rsa_prod ~/.ssh/config ~/.ssh/cm-* /tmp/zayuno-deploy-bundle.tar.gz
 
       - name: Generate Deployment Summary
         if: always()

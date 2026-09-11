@@ -36,11 +36,30 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           
-          echo "${{ secrets.PROD_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
+          if [ -n "${{ secrets.PROD_KNOWN_HOSTS }}" ]; then
+            echo "${{ secrets.PROD_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+            chmod 644 ~/.ssh/known_hosts
+          fi
 
           echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa_prod
           chmod 600 ~/.ssh/id_rsa_prod
+
+          # Configure resilient SSH options and connection multiplexing (ControlMaster)
+          cat << 'EOF' > ~/.ssh/config
+          Host *
+            IdentityFile ~/.ssh/id_rsa_prod
+            IdentitiesOnly yes
+            ServerAliveInterval 15
+            ServerAliveCountMax 4
+            ConnectTimeout 20
+            ConnectionAttempts 5
+            TCPKeepAlive yes
+            StrictHostKeyChecking accept-new
+            ControlMaster auto
+            ControlPath ~/.ssh/cm-%r@%h:%p
+            ControlPersist 10m
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Set lowercased repo prefix for GHCR
         id: repo-prefix
@@ -58,7 +77,7 @@ jobs:
           INPUT_TARGET_SHA: ${{ github.event.inputs.target_sha }}
           INPUT_SERVICES: ${{ github.event.inputs.services }}
         run: |
-          SSH_CMD="ssh -i ~/.ssh/id_rsa_prod -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
+          SSH_CMD="ssh -p ${PROD_PORT} ${PROD_USER}@${PROD_HOST}"
 
           SERVICES="$INPUT_SERVICES"
           if [ -z "$SERVICES" ] || [ "$SERVICES" = "all" ]; then
@@ -93,11 +112,12 @@ jobs:
             echo "Rollback to \$ROLLBACK_SHA completed successfully."
           EOF
 
-      - name: Cleanup SSH Key
+      - name: Cleanup SSH Key and Connections
         if: always()
         shell: bash
         run: |
-          rm -f ~/.ssh/id_rsa_prod
+          ssh -O exit -p "${{ secrets.PROD_PORT || '22' }}" "${{ secrets.PROD_USER || 'root' }}@${{ secrets.PROD_HOST }}" 2>/dev/null || true
+          rm -f ~/.ssh/id_rsa_prod ~/.ssh/config ~/.ssh/cm-*
 
       - name: Rollback Summary
         if: always()
