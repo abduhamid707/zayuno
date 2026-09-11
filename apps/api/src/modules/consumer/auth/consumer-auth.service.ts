@@ -96,6 +96,78 @@ export class ConsumerAuthService {
     }
   }
 
+  async sendEmailOtp(email: string) {
+    const cleanEmail = email?.toLowerCase().trim();
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      throw new UnauthorizedException("Yaroqli email kiritish shart.");
+    }
+    
+    const lastSent = await this.redis.get(`consumer:otp:sent:${cleanEmail}`);
+    if (lastSent) {
+      throw new UnauthorizedException("Iltimos, qayta yuborishdan oldin 1 daqiqa kuting.");
+    }
+
+    const otp = Math.floor(10000 + Math.random() * 90000).toString();
+    await this.redis.set(`consumer:otp:code:${cleanEmail}`, otp, 300);
+    await this.redis.set(`consumer:otp:sent:${cleanEmail}`, "1", 60);
+
+    if (process.env.NODE_ENV !== "production") {
+      this.logger.log(`[DEV OTP] Email: ${cleanEmail}, Code: ${otp}`);
+    }
+
+    const apiKey = process.env.RESEND_API_KEY;
+    if (apiKey) {
+      const { Resend } = require("resend");
+      const resend = new Resend(apiKey);
+      try {
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+          to: cleanEmail,
+          subject: "Zayuno — kirish kodi",
+          html: `
+<div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #0f172a;">Zayuno ilovasiga kirish</h2>
+  <p style="color: #334155; font-size: 16px;">Sizning tasdiqlash kodingiz:</p>
+  <h1 style="font-size: 36px; letter-spacing: 6px; color: #2563EB; margin: 16px 0;">${otp}</h1>
+  <p style="color: #64748b; font-size: 14px;">Ushbu kod 5 daqiqa davomida amal qiladi. Kodni hech kimga bermang!</p>
+</div>
+          `.trim()
+        });
+      } catch (err: any) {
+        this.logger.error(`Resend xatosi: ${err.message}`);
+      }
+    }
+    
+    return { success: true, message: "Kod yuborildi." };
+  }
+
+  async verifyEmailOtp(email: string, code: string) {
+    const cleanEmail = email?.toLowerCase().trim();
+    if (!cleanEmail || !code) throw new UnauthorizedException("Email va kod kiritilishi shart.");
+    
+    const validOtp = await this.redis.get(`consumer:otp:code:${cleanEmail}`);
+    if (!validOtp || validOtp !== code.trim()) {
+      throw new UnauthorizedException("Kod noto'g'ri yoki yaroqlilik muddati tugagan.");
+    }
+
+    await this.redis.del(`consumer:otp:code:${cleanEmail}`);
+    await this.redis.del(`consumer:otp:sent:${cleanEmail}`);
+
+    const user = await prisma.user.upsert({
+      where: { email: cleanEmail },
+      update: { isActive: true },
+      create: {
+        email: cleanEmail,
+        name: "Zayuno foydalanuvchisi",
+        passwordHash: "EMAIL_OTP_MANAGED",
+        role: UserRole.API_CONSUMER,
+        isActive: true,
+      },
+    });
+
+    return this.issueSession(user);
+  }
+
   async refreshSession(refreshToken: string) {
     if (!refreshToken)
       throw new UnauthorizedException("Refresh token is required.");

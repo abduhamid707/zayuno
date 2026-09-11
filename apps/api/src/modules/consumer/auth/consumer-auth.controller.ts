@@ -24,6 +24,20 @@ export class ConsumerAuthController {
     return this.authService.verifyGoogleToken(body.idToken);
   }
 
+  @Post("email/send-code")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Send a 6-digit OTP to consumer email" })
+  async sendEmailOtp(@Body() body: { email: string }) {
+    return this.authService.sendEmailOtp(body.email);
+  }
+
+  @Post("email/verify-code")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Verify 6-digit OTP and issue session" })
+  async verifyEmailOtp(@Body() body: { email: string; code: string }) {
+    return this.authService.verifyEmailOtp(body.email, body.code);
+  }
+
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

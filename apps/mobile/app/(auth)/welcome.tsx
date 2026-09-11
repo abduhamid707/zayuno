@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   View,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -211,6 +212,158 @@ function NativeGoogleButton({ webClientId }: { webClientId: string }) {
   );
 }
 
+function EmailAuth() {
+  const setSession = useAuthStore((state) => state.setSession);
+  const [step, setStep] = useState<"email" | "otp">("email");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSendCode = async () => {
+    const cleanEmail = email.trim();
+    if (!cleanEmail.includes("@")) {
+      setError("Yaroqli email kiriting.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch(
+        "/api/v1/consumer/auth/email/send-code",
+        {
+          method: "POST",
+          body: JSON.stringify({ email: cleanEmail }),
+        },
+        false,
+      );
+      setStep("otp");
+      setOtp("");
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+    } catch (err: any) {
+      setError(err?.message || "Emailga kod yuborishda xatolik.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (otp.length !== 5) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const session = await apiFetch<SessionResponse>(
+        "/api/v1/consumer/auth/email/verify-code",
+        {
+          method: "POST",
+          body: JSON.stringify({ email: email.trim(), code: otp }),
+        },
+        false,
+      );
+      const accessToken = session.accessToken || session.token;
+      if (!accessToken) throw new Error("Session token missing");
+      await setSession({
+        accessToken,
+        refreshToken: session.refreshToken,
+        user: session.user,
+        expiresIn: session.expiresIn,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    } catch (err: any) {
+      setError(err?.message || "Kod noto'g'ri.");
+      setOtp(""); // reset input on error
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (step === "otp") {
+    return (
+      <View style={styles.emailContainer}>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Text style={styles.otpPrompt}>
+          {email} manziliga 5 xonali kod yuborildi. Kodni kiriting:
+        </Text>
+        <TextInput
+          style={styles.input}
+          placeholder="00000"
+          placeholderTextColor="#9CA3AF"
+          value={otp}
+          onChangeText={(t) => {
+            const val = t.replace(/[^0-9]/g, "").slice(0, 5);
+            setOtp(val);
+            setError(null);
+          }}
+          keyboardType="number-pad"
+          textContentType="oneTimeCode"
+          autoFocus
+        />
+        <View style={styles.otpActions}>
+          <Pressable
+            disabled={busy}
+            onPress={() => {
+              setStep("email");
+              setOtp("");
+              setError(null);
+            }}
+            style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
+          >
+            <Text style={styles.backBtnText}>Orqaga</Text>
+          </Pressable>
+          <Pressable
+            disabled={busy || otp.length !== 5}
+            onPress={handleVerifyCode}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              pressed && styles.pressed,
+              (busy || otp.length !== 5) && styles.disabled,
+            ]}
+          >
+            <Text style={styles.primaryBtnText}>
+              {busy ? "Kutilmoqda..." : "Tasdiqlash"}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.emailContainer}>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <View style={styles.emailInputWrapper}>
+        <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+        <TextInput
+          style={[styles.input, styles.inputWithIcon]}
+          placeholder="Email manzilingiz"
+          placeholderTextColor="#9CA3AF"
+          value={email}
+          onChangeText={(t) => {
+            setEmail(t);
+            setError(null);
+          }}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      </View>
+      <Pressable
+        disabled={busy || !email.includes("@")}
+        onPress={handleSendCode}
+        style={({ pressed }) => [
+          styles.primaryBtn,
+          pressed && styles.pressed,
+          (busy || !email.includes("@")) && styles.disabled,
+        ]}
+      >
+        <Text style={styles.primaryBtnText}>
+          {busy ? "Yuborilmoqda..." : "Email bilan davom etish"}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function WelcomeScreen() {
   const webClientId =
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() || "";
@@ -279,6 +432,14 @@ export default function WelcomeScreen() {
               </Text>
             </Pressable>
           )}
+
+          <View style={styles.divider}>
+            <View style={styles.line} />
+            <Text style={styles.dividerText}>yoki</Text>
+            <View style={styles.line} />
+          </View>
+
+          <EmailAuth />
 
           <View style={styles.legalRow}>
             <Ionicons
@@ -453,4 +614,55 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   legalLink: { color: "#8178FF" },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 18,
+    gap: 12,
+  },
+  line: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.15)" },
+  dividerText: { color: "rgba(255,255,255,0.5)", fontSize: 13, fontWeight: "500" },
+  emailContainer: { width: "100%", gap: 12 },
+  emailInputWrapper: { position: "relative", justifyContent: "center" },
+  inputIcon: { position: "absolute", left: 16, zIndex: 10 },
+  input: {
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    color: "#FFF",
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 16,
+    textAlign: "center",
+  },
+  inputWithIcon: {
+    textAlign: "left",
+    paddingLeft: 46,
+  },
+  primaryBtn: {
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: "#315CFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+  otpPrompt: {
+    color: "#FFF",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  otpActions: { flexDirection: "row", gap: 12 },
+  backBtn: {
+    flex: 1,
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backBtnText: { color: "#FFF", fontSize: 15, fontWeight: "600" },
 });

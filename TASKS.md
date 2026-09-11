@@ -1,5 +1,15 @@
 # Deferred tasks
 
+## Joriy ish — Onboarding va Integratsiya oqimlarini o‘qish orqali xavfni baholash (Read-only Audit), 2026-09-11
+
+- [x] OnboardingWizard, provider-sdk (certification, remote-http-adapter) va API service fayllarini read-only rejimida o'qish.
+- [x] O'ta qattiq tekshiruvlar (strictness), state xatolari, SSRF / Timeout va DNS vulnerabilliklarni topish.
+- [x] Topilgan barcha muammolarni (code change qilmasdan) foydalanuvchiga ro'yxat qilib taqdim etish.
+
+**Scope:** `apps/provider-portal/src/OnboardingWizard.tsx`, `packages/provider-sdk/src/certification.ts`, `packages/provider-sdk/src/remote-http-adapter.ts`, `apps/api/src/modules/providers/providers.service.ts`.
+**Holat:** Yakunlandi. Kodga hech qanday o'zgartirish kiritilmadi. Topilgan kamchiliklar ro'yxati taqdim etildi.
+**Topilmalar:** SSRF DNS rebinding, timeout yo'qligi, redirect error, Quote math precision, qattiq Action parametrlar va Webhook HMAC verification'dagi oqsoqliklar aniqlandi.
+
 ## Joriy ish — onboarding validatsiyasi, logo va katalog ishonchliligi, 2026-09-11
 
 - [x] Wizard qadamlarini real validatsiya va saqlangan holat bilan cheklash; eski success xabarlarini tozalash.
