@@ -113,7 +113,8 @@ async function main() {
         type: 'DELIVERY' as any,
         category: 'logistics',
         description: 'Express parcel and courier service across Tashkent',
-        baseUrl: 'https://api.fastdeliveries.uz',
+        baseUrl: 'https://8.8.8.8', // Public IP fixture: validation without a DNS dependency; no HTTP request.
+        apiSecret: 'test-provider-secret-12345',
         authMethod: 'API_KEY',
         supportContact: {
           phone: '+998712009999',

@@ -34,6 +34,7 @@ const testSuites = [
   "tests/test-sensitive-dynamic-parameters.ts",
   "tests/test-docs-contract.ts",
   "tests/test-provider-portal-docs.ts",
+  "tests/test-onboarding-catalog-resilience.ts",
   "tests/test-provider-operations-guardrails.ts",
   "tests/test-poyez-sandbox-e2e.ts",
   "tests/test-customer-experience-and-presenter.ts",

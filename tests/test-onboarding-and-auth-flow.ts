@@ -154,6 +154,7 @@ async function main() {
     // --------------------------------------------------------------------------
     console.log('  [5/6] Testing Provider Application Registration & Slug Validation...');
     const mockRegistryService: any = {
+      isOfficialSandboxUrl: () => false,
       isSlugAvailable: (slug: string) => slug !== 'existing-provider',
       isReservedBrand: (name: string, slug: string) => slug === 'evos' || slug === 'uzum'
     };
@@ -249,7 +250,8 @@ async function main() {
         type: ProviderType.SERVICES,
         category: 'logistics',
         geography: ['UZ'],
-        baseUrl: 'https://api.expresslogistics.uz/zayuno',
+        baseUrl: 'https://8.8.8.8/zayuno', // Public IP fixture, no external DNS or HTTP.
+        apiSecret: 'test-provider-secret-12345',
         authMethod: 'API_KEY',
         capabilities: [
           ProviderCapability.METADATA,

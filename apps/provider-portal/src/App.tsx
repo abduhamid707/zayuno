@@ -447,8 +447,14 @@ export default function App() {
   const { data: providerData, isPending: providerLoading, isError: providerFailed, refetch: refetchProvider } = useQuery({
     queryKey: ['provider-details', token],
     queryFn: async () => {
-      const res = await apiFetch('/api/v1/providers/me');
-      return res.json();
+      try {
+        const res = await apiFetch('/api/v1/providers/me');
+        return res.json();
+      } catch (error) {
+        // A verified new account has no application yet; show its first business step.
+        if (error instanceof Error && error.message === 'Your account is not assigned to a provider application yet.') return null;
+        throw error;
+      }
     },
     enabled: !!token
   });

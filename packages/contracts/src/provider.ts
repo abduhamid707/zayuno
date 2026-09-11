@@ -270,8 +270,24 @@ export type FindProvidersResult = z.infer<typeof FindProvidersResultSchema>;
 /*                       ONBOARDING & MANAGEMENT SCHEMAS                      */
 /* -------------------------------------------------------------------------- */
 
+// Uploaded logos are resized by the portal; bounded raster data URLs need no external storage service.
+export const ProviderLogoSchema = z.string().max(96_000).refine(value => {
+  if (value.startsWith('https://')) {
+    try { const url = new URL(value); return !url.username && !url.password; } catch { return false; }
+  }
+  const match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match) return false;
+  try {
+    const bytes = atob(match[2]);
+    return match[1] === 'png' ? bytes.startsWith('\x89PNG\r\n\x1a\n')
+      : match[1] === 'jpeg' ? bytes.startsWith('\xff\xd8\xff')
+      : bytes.startsWith('RIFF') && bytes.slice(8, 12) === 'WEBP';
+  } catch { return false; }
+}, 'Logo must be a public HTTPS URL or a PNG/JPEG/WebP image under 96 KB');
+
 export const RegisterProviderInputSchema = z.object({
-  name: z.string().min(2),
+  name: z.string().trim().min(2).max(160),
+  logoUrl: ProviderLogoSchema.nullable().optional(),
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/),
   description: z.string().optional(),
   type: z.nativeEnum(ProviderType).default(ProviderType.SERVICES),
@@ -284,7 +300,13 @@ export const RegisterProviderInputSchema = z.object({
   authConfig: z.record(z.any()).optional(),
   capabilities: z.array(z.nativeEnum(ProviderCapability)).min(1),
   webhookUrl: z.string().url().optional(),
-  supportContact: RequiredSupportContactSchema
+  supportContact: RequiredSupportContactSchema.superRefine((contact, context) => {
+    if (typeof contact === 'string') return;
+    const invalid = (field: string, message: string) => context.addIssue({ code: z.ZodIssueCode.custom, path: [field], message });
+    if (contact.phone?.trim() && !/^\+?[\d\s()-]{7,22}$/.test(contact.phone.trim())) invalid('phone', 'Invalid support phone');
+    if (contact.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email.trim())) invalid('email', 'Invalid support email');
+    if (contact.telegram?.trim() && !/^(?:@|https:\/\/t\.me\/)?[a-zA-Z][a-zA-Z0-9_]{4,31}$/.test(contact.telegram.trim())) invalid('telegram', 'Invalid Telegram username');
+  })
 });
 export type RegisterProviderInput = z.infer<typeof RegisterProviderInputSchema>;
 

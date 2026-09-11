@@ -61,6 +61,8 @@ export type CatalogOfferingItem = {
   price: number;
   currency: string;
   imageUrl?: string;
+  priceKnown?: boolean;
+  isAvailable?: boolean;
   variantsCount?: number;
   optionsCount?: number;
 };
@@ -114,7 +116,7 @@ export type TrayItem =
 export function formatMoney(value?: number, currency = "UZS") {
   if (typeof value !== "number" || !Number.isFinite(value)) return "";
   const amount = Math.round(value).toLocaleString("uz-UZ");
-  const normalized = currency.toUpperCase();
+  const normalized = typeof currency === "string" ? currency.toUpperCase() : "UZS";
   if (normalized === "UZS") return `${amount} so‘m`;
   return `${amount} ${normalized}`;
 }

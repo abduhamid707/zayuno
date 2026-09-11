@@ -525,6 +525,12 @@ export class ProvidersService {
       }
     }
 
+    if (!input.baseUrl?.trim()) throw new BadRequestException('API Base URL kiritilishi shart. Avval integratsiya manzilini tayyorlang.');
+    input.baseUrl = await this.validateRemoteBaseUrl(input.baseUrl);
+    if (input.apiSecret && (input.apiSecret.trim().length < 12 || input.apiSecret.length > 512)) throw new BadRequestException('Provider credential must contain 12–512 characters.');
+    if (!this.registry.isOfficialSandboxUrl(input.baseUrl) && !input.apiSecret?.trim() && !existingOwnerDraft?.encryptedSecret) {
+      throw new BadRequestException('Provider API credential is required. Generate or enter a key before continuing.');
+    }
     const normalizedSupport = normalizeSupportContact(input.supportContact);
     const fulfillmentMode = input.fulfillmentMode || defaultFulfillmentModeForProviderType(input.type);
 
@@ -533,6 +539,7 @@ export class ProvidersService {
       const updateData: any = {
         slug: cleanSlug,
         name: input.name,
+        logoUrl: input.logoUrl,
         type: (input.type as any) || ProviderType.SERVICES,
         adapterType: input.baseUrl ? 'remote-http' : 'sandbox',
         capabilities: input.capabilities,
@@ -551,6 +558,7 @@ export class ProvidersService {
           supportContact: normalizedSupport,
           fulfillmentMode,
           isCertified: false,
+          lastCertificationReport: null,
           isPublished: false,
           reviewStatus: 'DRAFT',
           ownerUserId: owner.id,
@@ -592,13 +600,14 @@ export class ProvidersService {
 
     const sandboxKey = generateApiKey(false);
     const sandboxSecret = `zy_sb_sec_${Math.random().toString(36).substring(2, 12)}`;
-    const secretToEncrypt = input.apiSecret || sandboxSecret;
+    const secretToEncrypt = input.apiSecret || this.registry.resolveSandboxTestCredential(input.baseUrl, cleanSlug) || sandboxSecret;
     const encryptedSecret = encryptSecret(secretToEncrypt, this.getEncryptionKey());
 
     const created = await prisma.provider.create({
       data: {
         slug: cleanSlug,
         name: input.name,
+        logoUrl: input.logoUrl,
         type: (input.type as any) || ProviderType.SERVICES,
         status: ProviderStatus.DRAFT,
         adapterType: input.baseUrl ? 'remote-http' : 'sandbox',

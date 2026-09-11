@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../primitives/Text";
@@ -7,6 +7,7 @@ import {
   CategoryRibbonItem,
   CatalogSectionItem,
 } from "../../lib/interaction";
+import { normalizeCatalogSections } from '../../lib/catalog-presentation';
 import { CategoryRibbon } from "./CategoryRibbon";
 import { FoodProductCard, CartFlightOrigin } from "./FoodProductCard";
 import { offeringKey } from "../../lib/cart";
@@ -34,9 +35,17 @@ export const InChatCatalogWidget = memo(function InChatCatalogWidget({
   quantities = {},
   disabled,
 }: InChatCatalogWidgetProps) {
+  const safeSections = useMemo(() => normalizeCatalogSections(sections), [sections]);
+  const safeCategories = useMemo(() => safeSections.map(section => {
+    const original = Array.isArray(categories) ? categories.find(c => c && c.slug === section.categorySlug) : undefined;
+    return { id: section.categorySlug, slug: section.categorySlug, title: section.categoryTitle, itemCount: section.itemCount, emoji: typeof original?.emoji === 'string' ? original.emoji : undefined };
+  }), [categories, safeSections]);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
     "all",
   );
+  useEffect(() => {
+    if (selectedCategory !== 'all' && !safeSections.some(section => section.categorySlug === selectedCategory)) setSelectedCategory('all');
+  }, [safeSections, selectedCategory]);
   const { width, fontScale } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const cardWidth = Math.round(
@@ -44,15 +53,15 @@ export const InChatCatalogWidget = memo(function InChatCatalogWidget({
   );
 
   const filteredSections = useMemo(() => {
-    if (!selectedCategory || selectedCategory === "all") return sections;
-    return sections.filter((s) => s.categorySlug === selectedCategory);
-  }, [sections, selectedCategory]);
+    if (!selectedCategory || selectedCategory === "all") return safeSections;
+    return safeSections.filter((s) => s.categorySlug === selectedCategory);
+  }, [safeSections, selectedCategory]);
 
   return (
     <View style={styles.root}>
       {/* 1. Category Horizontal Ribbon - Sleek Text Pills */}
       <CategoryRibbon
-        categories={categories}
+        categories={safeCategories}
         selectedSlug={selectedCategory}
         onSelectCategory={(slug) => {
           setSelectedCategory(slug);
@@ -140,6 +149,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: "#F3F5FB",
     fontSize: 15,
+    flexShrink: 1,
     fontWeight: "700",
   },
   countBadge: {

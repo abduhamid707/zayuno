@@ -80,6 +80,8 @@ type CatalogOfferingItem = {
   price: number;
   currency: string;
   imageUrl?: string;
+  priceKnown?: boolean;
+  isAvailable?: boolean;
   variantsCount?: number;
   optionsCount?: number;
 };
@@ -434,7 +436,7 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       /^(r[ae]st[ao]r[a-z]*|fast\s*food[a-z]*|kafe[a-z]*|brend[a-z]*|oshxona[a-z]*|food[a-z]*|ovqat[a-z]*|taom[a-z]*)(\s+.*)?$/i.test(
         norm,
       ) ||
-      (/(r[ae]st[ao]r[a-z]*|fast\s*food|fastfood|kafe|oshxona|food|ovqat|taom|pitsa|pizza|lavash|burger|sushi|donar|menyu|katalog)/i.test(
+      (/(r[ae]st[ao]r[a-z]*|fast\s*food|fastfood|kafe|oshxona|menyu|katalog)/i.test(
         norm,
       ) &&
         /(ko['‘’`]?rsat|chiqar|bor|bormi|qanday|qaysi|qayerda|ro['‘’`]?yxat|mavjud|buyurtma|zakaz|tanlash|och)/i.test(
@@ -563,7 +565,7 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       ? null
       : this.findDirectProvider(prompt, providers);
     if (directProvider) {
-      const plan: LiveContextPlan = {
+      let plan: LiveContextPlan = {
         intent: "food_browse",
         needsCatalog: true,
         providerScope: "explicit",
@@ -576,17 +578,29 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         allowCatalogFallback: true,
         excludedOfferingIds: [],
       };
+      // Only continue the immediately preceding user request; never resurrect an older cancelled cart.
+      const previousRequest = [...history].reverse().find(message => message.role === 'user')?.content || '';
+      const continuingRequest = this.isConstrainedFoodRequest(previousRequest) ? previousRequest : '';
+      if (continuingRequest) {
+        const continuation = await this.planWithAi(continuingRequest, history, [directProvider], personalizationContext);
+        plan = this.normalizeBroadFoodDiscoveryPlan(continuingRequest, {
+          ...plan, ...(continuation || {}), needsCatalog: true, providerScope: 'explicit', providerSlugs: [directProvider.slug],
+          query: continuation?.query || continuingRequest,
+          intent: continuation?.intent === 'food_selection' ? 'food_selection' : 'food_browse',
+        });
+      }
       const liveContext = await this.loadLiveContext(plan, providers);
+      if (continuingRequest && plan.intent === 'food_selection') {
+        const answer = await this.startOrderSelection(input.userId, input.userEmail, plan, liveContext, input.conversationId);
+        if (answer) return { prompt, history, plan, liveContext, directAnswer: answer, interaction: this.buildRequirementInteraction(await this.readPendingOrder(input.userId, input.conversationId)) };
+      }
+      const interaction = await this.getCachedOrCuratedCatalogInteraction(plan, liveContext);
       return {
-        prompt,
-        history,
-        plan,
-        liveContext,
-        directAnswer: `${directProvider.name} menyusidan tanlang 👇`,
-        interaction: await this.getCachedOrCuratedCatalogInteraction(
-          plan,
-          liveContext,
-        ),
+        prompt, history, plan, liveContext,
+        directAnswer: interaction
+          ? (continuingRequest ? this.buildGroundedCatalogAnswer(plan, liveContext) || `${directProvider.name}: so‘rovingizga mos variantlardan tanlang 👇` : `${directProvider.name} menyusidan tanlang 👇`)
+          : `${directProvider.name} menyusini hozir ko‘rsata olmadim. Qayta urinib ko‘ring yoki boshqa restoran tanlang.`,
+        interaction: interaction || this.buildProviderInteraction(providers.filter(provider => provider.slug !== directProvider.slug)),
       };
     }
 
@@ -988,45 +1002,9 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     plan: LiveContextPlan,
     liveContext: any[],
   ): Promise<ChatInteraction | undefined> {
-    if (!plan.needsCatalog) return undefined;
-    const firstContext = liveContext?.[0];
-    const slug = firstContext?.slug;
-
-    const isFullCatalog =
-      Boolean(slug) &&
-      !plan.query?.trim() &&
-      (!plan.itemRequests || plan.itemRequests.length === 0);
-
-    const cacheKey = `consumer:catalog:curated:${slug}`;
-
-    if (isFullCatalog) {
-      try {
-        const cached = await this.redisService.get(cacheKey);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (
-            parsed &&
-            parsed.kind === "catalog_menu" &&
-            parsed.sections?.length > 0
-          ) {
-            return parsed;
-          }
-        }
-      } catch (err: any) {
-        this.logger.warn(`Redis catalog cache get failed: ${err.message}`);
-      }
-    }
-
-    const catalog = this.buildCatalogInteraction(plan, liveContext);
-    if (catalog && isFullCatalog) {
-      try {
-        await this.redisService.set(cacheKey, JSON.stringify(catalog), 86400);
-      } catch (err: any) {
-        this.logger.warn(`Redis catalog cache set failed: ${err.message}`);
-      }
-    }
-
-    return catalog;
+    // CatalogService owns freshness and webhook invalidation. A second 24-hour
+    // UI cache used to overwrite newly fetched prices, stock and empty responses.
+    return this.buildCatalogInteraction(plan, liveContext);
   }
 
   private buildCatalogInteraction(
@@ -1041,11 +1019,11 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         ),
     );
     const available = entries.filter(
-      ({ offering }) => offering?.id && offering?.title,
+      ({ context, offering }) => typeof context?.slug === 'string' && typeof offering?.id === 'string' && typeof offering?.title === 'string' && offering.title.trim(),
     );
     if (!available.length) return undefined;
 
-    const firstContext = liveContext[0] || entries[0]?.context;
+    const firstContext = available[0]?.context;
 
     const sectionsMap = new Map<
       string,
@@ -1056,7 +1034,7 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       }
     >();
     for (const { context, offering } of available) {
-      const catSlug = offering.categorySlug || "general";
+      const catSlug = typeof offering.categorySlug === 'string' && offering.categorySlug ? offering.categorySlug : "general";
       const catTitle =
         offering.categoryTitle || offering.categoryName || catSlug;
       if (!sectionsMap.has(catSlug)) {
@@ -1067,9 +1045,10 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         });
       }
 
-      let resolvedPrice = Number(offering.basePrice || offering.price || 0);
+      const rawPrice = offering.basePrice ?? offering.price;
+      let resolvedPrice = (typeof rawPrice === 'number' || (typeof rawPrice === 'string' && rawPrice.trim())) ? Number(rawPrice) : NaN;
       if (
-        (!resolvedPrice || resolvedPrice <= 0) &&
+        (!Number.isFinite(resolvedPrice) || resolvedPrice < 0) &&
         Array.isArray(offering.variants) &&
         offering.variants.length > 0
       ) {
@@ -1088,7 +1067,9 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
         categorySlug: catSlug,
         title: this.cleanMarkdownText(offering.title),
         description: offering.description || offering.summary,
-        price: resolvedPrice,
+        price: Number.isFinite(resolvedPrice) && resolvedPrice >= 0 ? resolvedPrice : 0,
+        priceKnown: Number.isFinite(resolvedPrice) && resolvedPrice >= 0,
+        isAvailable: offering.isAvailable !== false,
         currency: offering.currency || "UZS",
         imageUrl: this.safeInteractionImage(
           offering.imageUrl ||
@@ -1133,12 +1114,12 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     return {
       version: 1,
       kind: "catalog_menu",
-      providerSlug: firstContext?.slug || "evos",
+      providerSlug: firstContext.slug,
       providerName: this.cleanMarkdownText(firstContext?.name || "Restoran"),
       providerLogoUrl: this.safeInteractionImage(
         firstContext?.logoUrl || firstContext?.metadata?.logoUrl,
       ),
-      locationName: "Toshkent",
+      locationName: typeof firstContext?.locationName === "string" ? firstContext.locationName : undefined,
       categories: categoriesRibbon,
       sections: Array.from(sectionsMap.values()).map((s) => ({
         categorySlug: s.categorySlug,
@@ -1221,6 +1202,7 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
   }
 
   private safeInteractionImage(value: unknown): string | undefined {
+    if (typeof value === 'string' && value.length <= 96_000 && /^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(value)) return value;
     try {
       const url = new URL(String(value || ""));
       if (url.protocol !== "https:" || url.username || url.password)
@@ -1777,6 +1759,13 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
     };
   }
 
+  private isConstrainedFoodRequest(prompt: string): boolean {
+    const text = this.normalizeLookupText(prompt);
+    return /(?:pitsa|pizza|burger|lavash|sushi|roll|kruassan|ichimlik|ovqat|taom)/i.test(text)
+      && /(?:kerak|buyurtma|zakaz|xohla|katta|kichik|ming|budjet|budget|kishi|dona|bitta|\\d)/i.test(text)
+      && !/(?:bekor|cancel|otmena)/i.test(text);
+  }
+
   private normalizeBroadFoodDiscoveryPlan(
     prompt: string,
     plan: LiveContextPlan,
@@ -1792,12 +1781,13 @@ Quyidagi mashhur restoran va fast-foodlardan birini tanlang yoki xohlagan taomin
       /\b\d+\s*(?:kishi|kishiga|kishilik|odam|odamga|ming|mingdan|k)\b/i.test(
         normalized,
       ) ||
-      /\b(budjet|budget|oshmasin|gacha|arzon|qimmat|achchiq|vegetarian|vegan)\b/i.test(
+      /\b(budjet|budget|oshmasin|gacha|arzon|qimmat|achchiq|vegetarian|vegan|katta|kattasidan|kichik|kichigidan)\b/i.test(
         normalized,
       );
     if (!hasCategory || !hasDiscoveryConstraint) return plan;
 
     const genericWords = new Set([
+      "menga", "katta", "kattasidan", "kichik", "kichigidan", "bitta", "bir", "ta", "dona", "zakaz", "buyurtma", "qil", "qiling",
       "bugun",
       "kechqurun",
       "ertalab",
@@ -3032,7 +3022,7 @@ Rules:
 - Set needsCatalog=true whenever browsing or ordering from a provider.
 - Put the most relevant provider slug first. The query must express the user's actual need, without conversational filler.
 - For food_selection, preserve each exact requested menu item and quantity in itemRequests.
-- Budget, spice level, dietary preference, category and delivery speed belong in query.
+- Budget, size (e.g. kattasidan = large), quantity, spice level, dietary preference, category and delivery speed belong in query. Preserve these constraints when the user next selects a restaurant; a brand click does not reset the request.
 - PERSONALIZATION contains optional preference hints. Use it only to rank equally valid choices; the current USER request always overrides it. Never mention or expose the stored profile.
 - A greeting uses greeting. A question about what Zayuno can do uses capabilities and must not request catalog data.
 - For greeting, capabilities and food_clarification write one short natural Uzbek answer. For catalog intents answer must be empty.

@@ -31,6 +31,8 @@ import {
   AlertTriangle,
   Webhook
 } from 'lucide-react';
+import { ProviderLogoInput } from './ProviderLogoInput';
+import { businessErrors, integrationErrors, reachableOnboardingStep } from './onboarding-validation';
 import { DocsViewer } from './DocsViewer';
 import {
   createProviderOpenApiDocument,
@@ -170,11 +172,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   };
   const urlParams = getInitialParams();
 
+  // Scope local form drafts to the current account, without persisting its token.
+  const draftOwnerId = (() => { try { return token ? JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub || 'signed-in' : 'guest'; } catch { return 'guest'; } })();
   // Read saved draft from localStorage
   const loadSavedDraft = () => {
     try {
       const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
+      const draft = raw ? JSON.parse(raw) : null;
+      return draft?.ownerId === draftOwnerId ? draft : null;
     } catch {
       return null;
     }
@@ -209,16 +214,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // Step 3: Business Profile
+  const [logoUrl, setLogoUrl] = useState(initialProvider?.logoUrl || savedDraft?.logoUrl || '');
   const [businessName, setBusinessName] = useState(initialProvider?.name || savedDraft?.businessName || '');
-  const [category, setCategory] = useState(initialProvider?.metadata?.category || savedDraft?.category || 'general_services');
-  const initialProviderType = (CATEGORIES.find(item => item.id === (initialProvider?.metadata?.category || savedDraft?.category || 'general_services'))?.providerType || 'SERVICES') as ProviderType;
+  const [category, setCategory] = useState(initialProvider?.category || initialProvider?.metadata?.category || savedDraft?.category || 'general_services');
+  const initialProviderType = (CATEGORIES.find(item => item.id === (initialProvider?.category || initialProvider?.metadata?.category || savedDraft?.category || 'general_services'))?.providerType || 'SERVICES') as ProviderType;
   const [fulfillmentMode, setFulfillmentMode] = useState<ProviderFulfillmentMode>(
     initialProvider?.fulfillmentMode || initialProvider?.metadata?.fulfillmentMode || savedDraft?.fulfillmentMode || defaultFulfillmentModeForProviderType(initialProviderType)
   );
-  const [description, setDescription] = useState(initialProvider?.metadata?.description || savedDraft?.description || '');
-  const [supportPhone, setSupportPhone] = useState(initialProvider?.config?.supportContact?.phone || savedDraft?.supportPhone || '');
-  const [supportTelegram, setSupportTelegram] = useState(initialProvider?.config?.supportContact?.telegram || savedDraft?.supportTelegram || '');
-  const [supportEmail, setSupportEmail] = useState(initialProvider?.config?.supportContact?.email || savedDraft?.supportEmail || '');
+  const [description, setDescription] = useState(initialProvider?.description || initialProvider?.metadata?.description || savedDraft?.description || '');
+  const [supportPhone, setSupportPhone] = useState(initialProvider?.supportContact?.phone || savedDraft?.supportPhone || '');
+  const [supportTelegram, setSupportTelegram] = useState(initialProvider?.supportContact?.telegram || savedDraft?.supportTelegram || '');
+  const [supportEmail, setSupportEmail] = useState(initialProvider?.supportContact?.email || savedDraft?.supportEmail || '');
 
   // Step 4: Integration Details
   const [slug, setSlug] = useState(urlParams.provider || initialProvider?.slug || savedDraft?.slug || '');
@@ -229,10 +235,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [hasConfirmedSavedSecret, setHasConfirmedSavedSecret] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
-  const [hasSavedSecret, setHasSavedSecret] = useState(Boolean(savedDraft?.hasSavedSecret || initialProvider?.id));
+  const [hasSavedSecret, setHasSavedSecret] = useState(Boolean(initialProvider?.id && initialProvider?.baseUrl));
   const [showSecretInput, setShowSecretInput] = useState(false);
   const [authMethod, setAuthMethod] = useState<'API_KEY' | 'BEARER_TOKEN' | 'HMAC_SIGNATURE'>(
-    initialProvider?.config?.authMethod || savedDraft?.authMethod || 'API_KEY'
+    initialProvider?.authMethod || initialProvider?.config?.authMethod || savedDraft?.authMethod || 'API_KEY'
   );
   const [capabilityProfile, setCapabilityProfile] = useState<'transactional' | 'readonly'>(() => {
     if (initialProvider?.capabilities) {
@@ -276,7 +282,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         sandboxWebhookSecret: initialProvider.webhookSecret || ''
       };
     }
-    return savedDraft?.createdCredentials || null;
+    return null;
   });
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -285,6 +291,26 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const businessValidation = businessErrors({ businessName, supportPhone, supportTelegram, supportEmail });
+  const integrationValidation = integrationErrors({ slug, baseUrl, apiSecret, hasSavedSecret, sandbox: isOfficialSandboxUrl(baseUrl), generatedSecret, confirmed: hasConfirmedSavedSecret });
+  if (logoUrl && !/^https:\/\//i.test(logoUrl) && !/^data:image\/(png|jpeg|webp);base64,/i.test(logoUrl)) businessValidation.logoUrl = 'Logo uchun HTTPS manzil yoki rasm faylidan foydalaning.';
+  const businessValid = Object.keys(businessValidation).length === 0;
+  const integrationValid = Object.keys(integrationValidation).length === 0;
+  const fingerprint = JSON.stringify([businessName.trim(), category, fulfillmentMode, description.trim(), supportPhone.trim(), supportTelegram.trim(), supportEmail.trim(), logoUrl, slug.trim(), baseUrl.trim(), authMethod, capabilityProfile]);
+  const [savedFingerprint, setSavedFingerprint] = useState(initialProvider?.id ? fingerprint : '');
+  const integrationSaved = Boolean(savedFingerprint && savedFingerprint === fingerprint && !apiSecret && businessValid && integrationValid);
+  const maxStep = reachableOnboardingStep(Boolean(token), businessValid, integrationSaved, Boolean(certReport?.isProductionReady));
+  useEffect(() => { setCurrentStep(step => step === 5 && showCertificationSettings && businessValid ? step : Math.min(step, maxStep)); }, [maxStep, showCertificationSettings, businessValid]);
+  useEffect(() => { setSuccessMsg(null); setFieldErrors({}); setError(null); }, [fingerprint, currentStep]);
+  useEffect(() => { setUrlCheckResult({ status: 'idle', message: '' }); }, [baseUrl, authMethod, apiSecret]);
+  const showValidation = (errors: Record<string, string>) => {
+    setFieldErrors(errors);
+    setError('Belgilangan maydonlarni to‘g‘rilang.');
+    requestAnimationFrame(() => document.getElementById(Object.keys(errors)[0])?.focus());
+  };
+  const fieldError = (key: string) => fieldErrors[key] ? <p id={key + '-error'} role="alert" className="text-sm text-rose-300 mt-1">{fieldErrors[key]}</p> : null;
 
   // Sync deep-link parameters to browser URL: ?tab=onboarding&step=N&provider=slug
   useEffect(() => {
@@ -304,6 +330,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   useEffect(() => {
     try {
       const draft = {
+        ownerId: draftOwnerId,
+        logoUrl,
         fullName,
         email,
         businessName,
@@ -318,12 +346,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         authMethod,
         capabilityProfile,
         currentStep,
-        hasSavedSecret: hasSavedSecret || Boolean(apiSecret.trim()),
-        createdCredentials
+        // Credentials and workflow completion are never restored from local drafts.
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
     } catch {}
   }, [
+    logoUrl,
+    draftOwnerId,
     fullName,
     email,
     businessName,
@@ -498,14 +527,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const handleBusinessStepNext = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!businessName.trim() || businessName.trim().length < 2) {
-      setError('Iltimos, biznesingiz yoki xizmatingiz nomini kiriting.');
-      return;
-    }
-    if (!supportPhone.trim() && !supportTelegram.trim() && !supportEmail.trim()) {
-      setError('Mijozlar siz bilan bog‘lana olishi uchun kamida bitta support kontakti: telefon, Telegram yoki email kiriting.');
-      return;
-    }
+    if (!businessValid) { showValidation(businessValidation); return; }
     setCurrentStep(4);
   };
 
@@ -806,6 +828,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
   const handleSaveCertificationSettings = async () => {
     const cleanSlug = slug.trim().toLowerCase();
     const authToken = token || localStorage.getItem('zayuno_provider_token');
+    if (!businessValid || !integrationValid) { setCertError(Object.values({ ...businessValidation, ...integrationValidation }).join(' ')); return; }
     if (!authToken || !cleanSlug || !baseUrl.trim()) {
       setCertError('Provider slug, API Base URL va faol hisob talab qilinadi.');
       return;
@@ -829,6 +852,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
         body: JSON.stringify({
           name: businessName.trim(),
+          logoUrl: logoUrl || null,
           slug: cleanSlug,
           description: description.trim() || undefined,
           type: providerType,
@@ -848,7 +872,8 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || 'API sozlamalarini saqlab bo‘lmadi.');
-      onProviderCreated(data);
+      onProviderCreated(data.provider || data);
+      setSavedFingerprint(fingerprint);
       if (apiSecret.trim()) setHasSavedSecret(true);
       setApiSecret('');
       setShowSecretInput(false);
@@ -870,6 +895,8 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
     setError(null);
     setSuccessMsg(null);
 
+    if (!businessValid) { setCurrentStep(3); showValidation(businessValidation); return; }
+    if (!integrationValid) { showValidation(integrationValidation); return; }
     const cleanSlug = slug.trim().toLowerCase();
     if (!cleanSlug || !/^[a-z0-9-]+$/.test(cleanSlug)) {
       setError('Provider slug faqat kichik lotin harflari, raqamlar va defisdan iborat bo‘lishi kerak (masalan: my-shop).');
@@ -900,6 +927,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
         },
         body: JSON.stringify({
           name: businessName.trim(),
+          logoUrl: logoUrl || null,
           slug: cleanSlug,
           description: description.trim() || undefined,
           // Human-readable category labels never become wire enum values.
@@ -940,8 +968,10 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
         } catch {}
       }
 
-      onProviderCreated(data);
+      onProviderCreated(data.provider || data);
+      setSavedFingerprint(fingerprint);
       setHasSavedSecret(true);
+      setGeneratedSecret('');
       setApiSecret('');
       setShowSecretInput(false);
       setSuccessMsg('Provider DRAFT arizasi saqlandi! Endi 5-qadamda sertifikatlash testlarini bajaring.');
@@ -957,6 +987,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
   // STEP 5: In-Wizard Certification Runner
   // --------------------------------------------------------------------------
   const handleRunCertification = async () => {
+    if (!integrationSaved) { setCertError('O‘zgargan API sozlamalarini avval saqlang.'); return; }
     const targetSlug = slug.trim() || createdCredentials?.providerSlug;
     if (!targetSlug) {
       setCertError('Provider topilmadi. Iltimos, 4-qadamda arizani saqlang.');
@@ -993,6 +1024,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
   // STEP 6: Submit for Review
   // --------------------------------------------------------------------------
   const handleSubmitReview = async () => {
+    if (!integrationSaved || !certReport?.isProductionReady) { setError('Avval sozlamalarni saqlang va sertifikatlashni yakunlang.'); return; }
     const targetSlug = slug.trim() || createdCredentials?.providerSlug;
     if (!targetSlug) return;
     setSubmittingReview(true);
@@ -1018,46 +1050,10 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
     }
   };
 
-  const isStepAccessible = (stepNum: number): boolean => {
-    if (stepNum <= currentStep) return true;
-    if (stepNum === 1 || stepNum === 2) return true;
-    if (stepNum === 3) return Boolean(token);
-    if (stepNum === 4) return Boolean(token) && businessName.trim().length >= 2;
-    if (stepNum === 5 || stepNum === 6) {
-      return Boolean(token) && businessName.trim().length >= 2 && Boolean(createdCredentials);
-    }
-    return false;
-  };
-
+  const isStepAccessible = (stepNum: number): boolean => stepNum <= maxStep && !(Boolean(token) && stepNum < 3);
   const handleStepClick = (stepNum: number) => {
-    setError(null);
-    if (stepNum === currentStep) return;
-
-    if (stepNum < currentStep) {
-      setCurrentStep(stepNum);
-      return;
-    }
-
-    if (stepNum >= 3 && !token) {
-      setError('Iltimos, avval hisobingizga kiring yoki emailni tasdiqlang.');
-      return;
-    }
-
-    if (stepNum >= 4 && (!businessName.trim() || businessName.trim().length < 2)) {
-      setError('Iltimos, avval 3-qadamda biznes yoki xizmatingiz nomini kiriting.');
-      setCurrentStep(3);
-      return;
-    }
-
-    if (stepNum >= 5 && !createdCredentials) {
-      setError('Iltimos, avval 4-qadamda API sozlamalarini to‘ldirib, arizani saqlang.');
-      setCurrentStep(4);
-      return;
-    }
-
-    if (isStepAccessible(stepNum)) {
-      setCurrentStep(stepNum);
-    }
+    if (loading || certLoading || savingCertificationSettings) return;
+    if (isStepAccessible(stepNum)) { setCurrentStep(stepNum); setSuccessMsg(null); }
   };
 
   const openDocModal = (docId: string) => {
@@ -1106,7 +1102,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
         {/* Progress Bar & Steps Tabs */}
         <div className="grid grid-cols-6 gap-2">
           {stepsList.map(s => {
-            const isCompleted = currentStep > s.num || (Boolean(token) && s.num <= 2) || (s.num === 3 && businessName.trim().length >= 2) || (s.num === 4 && Boolean(createdCredentials));
+            const isCompleted = (Boolean(token) && s.num <= 2) || (s.num === 3 && businessValid) || (s.num === 4 && integrationSaved) || (s.num === 5 && integrationSaved && Boolean(certReport?.isProductionReady));
             const isCurrent = currentStep === s.num;
             const accessible = isStepAccessible(s.num);
             return (
@@ -1191,7 +1187,9 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
               </p>
             </div>
 
-            <div className="space-y-4 text-xs">
+            <ProviderLogoInput value={logoUrl} onChange={setLogoUrl} />
+          {fieldError('logoUrl')}
+          <div className="space-y-4 text-xs">
               <div>
                 <label className="block text-slate-300 mb-1 font-medium">Ismingiz yoki Tashkilot nomi *</label>
                 <div className="relative">
@@ -1379,7 +1377,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       {/* STEP 3: Business Details                                              */}
       {/* --------------------------------------------------------------------- */}
       {currentStep === 3 && (
-        <form onSubmit={handleBusinessStepNext} className="space-y-6 animate-fadeIn">
+        <form noValidate onSubmit={handleBusinessStepNext} className="space-y-6 animate-fadeIn">
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-white">3. Biznes va Xizmat Ma’lumotlari</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
@@ -1394,11 +1392,13 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                 <input
                   type="text"
                   required
-                  value={businessName}
+                  id="businessName" aria-label="businessName" aria-invalid={Boolean(fieldErrors.businessName)} aria-describedby="businessName-error"
+                    value={businessName}
                   onChange={e => handleBusinessNameChange(e.target.value)}
                   placeholder="Masalan: Express Logistics, Coffee Time, Tez Taxi"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500"
                 />
+                  {fieldError('businessName')}
               </div>
 
               <div>
@@ -1472,31 +1472,37 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                   <label className="block text-slate-400 mb-1">Telefon raqam</label>
                   <input
                     type="text"
+                    id="supportPhone" aria-label="supportPhone" aria-invalid={Boolean(fieldErrors.supportPhone)} aria-describedby="supportPhone-error"
                     value={supportPhone}
                     onChange={e => setSupportPhone(e.target.value)}
                     placeholder="+998712000000"
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500"
                   />
+                  {fieldError('supportPhone')}
                 </div>
                 <div>
                   <label className="block text-slate-400 mb-1">Telegram Support</label>
                   <input
                     type="text"
+                    id="supportTelegram" aria-label="supportTelegram" aria-invalid={Boolean(fieldErrors.supportTelegram)} aria-describedby="supportTelegram-error"
                     value={supportTelegram}
                     onChange={e => setSupportTelegram(e.target.value)}
                     placeholder="@business_support"
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-indigo-500"
                   />
+                  {fieldError('supportTelegram')}
                 </div>
                 <div>
                   <label className="block text-slate-400 mb-1">Support Email</label>
                   <input
                     type="email"
+                    id="supportEmail" aria-label="supportEmail" aria-invalid={Boolean(fieldErrors.supportEmail)} aria-describedby="supportEmail-error"
                     value={supportEmail}
                     onChange={e => setSupportEmail(e.target.value)}
                     placeholder="support@business.uz"
                     className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
                   />
+                  {fieldError('supportEmail')}
                 </div>
               </div>
             </div>
@@ -1512,7 +1518,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
             </button>
             <button
               type="submit"
-              disabled={!businessName.trim() || (!supportPhone.trim() && !supportTelegram.trim() && !supportEmail.trim())}
+              disabled={loading}
               className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
             >
               Keyingi qadam (API sozlamalari) <ArrowRight className="w-4 h-4" />
@@ -1525,7 +1531,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       {/* STEP 4: Integration Details (Slug, API URL & Auth)                    */}
       {/* --------------------------------------------------------------------- */}
       {currentStep === 4 && (
-        <form onSubmit={handleRegisterProvider} className="space-y-6 animate-fadeIn">
+        <form noValidate onSubmit={handleRegisterProvider} className="space-y-6 animate-fadeIn">
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-white">4. API Integratsiya va Identifikator</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
@@ -1549,11 +1555,13 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                   <input
                     type="text"
                     required
+                    id="slug" aria-label="slug" aria-invalid={Boolean(fieldErrors.slug)} aria-describedby="slug-error"
                     value={slug}
                     onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                     placeholder="my-company-slug"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
                   />
+                  {fieldError('slug')}
                 </div>
                 <span className="text-[11px] text-slate-500 mt-1 block">
                   AI so‘rovlarida identifikator: <span className="font-mono text-indigo-400">{slug || 'provider-slug'}</span>
@@ -1572,6 +1580,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                 <div className="flex gap-2">
                   <input
                     type="url"
+                    id="baseUrl" aria-label="baseUrl" aria-invalid={Boolean(fieldErrors.baseUrl)} aria-describedby="baseUrl-error"
                     value={baseUrl}
                     onChange={e => {
                       setBaseUrl(e.target.value);
@@ -1580,6 +1589,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                     placeholder="https://api.sizningbiznesingiz.uz/zayuno"
                     className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
                   />
+                  {fieldError('baseUrl')}
                   <button
                     type="button"
                     onClick={handleTestBaseUrl}
@@ -2018,7 +2028,8 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                           <div className="relative">
                             <input
                               type={showSecret ? "text" : "password"}
-                              value={apiSecret}
+                              id="apiSecret" aria-label="apiSecret" aria-invalid={Boolean(fieldErrors.apiSecret)} aria-describedby="apiSecret-error"
+                    value={apiSecret}
                               onChange={e => {
                                 setApiSecret(e.target.value);
                                 setHasConfirmedSavedSecret(true);
@@ -2027,6 +2038,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                               autoComplete="new-password"
                               className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
                             />
+                  {fieldError('apiSecret')}
                             <button
                               type="button"
                               onClick={() => setShowSecret(!showSecret)}
@@ -2066,7 +2078,8 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                           <div className="relative">
                             <input
                               type={showSecret ? "text" : "password"}
-                              value={apiSecret}
+                              id="apiSecret" aria-label="apiSecret" aria-invalid={Boolean(fieldErrors.apiSecret)} aria-describedby="apiSecret-error"
+                    value={apiSecret}
                               onChange={e => {
                                 setApiSecret(e.target.value);
                                 setHasConfirmedSavedSecret(true);
@@ -2075,6 +2088,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                               autoComplete="new-password"
                               className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
                             />
+                  {fieldError('apiSecret')}
                             <button
                               type="button"
                               onClick={() => setShowSecret(!showSecret)}
@@ -2114,7 +2128,8 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                           <div className="relative">
                             <input
                               type={showSecret ? "text" : "password"}
-                              value={apiSecret}
+                              id="apiSecret" aria-label="apiSecret" aria-invalid={Boolean(fieldErrors.apiSecret)} aria-describedby="apiSecret-error"
+                    value={apiSecret}
                               onChange={e => {
                                 setApiSecret(e.target.value);
                                 setHasConfirmedSavedSecret(true);
@@ -2123,6 +2138,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                               autoComplete="new-password"
                               className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 pr-10 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
                             />
+                  {fieldError('apiSecret')}
                             <button
                               type="button"
                               onClick={() => setShowSecret(!showSecret)}
@@ -2193,7 +2209,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
               )}
               <button
                 type="submit"
-                disabled={loading || !slug.trim() || (Boolean(generatedSecret) && !hasConfirmedSavedSecret)}
+                disabled={loading}
                 className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
               >
                 {loading ? 'Saqlanmoqda…' : 'Davom etish'} <ArrowRight className="w-4 h-4" />
@@ -2251,11 +2267,13 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                 <label className="text-[11px] text-slate-300 space-y-1.5">
                   <span className="font-semibold">API Base URL (HTTPS)</span>
                   <input
+                    id="baseUrl" aria-label="baseUrl" aria-invalid={Boolean(fieldErrors.baseUrl)} aria-describedby="baseUrl-error"
                     value={baseUrl}
                     onChange={event => setBaseUrl(event.target.value)}
                     className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-white outline-none focus:border-indigo-500"
                     placeholder="https://api.business.uz/zayuno"
                   />
+                  {fieldError('baseUrl')}
                 </label>
                 <label className="text-[11px] text-slate-300 space-y-1.5">
                   <span className="font-semibold">Autentifikatsiya formati</span>
@@ -2279,12 +2297,14 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                   <div className="relative">
                     <input
                       type={showSecret ? 'text' : 'password'}
-                      value={apiSecret}
+                      id="apiSecret" aria-label="apiSecret" aria-invalid={Boolean(fieldErrors.apiSecret)} aria-describedby="apiSecret-error"
+                    value={apiSecret}
                       onChange={event => setApiSecret(event.target.value)}
                       className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 pr-10 text-xs text-white outline-none focus:border-indigo-500"
                       placeholder={hasSavedSecret ? 'Serverda saqlangan credentialni o‘zgartirmaslik uchun bo‘sh qoldiring' : 'Provider serveringiz kutadigan secret'}
                       autoComplete="new-password"
                     />
+                  {fieldError('apiSecret')}
                     <button type="button" onClick={() => setShowSecret(value => !value)} className="absolute right-3 top-2.5 text-slate-400 hover:text-white">
                       {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>

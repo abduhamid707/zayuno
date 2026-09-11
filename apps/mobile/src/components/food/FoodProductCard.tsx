@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef } from "react";
+import React, { memo, useEffect, useRef, useState } from "react";
 import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text } from "../primitives/Text";
@@ -33,10 +33,13 @@ export const FoodProductCard = memo(function FoodProductCard({
   reducedMotion,
   disabled,
 }: FoodProductCardProps) {
+  const [failedImage, setFailedImage] = useState<string | undefined>();
+  const showImage = Boolean(offering.imageUrl && offering.imageUrl !== failedImage);
+  const priceLabel = offering.priceKnown === false ? 'Narx hali berilmagan' : formatMoney(offering.price, offering.currency);
   const imageRef = useRef<View>(null);
   const originRef = useRef<CartFlightOrigin | undefined>(undefined);
   const scale = useRef(new Animated.Value(1)).current;
-  const unavailable = disabled || quantity >= MAX_CART_QUANTITY;
+  const unavailable = disabled || offering.isAvailable === false || offering.priceKnown === false || quantity >= MAX_CART_QUANTITY;
   useEffect(() => () => scale.stopAnimation(), [scale]);
   const settle = () => {
     if (reducedMotion) return;
@@ -56,7 +59,7 @@ export const FoodProductCard = memo(function FoodProductCard({
     <Animated.View style={{ width, transform: [{ scale }] }}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${offering.title}, ${formatMoney(offering.price, offering.currency)}${quantity ? `, savatda ${quantity} ta` : ""}`}
+        accessibilityLabel={`${offering.title}, ${priceLabel}${quantity ? `, savatda ${quantity} ta` : ""}`}
         accessibilityHint="Savatga bitta qo‘shish uchun bosing"
         accessibilityState={{ disabled: unavailable, selected: quantity > 0 }}
         disabled={unavailable}
@@ -82,16 +85,16 @@ export const FoodProductCard = memo(function FoodProductCard({
           styles.card,
           quantity > 0 && styles.selected,
           pressed && styles.pressed,
-          disabled && styles.disabled,
+          unavailable && styles.disabled,
         ]}
       >
-        <View
+        {showImage ? <View
           ref={imageRef}
           collapsable={false}
           style={[styles.image, { height: Math.round(width * 0.62) }]}
         >
-          <ProductImage uri={offering.imageUrl} />
-        </View>
+          <ProductImage uri={offering.imageUrl} onUnavailable={() => setFailedImage(offering.imageUrl)} />
+        </View> : <View style={styles.textHeader}><Ionicons name="bag-handle-outline" size={19} color="#AE9EFF" /><Text style={styles.textBadge}>Menyu</Text></View>}
         {quantity > 0 ? (
           <View pointerEvents="none" style={styles.quantity}>
             <Ionicons name="checkmark" size={12} color="#FFFFFF" />
@@ -102,8 +105,9 @@ export const FoodProductCard = memo(function FoodProductCard({
           <Text numberOfLines={2} style={styles.title}>
             {offering.title}
           </Text>
+          {!showImage && offering.description ? <Text numberOfLines={2} style={styles.description}>{offering.description}</Text> : null}
           <Text style={styles.price}>
-            {formatMoney(offering.price, offering.currency)}
+            {offering.isAvailable === false ? "Hozir mavjud emas" : priceLabel}
           </Text>
         </View>
       </Pressable>
@@ -112,6 +116,9 @@ export const FoodProductCard = memo(function FoodProductCard({
 });
 
 const styles = StyleSheet.create({
+  textHeader: { padding: 12, flexDirection: "row", alignItems: "center", gap: 7 },
+  textBadge: { color: "#8C93AF", fontSize: 11 },
+  description: { color: "#9BA3B9", fontSize: 12, lineHeight: 17 },
   card: {
     flex: 1,
     borderRadius: 17,

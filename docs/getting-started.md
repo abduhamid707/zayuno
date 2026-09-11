@@ -69,3 +69,10 @@ AI Kit’da framework va vazifani tanlab briefni nusxalang yoki Markdown yuklab 
 - [Postman](/postman.json) — so‘rovlar to‘plami.
 
 API kalit va webhook secretni briefga yozmang. Agentga muhit o‘zgaruvchisi nomi yetadi.
+# Provider arizasini bosqichma-bosqich tayyorlash
+
+Hisob va email tasdiqlangach, biznes nomi va kamida bitta to‘g‘ri telefon, Telegram username yoki email kiriting. Keyingi bosqichda public HTTPS API Base URL va provider serveringiz tekshiradigan credential kerak. Bo‘sh Base URL endi avtomatik sandbox yaratmaydi. API tayyor bo‘lmasa, AI Kit va OpenAPI orqali backendni tayyorlang; demo uchun alohida Sandbox bo‘limidan foydalaning.
+
+Logo uchun HTTPS rasm manzilini kiriting yoki PNG/JPG/WebP fayl yuklang (5 MB gacha). Portal rasmni 384px gacha kichraytiradi; 96 KB chegarali raster data URL mavjud `logoUrl` maydonida saqlanadi. Logo ixtiyoriy.
+
+API sozlamalarini saqlash → sertifikatlash → review tartibida davom eting. Ma’lumot yoki credential o‘zgarsa, qayta saqlash va sertifikatlash kerak; qadam havolasi yoki saqlangan brauzer drafti bu tekshiruvni chetlab o‘tmaydi.

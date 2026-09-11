@@ -4,8 +4,10 @@ import { Ionicons } from "@expo/vector-icons";
 
 export const ProductImage = memo(function ProductImage({
   uri,
+  onUnavailable,
 }: {
   uri?: string;
+  onUnavailable?: () => void;
 }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [uri]);
@@ -14,7 +16,7 @@ export const ProductImage = memo(function ProductImage({
       source={{ uri }}
       style={styles.image}
       resizeMode="contain"
-      onError={() => setFailed(true)}
+      onError={() => { setFailed(true); onUnavailable?.(); }}
     />
   ) : (
     <View style={styles.fallback}>
