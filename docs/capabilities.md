@@ -1,37 +1,39 @@
-# Capabilities Specification & Categorization
+# Capability profillari
 
-Zayuno uses a composable capability matrix to determine which operations can be executed against a provider.
+Capability provider bajara oladigan operatsiyani bildiradi. U mahsulot kategoriyasi yoki provider type bilan bir xil narsa emas. Contract versiyasi: 1.0.0.
 
----
+## Profil bo‘yicha talablar
 
-## 1. Capability Matrix
+| Capability | DISCOVERY_READONLY | TRANSACTIONAL | Provider route yoki yo‘nalish |
+| --- | --- | --- | --- |
+| METADATA | Talab qilinadi | Talab qilinadi | GET /provider-info |
+| HEALTH | Talab qilinadi | Talab qilinadi | GET /health |
+| CATALOG | Talab qilinadi | Talab qilinadi | GET /catalog; GET /offerings/:id |
+| QUOTE | Yo‘q | Talab qilinadi | POST /quote |
+| ACTION_CREATE | Yo‘q | Talab qilinadi | POST /actions |
+| ACTION_STATUS | Yo‘q | Talab qilinadi | GET /actions/:id |
+| WEBHOOK | Yo‘q | Talab qilinadi | Provider → Zayuno: POST /api/v1/webhooks/:providerSlug |
+| LOCATIONS | Fulfillment’ga qarab | Fulfillment’ga qarab | GET /locations |
+| SEARCH | Ixtiyoriy | Ixtiyoriy | GET /search |
+| ACTION_CANCEL | Yo‘q | Ixtiyoriy | POST /actions/:id/cancel |
+| PAYMENT_OPTIONS | Yo‘q | Ixtiyoriy | GET /actions/:id/payment-options |
 
-| Capability Flag | Category | Method in SDK / HTTP Endpoint | Description |
-| :--- | :--- | :--- | :--- |
-| **`METADATA`** | **MANDATORY** | `GET /provider-info` | Provider details, category, geography, support contact. |
-| **`HEALTH`** | **MANDATORY** | `GET /health` | Real-time health status, operational latency. |
-| **`CATALOG`** | **MANDATORY** | `GET /catalog`, `GET /offerings/:id` | Structured offerings, categories, option groups, and prices. |
-| **`QUOTE`** | **MANDATORY** | `POST /quote` | Verified itemized quotation calculation with expiration. |
-| **`ACTION_CREATE`** | **MANDATORY** | `POST /actions` | Action initiation with idempotency & `NextAction` handoff. |
-| **`ACTION_STATUS`** | **MANDATORY** | `GET /actions/:id` | Status lookup, fulfillment stages, tracking timeline. |
-| **`WEBHOOK`** | **MANDATORY** | `POST /webhooks` | Asynchronous status push updates with HMAC validation. |
-| **`LOCATIONS`** | *OPTIONAL* | `GET /locations` | Physical branch facilities, coordinates, service radius. |
-| **`SEARCH`** | *OPTIONAL* | `GET /search` | Keyword and semantic search indexing across offerings. |
-| **`ACTION_CANCEL`** | *OPTIONAL* | `POST /actions/:id/cancel` | User-initiated cancellation before fulfillment lock. |
-| **`PAYMENT_OPTIONS`** | *OPTIONAL* | `GET /actions/:id/payment-options`| Discovery of provider-supported checkout options. |
+Faqat mavjud imkoniyatlarni e’lon qiling. Capability e’lon qilinsa uning response schema’si ham tekshiriladi. [Generated reference](/docs/contract-reference/) har bir endpointning aniq request va response formatini beradi.
 
----
+## Faol location qachon kerak?
 
-## 2. Mandatory Capabilities Requirement
+DELIVERY, PICKUP, ONSITE va HYBRID fulfillment faol location talab qiladi. REMOTE uchun avtomatik location talabi yo‘q.
 
-> [!IMPORTANT]
-> To achieve **Production Certification**, a provider MUST implement all 7 mandatory capabilities:
-> `METADATA`, `HEALTH`, `CATALOG`, `QUOTE`, `ACTION_CREATE`, `ACTION_STATUS`, and `WEBHOOK`.
->
-> The automated certification runner will verify these 7 capabilities. Undeclared optional capabilities will be skipped and will not cause certification failure.
+Fulfillment belgilanmagan bo‘lsa type bo‘yicha default ishlatiladi: DELIVERY → DELIVERY; RETAIL va BOOKINGS → ONSITE; boshqa type’lar → REMOTE. Aniq fulfillment berish afzal.
 
----
+Physical biznes LOCATIONS’ni e’lon qilmasdan bu talabni chetlab o‘ta olmaydi. Metadata’dagi branch soni emas, GET /locations response’idagi faol locationlar tekshiriladi.
 
-## 3. Dynamic Capability Discovery
+## Contract bilan moslashtirish
 
-AI agents query a provider's supported capabilities before invoking specialized tools. If a provider does not support `LOCATIONS`, the AI agent will not prompt the user for physical store branches. If a provider does not support `ACTION_CANCEL`, the AI agent will inform the user that cancellations must go through provider customer support.
+Backend implementation manbalari: packages/contracts/src/provider.ts va provider-protocol.ts. Runtime validation shu contractlarga tayanadi.
+
+1. Kerakli profil va fulfillment’ni tanlang.
+2. Portal va GET /provider-info’dagi capabilitylar bir-biriga mos bo‘lsin.
+3. [OpenAPI](/openapi.json) orqali endpoint schema’larini tekshiring.
+4. Test muhitida [certification](certification.md) bajaring.
+5. Konfiguratsiya o‘zgargandan keyin qayta certification qiling.

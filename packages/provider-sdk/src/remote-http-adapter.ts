@@ -282,7 +282,7 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
         path: forbidden,
         expected: 'Safe non-sensitive dynamic parameter',
         received: 'sensitive parameter key/value',
-        docsUrl: 'https://developers.zayuno.uz/?doc=provider-integration#contract-parameters',
+        docsUrl: 'https://partners.zayuno.uz/docs/contract-reference/#contract-parameters',
         message: `Sensitive identity or payment field "${forbidden}" is not allowed in dynamic parameters. Use the provider-owned secure handoff.`
       });
     }
@@ -303,7 +303,7 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
         path: forbidden,
         expected: 'Safe non-sensitive dynamic parameter',
         received: 'sensitive parameter key/value',
-        docsUrl: 'https://developers.zayuno.uz/?doc=provider-integration#contract-parameters',
+        docsUrl: 'https://partners.zayuno.uz/docs/contract-reference/#contract-parameters',
         message: `Sensitive identity or payment field "${forbidden}" is not allowed in dynamic parameters. Use the provider-owned secure handoff.`
       });
     }

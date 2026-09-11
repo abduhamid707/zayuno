@@ -1,48 +1,40 @@
-# Webhooks & Asynchronous Event Notification
+# Webhooks & asynchronous events
 
-Webhooks allow provider systems to push real-time status transitions, fulfillment updates, and courier milestones back into Zayuno.
+Provider buyurtma holati o‘zgarganda Zayunoga imzolangan event yuboradi. Provider action ID, event ID va status haqiqiy ma’lumotlardan olinadi.
 
----
+## Canonical endpoint
 
-## 1. Webhook Ingestion Endpoint
+~~~text
+POST https://api.zayuno.uz/api/v1/webhooks/{providerSlug}
+Content-Type: application/json
+x-zayuno-signature: <HMAC_SHA256_HEX>
+~~~
 
-- **URL**: `POST https://api.zayuno.uz/api/v1/webhooks`
-- **Method**: `POST`
-- **Content-Type**: `application/json`
+providerSlug URL ichida beriladi. Event ichidagi providerSlug ham shu providerga tegishli bo‘lsin. Yangi integratsiyalar canonical route’dan foydalanadi.
 
-### Required HTTP Headers:
-- `x-provider`: Your unique `providerSlug` (e.g. `acme-logistics`).
-- `x-signature`: HMAC-SHA256 hex digest of the raw JSON request body computed using your assigned `webhookSecret`.
+## Event schema va namuna
 
----
+Aniq JSON, required fieldlar va response [generated webhook reference](/docs/contract-reference/#contract-webhooks) ichida.
 
-## 2. Webhook Event Payload
+- eventId: shu hodisa uchun barqaror ID; retry’da almashtirmang.
+- eventType: contractga mos event turi.
+- providerSlug: ro‘yxatdan o‘tgan provider.
+- actionId yoki externalActionId: to‘g‘ri buyurtmani aniqlash uchun.
+- timestamp: hodisa vaqti, ISO 8601.
+- newStatus va newPaymentStatus: o‘zgarayotgan normalized holatlar.
 
-```json
-{
-  "eventId": "evt_9841029481",
-  "eventType": "action.status_updated",
-  "providerSlug": "acme-logistics",
-  "actionId": "act_8849102",
-  "externalActionId": "acme_order_9981",
-  "newStatus": "CONFIRMED",
-  "newPaymentStatus": "PAID",
-  "timestamp": "2026-08-17T15:35:00.000Z",
-  "description": "Payment confirmed via Payme acquiring. Order sent to dispatch queue.",
-  "payload": {
-    "paymentReference": "payme_txn_998104"
-  }
-}
-```
+Faqat backend tasdiqlagan statusni yuboring. To‘lov uchun PAID qiymati provider xabari hisoblanadi; u bank settlement’i mustaqil tekshirilganini anglatmaydi.
 
----
+## Raw body va HMAC
 
-## 3. Supported Event Types
+HMAC-SHA256 hex digest’ni ZAYUNO_WEBHOOK_SECRET bilan **aynan yuboriladigan rawBody** ustida hisoblang. x-zayuno-signature headerga yozing. Timestampni signature stringiga qo‘shmang. [Tayyor TypeScript signing misoli](authentication.md).
 
-| Event Type | Description |
-| :--- | :--- |
-| `action.status_updated` | General status transition (`CONFIRMED`, `PROCESSING`, `COMPLETED`, `CANCELLED`, `FAILED`). |
-| `action.completed` | Action successfully fulfilled. |
-| `action.cancelled` | Action cancelled by merchant or store. |
-| `catalog.updated` | Signals Zayuno to invalidate catalog cache. |
-| `location.status_changed` | Signals branch closure or temporary outage. |
+## Delivery va retry
+
+HTTP natijasini tekshiring. Timeout yoki vaqtinchalik server xatosida o‘sha eventId bilan cheklangan backoff retry qiling. 401 da key va imzoni tuzatmasdan doimiy retry qilmang.
+
+Event statusi o‘zgarsa yangi eventId bering. Bir xil eventni qayta yuborish takroriy buyurtma yaratmasligi kerak. Idempotency event va action darajasida alohida ahamiyatga ega.
+
+## Diagnostika
+
+[So‘rovlar jurnali](/?tab=inspector) va [troubleshooting](troubleshooting-faq.md) yordamida provider slug, trace ID, signature header nomi va timestamp’ni tekshiring. Raw secretlarni diagnostika xabariga qo‘shmang.

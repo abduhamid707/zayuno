@@ -3,6 +3,25 @@
 All externally visible API, MCP, provider-dashboard, certification, and
 moderation changes must be recorded here.
 
+## 2026-09-11 — Provider workspace and canonical developer docs
+
+- Replaced repeated portal navigation and marketing/onboarding blocks with a
+  responsive workspace, provider-state-based next steps, and separate
+  orders/integration dashboard sections. Loading or failed requests no longer
+  appear as zero orders.
+- Consolidated portal documentation into the repository Markdown guides.
+  Added full-text search, stable heading links, browser Back/Forward,
+  clipboard/Markdown export and a framework-specific AI handoff.
+- Generate crawlable HTML, Markdown, llms.txt, llms-full.txt, search corpus,
+  OpenAPI, Postman, robots and sitemap from the same build. The portal Docker
+  image now includes the canonical docs sources.
+- Corrected provider/Core endpoint distinctions, API key ownership, HMAC
+  header and raw-body rules, capability/location requirements, certification
+  versus publishing, and normalized status guidance.
+- Updated certification/validation documentation links to partners.zayuno.uz.
+  OpenAPI webhook examples now reuse the canonical event with newStatus.
+  No runtime authentication or transaction guard was relaxed.
+
 ## 2026-08-19
 
 - Added provider-scoped action filters and pagination to
@@ -38,5 +57,4 @@ moderation changes must be recorded here.
   and JSON-LD structured data (Organization, WebSite, SoftwareApplication, FAQPage).
 - Redesigned public landing page into a high-converting, modern SaaS aesthetic with
   interactive protocol visualizer, 3-step action workflow, and developer sandboxes.
-
 

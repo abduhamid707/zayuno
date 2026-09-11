@@ -1,50 +1,30 @@
-# Payment Handoff & NextAction Architecture
+# Payment Handoff & NextAction
 
-Zayuno strictly enforces a **zero payment processing** architectural boundary.
+**Zayuno does not process card payments in this contract.** The provider owns checkout, acquiring, receipts and payment verification.
 
----
+## Action response
 
-## 1. The Core Payment Rule
+When payment is required, return the appropriate normalized action status and nextAction with a provider-owned checkout URL. Use [canonical action response](/docs/contract-reference/#contract-actions) and [OpenAPI](/openapi.json) for the complete NextAction schema.
 
-> [!IMPORTANT]
-> **Zayuno NEVER processes payments or collects card details.**
-> - Providers manage their own acquiring partnerships (e.g. Payme, Click, Uzum, Stripe, Adyen, POS terminals).
-> - Providers own their checkout screens, fraud prevention, receipts, and fiscal registrations.
-> - When an action requires payment, the provider returns an `AWAITING_PAYMENT` status with a normalized `NextAction` object.
+Do not assume every NextAction type requires the same fields. Do not manufacture a payment URL or mark an action paid before the provider has verified it.
 
----
+## Customer flow
 
-## 2. Normalized `NextAction` Specification
+1. Customer confirms the quote.
+2. Zayuno creates the action with a stable idempotency key.
+3. Provider returns the actual status and nextAction.
+4. Customer opens the provider checkout and completes payment there.
+5. Provider verifies payment and sends a signed status webhook to Zayuno.
+6. Zayuno displays the resulting action and payment status.
 
-```typescript
-export interface NextAction {
-  type: 'OPEN_URL' | 'REDIRECT' | 'CONFIRMATION_REQUIRED' | 'NONE';
-  url: string;           // Provider-managed HTTPS checkout URL
-  label: string;         // Button label presented to user (e.g. "Pay with Payme", "Checkout")
-  expiresAt?: string;    // ISO timestamp when payment session expires
-}
-```
+A click on the checkout link is not proof of payment.
 
----
+## Payment status evidence
 
-## 3. The End-to-End Handoff Flow
+Dashboard paymentStatus is labelled PROVIDER_REPORTED. It reflects the provider integration's report, not a separate guarantee of bank settlement. Action fulfillment and payment status are separate concepts.
 
-```mermaid
-sequenceDiagram
-    actor User as User
-    participant AI as AI Agent (ChatGPT)
-    participant Zayuno as Zayuno Gateway
-    participant Provider as Provider System
-    participant Checkout as Provider Checkout (Payme/Click/Stripe)
+If checkout expires, show the actual provider state and supported next step. Do not create a second order just to generate another payment link without checking the existing action.
 
-    AI->>Zayuno: create_action(...)
-    Zayuno->>Provider: createAction(...)
-    Provider-->>Zayuno: { status: "AWAITING_PAYMENT", nextAction: { type: "OPEN_URL", url: "https://..." } }
-    Zayuno-->>AI: NormalizedAction with nextAction
-    AI->>User: "Your action is created! Please complete payment here: [Pay now](https://...)"
-    User->>Checkout: Opens link & completes payment
-    Checkout->>Provider: Settlement webhook received
-    Provider->>Zayuno: Webhook POST (status: "CONFIRMED")
-    Zayuno->>Zayuno: Action updated to CONFIRMED
-    AI->>Zayuno: get_action(...) -> Confirmed & Processing
-```
+## Optional payment options
+
+When PAYMENT_OPTIONS is declared, implement GET /actions/:id/payment-options and return the canonical **top-level array**. See [payment-options reference](/docs/contract-reference/#contract-payment-options) and [webhooks](webhooks.md).

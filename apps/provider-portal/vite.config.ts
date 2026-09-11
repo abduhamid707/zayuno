@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { docsSitePlugin } from './scripts/docs-site';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), docsSitePlugin(path.resolve(__dirname, '../..'))],
   resolve: {
     alias: {
       '@zayuno/contracts': path.resolve(__dirname, '../../packages/contracts/src'),

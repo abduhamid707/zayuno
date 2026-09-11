@@ -1,5 +1,117 @@
 # Deferred tasks
 
+## Joriy ish — provider portal UX va developer/agent docs, 2026-09-10
+
+- [x] Portal navigation, onboarding, docs, AI kit va real API contractni audit qilish.
+- [x] Tushunarli workspace: overview/dashboard, bitta aniq keyingi qadam, sodda navigation va responsive UI.
+- [x] Developer docs: qidiruv, deep link, quickstart, endpoint/credential farqlari va troubleshootingni yangilash.
+- [x] AI agentlar uchun kanonik machine-readable docs, copy/download handoff va discoverability.
+- [x] Tegishli contract testlari, typecheck/build va desktop/mobile browser flow tekshiruvi (39/39 testlar o'tdi).
+- [x] Yakuniy o'zgargan fayllar, dalillar va release holatini yozish.
+
+## Joriy ish — Dashboard UI/UX va Developer Docs’ni super darajaga olib chiqish, 2026-09-11
+
+- [x] Foydalanuvchiga nima bo'layotganini (v10 APK o'rnatilishi, portal audit va hozirgi holat) to'liq tushuntirib berish.
+- [x] Provider Dashboard UI/UX ni "udar" darajaga chiqarish:
+  - [x] Biznes egasi uchun: qulay, sodda, professional ko'rinish; aniq holat indikatorlari va bitta asosiy keyingi qadam.
+  - [x] Dasturchilar uchun: API sozlamalari, credentiallar, webhook HMAC boshqaruvi, terminal cURL snippet va Live Inspector qulayligi.
+  - [x] Buyurtmalar va KPI ko'rsatkichlari: zamonaviy SaaS kartalari, filtrlar va buyurtma detallari.
+- [x] Dasturchilar va AI agentlar (Codex, Claude, ChatGPT, Cursor) uchun tajribani mukammallashtirish:
+  - [x] AI Integration Kit: bir bosish bilan Claude, ChatGPT, Cursor uchun tayyor kontekst va prompt.
+  - [x] `/llms.txt`, `/llms-full.txt`, `openapi.json`, `postman.json` eksportlarini boyitish va osonlashtirish.
+- [x] Developer Docs’ni to'liq ko'rib chiqish va yangilash:
+  - [x] Barcha contract o'zgarishlari, misollar (cURL, TS, Python), tayyor AI Agent promptlari va troubleshooting qo'llanmasini mukammal qilish.
+  - [x] Docs qidiruv va ko'rinishini qulay, chiroyli va o'qishga zavqli qilish (tezkor chiplar: GET /health, POST /quote, Webhook HMAC, 401, AI Agent prompt, Idempotency).
+- [x] Build, typecheck va 39/39 regression testlarni to'liq tekshirish va tasdiqlash (100% PASS).
+- [x] O'zgarishlarni commit qilib origin/main ga push qilish.
+
+**Scope:** `apps/provider-portal` va `docs/` arxitekturasi. Maqsad: biznes egasi o'z statusini va keyingi qadamini yaqqol tushunsin, dasturchi va AI agentlar (Claude, Codex, Cursor, ChatGPT) esa bir qarashda API contractini tushunib, tezkor integratsiya qila olsin.
+**Holat:** Dashboard UI/UX modern SaaS darajasiga ko'tarildi. Shriftlar kattalashtirildi, zamonaviy gradient va kartalar qo'yildi. Dashboardda AI agent bilan 5 daqiqada integratsiya qilish banneri va Base URL uchun avtomatik cURL tekshirish terminali qo'shildi. DocsViewer'ga tezkor qidiruv chiplari o'rnatildi. Docs va AI Agent qo'llanmasiga (`docs/ai-agents.md`) to'g'ridan-to'g'ri nusxalab ishlatishga tayyor Claude Code/Cursor/Codex promptlari kiritildi.
+**Tekshiruv:**
+- `pnpm --filter @zayuno/provider-portal build` (`tsc --noEmit && vite build`) → **PASS** (5.88s, 0 xato).
+- `pnpm exec tsx tests/test-provider-portal-docs.ts` → **PASS**.
+- `pnpm test:review` (`tsx tests/run-all-review-tests.ts`) → **39 / 39 test suites PASSED** (100% clean pass).
+**Keyingi qadam:** CI orqali avtomatik deployment monitoringi.
+
+## Product strategy — transaction network moat, 2026-09-10
+
+- [x] Investor/product stress-testdagi barcha fikrlarni amaliy roadmapga ajratish.
+- [x] Asosiy transaction invariantini saqlash: `Intent → Discovery → Selection → Validation → Confirmation → Action`; LLM hech qachon narx, mavjudlik yoki order holati uchun source of truth bo‘lmaydi.
+- [ ] Tashqi positioningni food orderingga fokuslash: **“Zayunoga nima yemoqchi ekaningizni ayting — u topadi, savatni yig‘adi va tasdiqlashga tayyorlaydi.”** Universal platforma va boshqa vertikallarni hozir asosiy marketing va onboardingdan chiqarish.
+- [ ] Food ordering tajribasini chuqurlashtirish: tabiiy so‘rov → mos real mahsulotlar → savat → authoritative quote → user confirmation → provider order → fulfillment status oqimini har asosiy providerda bir xil va ishonchli qilish.
+- [ ] Har hafta asosiy KPI sifatida `successful_agentic_orders`ni yuritish; downloads, registrations va chat countni yordamchi metrika sifatida qoldirish.
+  - [ ] Funnel: AI conversation → product selection → cart created → quote received → order confirmed → provider accepted → successfully fulfilled.
+  - [ ] `intent_to_order_conversion`, `order_to_fulfillment_rate`, abandon bosqichi, vaqt va provider kesimidagi conversionni dashboardga chiqarish.
+  - [ ] Avval real baseline o‘lchash, keyin haftalik target va alert chegaralarini belgilash.
+- [ ] Demand moat yaratish: eng ko‘p so‘raladigan taom/providerlar, topilmagan so‘rovlar va abandoned cartlardan provider acquisition hamda katalog yaxshilash backlogini avtomatik shakllantirish.
+- [ ] Provider moat yaratish:
+  - [ ] Provider integratsiyasini standart schema, SDK/reference adapter, certification va sandbox bilan tez va arzon qilish.
+  - [ ] Providerga Zayuno olib kelgan order, conversion, revenue, top demand va yo‘qotilgan talabni ko‘rsatadigan aniq ROI dashboard berish.
+  - [ ] Real-time availability, narx aniqligi, order acceptance, cancellation, latency va fulfillment reliability uchun provider score/SLA monitoring qurish.
+  - [ ] Kamida 3–5 real production provider bilan repeatable onboarding va order fulfillmentni isbotlash.
+- [ ] Transaction/data moat yaratish: privacy va consent chegarasida conversion, product preference, price sensitivity, failed order sababi, substitution, cancellation va provider reliability signallarini transaction bilan bog‘lash.
+- [ ] Agent infrastructure moatni chuqurlashtirish:
+  - [x] Universal provider protocol, action orchestration va MCP tool foundation mavjud.
+  - [ ] Zayuno’ni ChatGPT, Claude, Gemini va boshqa agentlar chaqira oladigan default action layer sifatida hujjatlashtirish va reference integrationlar tayyorlash.
+  - [ ] Agent hamkorlar uchun discovery → quote → confirmation → action contract, idempotency, auth va observability bo‘yicha production SDK/DX yaratish.
+  - [ ] Consumer appdan tashqari `Any AI Agent → Zayuno → Provider` orqali kelgan transactionlarni alohida o‘lchash va partner adoptionni oshirish.
+- [ ] Defensibilityni kuchaytirish: katta AI platformalari providerlarni bevosita ulashiga qarshi ustunlikni `provider network + standardized transaction protocol + real-time inventory + orchestration + fulfillment reliability + transaction history` orqali amalda isbotlash.
+- [ ] Yangi vertikal qo‘shish gate’i: food flowda barqaror conversion/fulfillment, real provider network va repeat usage isbotlanmaguncha booking yoki transportni public product scope’ga olib chiqmaslik; ichki universal arxitekturani saqlash.
+- [ ] Har yangi feature oldidan tekshirish: u successful agentic orders, provider network yoki agent distributiondan kamida bittasini o‘lchanadigan tarzda oshiradimi; oshirmasa future backlogda qoldirish.
+
+**Strategik qaror:** hozirgi asosiy vazifa yana ko‘p feature qo‘shish emas, food transaction networkni chuqurlashtirish. Consumer app demand yaratadi, provider platform real fulfillmentni standartlashtiradi, MCP/API esa boshqa AI agentlardan distribution olib keladi.
+**Moat javobi:** Zayuno’ning himoyasi “bizda AI bor” emas. Himoya real provider aloqalari, bir xil va sertifikatlangan transaction contracti, real-time katalog/narx/mavjudlik, reliable orchestration, fulfillment tarixi va agentlar olib keladigan demand bir joyda to‘planishidir.
+**Keyingi amaliy qadam:** production dashboardda agentic-order funnelning real baselineni chiqarish, eng ko‘p demand kelayotgan 3 provider bo‘yicha integratsiya/fulfillment gaplarini topish va birinchi real provider pilotini shu dalil bilan yopish.
+
+### Prioritetli execution plan
+
+- [ ] **P0.1 — Agentic-order funnel va baseline.**
+  - **Dependency:** yagona transaction/conversation ID, provider ID, order state va event naming contract.
+  - **Acceptance criteria:** `AI conversation → qualified intent → product selection → cart → quote → confirmation → provider accepted → fulfilled` bosqichlarining har biri transaction ID, source, provider, latency va standart failure reason bilan yoziladi; analyticsga raw chat yoki PII yuborilmaydi.
+  - **KPI:** har bosqich conversion rate’i, p50/p95 latency, abandon rate va failure-reason ulushi; North Star — `successful_agentic_orders_per_week`.
+  - **Done:** production dashboard real test orderni boshidan oxirigacha bir marta sanaydi, takroriy event/idempotent retry raqamni buzmaydi va order DB holati bilan reconciliation tekshiruvidan o‘tadi.
+- [ ] **P0.2 — 3–5 real providerda liquidity va fulfillment isboti.**
+  - **Dependency:** sertifikatlangan catalog/search/quote/action/status integratsiyasi, production credential va har providerda mas’ul aloqa.
+  - **Acceptance criteria:** har providerda real katalog, availability, authoritative quote, confirmation, order create, status va cancellation ishlaydi; failure sabab kodlari bir xil contractga tushadi.
+  - **KPI:** active providerlar, provider acceptance, successful fulfillment, catalog freshness, cancellation va p95 provider latency.
+  - **Done:** kamida 3 production providerda repeatable end-to-end real order bajariladi; baseline o‘lchangach founder tasdiqlagan acceptance/fulfillment thresholdi ketma-ket 4 hafta ushlanadi.
+- [ ] **P0.3 — Provider ROI va incremental value isboti.**
+  - **Dependency:** Zayuno source attribution, provider order/revenue mapping va imkon bo‘lsa providerning boshqa kanal baseline’i.
+  - **Acceptance criteria:** provider portal Zayuno’dan kelgan accepted/fulfilled orders, GMV/revenue, conversion, top demand va lost demandni ko‘rsatadi; “incremental” da’vosi baseline/holdout yoki provider tasdiqlagan taqqoslashga tayanadi.
+  - **KPI:** incremental fulfilled orders, incremental GMV, provider conversion va provider retention.
+  - **Done:** kamida 2 real provider dashboard raqamlarini o‘z orderlari bilan reconcile qiladi va Zayuno bergan o‘lchanadigan qo‘shimcha qiymatni tasdiqlaydi.
+- [ ] **P0.4 — “Why Zayuno?” provider va user testi.**
+  - **Dependency:** P0.1 funnel baseline va P0.2 real provider oqimi.
+  - **Acceptance criteria:** provider uchun “nega integratsiya?”, user uchun “nega restoran appi o‘rniga Zayuno?” savollariga yozma hypothesis, test usuli va natija mavjud.
+  - **KPI:** user time-to-valid-cart, intent-to-order conversion, repeat order rate; provider incremental orders/GMV va integration payback.
+  - **Done:** real user/provider cohortida kamida bittadan o‘lchanadigan ustunlik tasdiqlanadi; tasdiqlanmagan hypothesis positioning yoki roadmapdan chiqariladi.
+- [ ] **P1.1 — Provider Reliability Score v1.**
+  - **Dependency:** P0.1 eventlar va yetarli real transaction sample’i.
+  - **Acceptance criteria:** score faqat transaction-derived operational signal — acceptance, availability mismatch, quote/action failure, cancellation, substitution, latency va fulfillment — asosida hisoblanadi; oddiy user rating bilan aralashtirilmaydi va har score izohlanadi.
+  - **KPI:** reliability score, availability mismatch, quote-to-fulfillment failure, substitution frequency va provider latency.
+  - **Done:** formula/version hujjatlashtirilgan, admin/provider dashboardda sabablar bilan ko‘rinadi va kam sample’da `insufficient_data` qaytaradi.
+- [ ] **P1.2 — Operational intelligence va demand loop.**
+  - **Dependency:** P0 funnel, unmet-demand va privacy-safe transaction data.
+  - **Acceptance criteria:** failed orders, tez tugaydigan mahsulotlar, substitutions, price sensitivity va provider gaplari haftalik action backlogga aylanadi.
+  - **KPI:** takrorlangan failure kamayishi, recovered demand, catalog-gap yopilish va provider improvement rate.
+  - **Done:** kamida bitta aniqlangan operational muammo tuzatiladi va keyingi cohortda KPI yaxshilangani o‘lchanadi.
+- [ ] **P1.3 — Provider integration DX.**
+  - **Dependency:** P0 real pilotlarda topilgan takroriy integration pain’lari.
+  - **Acceptance criteria:** standard schema, reference adapter, sandbox, certification, webhook/idempotency va observability providerga mustaqil integratsiya yo‘lini beradi.
+  - **KPI:** time-to-first-certified-transaction, certification pass rate va support touch soni.
+  - **Done:** yangi provider production kodiga maxsus Zayuno branch qo‘shmasdan reference flow orqali sertifikatsiyadan o‘tadi.
+- [ ] **P2.1 — Any AI Agent distribution.**
+  - **Dependency gate:** P0.1–P0.4 bajarilgan, food liquidity/fulfillment barqaror va Provider Reliability Score ishlayapti. Ungacha bu North Star yoki asosiy sprint KPI emas.
+  - **Acceptance criteria:** tashqi agent discovery → quote → confirmation → action oqimini bir xil contract orqali bajaradi; source attribution va support ownership aniq.
+  - **KPI:** agent-sourced successful orders, conversion, fulfillment va integration adoption.
+  - **Done:** kamida 2 tashqi AI surface production transaction yuboradi va ularning fulfillment sifati consumer app baseline’idan yomonlashmaydi.
+- [ ] **P2.2 — Booking/transport kabi yangi vertikal.**
+  - **Dependency gate:** food uchun founder belgilagan conversion, fulfillment, repeat usage va provider-network thresholdlari ketma-ket 4 hafta bajarilgan.
+  - **Acceptance criteria:** yangi vertikal real demand va real provider pilotiga ega; food roadmap resursini buzmaydi.
+  - **Done:** gate review yozma tasdiqlanadi; aks holda g‘oya future backlogda qoladi.
+
+**Priority qoidasi:** P0 liquidity va provider ROI tugamasdan P2 agent distribution yoki yangi vertikal asosiy sprintga olinmaydi. “Data moat” atamasi faqat yuqoridagi operational intelligence real qaror yoki KPI yaxshilanishiga olib kelganda ishlatiladi.
+
 ## Joriy ish — tabiiy pizza/budjet so‘rovini actionga aylantirish, 2026-09-10
 
 - [x] Reportdagi so‘rov nega exact-product fallbackga tushganini aniqlash.

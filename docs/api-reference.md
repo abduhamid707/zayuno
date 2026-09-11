@@ -65,7 +65,7 @@ Admin-only operation that reopens a `REJECTED` or `SUSPENDED` application as
 
 ### `GET /admin/logs/events`
 Admin-only redacted operational event stream. See
-[Operations Logs and Support Export](./operations-observability.md).
+[Provider troubleshooting](./troubleshooting-faq.md). Internal operators can also consult the repository document docs/operations-observability.md.
 
 ### `GET /admin/logs/export`
 Download the filtered redacted event stream as `json` or `csv`.
@@ -86,5 +86,5 @@ Retrieve live status and fulfillment timeline.
 ### `POST /actions/:id/cancel`
 Cancel an active action.
 
-### `POST /webhooks`
-Ingest provider status transition events with HMAC-SHA256 signature verification.
+### `POST /webhooks/:providerSlug`
+Canonical provider-to-Zayuno status event ingestion with HMAC-SHA256 signature verification. Use x-zayuno-signature over the raw body. The legacy slugsiz route is retained for compatibility; new integrations use the slug in the path.

@@ -1,102 +1,43 @@
 # Actions & Execution Lifecycle
 
-An **Action** represents a confirmed real-world transaction dispatched from an AI agent to an external provider.
+An action is a confirmed real-world operation sent to a provider. For food ordering, it represents the provider order and its fulfillment state.
 
----
+## Provider endpoints versus Core endpoints
 
-## 1. Action Status Lifecycle
+Implement POST /actions and GET /actions/:id on the provider backend. ACTION_CANCEL adds POST /actions/:id/cancel. Core orchestration routes such as POST /api/v1/actions belong to Zayuno.
 
-All provider-specific order and execution statuses must be mapped into Zayuno's normalized lifecycle:
+Use [canonical action request and response](/docs/contract-reference/#contract-actions), [status response](/docs/contract-reference/#contract-action-status), and [OpenAPI](/openapi.json). Do not infer field or enum names from a UI label.
 
-```mermaid
-stateDiagram-v2
-    [*] --> CREATED: Action initialized
-    CREATED --> AWAITING_PAYMENT: Provider requires settlement
-    AWAITING_PAYMENT --> CONFIRMED: Payment verified by provider
-    CREATED --> CONFIRMED: Free / offline payment / invoice
-    CONFIRMED --> PROCESSING: Provider fulfillment initiated
-    PROCESSING --> COMPLETED: Action fulfilled & delivered
-    CREATED --> CANCELLED: Cancelled before lock
-    AWAITING_PAYMENT --> CANCELLED: Expired or user cancelled
-    CONFIRMED --> CANCELLED: Cancelled before processing
-    CREATED --> FAILED: Provider rejection / error
-    PROCESSING --> FAILED: Fulfillment failure
-```
+## Preconditions
 
-### Normalized Status Definitions:
-- **`CREATED`**: Action received and recorded by Zayuno and provider.
-- **`AWAITING_PAYMENT`**: Action requires customer payment via provider checkout URL before processing starts.
-- **`CONFIRMED`**: Payment verified or order confirmed by merchant.
-- **`PROCESSING`**: Provider backend is actively fulfilling or preparing the order.
-- **`COMPLETED`**: Fulfillment finished, service rendered, or delivery delivered.
-- **`CANCELLED`**: Cancelled by user or provider before completion.
-- **`FAILED`**: Action failed due to validation, rejection, or external errors.
+1. Resolve real catalog IDs, variants, options and quantities.
+2. Obtain a server-calculated quote for that selection and fulfillment.
+3. Verify the quote is still valid.
+4. Obtain explicit customer confirmation of the current price and terms.
+5. Create the action with a persistent idempotencyKey.
 
----
+Changing the selection or expired terms requires a new quote and confirmation. User contact details alone do not mean the user has confirmed a purchase.
 
-## 2. Action Creation Request
+## Normalized statuses
 
-Provider dashboards display `paymentStatus` separately from the action status.
-A `PAID` value is labelled `PROVIDER_REPORTED`: it represents the provider
-integration's signed status update and is not a claim of bank settlement unless
-the provider explicitly exposes settlement data. Cancellation and failure
-events should include a clear, safe reason. See
-[Provider Operations Dashboard and Moderation](./provider-operations.md).
+Use the NormalizedAction schema's status enum: CREATED, AWAITING_PAYMENT, CONFIRMED, PROCESSING, COMPLETED, CANCELLED and FAILED.
 
-Cancellation requests accept a stable `reasonCode` plus a clear `reason`:
+Map the merchant's internal statuses at the adapter boundary. The Core dashboard may display operational statuses such as SUBMITTED or IN_PROGRESS; those are not a replacement for the provider contract enum. The allowed transition depends on the current action and provider operation.
 
-```json
-{
-  "reasonCode": "CUSTOMER_CANCELLED",
-  "reason": "Customer changed the travel date"
-}
-```
+## Payment evidence is separate
 
-### Endpoint
-`POST /api/v1/actions`
+Provider dashboards display paymentStatus separately from action status. PAID is labelled **PROVIDER_REPORTED**: it represents the provider integration's status report, not independent proof of bank settlement.
 
-```json
-{
-  "idempotencyKey": "d8e379b2-6c9a-4e9b-83bb-92736152a1b9",
-  "providerSlug": "acme-logistics",
-  "quoteId": "quote_894103859",
-  "userConfirmed": true,
-  "customer": {
-    "name": "Jane Doe",
-    "phone": "+998901234567",
-    "email": "jane@example.com"
-  },
-  "destination": {
-    "raw": "Amir Timur Avenue 15, Tashkent"
-  },
-  "items": [
-    {
-      "offeringId": "offering_parcel_doc",
-      "quantity": 1,
-      "selectedOptions": [
-        { "groupId": "grp_urgency", "optionId": "opt_rush", "quantity": 1 }
-      ]
-    }
-  ]
-}
-```
+Return the provider-owned checkout via nextAction when needed. See [payment handoff](payment-handoff.md) and [Provider Operations Dashboard and Moderation](provider-operations.md).
 
-### Action Creation Response
-```json
-{
-  "id": "act_8849102",
-  "publicId": "ZY-LOGISTICS-10928",
-  "providerSlug": "acme-logistics",
-  "externalActionId": "acme_order_9981",
-  "status": "AWAITING_PAYMENT",
-  "nextAction": {
-    "type": "OPEN_URL",
-    "url": "https://acme-logistics.example/pay/9981",
-    "label": "Pay now",
-    "expiresAt": "2026-08-17T16:15:00Z"
-  },
-  "total": 50000,
-  "currency": "UZS",
-  "createdAt": "2026-08-17T15:30:00Z"
-}
-```
+## Idempotency and retries
+
+Persist the incoming idempotencyKey with the created order. Concurrent duplicates and retries after a restart must return the existing action instead of creating another order.
+
+On an uncertain timeout, query the existing action or retry the same key. Do not generate a fresh key simply because the first response was lost. [Idempotency guide](errors-and-idempotency.md).
+
+## Cancellation and status updates
+
+When ACTION_CANCEL is supported, use the canonical cancellation route and payload. A stable reasonCode and safe human-readable reason help explain the result.
+
+Provider sends signed status events to Zayuno's webhook endpoint. Polling GET /actions/:id must reflect the same order identity and authoritative state. Cancellation, payment and fulfillment should remain consistent.

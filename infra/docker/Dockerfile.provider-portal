@@ -15,6 +15,7 @@ RUN pnpm --filter @zayuno/contracts run build
 RUN pnpm --filter @zayuno/shared run build
 
 COPY apps/provider-portal ./apps/provider-portal
+COPY docs ./docs
 
 ARG VITE_API_URL=https://api.zayuno.uz
 ENV VITE_API_URL=$VITE_API_URL

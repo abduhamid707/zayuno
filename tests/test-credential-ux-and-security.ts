@@ -9,7 +9,7 @@ async function main() {
 
   const wizardContent = fs.readFileSync(path.resolve('apps/provider-portal/src/OnboardingWizard.tsx'), 'utf-8');
   const appContent = fs.readFileSync(path.resolve('apps/provider-portal/src/App.tsx'), 'utf-8');
-  const docsContent = fs.readFileSync(path.resolve('apps/provider-portal/src/DocsViewer.tsx'), 'utf-8');
+  const docsContent = fs.readFileSync(path.resolve('docs/authentication.md'), 'utf-8');
   const providersServiceContent = fs.readFileSync(path.resolve('apps/api/src/modules/providers/providers.service.ts'), 'utf-8');
   const providersControllerContent = fs.readFileSync(path.resolve('apps/api/src/modules/providers/providers.controller.ts'), 'utf-8');
 

@@ -1,154 +1,86 @@
-# 14. Troubleshooting & Developer FAQ
+# Troubleshooting & FAQ
 
-This guide addresses the most common integration challenges, networking issues, cryptographic verification pitfalls, and error codes encountered when connecting external provider systems to Zayuno.
+Start with the request direction, provider slug, HTTP status, trace ID and validation field path. Open the [Inspector](/?tab=inspector) for provider requests. Do not paste unredacted headers into a support ticket.
 
----
+## 401: credentials and HMAC
 
-## 1. CORS & Preflight Requests
+| Request | Expected credential |
+| --- | --- |
+| Zayuno → provider, API_KEY mode | x-provider-api-key |
+| Zayuno → provider, BEARER_TOKEN mode | Authorization: Bearer |
+| Zayuno → provider, HMAC_SIGNATURE mode | x-zayuno-signature over rawBody |
+| Provider → Zayuno webhook | x-zayuno-signature with ZAYUNO_WEBHOOK_SECRET |
+| Portal → Zayuno Core | Account access token |
 
-When testing from web-based simulators, developer dashboards, or frontend applications, your provider HTTP endpoints may receive browser preflight `OPTIONS` requests before the actual `POST` or `GET` request.
+A provider API key is not a webhook signing secret. Confirm the portal's authMethod matches the backend. After secret rotation update both sides.
 
-### Required CORS Headers
-Your server must respond to `OPTIONS` preflight requests with `204 No Content` or `200 OK` and include:
-```http
-Access-Control-Allow-Origin: * (or https://developers.zayuno.uz)
-Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
-Access-Control-Allow-Headers: Content-Type, Authorization, x-api-key, x-signature, x-provider, idempotency-key
-Access-Control-Max-Age: 86400
-```
+For rawBody verification, use exactly the bytes sent over HTTP; parsing and reserializing JSON can change whitespace and field order. Current signing does not prepend a timestamp. See [authentication](authentication.md) for a signing example.
 
-### Express.js Example:
-```typescript
-import cors from 'cors';
-app.use(cors({
-  origin: ['https://developers.zayuno.uz', 'https://zayuno.uz'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-signature', 'x-provider', 'idempotency-key']
-}));
-```
+## CORS & Preflight
 
----
+Zayuno's normal provider API calls are server-to-server. CORS does not authorize those calls and is not a replacement for API authentication.
 
-## 2. Webhook & Request HMAC Signature Verification (`rawBody`)
+If your own browser-based development tool calls your backend, allow only its actual origin and required headers. The provider portal origin is https://partners.zayuno.uz. Handle OPTIONS if your tool uses preflight. Do not move production provider secrets into browser code to solve a CORS error.
 
-Zayuno signs all outbound webhook payloads using **HMAC-SHA256** and passes the hexadecimal digest in the `x-signature` header.
+## 404 or HTML instead of JSON
 
-> [!IMPORTANT]
-> **Use the Raw Request Body (`rawBody`)!**
-> You must compute the HMAC digest on the **exact raw bytes** received over the wire. Parsing the JSON body first (`JSON.parse` or body-parser) and re-stringifying it (`JSON.stringify(req.body)`) alters whitespace, property order, and unicode escapes, causing signature mismatch!
+Check the configured base URL. For https://YOUR_HOST/zayuno, health resolves to https://YOUR_HOST/zayuno/health.
 
-### Node.js / Express Example:
-```typescript
-import crypto from 'crypto';
-import express from 'express';
+- Do not use the portal's frontend URL.
+- Do not append /health to the base URL.
+- Do not implement Core /api/v1/quotes where the provider expects POST /quote.
+- Check reverse proxy prefixes and trailing slashes.
 
-const app = express();
-// Capture raw buffer before JSON parsing
-app.use(express.json({
-  verify: (req: any, _res, buf) => {
-    req.rawBody = buf;
-  }
-}));
+[Base URL guide](base-url.md) includes Express and FastAPI starting points.
 
-app.post('/api/zayuno-webhook', (req: any, res) => {
-  const signature = req.headers['x-signature'] as string;
-  const secret = process.env.ZAYUNO_WEBHOOK_SECRET!;
+## Latency & Timeout
 
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(req.rawBody)
-    .digest('hex');
+Verify the backend is reachable from the hosted service, not only from your laptop. localhost and private IP addresses are not reachable provider hosts for hosted Zayuno. Use a public HTTPS test endpoint.
 
-  const isValid = crypto.timingSafeEqual(
-    Buffer.from(signature || '', 'hex'),
-    Buffer.from(expectedSignature, 'hex')
-  );
+Inspect provider logs for slow database queries, downstream API delays and retries. A timeout after action creation has an unknown result; retry with the same idempotencyKey or query status, not a new key.
 
-  if (!isValid) {
-    return res.status(401).json({ error: 'Invalid HMAC signature' });
-  }
+Do not return fake HEALTHY or successful actions to hide a timeout.
 
-  // Process event safely
-  res.status(200).json({ received: true });
-});
-```
+## Quote Math Validation
 
-### Python (FastAPI / Flask) Example:
-```python
-import hmac
-import hashlib
-from fastapi import FastAPI, Request, HTTPException
+Calculate prices on the provider server from real catalog and selected variants/options.
 
-app = FastAPI()
+~~~text
+subtotal = sum(lines[].lineTotal)
+total = subtotal + totalFees - totalDiscount
+~~~
 
-@app.post("/api/zayuno-webhook")
-async def handle_webhook(request: Request):
-    signature = request.headers.get("x-signature", "")
-    raw_body = await request.body()
-    secret = b"your_webhook_secret"
+Return canonical id and lines, currency and expiresAt. Do not use only quoteId or items in new normalized responses. Quantity, option counts and decimal handling must match the contract. Do not recalculate totals in the client to disguise mismatched provider data.
 
-    expected_sig = hmac.new(secret, raw_body, hashlib.sha256).hexdigest()
+When a quote expires or selections change, request a new quote and get confirmation for its terms before creating an action. [Quote reference](/docs/contract-reference/#contract-quote).
 
-    if not hmac.compare_digest(signature, expected_sig):
-        raise HTTPException(status_code=401, detail="Invalid HMAC signature")
+## Capability or location failure
 
-    payload = await request.json()
-    return {"received": True}
-```
+READONLY requires METADATA, HEALTH, CATALOG. Transactional integrations additionally require QUOTE, ACTION_CREATE, ACTION_STATUS, WEBHOOK.
 
----
+Physical fulfillment (DELIVERY, PICKUP, ONSITE, HYBRID) requires active locations. Removing LOCATIONS from declared capabilities does not remove this requirement. See [capability profiles](capabilities.md).
 
-## 3. Latency & Timeout Service Level Agreements (SLAs)
+## Common diagnostic codes
 
-AI agents (ChatGPT, Claude, Autonomous Orchestrators) maintain a **15–30 second total timeout** for user conversational turns.
+| Code / signal | Next step |
+| --- | --- |
+| UNAUTHORIZED / 401 | Match auth method, credential and signature direction |
+| NOT_FOUND / 404 | Check base URL, endpoint and real resource ID |
+| QUOTE_MATH_INVALID | Reconcile lines, fees, discounts and total |
+| Quote expired / state conflict | Get a fresh quote or inspect existing action before retry |
+| RESERVED_BRAND_PROTECTED | Use the authorized business identity; contact operations for an existing protected brand |
+| CHANGES_REQUESTED | Read review notes and requiredChanges in the dashboard |
+| Schema field path | Compare that field with generated OpenAPI; do not rename guessed fields |
+| Timeout / upstream failure | Check public reachability, server logs and downstream dependencies |
 
-- **Quote & Search endpoints (`POST /quote`, `GET /search`)**: Must respond within **1.5 seconds**.
-- **Action creation (`POST /action`)**: Must respond within **2.0 seconds**.
-- **Health check (`GET /health`)**: Must respond within **500 milliseconds**.
+HTTP mappings depend on the route and failure; use the returned code and report instead of assuming every failure has one fixed status.
 
-If your backend requires asynchronous external inventory reservations or heavy billing calls, return a pending status with a checkout URL (`nextAction`) immediately rather than blocking the HTTP response.
+## Sandbox works but certification fails
 
----
+The portal sandbox uses a sample provider. It proves the example flow works, not that your backend implements the contract.
 
-## 4. Quote Math Validation
+Certification runs your configured adapter. Check providerSlug, base URL, capabilities and test data. It may create a test action for transactional integrations. A passing certification is still separate from approval and ACTIVE status.
 
-Zayuno strictly validates quote mathematics. All prices must adhere to the exact formula:
-$$\text{total} = \text{subtotal} + \text{fees} - \text{discount}$$
+## What should an AI agent receive?
 
-- **Non-negative numbers**: `subtotal >= 0`, `fees >= 0`, `discount >= 0`, `total >= 0`.
-- **Currency consistency**: `currency` must match across all lines and totals (e.g. `"UZS"`).
-- **Line items summation**: `subtotal` must equal the sum of `line.total` across all quote lines.
-- **Expiration**: `expiresAt` must be an ISO 8601 UTC timestamp in the future (recommended: 5–15 minutes).
-
----
-
-## 5. Idempotency Guarantees
-
-All quote and action creation requests carry an `idempotencyKey` (UUID or random string).
-- If your system receives a duplicate `idempotencyKey` within 24 hours:
-  1. **Do not create a duplicate order or charge.**
-  2. **Return the original action record** with its current status.
-  3. Ensure database constraints enforce uniqueness on `(provider_id, idempotency_key)`.
-
----
-
-## 6. HTTPS & SSL Certificate Requirements
-
-In production environments:
-- Endpoints must use **`https://`**.
-- SSL certificates must be issued by a recognized public Certificate Authority (Let's Encrypt, Cloudflare, DigiCert, Google Trust Services).
-- Self-signed certificates or expired certificates will be rejected by the Zayuno Gateway and Certification Runner.
-
----
-
-## 7. Common HTTP Error Codes & Diagnostics
-
-| HTTP Status | Error Code | Reason & Solution |
-| :--- | :--- | :--- |
-| **`400 Bad Request`** | `RESERVED_BRAND_PROTECTED` | The brand or slug is reserved for verified enterprise onboarding. Contact `operations@zayuno.uz`. |
-| **`400 Bad Request`** | `QUOTE_EXPIRED` | The quote validity window has elapsed. Request a fresh quote before creating an action. |
-| **`401 Unauthorized`** | `INVALID_CREDENTIALS` | Check your API key or Bearer token header. Ensure your account is active and email verified. |
-| **`403 Forbidden`** | `NOT_PUBLISHED` | The provider has not completed certification or administrator approval. |
-| **`409 Conflict`** | `IDEMPOTENCY_CONFLICT` | An action with this idempotency key was already created with different parameters. |
-| **`422 Unprocessable`** | `SCHEMA_VALIDATION_FAILED` | Check the error response details for missing required fields (e.g. `customer.phone`, `items`). |
-| **`502 Bad Gateway`** | `UPSTREAM_UNREACHABLE` | Zayuno could not connect to your `baseUrl`. Verify firewall, DNS, and server health. |
+Give the agent the [canonical workflow](ai-agents.md), contract version, framework, capability profile and redacted failure. AI Kit can include the certification context. Ask it to report changed files, tests, remaining work and the exact next step.

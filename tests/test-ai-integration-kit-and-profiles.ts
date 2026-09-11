@@ -245,7 +245,8 @@ async function runTests() {
   assert.ok(!sensitivePrompt.includes('password123'), 'Prompt must NOT contain password');
   assert.ok(!sensitivePrompt.includes('Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'), 'Prompt must redact Bearer tokens');
   assert.ok(sensitivePrompt.includes('Bearer [REDACTED]'), 'Prompt must replace tokens with [REDACTED]');
-  assert.ok(sensitivePrompt.includes('key=[REDACTED]'), 'Prompt must replace sensitive keys with [REDACTED]');
+  assert.ok(!sensitivePrompt.includes('zy_live_agent_secret_key_12345'), 'Prompt must omit the original key');
+  assert.ok(sensitivePrompt.includes('key=[REDACTED_CREDENTIAL]'), 'Prompt must use the central credential redaction marker');
   console.log('✅ 3.3 Strict privacy & zero secret leakage verified: all credentials, tokens, and PII are redacted');
 
   // Test 3.4: Contract JSON generation

@@ -773,14 +773,7 @@ export function createProviderOpenApiDocument(): Record<string, any> {
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/NormalizedWebhookEvent' },
-                example: {
-                  eventId: 'evt_123',
-                  eventType: 'action.status_updated',
-                  providerSlug: 'shopla',
-                  actionId: 'act_12345',
-                  status: 'COMPLETED',
-                  timestamp: '2026-08-24T10:00:00.000Z'
-                }
+                example: PROVIDER_PROTOCOL_ENDPOINTS.find(endpoint => endpoint.id === 'webhook')!.requestExample
               }
             }
           },

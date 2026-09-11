@@ -1,70 +1,30 @@
-# Catalog & Offerings Specification
+# Catalog & Offerings
 
-The Catalog capability allows AI agents to explore categories, offerings, variant pricing, modifier groups, and real-time inventory availability.
+The catalog supplies real categories, products, variants, modifiers, prices and availability to Zayuno. Stable identifiers are essential: the order flow uses IDs, not display names.
 
----
+## Provider endpoints
 
-## 1. Catalog Schema Overview
+- GET /catalog — categories and offerings.
+- GET /offerings/:id — one offering by its stable ID.
+- GET /search — when SEARCH is declared.
+- GET /locations — when declared or required by physical fulfillment.
 
-A catalog represents the collection of services or goods offered by a provider.
+Use [canonical catalog JSON](/docs/contract-reference/#contract-catalog) and [offering JSON](/docs/contract-reference/#contract-offering). The OpenAPI schema specifies required fields; a short UI card is not a complete API payload.
 
-```json
-{
-  "providerSlug": "acme-logistics",
-  "locationId": "loc_tashkent_central",
-  "categories": [
-    {
-      "id": "cat_express",
-      "slug": "express-delivery",
-      "name": "Express Delivery",
-      "description": "Same-day courier dispatch",
-      "sortOrder": 1
-    }
-  ],
-  "offerings": [
-    {
-      "id": "offering_parcel_doc",
-      "providerSlug": "acme-logistics",
-      "categorySlug": "express-delivery",
-      "offeringCode": "DOC_DELIVERY",
-      "title": "Document Courier Service",
-      "description": "Door-to-door envelope delivery within 2 hours",
-      "basePrice": 25000,
-      "currency": "UZS",
-      "isAvailable": true,
-      "optionGroups": [
-        {
-          "id": "grp_urgency",
-          "name": "Delivery Speed",
-          "minSelections": 1,
-          "maxSelections": 1,
-          "options": [
-            {
-              "id": "opt_standard",
-              "name": "Standard (2 hours)",
-              "priceDelta": 0,
-              "isDefault": true
-            },
-            {
-              "id": "opt_rush",
-              "name": "Rush (45 minutes)",
-              "priceDelta": 15000,
-              "isDefault": false
-            }
-          ]
-        }
-      ]
-    }
-  ],
-  "version": "2026.1",
-  "updatedAt": "2026-08-17T15:00:00Z"
-}
-```
+## Map the real catalog
 
----
+Map providerId, offeringCode, title, description, categorySlug, categoryTitle, basePrice, currency, isAvailable and declared optional metadata according to the schema.
 
-## 2. Option Groups & Modifiers
+Do not rename canonical fields to a merchant's internal field names. Keep that translation inside the provider adapter. Missing data should not become a fabricated default price or stock status.
 
-- **`minSelections`**: Minimum required selections (e.g. `1` for mandatory choice, `0` for optional add-on).
-- **`maxSelections`**: Maximum allowed selections (e.g. `1` for radio-style, `5` for multi-select).
-- **`priceDelta`**: Additional cost in provider currency added to `basePrice`.
+## Variants and modifiers
+
+Variants have their own IDs, labels, prices and availability. Option groups define selectable modifiers; minSelections and maxSelections constrain the choices. priceDelta is used in verified quote calculation, not merely in the product card.
+
+Keep IDs stable across catalog refreshes. Changed or unavailable choices must be checked again by POST /quote.
+
+## Catalog versus quote
+
+Catalog prices help discovery. The quote is the authoritative calculation for the customer's exact selection, destination, fees and discounts. A catalog refresh does not replace quote validation.
+
+Test catalog, single-offering and search results against the same schema and ensure they refer to the same provider and product IDs. See [quotes](quotes.md).

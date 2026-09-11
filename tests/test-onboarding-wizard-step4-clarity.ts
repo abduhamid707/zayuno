@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DOCS_MENU } from '../apps/provider-portal/src/DocsViewer.tsx';
+import { DOCS_MENU } from '../apps/provider-portal/src/docs-catalog.ts';
 
 function testUrlValidation(url: string): { valid: boolean; reason?: string } {
   const raw = url.trim();
@@ -54,10 +54,10 @@ async function main() {
   assert.ok(baseUrlDoc, 'DOCS_MENU must contain base-url guide');
   assert.ok(baseUrlDoc.title.includes('Base URL'), 'base-url doc title must mention Base URL');
 
-  const docsViewerContent = fs.readFileSync(path.resolve('apps/provider-portal/src/DocsViewer.tsx'), 'utf-8');
-  assert.ok(docsViewerContent.includes("selectedDoc === 'base-url'"), 'DocsViewer must implement base-url view');
-  assert.ok(docsViewerContent.includes('Express & TypeScript'), 'base-url doc must contain Node.js Express example');
-  assert.ok(docsViewerContent.includes('Python (FastAPI)'), 'base-url doc must contain FastAPI example');
+  assert.equal(baseUrlDoc.file, 'base-url.md', 'Base URL route must resolve to the canonical guide');
+  const baseUrlContent = fs.readFileSync(path.resolve('docs', baseUrlDoc.file), 'utf-8');
+  assert.ok(baseUrlContent.includes('Express & TypeScript'), 'base-url doc must contain Node.js Express example');
+  assert.ok(baseUrlContent.includes('Python (FastAPI)'), 'base-url doc must contain FastAPI example');
   console.log('    ✓ Deep-link base-url documentation present with Express & FastAPI boilerplate.');
 
   // 3. Capability Profile Selection Mapping

@@ -4,9 +4,10 @@ import {
   determineProviderCapabilityProfile,
   getMandatoryCapabilitiesForProfile,
   getProviderProtocolEndpoints,
-  PROVIDER_CONTRACT_VERSION
+  PROVIDER_CONTRACT_VERSION,
+  requiresActiveLocations
 } from '@zayuno/contracts';
-import { redactForLogs, scrubSensitiveString } from '@zayuno/shared';
+import { redactForLogs, scrubSensitiveString } from '../../../packages/shared/src/redaction';
 
 export type AiIntegrationGoal =
   | 'create-new'
@@ -146,14 +147,14 @@ function getFrameworkTask(framework: AiFramework, goal: AiIntegrationGoal): stri
     case 'nodejs-express':
       return `### Framework: Node.js (TypeScript / Express)
 - Use \`express.json({ verify: (req, res, buf) => { (req as any).rawBody = buf; } })\` so the raw body buffer is preserved for HMAC verification.
-- Use \`crypto.createHmac('sha256', process.env.ZAYUNO_WEBHOOK_SECRET!).update(req.rawBody).digest('hex')\` for webhook signature verification.
+- Use \`crypto.createHmac('sha256', process.env.ZAYUNO_WEBHOOK_SECRET!).update(rawBody).digest('hex')\` to sign the exact outgoing status event body sent to Zayuno.
 - Omit undefined optional properties when serializing JSON responses; never emit explicit \`{ field: null }\` for optional properties.
 - Return structured error responses with HTTP 400/404/409 matching Zayuno contract error structures.`;
 
     case 'nestjs':
       return `### Framework: NestJS
 - Configure \`rawBody: true\` in \`NestFactory.create(AppModule, { rawBody: true })\`.
-- Create a dedicated \`@Controller('zayuno')\` with endpoints: \`@Get('health')\`, \`@Get('provider-info')\`, \`@Get('catalog')\`, \`@Post('quote')\`, \`@Post('actions')\`, \`@Get('actions/:id')\`, \`@Post('webhooks')\`.
+- Create a dedicated \`@Controller('zayuno')\` with endpoints: \`@Get('health')\`, \`@Get('provider-info')\`, \`@Get('catalog')\`, \`@Post('quote')\`, \`@Post('actions')\`, \`@Get('actions/:id')\`; status webhooks are sent to Zayuno, not implemented as a merchant route.
 - Use an \`IdempotencyGuard\` or Redis-backed service for mutating \`POST /actions\` requests.
 - Omit optional null properties using \`class-transformer\` or custom interceptor.`;
 
@@ -198,7 +199,7 @@ function getFrameworkTask(framework: AiFramework, goal: AiIntegrationGoal): stri
 - Enable \`HttpRequest.EnableBuffering()\` to read the raw request body stream for HMAC-SHA256 verification.
 - Define strongly-typed records matching Zayuno API contracts.
 - Configure \`JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull\` or use \`[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]\` on optional properties.
-- Use \`IMemoryCache\` or Distributed Redis Cache for idempotency keys.`;
+- Persist idempotency keys with a database uniqueness constraint and an atomic action transaction; an in-memory cache alone is insufficient.`;
 
     default:
       return `### Framework: Raw HTTP / cURL
@@ -232,7 +233,7 @@ export function generateAiPrompt(options: GeneratePromptOptions): string {
   ];
 
   const profile = determineProviderCapabilityProfile(declaredCaps);
-  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps, { type: providerType });
+  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps, { type: providerType, fulfillmentMode: sanitizedProvider.fulfillmentMode || sanitizedProvider.metadata?.fulfillmentMode });
   const isReadOnly = profile === ProviderCapabilityProfile.DISCOVERY_READONLY;
 
   // Redacted certification issues if any
@@ -251,19 +252,20 @@ ${failed.map((f: any, idx: number) => `
 - **Field path:** \`${f.issue?.path || 'not provided'}\`
 - **Expected:** \`${f.issue?.expected || 'Provider Contract v1 response'}\`
 - **Received:** \`${f.issue?.received || 'invalid response'}\`
-- **Docs:** ${f.docsUrl || f.issue?.docsUrl || 'https://developers.zayuno.uz/?tab=docs&doc=spec-v1'}
+- **Docs:** ${f.docsUrl || f.issue?.docsUrl || 'https://partners.zayuno.uz/docs/contract-reference/'}
 - **Required Resolution:** Patch the endpoint to return the exact schema and response codes expected by Zayuno contracts.
 `).join('\n')}`;
     }
   }
 
   const contractSection = getProviderProtocolEndpoints(profile)
-    .filter(endpoint => endpoint.required || declaredCaps.includes(endpoint.capability as ProviderCapability))
+    .filter(endpoint => endpoint.required || mandatoryCaps.includes(endpoint.capability as ProviderCapability) || declaredCaps.includes(endpoint.capability as ProviderCapability))
     .map((endpoint, index) => `${index + 1}. **${endpoint.summary}** \`${endpoint.method} ${endpoint.path}\`
+   - Direction: \`${endpoint.direction || 'ZAYUNO_TO_PROVIDER'}\`
    - Capability: \`${endpoint.capability}\` (${endpoint.required ? 'REQUIRED' : 'OPTIONAL / DECLARED'})
    ${endpoint.requestExample === undefined ? '' : `- Request: \`${JSON.stringify(endpoint.requestExample)}\``}
    - Canonical response: \`${JSON.stringify(endpoint.responseExample)}\`
-   - Docs: https://developers.zayuno.uz/?tab=docs&doc=spec-v1#${endpoint.docsAnchor}`)
+   - Docs: https://partners.zayuno.uz/docs/contract-reference/#${endpoint.docsAnchor}`)
     .join('\n');
 
   const rawPrompt = `# Zayuno Provider Integration Task
@@ -275,6 +277,12 @@ ${failed.map((f: any, idx: number) => `
 ---
 
 ## 2. Product Context
+
+Read https://partners.zayuno.uz/llms.txt first, then https://partners.zayuno.uz/docs/ai-agents.md.
+Exact schemas: https://partners.zayuno.uz/openapi.json. All guides: https://partners.zayuno.uz/llms-full.txt.
+Source precedence: canonical schemas and endpoint definitions, then generated reference, then explanatory guides.
+Current product focus is food ordering; general capability support is not proof of live providers in every category.
+
 Zayuno is an AI Agent Business Network that enables conversational AI agents (ChatGPT, Claude, Cursor, Codex) to discover and interact with real-world business services through normalized capability contracts.
 
 The universal lifecycle follows four strict stages:
@@ -292,7 +300,7 @@ The universal lifecycle follows four strict stages:
 - **Capability Profile:** \`${profile}\` (${isReadOnly ? 'Read-only / Discovery only' : 'Full Transactional'})
 - **Declared Capabilities:** \`${declaredCaps.join(', ')}\`
 - **Mandatory for this Profile:** \`${mandatoryCaps.join(', ')}\`
-- **Physical Locations:** ${declaredCaps.includes(ProviderCapability.LOCATIONS) ? 'Required (Physical delivery/retail)' : 'Not Required (Digital/remote service)'}
+- **Physical Locations:** ${requiresActiveLocations(providerType, sanitizedProvider.fulfillmentMode || sanitizedProvider.metadata?.fulfillmentMode) ? 'Required (physical fulfillment)' : 'Not automatically required (remote fulfillment)'}
 
 ---
 
@@ -308,7 +316,7 @@ Compatibility note: new integrations emit canonical \`id/lines\` quote fields an
 
 ## 5. Security & Privacy Rules
 1. **Zero Secret Leakage:** Never hardcode secrets, API keys, or tokens in source files or AI prompts. Use environment variables (\`process.env\` / \`os.environ\`).
-2. **HMAC Signature Verification:** HMAC-SHA256 must be computed over the **raw, unparsed body buffer**.
+2. **HMAC Signature Verification:** HMAC-SHA256 must be computed over the **raw, unparsed body buffer**, without a timestamp prefix. For incoming HMAC_SIGNATURE requests use the configured provider auth secret; for outgoing status events use ZAYUNO_WEBHOOK_SECRET and x-zayuno-signature. Preserve this direction when applying framework snippets.
 3. **Idempotency Guarantee:** Mutating action requests must respect \`idempotencyKey\` and return identical results on duplicates.
 4. **Provider-Owned Checkout:** Zayuno never processes credit cards directly. Always return provider-owned payment URLs in \`nextAction\`.
 5. **Customer PII Protection:** Mask or redact customer phone numbers and names in application logs.
@@ -322,8 +330,8 @@ ${getFrameworkTask(framework, goal)}
 
 ## 7. Verification Steps
 1. **Local Test:** Start local server on port \`4001\` and verify \`GET /health\` and \`GET /catalog\`.
-2. **Simulator Test:** Open Zayuno Developer Portal &rarr; **Sandbox Simulator** tab and execute the step-by-step lifecycle.
-3. **Automated Certification:** Open **Certification** tab and run the automated test harness until 100% pass rate is achieved.
+2. **Simulator Test:** The portal Sandbox uses a sample provider to explain the lifecycle. Its success does NOT verify your provider backend.
+3. **Automated Certification:** Configure your own HTTPS provider base URL and run API verification in a controlled test environment. Transactional certification may create test actions. Certification, review and ACTIVE publication are separate steps.
 ${issueSection}
 ---
 
@@ -332,6 +340,7 @@ ${issueSection}
 - Do NOT generate fake providers or fake certification success flags.
 - Follow the universal capability contract schemas strictly.
 - Write unit and integration tests covering the implemented endpoints.
+- Leave a completed/pending checklist, changed files, exact test results and next step for the next agent.
 `;
 
   return scrubSensitiveString(rawPrompt, 100000);
@@ -353,15 +362,17 @@ export function generateContractJson(provider?: any): string {
   ];
 
   const profile = determineProviderCapabilityProfile(declaredCaps);
-  const isReadOnly = profile === ProviderCapabilityProfile.DISCOVERY_READONLY;
+  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps, { type: clean.type || 'SERVICES', fulfillmentMode: clean.fulfillmentMode || clean.metadata?.fulfillmentMode });
 
   const endpoints = Object.fromEntries(
     getProviderProtocolEndpoints(profile)
-      .filter(endpoint => endpoint.required || declaredCaps.includes(endpoint.capability as ProviderCapability))
+      .filter(endpoint => endpoint.required || mandatoryCaps.includes(endpoint.capability as ProviderCapability) || declaredCaps.includes(endpoint.capability as ProviderCapability))
       .map(endpoint => [endpoint.id, {
         method: endpoint.method,
         path: endpoint.path,
-        required: endpoint.required,
+        required: endpoint.required || mandatoryCaps.includes(endpoint.capability as ProviderCapability),
+        direction: endpoint.direction || 'ZAYUNO_TO_PROVIDER',
+        requestExample: endpoint.requestExample,
         responseExample: endpoint.responseExample,
         docsAnchor: endpoint.docsAnchor
       }])
@@ -369,6 +380,8 @@ export function generateContractJson(provider?: any): string {
 
   const exportData = {
     contractVersion: PROVIDER_CONTRACT_VERSION,
+    docs: 'https://partners.zayuno.uz/llms.txt',
+    openapi: 'https://partners.zayuno.uz/openapi.json',
     profile,
     generatedAt: new Date().toISOString(),
     provider: {

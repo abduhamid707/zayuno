@@ -1,40 +1,38 @@
-# Errors & Idempotency Guidelines
+# Errors & Idempotency
 
-Robust error handling and idempotency prevent duplicate transactions, double payments, and unexpected state inconsistencies.
+Explicit failures and persistent idempotency prevent duplicate transactions when clients, agents or networks retry.
 
----
+## Error contract
 
-## 1. Standard Error Responses
+Use the ErrorResponse schema in [OpenAPI](/openapi.json). Provider and Core errors may have different HTTP wrappers; do not assume a generic NestJS error object is an RFC 7807 problem response.
 
-Zayuno returns standard RFC 7807 problem details:
+Return a safe, actionable message and the appropriate code. Do not expose secrets, full customer data or internal stack traces.
 
-```json
-{
-  "statusCode": 400,
-  "error": "BAD_REQUEST",
-  "message": "Quote has expired. Please calculate a new quote before submitting action.",
-  "timestamp": "2026-08-17T15:40:00Z"
-}
-```
+## Action idempotency
 
-### Common Error Codes:
-- `400 BAD_REQUEST`: Missing required fields, invalid parameters, or unconfirmed quote.
-- `401 UNAUTHORIZED`: Missing or invalid API key / webhook signature.
-- `404 NOT_FOUND`: Offering, location, quote, or action not found.
-- `409 CONFLICT`: Conflicting state or concurrency collision.
-- `410 GONE`: Quote expired (`QuoteExpiredError`).
-- `422 UNPROCESSABLE_ENTITY`: Fulfillment unavailable or item out of stock.
-- `502 BAD_GATEWAY`: External provider backend timeout or unhandled exception.
+Every create-action request carries an idempotencyKey.
 
----
+1. Store the key and associated action durably with a unique database constraint.
+2. Make duplicate detection and order creation atomic.
+3. A retry with the same key returns the existing action instead of creating or charging again.
+4. An incompatible payload for an already used key must not silently mutate the original order.
+5. Keep the behavior across process restarts and concurrent requests.
 
-## 2. Idempotency Implementation
+An in-memory map or cache alone is not sufficient for production order idempotency.
 
-To ensure safe retries over unreliable mobile or conversational networks, every action creation request includes an `idempotencyKey`.
+## Retry decisions
 
-### Provider Responsibilities:
-1. Store the incoming `idempotencyKey` alongside the created action record.
-2. If a second request arrives with the same `idempotencyKey`:
-   - Do **NOT** create a new internal order.
-   - Do **NOT** charge the customer a second time.
-   - Return the **exact same** action payload originally created.
+| Situation | Next step |
+| --- | --- |
+| Validation failure | Fix the request; do not retry unchanged |
+| Invalid authentication | Fix credentials or signature direction |
+| Expired quote | Obtain a fresh quote and confirmation |
+| Unknown result after timeout | Query status or retry the same idempotency key |
+| Temporary upstream failure | Bounded backoff; preserve request identity |
+| State conflict | Inspect existing action before another mutation |
+
+HTTP status varies by route and failure. Read the structured code and validation report as well as the status. See [troubleshooting](troubleshooting-faq.md).
+
+## Tests before certification
+
+Send concurrent duplicates, retry after a simulated timeout, restart the backend and resend a key. Verify one provider order exists and the same action ID is returned. Check cancellation and webhook duplicates separately.

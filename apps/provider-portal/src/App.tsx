@@ -1,4 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { WorkspaceShell } from './WorkspaceShell';
+import { WorkspaceOverview } from './WorkspaceOverview';
+import { getIntegrationState, WorkspaceTab } from './workspace-model';
+import { DOCS_MENU, normalizeDocId } from './docs-catalog';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Code2,
@@ -44,9 +48,6 @@ import {
   Bot,
   FileText
 } from 'lucide-react';
-import { DocsViewer } from './DocsViewer';
-import { OnboardingWizard } from './OnboardingWizard';
-import { AuthView } from './AuthView';
 import { ProtectedGate } from './ProtectedGate';
 import {
   generateAiPrompt,
@@ -61,6 +62,10 @@ import {
   ProviderType,
   requiresActiveLocations
 } from '@zayuno/contracts';
+
+const DocsViewer = lazy(() => import('./DocsViewer').then(module => ({ default: module.DocsViewer })));
+const OnboardingWizard = lazy(() => import('./OnboardingWizard').then(module => ({ default: module.OnboardingWizard })));
+const AuthView = lazy(() => import('./AuthView').then(module => ({ default: module.AuthView })));
 
 const API_BASE =
   (import.meta as any).env?.VITE_API_URL ||
@@ -136,19 +141,24 @@ export default function App() {
 
   const [selectedDoc, setSelectedDoc] = useState<string>(() => {
     if (typeof window === 'undefined') return 'getting-started';
-    return new URLSearchParams(window.location.search).get('doc') || 'getting-started';
+    return normalizeDocId(new URLSearchParams(window.location.search).get('doc') || 'getting-started', window.location.hash);
   });
 
+  const routeKey = useRef<string | null>(null);
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const url = new URL(window.location.href);
-    if (activeTab === 'overview') {
-      url.searchParams.delete('tab');
-    } else {
-      url.searchParams.set('tab', activeTab);
-    }
-    window.history.replaceState({}, '', url.toString());
-  }, [activeTab]);
+    const onBack = () => {
+      const params = new URLSearchParams(window.location.search);
+      const doc = normalizeDocId(params.get('doc') || 'getting-started', window.location.hash);
+      const rawTab = params.get('tab') || 'overview';
+      const allowed: WorkspaceTab[] = ['overview', 'apps', 'docs', 'sandbox', 'certification', 'inspector', 'onboarding', 'auth'];
+      const tab = params.has('doc') ? 'docs' : allowed.includes(rawTab as WorkspaceTab) ? rawTab as WorkspaceTab : rawTab === 'login' ? 'auth' : 'overview';
+      routeKey.current = tab + ':' + doc;
+      setSelectedDoc(doc);
+      setActiveTab(tab);
+    };
+    window.addEventListener('popstate', onBack);
+    return () => window.removeEventListener('popstate', onBack);
+  }, []);
 
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
@@ -182,6 +192,7 @@ export default function App() {
 
   const [createdCredentials, setCreatedCredentials] = useState<any>(null);
   const [selectedProviderActionId, setSelectedProviderActionId] = useState<string | null>(null);
+  const [dashboardSection, setDashboardSection] = useState<'orders' | 'integration'>('orders');
   const [actionFilters, setActionFilters] = useState({
     query: '', status: 'ALL', paymentStatus: 'ALL', from: '', to: '', sort: 'newest'
   });
@@ -199,6 +210,25 @@ export default function App() {
   const [aiFramework, setAiFramework] = useState<AiFramework>('nodejs-express');
   const [aiCopiedToast, setAiCopiedToast] = useState<string | null>(null);
   const [locale, setLocale] = useState<'uz' | 'en'>('uz');
+  useEffect(() => {
+    if (!aiKitOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = document.querySelector<HTMLElement>('[aria-labelledby="ai-kit-title"]');
+    const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input, select, textarea, [tabindex="0"]') || []).filter(element => element.offsetParent !== null);
+    focusable()[0]?.focus();
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setAiKitOpen(false); }
+      if (event.key === 'Tab') {
+        const elements = focusable(), first = elements[0], last = elements[elements.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    dialog?.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = overflow; dialog?.removeEventListener('keydown', onKey); previous?.focus(); };
+  }, [aiKitOpen]);
 
   // Webhook Secret Rotation State
   const [rotatedSecretModal, setRotatedSecretModal] = useState<{
@@ -237,7 +267,16 @@ export default function App() {
       url.searchParams.set('tab', activeTab);
       url.searchParams.delete('doc');
     }
-    window.history.replaceState({}, '', url);
+    const key = activeTab + ':' + selectedDoc;
+    if (routeKey.current !== null && routeKey.current !== key) {
+      url.hash = '';
+      window.history.pushState({}, '', url);
+      window.scrollTo({ top: 0 });
+    } else {
+      window.history.replaceState({}, '', url);
+    }
+    routeKey.current = key;
+    document.title = (activeTab === 'docs' ? DOCS_MENU.find(doc => doc.id === selectedDoc)?.title || 'Hujjatlar' : activeTab === 'apps' ? 'Mening biznesim' : 'Provider workspace') + ' · Zayuno Partners';
   }, [activeTab, selectedDoc]);
 
   const apiFetch = async (path: string, init: RequestInit = {}) => {
@@ -405,7 +444,7 @@ export default function App() {
     setTimeout(() => setCopiedText(null), 2000);
   };
 
-  const { data: providerData, refetch: refetchProvider } = useQuery({
+  const { data: providerData, isPending: providerLoading, isError: providerFailed, refetch: refetchProvider } = useQuery({
     queryKey: ['provider-details', token],
     queryFn: async () => {
       const res = await apiFetch('/api/v1/providers/me');
@@ -418,8 +457,16 @@ export default function App() {
     providerData?.type as ProviderType | undefined,
     (providerData?.fulfillmentMode || providerData?.metadata?.fulfillmentMode) as ProviderFulfillmentMode | undefined
   );
+  const dashboardProvider = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (providerData?.slug && dashboardProvider.current !== providerData.slug) {
+      dashboardProvider.current = providerData.slug;
+      setDashboardSection(providerData.status === 'ACTIVE' ? 'orders' : 'integration');
+    }
+  }, [providerData?.slug, providerData?.status]);
+  const integrationState = getIntegrationState(!!token, providerData);
 
-  const { data: providerDashboard, isFetching: dashboardFetching, refetch: refetchDashboard } = useQuery({
+  const { data: providerDashboard, isFetching: dashboardFetching, isError: dashboardFailed, refetch: refetchDashboard } = useQuery({
     queryKey: ['provider-dashboard', token, actionFilters],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -716,7 +763,7 @@ export default function App() {
       setAiCopiedToast(`${targetName} uchun prompt nusxalandi!`);
       setTimeout(() => setAiCopiedToast(null), 3000);
     } catch {
-      setAiCopiedToast('Prompt clipboardga nusxalandi!');
+      setAiCopiedToast('Nusxalash amalga oshmadi. Markdown faylini yuklab oling.');
       setTimeout(() => setAiCopiedToast(null), 3000);
     }
   };
@@ -748,373 +795,26 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // One consistent path for providers. The individual tools remain available,
-  // but the product should always explain what comes before and after the
-  // current screen.
-  const integrationJourney = [
-    { id: 'start', label: 'Get started', short: 'Start', detail: 'Account & verification', tab: 'onboarding' as const, step: 1 },
-    { id: 'profile', label: 'Business setup', short: 'Profile', detail: 'Business, support & category', tab: 'onboarding' as const, step: 3 },
-    { id: 'connect', label: 'Connect API', short: 'Connect', detail: 'Endpoint, auth & capabilities', tab: 'onboarding' as const, step: 4 },
-    { id: 'sandbox', label: 'Test in sandbox', short: 'Test', detail: 'Run a safe end-to-end request', tab: 'sandbox' as const },
-    { id: 'certify', label: 'Certify', short: 'Certify', detail: 'Contract and security checks', tab: 'certification' as const },
-    { id: 'publish', label: 'Review & publish', short: 'Publish', detail: 'Submit for approval and go live', tab: 'onboarding' as const, step: 6 }
-  ];
-  const journeyIndex = activeTab === 'overview' ? 0
-    : activeTab === 'onboarding' ? Math.max(0, Math.min(5, initialOnboardingStep - 1))
-    : activeTab === 'apps' ? 5
-    : activeTab === 'sandbox' ? 3
-    : activeTab === 'certification' ? 4
-    : activeTab === 'inspector' ? 4
-    : 0;
-  const openJourneyStep = (item: typeof integrationJourney[number], index: number) => {
-    if (!token && index > 0) {
-      setActiveTab('onboarding');
-      setInitialOnboardingStep(1);
-      return;
-    }
-    if (item.step) setInitialOnboardingStep(item.step);
-    setActiveTab(item.tab);
-  };
+  const [docsSearchRequest, setDocsSearchRequest] = useState(0);
+  const openDocsSearch = () => { setActiveTab('docs'); setDocsSearchRequest(value => value + 1); };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
-      {/* Product shell */}
-      <header className="product-header sticky top-0 z-50">
-        <div className="flex items-center gap-3 min-w-max">
-          <img src="/logo.svg" alt="Zayuno" className="brand-mark" />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-lg tracking-tight text-white">ZAYUNO</span>
-              <span className="product-badge">DEVELOPERS</span>
-            </div>
-            <p className="text-[11px] text-slate-500">Provider integration workspace</p>
-          </div>
-        </div>
-
-        <nav className="workflow-nav" aria-label="Developer workspace navigation">
-          <div className="nav-group-label">Workspace</div>
-          <button onClick={() => setActiveTab('overview')} className={`workflow-link ${activeTab === 'overview' ? 'is-active' : ''}`}>
-            <Zap className="w-3.5 h-3.5" /> Overview
-          </button>
-          <button onClick={() => setActiveTab('apps')} className={`workflow-link ${activeTab === 'apps' ? 'is-active' : ''}`}>
-            <LayoutDashboard className="w-3.5 h-3.5" /> Provider {token && <span className="nav-status-dot" />}
-          </button>
-          <span className="nav-divider" />
-          <div className="nav-group-label">Build & verify</div>
-          <button onClick={() => setActiveTab('docs')} className={`workflow-link ${activeTab === 'docs' ? 'is-active' : ''}`}>
-            <BookOpen className="w-3.5 h-3.5" /> Docs
-          </button>
-          {SHOW_LOCAL_SIMULATOR && <button onClick={() => setActiveTab('sandbox')} className={`workflow-link ${activeTab === 'sandbox' ? 'is-active' : ''}`}>
-            <Sliders className="w-3.5 h-3.5" /> Sandbox
-          </button>}
-          <button onClick={() => setActiveTab('certification')} className={`workflow-link ${activeTab === 'certification' ? 'is-active' : ''}`}>
-            <ShieldCheck className="w-3.5 h-3.5" /> Certify {!token && <Lock className="w-3 h-3 text-slate-600" />}
-          </button>
-          <button onClick={() => setActiveTab('inspector')} className={`workflow-link ${activeTab === 'inspector' ? 'is-active' : ''}`}>
-            <Activity className="w-3.5 h-3.5" /> Inspector {!token && <Lock className="w-3 h-3 text-slate-600" />}
-          </button>
-        </nav>
-
-        {/* Right Status, Language & Account */}
-        <div className="flex items-center gap-2.5 text-xs">
-          <button
-            onClick={() => setAiKitOpen(true)}
-            className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold px-3 py-1.5 rounded-lg text-xs shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" /> AI Kit
-          </button>
-          <button
-            onClick={() => setLocale(l => l === 'uz' ? 'en' : 'uz')}
-            className="bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white font-mono text-xs transition-colors"
-          >
-            {locale.toUpperCase()}
-          </button>
-          {token ? (
-            <div className="flex items-center gap-2">
-              <div className="bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                <User className="w-3.5 h-3.5 text-indigo-400" />
-                <span className="font-medium text-slate-200">{userProfile?.name || userProfile?.email || 'Partner'}</span>
-              </div>
-              <button
-                onClick={handleLogout}
-                title="Chiqish"
-                className="p-1.5 rounded-lg border border-slate-800 bg-slate-900/60 text-slate-400 hover:text-rose-400 hover:border-rose-500/30 transition-all"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setActiveTab('auth')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${activeTab === 'auth' ? 'text-white bg-slate-800' : 'text-slate-300 hover:text-white'}`}
-              >
-                Kirish
-              </button>
-              <button
-                onClick={() => setActiveTab('onboarding')}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1"
-              >
-                Provider bo‘lish <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Persistent journey: prevents the developer from losing the mental model
-          when moving between docs, tools and protected provider screens. */}
-      {activeTab !== 'auth' && (
-        <div className="journey-strip">
-          <div className="journey-heading">
-            <span className="journey-kicker">INTEGRATION JOURNEY</span>
-            <span className="journey-caption">Your path from API to live provider</span>
-          </div>
-          <div className="journey-steps">
-            {integrationJourney.map((item, index) => {
-              const completed = Boolean(token) && index < journeyIndex;
-              const current = index === journeyIndex;
-              return (
-                <React.Fragment key={item.id}>
-                  {index > 0 && <span className={`journey-connector ${completed ? 'is-complete' : ''}`} />}
-                  <button
-                    type="button"
-                    title={item.detail}
-                    onClick={() => openJourneyStep(item, index)}
-                    className={`journey-step ${current ? 'is-current' : ''} ${completed ? 'is-complete' : ''}`}
-                  >
-                    <span className="journey-number">{completed ? <Check className="w-3 h-3" /> : index + 1}</span>
-                    <span className="journey-label"><b>{item.short}</b><small>{item.detail}</small></span>
-                  </button>
-                </React.Fragment>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
+    <>
+      <WorkspaceShell activeTab={activeTab} onNavigate={setActiveTab} onSearch={openDocsSearch}
+        onAiKit={() => setAiKitOpen(true)} signedIn={!!token} account={userProfile?.name || userProfile?.email}
+        onLogout={handleLogout}>
+        <Suspense fallback={<div className="workspace-loading" role="status"><RefreshCw className="animate-spin" size={20} /> Yuklanmoqda…</div>}>
         {/* ========================================================================= */}
         {/* TAB 1: OVERVIEW & QUICK START (PUBLIC)                                   */}
         {/* ========================================================================= */}
         {activeTab === 'overview' && (
-          <div className="space-y-8 animate-fadeIn">
-            {/* Hero Banner */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-950/80 via-slate-900 to-slate-900 border border-indigo-500/20 p-8 shadow-2xl">
-              <div className="max-w-3xl space-y-4">
-                <span className="text-xs font-mono bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full border border-indigo-500/30">
-                  AI-First Provider Integration Contract v1
-                </span>
-                <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
-                  Connect Your Business to <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-sky-300 to-emerald-400">
-                    Conversational AI Agents
-                  </span>
-                </h1>
-                <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-                  AI yordamida provider API’ingizni Zayuno’ga ulang, test qiling va certificationdan o‘ting. ChatGPT, Claude va Cursor orqali xizmatlaringizni jonli AI agentlar qidiruviga chiqaring.
-                </p>
-                <div className="flex flex-wrap items-center gap-3 pt-2">
-                  <button
-                    onClick={() => setAiKitOpen(true)}
-                    className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
-                  >
-                    <Sparkles className="w-4 h-4 text-amber-300" /> AI bilan integratsiya qilish
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('onboarding')}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
-                  >
-                    Provider bo‘lish (5 daqiqada) <ArrowRight className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('docs')}
-                    className="bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs font-medium px-4 py-2.5 rounded-xl border border-slate-800 transition-all flex items-center gap-2"
-                  >
-                    <BookOpen className="w-3.5 h-3.5" /> Hujjatlarni o‘qish
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* 6-Step Onboarding Roadmap Card */}
-            <div className="bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-indigo-950/40 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                <div>
-                  <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-semibold">Self-Service Roadmap</span>
-                  <h2 className="text-xl font-bold text-white mt-1">Qanday qilib Zayuno Provider bo‘lish mumkin?</h2>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Hech qanday murakkab byurokratiyasiz: ro‘yxatdan o‘ting, API ulang va AI qidiruviga chiqing.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActiveTab('onboarding')}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5 self-start sm:self-auto shrink-0"
-                >
-                  Hoziroq boshlash <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-                {[
-                  { n: 1, title: 'Hisob ochish', desc: 'Ism, rasmiy email va 12+ belgili parol' },
-                  { n: 2, title: 'Email tasdiqlash', desc: '1 martalik xavfsiz kod orqali faollashtirish' },
-                  { n: 3, title: 'Biznes profil', desc: 'Brend nomi, toifa va support kontaktlar' },
-                  { n: 4, title: 'API & Slug', desc: 'Endpoint, auth formati va capability profili' },
-                  { n: 5, title: 'Sandbox & Test', desc: 'Simulator va compliance runner bilan tekshirish' },
-                  { n: 6, title: 'Review & Nashr', desc: '1-2 ish kunida ko‘rib chiqish va AI agentlarga ochish' }
-                ].map(item => (
-                  <div key={item.n} className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
-                    <div className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center text-xs font-mono">
-                      {item.n}
-                    </div>
-                    <h4 className="font-semibold text-white text-xs">{item.title}</h4>
-                    <p className="text-slate-400 text-[11px] leading-tight">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* How Integration Works Guide */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6">
-              <div className="border-b border-slate-800 pb-4">
-                <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest font-semibold">Integratsiya oqimi</span>
-                <h2 className="text-xl font-bold text-white mt-1">Qanday ishlaydi? (How Integration Works)</h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Ommaviy self-service orqali Zayuno platformasiga ulanish va AI agentlariga xizmat ko‘rsatish jarayoni.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs leading-relaxed">
-                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold border border-indigo-500/20">
-                    1
-                  </div>
-                  <h3 className="font-semibold text-white text-xs">1. Xizmatingizni ulang</h3>
-                  <p className="text-slate-400 text-[11px]">
-                    API va mahsulotlar katalogingizni Zayuno universal adapteriga ulaysiz.
-                  </p>
-                </div>
-
-                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
-                  <div className="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold border border-sky-500/20">
-                    2
-                  </div>
-                  <h3 className="font-semibold text-white text-xs">2. AI agentlar sizni topadi</h3>
-                  <p className="text-slate-400 text-[11px]">
-                    ChatGPT, Claude va AI assistentlar mijoz so‘roviga ko‘ra xizmatingizni tanlaydi.
-                  </p>
-                </div>
-
-                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
-                  <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold border border-amber-500/20">
-                    3
-                  </div>
-                  <h3 className="font-semibold text-white text-xs">3. Mijoz narxni tasdiqlaydi</h3>
-                  <p className="text-slate-400 text-[11px]">
-                    Kotirovka (Quote) va yetkazib berish shartlari shaffof shakllanadi va tasdiqlanadi.
-                  </p>
-                </div>
-
-                <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/20">
-                    4
-                  </div>
-                  <h3 className="font-semibold text-white text-xs">4. Buyurtma tizimingizga keladi</h3>
-                  <p className="text-slate-400 text-[11px]">
-                    Tranzaksiya xavfsiz webhook orqali to‘g‘ridan-to‘g‘ri backend yoki CRM tizimingizga keladi.
-                  </p>
-                </div>
-              </div>
-
-              {/* Reserved Brands Warning Box */}
-              <div className="rounded-xl bg-indigo-950/20 border border-indigo-500/30 p-4 text-xs text-indigo-200 flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <strong>Himoyalangan brendlar (Reserved Brands):</strong> EVOS, Uzum, Yandex, Payme, Click, Korzinka va boshqa korporativ brendlar nomidan soxta ro‘yxatdan o‘tish avtomatik bloklanadi. Rasmiy enterprise onboarding uchun <code>operations@zayuno.uz</code> bilan bog‘laning.
-                </div>
-              </div>
-            </div>
-
-            {/* Trust & Guarantee Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
-                <div className="flex items-center gap-2 font-semibold text-white">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Karta ma’lumotlari saqlanmaydi</span>
-                </div>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
-                  Bank kartalari va to‘lov maxfiyligi Zayuno’da saqlanmaydi. Providerlar to‘lovlarni o‘z checkout havolalari orqali qabul qiladi.
-                </p>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
-                <div className="flex items-center gap-2 font-semibold text-white">
-                  <Lock className="w-4 h-4 text-sky-400 shrink-0" />
-                  <span>Mijoz tasdig‘i kafolati</span>
-                </div>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
-                  Har qanday buyurtma va to‘lov faqat mijozning bevosita tasdig‘idan keyin rasmiylashtiriladi.
-                </p>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
-                <div className="flex items-center gap-2 font-semibold text-white">
-                  <Key className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Xavfsiz Credentiallar</span>
-                </div>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
-                  Sizning API kalitlaringiz va webhook secretlaringiz bir marta ko‘rsatiladi va shifrlangan holda saqlanadi.
-                </p>
-              </div>
-            </div>
-
-            {/* Capabilities Profiles Section */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
-              <h2 className="text-base font-semibold text-white flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-400" /> Universal Capability Profiles
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="space-y-3 bg-slate-950/60 border border-indigo-500/20 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono font-bold text-sky-400 tracking-wider">PROFILE A: DISCOVERY / READ-ONLY</span>
-                    <span className="text-[10px] bg-sky-500/10 text-sky-300 px-2 py-0.5 rounded-full border border-sky-500/20">3 Capabilities</span>
-                  </div>
-                  <p className="text-slate-400 text-[11px]">Kataloglar, Telegram recruitment, ommaviy narxlar va qidiruv botlari uchun:</p>
-                  <div className="space-y-1.5">
-                    {['METADATA (GET /provider-info)', 'HEALTH (GET /health)', 'CATALOG (GET /catalog, GET /offerings/:id)'].map((c, i) => (
-                      <div key={i} className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
-                        <span className="font-mono text-slate-300">{c}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3 bg-slate-950/60 border border-emerald-500/20 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono font-bold text-emerald-400 tracking-wider">PROFILE B: FULL TRANSACTIONAL</span>
-                    <span className="text-[10px] bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/20">7 Capabilities</span>
-                  </div>
-                  <p className="text-slate-400 text-[11px]">Yetkazib berish, e-tijorat, xizmatlar va buyurtma platformalari uchun:</p>
-                  <div className="space-y-1.5">
-                    {['METADATA, HEALTH, CATALOG', 'QUOTE (POST /quote)', 'ACTION_CREATE (POST /actions with NextAction)', 'ACTION_STATUS (GET /actions/:id)', 'WEBHOOK (HMAC-SHA256 push)'].map((c, i) => (
-                      <div key={i} className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-2.5 py-1.5 rounded-lg">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                        <span className="font-mono text-slate-300">{c}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <WorkspaceOverview signedIn={!!token} provider={providerData}
+            loading={!!token && providerLoading} failed={!!token && providerFailed}
+            onRetry={() => refetchProvider()}
+            onNavigate={(tab, step) => { if (step) setInitialOnboardingStep(step); if (tab === 'apps' && providerData?.status !== 'ACTIVE') setDashboardSection('integration'); setActiveTab(tab); }}
+            onDoc={id => { setSelectedDoc(id); setActiveTab('docs'); }}
+            onAiKit={() => setAiKitOpen(true)} />
         )}
-
-        {/* ========================================================================= */}
-        {/* ONBOARDING WIZARD VIEW                                                    */}
-        {/* ========================================================================= */}
         {activeTab === 'onboarding' && (
           <OnboardingWizard
             apiBase={API_BASE}
@@ -1177,6 +877,7 @@ export default function App() {
         {activeTab === 'docs' && (
           <DocsViewer
             selectedDoc={selectedDoc}
+            searchRequest={docsSearchRequest}
             onSelectDoc={setSelectedDoc}
             onOpenAiKit={() => setAiKitOpen(true)}
           />
@@ -1195,6 +896,10 @@ export default function App() {
                 onSignupClick={() => setActiveTab('onboarding')}
                 onDocsClick={() => setActiveTab('docs')}
               />
+            ) : providerLoading ? (
+              <div className="workspace-loading" role="status"><RefreshCw className="animate-spin" size={20} /> Provider profili yuklanmoqda…</div>
+            ) : providerFailed ? (
+              <div className="workspace-notice" role="alert">Provider profilini yuklab bo‘lmadi.<button onClick={() => refetchProvider()}>Qayta urinish</button></div>
             ) : !provider ? (
               <div className="p-8 rounded-3xl bg-slate-950 border border-slate-800 text-center space-y-4 max-w-lg mx-auto animate-fadeIn">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
@@ -1217,14 +922,68 @@ export default function App() {
             ) : (
               /* EXISTING PROVIDER DASHBOARD */
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-white">Provider Applications & Credentials</h2>
-                    <p className="text-xs text-slate-400">Manage your registered provider endpoints, authentication secrets, and review status.</p>
+                {/* Header with Provider Brand & Live Status */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-2xl font-extrabold text-white tracking-tight">{provider.name}</h2>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border ${
+                        provider.status === 'ACTIVE'
+                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                          : provider.status === 'DRAFT'
+                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                          : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                      }`}>
+                        {provider.status === 'ACTIVE' ? '● JONLI / ACTIVE' : `● ${provider.status}`}
+                      </span>
+                      {provider.metadata?.isCertified && (
+                        <span className="bg-sky-500/15 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded-full text-[11px] font-medium flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" /> Sertifikatlangan
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Zayuno tarmog‘idagi biznes profili · Slug: <code className="text-indigo-300 font-mono font-semibold">{provider.slug}</code> · Turi: <span className="text-slate-300">{provider.type}</span>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setAiKitOpen(true)}
+                      className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" /> AI Kit (Prompt)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedDoc('contract-reference'); setActiveTab('docs'); }}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium px-3.5 py-2 rounded-xl transition flex items-center gap-1.5"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" /> API Reference
+                    </button>
                   </div>
                 </div>
 
                 {/* Health / Temporary Unavailability Banner */}
+                {provider.status !== 'ACTIVE' && (
+                  <div className="dashboard-next-step">
+                    <div>
+                      <h3>{integrationState.status}</h3>
+                      <p>{integrationState.description}</p>
+                    </div>
+                    <button
+                      className="secondary-button"
+                      onClick={() => {
+                        if (integrationState.tab === 'apps') setDashboardSection('integration');
+                        else setActiveTab(integrationState.tab);
+                      }}
+                    >
+                      {integrationState.label} <ArrowRight size={15} />
+                    </button>
+                  </div>
+                )}
+
                 {(provider.metadata?.isTemporarilyUnavailable || provider.metadata?.healthMonitoring?.isTemporarilyUnavailable || provider.metadata?.healthMonitoring?.state === 'DOWN') && (
                   <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-rose-200 space-y-2 animate-fadeIn">
                     <div className="flex items-start justify-between gap-3">
@@ -1266,20 +1025,84 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                {/* Modern KPI Cards */}
+                {dashboardFailed && (
+                  <div className="workspace-notice" role="alert">
+                    Buyurtma ko‘rsatkichlari yangilanmadi. Avvalgi ma’lumotlar eskirgan bo‘lishi mumkin.
+                    <button onClick={() => refetchDashboard()}>Qayta urinish</button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3.5 md:grid-cols-5" aria-busy={dashboardFetching}>
                   {[
-                    ['Jami actionlar', providerDashboard?.metrics?.totalActions || 0],
-                    ['Jarayonda', providerDashboard?.metrics?.pendingActions || 0],
-                    ['To‘langan', providerDashboard?.metrics?.paidActions || 0],
-                    ['Tugallangan', providerDashboard?.metrics?.completedActions || 0],
-                    ['Muammoli', providerDashboard?.metrics?.failedActions || 0]
-                  ].map(([label, value]) => (
-                    <div key={String(label)} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-                      <p className="text-xs text-slate-400">{label}</p>
-                      <p className="mt-1 text-xl font-bold text-white">{value}</p>
+                    { label: 'Jami buyurtmalar', value: providerDashboard?.metrics?.totalActions ?? '—', color: 'text-indigo-400', border: 'border-indigo-500/20', bg: 'bg-indigo-950/20' },
+                    { label: 'Kutilmoqda (Pending)', value: providerDashboard?.metrics?.pendingActions ?? '—', color: 'text-amber-400', border: 'border-amber-500/20', bg: 'bg-amber-950/20' },
+                    { label: 'To‘langan (Paid)', value: providerDashboard?.metrics?.paidActions ?? '—', color: 'text-emerald-400', border: 'border-emerald-500/20', bg: 'bg-emerald-950/20' },
+                    { label: 'Tugallangan', value: providerDashboard?.metrics?.completedActions ?? '—', color: 'text-sky-400', border: 'border-sky-500/20', bg: 'bg-sky-950/20' },
+                    { label: 'Muammoli / Bekor', value: providerDashboard?.metrics?.failedActions ?? '—', color: 'text-rose-400', border: 'border-rose-500/20', bg: 'bg-rose-950/20' }
+                  ].map(stat => (
+                    <div key={stat.label} className={`rounded-2xl border ${stat.border} ${stat.bg} p-4 backdrop-blur-sm transition hover:border-slate-700`}>
+                      <p className="text-xs font-medium text-slate-400">{stat.label}</p>
+                      <p className={`mt-2 text-2xl font-extrabold tracking-tight ${stat.color}`}>{stat.value}</p>
                     </div>
                   ))}
                 </div>
+
+                {/* Navigation Tabs between Orders and Integration */}
+                <nav className="dashboard-section-tabs" aria-label="Dashboard bo‘limlari">
+                  <button
+                    aria-pressed={dashboardSection === 'orders'}
+                    onClick={() => setDashboardSection('orders')}
+                    className="flex items-center gap-2"
+                  >
+                    <span>🛒 Buyurtmalar va Actionlar</span>
+                  </button>
+                  <button
+                    aria-pressed={dashboardSection === 'integration'}
+                    onClick={() => setDashboardSection('integration')}
+                    className="flex items-center gap-2"
+                  >
+                    <span>⚙️ API Sozlamalari & Credentiallar</span>
+                  </button>
+                </nav>
+
+                <section hidden={dashboardSection !== 'integration'} aria-label="API sozlamalari va nashr" className="space-y-6">
+                  {/* AI Quick Handoff Banner */}
+                  <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-slate-900/60 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                        <Sparkles className="w-5 h-5 text-amber-300" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <span>AI Agent bilan 5 daqiqada integratsiya</span>
+                          <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-mono px-2 py-0.5 rounded-full border border-indigo-500/30">Claude · Cursor · Codex</span>
+                        </h4>
+                        <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                          AI agentingiz bormi? Zayuno AI Kit orqali tayyor brief va OpenAPI schema oling. Agentingiz backend kodingizga to‘liq mos keluvchi Zayuno adapterini mustaqil yozib beradi.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setAiKitOpen(true)}
+                        className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-600/20 transition flex items-center gap-2"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        AI Kit’ni ochish
+                      </button>
+                      <a
+                        href="/llms.txt"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3 py-2.5 text-xs font-medium text-slate-200 transition flex items-center gap-1.5"
+                      >
+                        <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+                        /llms.txt
+                      </a>
+                    </div>
+                  </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Provider Info Card */}
@@ -1331,6 +1154,33 @@ export default function App() {
                           disabled={provider.status === 'ACTIVE'}
                           className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-indigo-500 disabled:opacity-50"
                         />
+                        {integrationForm.baseUrl.trim() && !integrationForm.baseUrl.toLowerCase().includes('sandbox') && (
+                          <div className="mt-2.5 rounded-xl border border-slate-800/80 bg-slate-950/80 p-3 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
+                                <Terminal className="w-3.5 h-3.5 text-emerald-400" /> Terminal orqali tezkor tekshirish:
+                              </span>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const cmd = `curl -X GET "${integrationForm.baseUrl.replace(/\/+$/, '')}/health" -H "x-provider-api-key: $YOUR_API_KEY"`;
+                                  try {
+                                    await navigator.clipboard.writeText(cmd);
+                                    setCopiedText('cmd');
+                                    setTimeout(() => setCopiedText(null), 2000);
+                                  } catch {}
+                                }}
+                                className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-mono"
+                              >
+                                {copiedText === 'cmd' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                {copiedText === 'cmd' ? 'Nusxalandi!' : 'cURL nusxalash'}
+                              </button>
+                            </div>
+                            <pre className="text-[11px] font-mono text-emerald-300 bg-black/40 p-2 rounded-lg overflow-x-auto">
+                              curl -X GET "{integrationForm.baseUrl.replace(/\/+$/, '')}/health" -H "x-provider-api-key: $YOUR_API_KEY"
+                            </pre>
+                          </div>
+                        )}
                       </div>
 
                       {/* Sandbox Notification if sandbox domain is selected */}
@@ -1547,58 +1397,166 @@ export default function App() {
                 </div>
 
                 {/* Actions Dashboard Table */}
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+                </section>
+                <section hidden={dashboardSection !== 'orders'} aria-label="Buyurtmalar">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <h3 className="text-sm font-semibold text-white">Kelgan actionlar</h3>
-                      <p className="mt-1 text-[11px] text-slate-500">Faqat {provider.name} provideriga tegishli actionlar ko‘rsatiladi.</p>
+                      <h3 className="text-base font-bold text-white flex items-center gap-2">
+                        <span>Kelgan buyurtmalar va tranzaksiyalar</span>
+                      </h3>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {provider.name} provideriga AI mijozlari tomonidan yuborilgan barcha actionlar ro‘yxati.
+                      </p>
                     </div>
-                    <button onClick={() => refetchDashboard()} disabled={dashboardFetching} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50">
+                    <button
+                      onClick={() => refetchDashboard()}
+                      disabled={dashboardFetching}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-200 transition disabled:opacity-50"
+                    >
                       <RefreshCw className={`h-3.5 w-3.5 ${dashboardFetching ? 'animate-spin' : ''}`} /> Yangilash
                     </button>
                   </div>
 
-                  <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-6">
+                  {/* Filter & Search Controls */}
+                  <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 pt-1">
                     <label className="relative xl:col-span-2">
-                      <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
-                      <input value={actionFilters.query} onChange={event => setActionFilters(current => ({ ...current, query: event.target.value }))} placeholder="Action ID, mijoz, telefon..." className="w-full rounded-lg border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-xs" />
+                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                      <input
+                        value={actionFilters.query}
+                        onChange={event => setActionFilters(current => ({ ...current, query: event.target.value }))}
+                        placeholder="Action ID, mijoz ismi, telefon..."
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      />
                     </label>
-                    <select value={actionFilters.status} onChange={event => setActionFilters(current => ({ ...current, status: event.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs">
-                      <option value="ALL">Barcha action statuslari</option>
-                      {['AWAITING_PAYMENT', 'SUBMITTED', 'ACCEPTED', 'IN_PROGRESS', 'READY', 'FULFILLING', 'COMPLETED', 'CANCELLED', 'FAILED'].map(status => <option key={status}>{status}</option>)}
+                    <select
+                      value={actionFilters.status}
+                      onChange={event => setActionFilters(current => ({ ...current, status: event.target.value }))}
+                      className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="ALL">Barcha action holatlari</option>
+                      {['AWAITING_PAYMENT', 'SUBMITTED', 'ACCEPTED', 'IN_PROGRESS', 'READY', 'FULFILLING', 'COMPLETED', 'CANCELLED', 'FAILED'].map(status => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
                     </select>
-                    <select value={actionFilters.paymentStatus} onChange={event => setActionFilters(current => ({ ...current, paymentStatus: event.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs">
-                      <option value="ALL">Barcha payment statuslari</option>
-                      {['PENDING', 'AUTHORIZED', 'PAID', 'FAILED', 'REFUNDED'].map(status => <option key={status}>{status}</option>)}
+                    <select
+                      value={actionFilters.paymentStatus}
+                      onChange={event => setActionFilters(current => ({ ...current, paymentStatus: event.target.value }))}
+                      className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="ALL">Barcha to‘lov holatlari</option>
+                      {['PENDING', 'AUTHORIZED', 'PAID', 'FAILED', 'REFUNDED'].map(status => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
                     </select>
-                    <input type="date" aria-label="Boshlanish sanasi" value={actionFilters.from} onChange={event => setActionFilters(current => ({ ...current, from: event.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs" />
-                    <input type="date" aria-label="Tugash sanasi" value={actionFilters.to} onChange={event => setActionFilters(current => ({ ...current, to: event.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs" />
-                    <select value={actionFilters.sort} onChange={event => setActionFilters(current => ({ ...current, sort: event.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs">
-                      <option value="newest">Eng yangi</option><option value="oldest">Eng eski</option><option value="total_desc">Summa: katta</option><option value="total_asc">Summa: kichik</option>
+                    <input
+                      type="date"
+                      aria-label="Boshlanish sanasi"
+                      value={actionFilters.from}
+                      onChange={event => setActionFilters(current => ({ ...current, from: event.target.value }))}
+                      className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    />
+                    <select
+                      value={actionFilters.sort}
+                      onChange={event => setActionFilters(current => ({ ...current, sort: event.target.value }))}
+                      className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="newest">Eng yangi birinchi</option>
+                      <option value="oldest">Eng eski birinchi</option>
+                      <option value="total_desc">Summa: kamayish</option>
+                      <option value="total_asc">Summa: o‘sish</option>
                     </select>
-                    <button onClick={() => setActionFilters({ query: '', status: 'ALL', paymentStatus: 'ALL', from: '', to: '', sort: 'newest' })} className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">Filtrlarni tozalash</button>
                   </div>
 
-                  <div className="mt-4 overflow-x-auto rounded-xl border border-slate-800">
+                  <div className="overflow-x-auto rounded-xl border border-slate-800 shadow-xl">
                     <table className="min-w-full text-left text-xs">
-                      <thead className="bg-slate-950 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="p-3">Action</th><th className="p-3">Mijoz</th><th className="p-3">Summa</th><th className="p-3">Payment</th><th className="p-3">Action status</th><th className="p-3">Sana</th><th className="p-3"></th></tr></thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {(providerDashboard?.actions || []).length === 0 ? <tr><td colSpan={7} className="p-6 text-center text-slate-400">Tanlangan filtrlar bo‘yicha action topilmadi.</td></tr> : providerDashboard.actions.map((action: any) => (
-                          <tr key={action.publicId} className="bg-slate-900/30 hover:bg-slate-800/50">
-                            <td className="p-3"><div className="font-mono font-semibold text-indigo-300">{action.publicId}</div>{action.externalActionId && <div className="mt-1 font-mono text-[10px] text-slate-500">{action.externalActionId}</div>}</td>
-                            <td className="p-3"><div>{action.customerName}</div><div className="text-[10px] text-slate-500">{action.customerPhoneMasked}</div></td>
-                            <td className="p-3 font-semibold">{action.total?.toLocaleString('uz-UZ')} {action.currency}</td>
-                            <td className="p-3"><span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${action.paymentStatus === 'PAID' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : action.paymentStatus === 'FAILED' ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>{action.paymentStatus}</span><div className="mt-1 text-[9px] text-slate-600">provider reported</div></td>
-                            <td className="p-3"><span className="font-semibold text-slate-200">{action.status}</span>{action.cancellationReason && <div className="mt-1 max-w-xs text-[10px] text-rose-300">{action.cancellationReason}</div>}</td>
-                            <td className="p-3 text-slate-400">{new Date(action.createdAt).toLocaleString('uz-UZ')}</td>
-                            <td className="p-3 text-right"><button onClick={() => setSelectedProviderActionId(action.publicId)} className="rounded-lg bg-indigo-600 px-3 py-1.5 font-semibold text-white hover:bg-indigo-500">Batafsil</button></td>
+                      <thead className="bg-slate-950/80 border-b border-slate-800 text-[11px] font-mono uppercase tracking-wider text-slate-400">
+                        <tr>
+                          <th className="p-3.5">Action ID</th>
+                          <th className="p-3.5">Mijoz</th>
+                          <th className="p-3.5">Jami Summa</th>
+                          <th className="p-3.5">To‘lov (Payment)</th>
+                          <th className="p-3.5">Buyurtma Statusi</th>
+                          <th className="p-3.5">Vaqt</th>
+                          <th className="p-3.5 text-right">Amal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {dashboardFetching && !providerDashboard ? (
+                          <tr><td colSpan={7} className="p-8 text-center text-slate-400 font-sans" role="status">Buyurtmalar yuklanmoqda…</td></tr>
+                        ) : dashboardFailed && !providerDashboard ? (
+                          <tr><td colSpan={7} className="p-8 text-center text-amber-300 font-sans">Ma’lumot olinmadi. Qayta urinib ko‘ring.</td></tr>
+                        ) : (providerDashboard?.actions || []).length === 0 ? (
+                          <tr><td colSpan={7} className="p-8 text-center text-slate-400 font-sans">Tanlangan filtrlar bo‘yicha buyurtma topilmadi.</td></tr>
+                        ) : providerDashboard.actions.map((action: any) => (
+                          <tr key={action.publicId} className="hover:bg-slate-800/40 transition">
+                            <td className="p-3.5">
+                              <div className="font-mono font-bold text-indigo-300 text-xs">{action.publicId}</div>
+                              {action.externalActionId && <div className="mt-0.5 font-mono text-[10px] text-slate-500">{action.externalActionId}</div>}
+                            </td>
+                            <td className="p-3.5 font-sans">
+                              <div className="font-semibold text-slate-200">{action.customerName || 'Mijoz'}</div>
+                              <div className="text-[11px] text-slate-400 font-mono">{action.customerPhoneMasked}</div>
+                            </td>
+                            <td className="p-3.5 font-mono font-bold text-white text-xs">
+                              {action.total?.toLocaleString('uz-UZ')} <span className="text-slate-400 font-normal">{action.currency}</span>
+                            </td>
+                            <td className="p-3.5">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono border ${
+                                action.paymentStatus === 'PAID'
+                                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+                                  : action.paymentStatus === 'FAILED'
+                                  ? 'border-rose-500/30 bg-rose-500/15 text-rose-300'
+                                  : 'border-amber-500/30 bg-amber-500/15 text-amber-300'
+                              }`}>
+                                {action.paymentStatus}
+                              </span>
+                            </td>
+                            <td className="p-3.5">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono border ${
+                                action.status === 'COMPLETED'
+                                  ? 'border-sky-500/30 bg-sky-500/15 text-sky-300'
+                                  : action.status === 'CANCELLED' || action.status === 'FAILED'
+                                  ? 'border-rose-500/30 bg-rose-500/15 text-rose-300'
+                                  : 'border-indigo-500/30 bg-indigo-500/15 text-indigo-300'
+                              }`}>
+                                {action.status}
+                              </span>
+                              {action.cancellationReason && (
+                                <div className="mt-1 max-w-xs text-[10px] text-rose-300 truncate" title={action.cancellationReason}>
+                                  {action.cancellationReason}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-3.5 text-slate-400 font-mono text-[11px]">
+                              {new Date(action.createdAt).toLocaleString('uz-UZ')}
+                            </td>
+                            <td className="p-3.5 text-right">
+                              <button
+                                onClick={() => setSelectedProviderActionId(action.publicId)}
+                                className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3.5 py-1.5 font-sans text-xs font-semibold text-white shadow transition"
+                              >
+                                Batafsil
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                  <div className="mt-3 text-right text-[11px] text-slate-500">Natija: {providerDashboard?.pagination?.total || 0} ta</div>
+                  <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
+                    <span>Filtr bo‘yicha jami: <strong className="text-white font-mono">{providerDashboard?.pagination?.total ?? 0}</strong> ta buyurtma</span>
+                    {actionFilters.query && (
+                      <button
+                        onClick={() => setActionFilters({ query: '', status: 'ALL', paymentStatus: 'ALL', from: '', to: '', sort: 'newest' })}
+                        className="text-indigo-400 hover:underline"
+                      >
+                        Qidiruvni tozalash
+                      </button>
+                    )}
+                  </div>
                 </div>
+                </section>
               </div>
             )}
           </div>
@@ -2059,7 +2017,8 @@ export default function App() {
             )}
           </div>
         )}
-      </main>
+        </Suspense>
+      </WorkspaceShell>
 
       {/* Auth & Onboarding Modal */}
       {authModalOpen && (
@@ -2388,7 +2347,7 @@ export default function App() {
 
       {/* AI Integration Kit Modal */}
       {aiKitOpen && (
-        <div className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-black/85 p-4 backdrop-blur-md animate-fadeIn">
+        <div role="dialog" aria-modal="true" aria-labelledby="ai-kit-title" className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-black/85 p-4 backdrop-blur-md animate-fadeIn">
           <div className="my-8 w-full max-w-4xl rounded-2xl border border-indigo-500/30 bg-slate-900 p-6 sm:p-8 shadow-2xl space-y-6">
             <div className="flex items-start justify-between border-b border-slate-800 pb-4">
               <div className="space-y-1">
@@ -2400,7 +2359,7 @@ export default function App() {
                     AI Integration Kit
                   </span>
                 </div>
-                <h2 className="text-xl font-bold text-white">
+                <h2 id="ai-kit-title" className="text-xl font-bold text-white">
                   {locale === 'uz' ? 'AI bilan integratsiya qilish (Copy for AI)' : 'AI Integration Assistant'}
                 </h2>
                 <p className="text-xs text-slate-400">
@@ -2411,6 +2370,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setAiKitOpen(false)}
+                aria-label="AI Kit’ni yopish"
                 className="rounded-full bg-slate-800 p-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700 transition"
               >
                 ✕
@@ -2422,11 +2382,11 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>
-                  <strong>Maxfiylik kafolati:</strong> Ushbu prompt tarkibida hech qanday API key, webhook secret yoki mijoz ma’lumotlari (PII) mavjud emas.
+                  <strong>Agentga tayyor kontekst:</strong> Credential maydonlari chiqarib tashlanadi. Yuborishdan oldin previewni ko‘rib chiqing; haqiqiy kalitlarni o‘zingiz qo‘shmang.
                 </span>
               </div>
               <span className="text-[10px] font-mono bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">
-                100% SECURE
+                BRIEF
               </span>
             </div>
 
@@ -2632,18 +2592,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950 px-6 py-4 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-        <div>
-          © 2026 Zayuno Action Infrastructure. All rights reserved.
-        </div>
-        <div className="flex items-center gap-4">
-          <a href="https://developers.zayuno.uz/docs" className="hover:text-slate-300">Docs</a>
-          <a href="https://status.zayuno.uz" className="hover:text-slate-300">System Status</a>
-          <a href="https://mcp.zayuno.uz" className="hover:text-slate-300">MCP Protocol</a>
-          <a href="https://zayuno.uz/privacy" className="hover:text-slate-300">Privacy</a>
-        </div>
-      </footer>
-    </div>
+    </>
   );
 }

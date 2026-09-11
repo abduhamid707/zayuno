@@ -746,10 +746,10 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
 --------------------------------------------------------------------------------
 4. QO'LLANMALAR VA AVTOMATIK TEST
 --------------------------------------------------------------------------------
-- Base URL va Endpointlar qo'llanmasi: https://developers.zayuno.uz/?tab=docs&doc=base-url
-- Autentifikatsiya va Kalitlar qo'llanmasi: https://developers.zayuno.uz/?tab=docs&doc=auth
-- Avtomatlashtirilgan sertifikatlash testi: https://developers.zayuno.uz/?tab=certification
-- OpenAPI 3.1 va Postman Collection: https://developers.zayuno.uz/?tab=docs&doc=openapi
+- Base URL va Endpointlar qo'llanmasi: https://partners.zayuno.uz/?tab=docs&doc=base-url
+- Autentifikatsiya va Kalitlar qo'llanmasi: https://partners.zayuno.uz/?tab=docs&doc=auth
+- Avtomatlashtirilgan sertifikatlash testi: https://partners.zayuno.uz/?tab=certification
+- OpenAPI 3.1 va Postman Collection: https://partners.zayuno.uz/openapi.json
 `;
 
     navigator.clipboard.writeText(brief);

@@ -194,12 +194,12 @@ async function runSecuritySuite() {
 
   assert.equal(readOnlyJson.profile, ProviderCapabilityProfile.DISCOVERY_READONLY);
   assert.ok(readOnlyJson.endpoints.health, 'Read-only contract must include health endpoint');
-  assert.ok(readOnlyJson.endpoints.providerInfo, 'Read-only contract must include providerInfo endpoint');
+  assert.ok(readOnlyJson.endpoints.metadata, 'Read-only contract must include providerInfo endpoint');
   assert.ok(readOnlyJson.endpoints.catalog, 'Read-only contract must include catalog endpoint');
   assert.ok(readOnlyJson.endpoints.search, 'Read-only contract must include search when declared');
   assert.equal(readOnlyJson.endpoints.quote, undefined, 'Read-only contract must NOT include quote endpoint');
-  assert.equal(readOnlyJson.endpoints.actions, undefined, 'Read-only contract must NOT include actions endpoint');
-  assert.equal(readOnlyJson.endpoints.actionStatus, undefined, 'Read-only contract must NOT include actionStatus endpoint');
+  assert.equal(readOnlyJson.endpoints['action-create'], undefined, 'Read-only contract must NOT include actions endpoint');
+  assert.equal(readOnlyJson.endpoints['action-status'], undefined, 'Read-only contract must NOT include actionStatus endpoint');
   assert.equal(readOnlyJson.endpoints.webhook, undefined, 'Read-only contract must NOT include webhook endpoint');
   console.log('✅ 5.1 Read-Only Contract JSON strictly omits quote, action, and webhook endpoints');
 
@@ -227,11 +227,11 @@ async function runSecuritySuite() {
   assert.ok(transJson.endpoints.health);
   assert.ok(transJson.endpoints.catalog);
   assert.ok(transJson.endpoints.quote);
-  assert.ok(transJson.endpoints.actions);
-  assert.ok(transJson.endpoints.actionStatus);
+  assert.ok(transJson.endpoints['action-create']);
+  assert.ok(transJson.endpoints['action-status']);
   assert.ok(transJson.endpoints.webhook);
-  assert.ok(transJson.endpoints.paymentOptions);
-  assert.ok(transJson.endpoints.actionCancel);
+  assert.ok(transJson.endpoints['payment-options']);
+  assert.ok(transJson.endpoints['action-cancel']);
   console.log('✅ 5.2 Transactional Contract JSON includes all declared transaction & cancellation endpoints');
 
   // =========================================================================

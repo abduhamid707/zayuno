@@ -160,13 +160,13 @@ export class ProviderCertificationRunner {
         status: 'SKIPPED',
         durationMs: 0,
         endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
-        docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+        docsUrl: endpoint ? `https://partners.zayuno.uz/docs/contract-reference/#${endpoint.docsAnchor}` : undefined,
         blockedBy,
         error: `Oldingi asosiy test muvaffaqiyatsiz: ${blockedBy.join(', ')}`,
         issue: {
           code: 'DEPENDENCY_FAILED',
           endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
-          docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+          docsUrl: endpoint ? `https://partners.zayuno.uz/docs/contract-reference/#${endpoint.docsAnchor}` : undefined,
           rootCause: `Bu test ${blockedBy.join(', ')} natijasiga bog‘liq. Avval asosiy xatoni tuzating.`
         }
       });
@@ -185,7 +185,7 @@ export class ProviderCertificationRunner {
         passed: true,
         status: 'PASS',
         endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
-        docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+        docsUrl: endpoint ? `https://partners.zayuno.uz/docs/contract-reference/#${endpoint.docsAnchor}` : undefined,
         durationMs: Date.now() - start
       });
     } catch (err: any) {
@@ -202,7 +202,7 @@ export class ProviderCertificationRunner {
             path: ci.path,
             expected: ci.expected,
             received: ci.received,
-            docsUrl: ci.docsUrl || (endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined),
+            docsUrl: ci.docsUrl || (endpoint ? `https://partners.zayuno.uz/docs/contract-reference/#${endpoint.docsAnchor}` : undefined),
             rootCause: ci.message,
             fixExample: ci.fixExample
           }))
@@ -213,7 +213,7 @@ export class ProviderCertificationRunner {
         : {
             code: this.inferErrorCode(rawError),
             endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
-            docsUrl: endpoint ? `https://developers.zayuno.uz/?doc=provider-integration#${endpoint.docsAnchor}` : undefined,
+            docsUrl: endpoint ? `https://partners.zayuno.uz/docs/contract-reference/#${endpoint.docsAnchor}` : undefined,
             rootCause: rawError
           };
 
@@ -279,7 +279,7 @@ export class ProviderCertificationRunner {
         status: 'FAIL',
         durationMs: 0,
         endpoint: 'GET /locations',
-        docsUrl: 'https://developers.zayuno.uz/?doc=provider-integration#contract-locations',
+        docsUrl: 'https://partners.zayuno.uz/docs/contract-reference/#contract-locations',
         error: 'Jismoniy xizmat uchun LOCATIONS majburiy',
         issue: {
           code: 'MISSING_REQUIRED_LOCATIONS',
@@ -287,7 +287,7 @@ export class ProviderCertificationRunner {
           path: 'capabilities.LOCATIONS',
           expected: 'LOCATIONS capability and at least one active location',
           received: 'LOCATIONS capability is not declared',
-          docsUrl: 'https://developers.zayuno.uz/?doc=provider-integration#contract-locations',
+          docsUrl: 'https://partners.zayuno.uz/docs/contract-reference/#contract-locations',
           rootCause: 'Bu xizmat mijozga fizik joyda yoki yetkazib berish orqali ko‘rsatiladi. Faol filial bo‘lmasa AI discovery provider’ni yashiradi.',
           fixExample: 'GET /locations endpointini qo‘shing, LOCATIONS capabilityni e’lon qiling va kamida bitta isActive=true filial qaytaring.'
         }

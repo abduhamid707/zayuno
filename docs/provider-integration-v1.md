@@ -1,59 +1,50 @@
-# Zayuno Provider Integration Specification v1
+# Provider Integration v1
 
-This document outlines the architectural contract for integrating third-party provider backends with the Zayuno AI Action Infrastructure.
+Zayuno provider API’dagi katalog, narx va actionlarni normalized contract orqali ishlatadi. Hozirgi mahsulot fokusi food ordering; umumiy contract boshqa kategoriyalar uchun ham kengaytirish imkonini beradi.
 
----
+## Architectural boundaries
 
-## 1. Architectural Boundaries
+| Mas’ul tomon | Source of truth |
+| --- | --- |
+| Provider | Mahsulot ID, katalog, narx, mavjudlik, quote, fulfillment va provider checkout |
+| Zayuno | Suhbat, discovery, tanlov, confirmation gate, action orchestration va provider status monitoringi |
+| Mijoz | Yakuniy buyurtma tasdig‘i |
 
-1. **Protocol Neutrality**:
-   - Zayuno Core is completely decoupled from any single provider, domain, or merchant category.
-   - Core runtime operates solely with normalized data contracts defined in `@zayuno/contracts`.
+LLM narx yoki mavjudlikni uydirmasligi kerak. Buyurtmadan oldin amaldagi quote va mijoz tasdig‘i talab qilinadi. Retry yangi buyurtma yaratmasligi uchun idempotency key saqlanadi.
 
-2. **Strict Payment Boundary**:
-   > [!IMPORTANT]
-   > **ZAYUNO DOES NOT PROCESS PAYMENTS.**
-   > - Zayuno does not collect customer funds.
-   > - Zayuno does not store credit/debit card details.
-   > - Zayuno does not integrate directly with payment aggregators (Payme, Click, Stripe, Uzum).
-   > - Providers own their checkout pages, invoicing, and acquiring systems.
-   > - If an action requires settlement, the provider returns an `AWAITING_PAYMENT` status containing a normalized `nextAction` of type `OPEN_URL`.
+## Transaction lifecycle
 
-3. **Guaranteed Idempotency**:
-   - Every mutating request (`POST /actions`) requires a client-generated `idempotencyKey`.
-   - Providers must ensure duplicate submissions with identical idempotency keys return the original action record without duplicating internal state or double-charging.
+~~~text
+Intent → Discovery → Selection → Quote → Confirmation → Action → Fulfillment
+~~~
 
----
+- Intent — foydalanuvchi xohlagan natija.
+- Discovery/selection — haqiqiy catalogdan ID va variant tanlash.
+- Quote — server hisoblagan narx, fees, discounts, expiry.
+- Confirmation — mijoz shu shartlarni tasdiqlaydi.
+- Action — providerga idempotent yaratish so‘rovi.
+- Fulfillment — provider statusi, webhook va kerak bo‘lsa checkout handoff.
 
-## 2. Integration Modes
+## Integration surfaces
 
-Providers can integrate with Zayuno via two models:
+Provider o‘z HTTPS endpointlarini beradi. Har bir canonical request, response va yo‘nalish [generated Provider API reference](/docs/contract-reference/) va [OpenAPI](/openapi.json) orqali olinadi.
 
-1. **Remote HTTP Endpoint (Standard)**:
-   - The provider hosts an HTTPS API implementing the endpoints described in this specification.
-   - Zayuno forwards agent requests directly over HTTPS with API Key or HMAC signatures.
+Zayuno Core management API boshqa surface: [Core API reference](api-reference.md). Provider Base URL’ga Core route’larni ko‘chirib qo‘ymang.
 
-2. **TypeScript / Node.js Adapter (SDK)**:
-   - For high-performance or private enterprise deployments, providers implement the `ProviderAdapter` interface from `@zayuno/provider-sdk`.
+## Payment boundary
 
----
+**ZAYUNO DOES NOT PROCESS PAYMENTS.** Joriy contractda provider to‘lov sahifasini nextAction orqali qaytaradi. Zayuno mijozni o‘sha sahifaga yo‘naltiradi; karta ma’lumotlarini qabul qiladigan provider checkout’ining o‘rnini bosmaydi.
 
-## 3. Provider Lifecycle States
+Dashboarddagi paymentStatus provider xabariga asoslanadi (PROVIDER_REPORTED). Uni mustaqil bank settlement tekshiruvi deb ko‘rsatmang. [Payment handoff](payment-handoff.md).
 
-```mermaid
-stateDiagram-v2
-    [*] --> DRAFT: Developer registers provider
-    DRAFT --> SANDBOX: Sandbox credentials assigned
-    SANDBOX --> CERTIFIED: Passes automated certification
-    CERTIFIED --> REVIEW: Submitted for platform review
-    REVIEW --> ACTIVE: Approved & published for AI discovery
-    ACTIVE --> SUSPENDED: Temporary operational pause
-    SUSPENDED --> ACTIVE: Operational resumption
-    ACTIVE --> DISABLED: Decommissioned
-```
+## Provider lifecycle
 
-- **DRAFT**: Initial creation; configuring endpoints, capabilities, and auth.
-- **SANDBOX**: Active in sandbox environment for developer testing and mock simulations.
-- **ACTIVE**: Certified, approved, and discoverable by conversational AI agents.
-- **SUSPENDED**: Temporarily hidden from agent discovery (e.g. backend maintenance).
-- **DISABLED**: Deactivated.
+DRAFT — sozlash; SANDBOX — test; ACTIVE — nashr qilingan; SUSPENDED — to‘xtatilgan; DISABLED — o‘chirilgan provider. Status o‘tishlarida API mavjud guardlarni qo‘llaydi.
+
+Certification (metadata.isCertified) va review (metadata.reviewStatus) provider statusdan alohida. CERTIFIED va REVIEW provider status enum qiymatlari emas. [Nashr jarayoni](certification.md).
+
+## Version va moslik
+
+Contract v1.0.0 manbasi packages/contracts/src/provider-protocol.ts va Zod schema’lar. Yangi integratsiyalar canonical field nomlarini ishlatadi; legacy aliaslar faqat adapter migration boundary’da.
+
+Hujjat va kod farqlansa schema, adapter va test bilan aniqlashtiring. [AI agent workflow](ai-agents.md) shunday tekshiruvga yo‘naltiradi.

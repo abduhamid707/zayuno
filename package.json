@@ -27,6 +27,7 @@
     "test:dynamic-provider-context": "tsx tests/test-dynamic-provider-context.ts",
     "test:sensitive-dynamic-parameters": "tsx tests/test-sensitive-dynamic-parameters.ts",
     "test:docs-contract": "tsx tests/test-docs-contract.ts",
+    "test:provider-portal-docs": "tsx tests/test-provider-portal-docs.ts",
     "test:consumer-auth-persistence": "tsx tests/test-consumer-auth-persistence.ts",
     "test:consumer-memory": "tsx tests/test-consumer-memory-personalization.ts",
     "test:provider-operations": "tsx tests/test-provider-operations-guardrails.ts",

@@ -87,7 +87,7 @@ export function validateProviderResponse<S extends z.ZodTypeAny>(
   const parsed = schema.safeParse(value);
   if (parsed.success) return parsed.data as z.output<S>;
 
-  const docsUrl = `https://developers.zayuno.uz/?doc=provider-integration#${docsAnchor}`;
+  const docsUrl = `https://partners.zayuno.uz/docs/contract-reference/#${docsAnchor}`;
   const issues: ProviderContractIssue[] = parsed.error.issues.map(err => {
     const path = err.path.length ? `response.${err.path.join('.')}` : 'response';
     const receivedValue = valueAtPath(value, err.path);
