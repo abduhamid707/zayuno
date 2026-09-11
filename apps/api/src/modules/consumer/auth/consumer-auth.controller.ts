@@ -26,14 +26,14 @@ export class ConsumerAuthController {
 
   @Post("email/send-code")
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Send a 6-digit OTP to consumer email" })
+  @ApiOperation({ summary: "Send a 5-digit OTP to consumer email" })
   async sendEmailOtp(@Body() body: { email: string }) {
     return this.authService.sendEmailOtp(body.email);
   }
 
   @Post("email/verify-code")
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Verify 6-digit OTP and issue session" })
+  @ApiOperation({ summary: "Verify 5-digit OTP and issue session" })
   async verifyEmailOtp(@Body() body: { email: string; code: string }) {
     return this.authService.verifyEmailOtp(body.email, body.code);
   }

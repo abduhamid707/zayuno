@@ -1,5 +1,16 @@
 # Deferred tasks
 
+## Joriy ish — minimalist mobile email login, 2026-09-11 (side conversation)
+
+- [ ] Hozirgi Google/email/Resend oqimi va klaviatura holatini audit qilish.
+- [ ] Claude reference tartibida Zayuno login: bitta sarlavha, Google, inline email arrow; alohida kod ekrani va ixcham keyboard holati.
+- [ ] Kod paste/autofill/auto-submit, qayta yuborish cooldown, emailni almashtirish, duplicate request va error UX.
+- [ ] Mobile typecheck, tegishli regression va handoff.
+
+**Scope:** faqat mobile login va shu oqimga kerakli tuzatishlar. Provider portal va boshqa agentlar ishiga tegilmaydi. Push/deploy so‘ralmagan.
+**Holat:** welcome.tsx ichida OTP Google/hero bilan bir ekranda qolgan, resend yo‘q, kod avtomatik tekshirilmaydi, email faqat @ belgisi bilan validatsiya qilinadi.
+**Keyingi qadam:** mavjud 5 xonali Resend contractini saqlagan holda alohida bosqichli ekran va request guardlar.
+
 ## Joriy ish — Onboarding va Integratsiya oqimlarini o‘qish orqali xavfni baholash (Read-only Audit), 2026-09-11
 
 - [x] OnboardingWizard, provider-sdk (certification, remote-http-adapter) va API service fayllarini read-only rejimida o'qish.

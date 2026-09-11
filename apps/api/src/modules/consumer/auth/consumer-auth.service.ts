@@ -1,11 +1,13 @@
 import {
   Injectable,
+  BadRequestException,
+  HttpException,
   UnauthorizedException,
   ServiceUnavailableException,
   Logger,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { randomUUID } from "crypto";
+import { randomUUID, randomInt, createHash } from "crypto";
 import { prisma, UserRole } from "@zayuno/database";
 import { RedisService } from "../../../common/services/redis.service";
 
@@ -96,76 +98,101 @@ export class ConsumerAuthService {
     }
   }
 
+
+  private normalizeOtpEmail(email: unknown): string {
+    const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (normalized.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+      throw new BadRequestException('Yaroqli email manzilini kiriting.');
+    }
+    return normalized;
+  }
+
+  private otpDigest(email: string, code: string) {
+    return createHash('sha256').update(email + ':' + code).digest('hex');
+  }
+
+  private async withEmailOtpLock<T>(email: string, action: (client: ReturnType<RedisService['getClient']>) => Promise<T>): Promise<T> {
+    const client = this.redis.getClient();
+    if (!client) throw new ServiceUnavailableException('Kirish xizmati vaqtincha ishlamayapti. Qayta urinib ko‘ring.');
+    const lockKey = 'consumer:otp:operation:' + email;
+    const lease = randomUUID();
+    let acquired = false;
+    try {
+      acquired = await client.set(lockKey, lease, 'EX', 30, 'NX') === 'OK';
+      if (!acquired) throw new HttpException('So‘rov bajarilmoqda. Bir ozdan keyin qayta urinib ko‘ring.', 429);
+      return await action(client);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.warn('Email sign-in operation failed.');
+      throw new ServiceUnavailableException('Kirish xizmati bilan ulanib bo‘lmadi. Qayta urinib ko‘ring.');
+    } finally {
+      if (acquired) await client.eval("if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end return 0", 1, lockKey, lease).catch(() => undefined);
+    }
+  }
+
+  private async deliverEmailOtp(email: string, code: string): Promise<void> {
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (!apiKey) throw new ServiceUnavailableException('Email orqali kirish vaqtincha ishlamayapti.');
+    // Resend's REST response must be accepted before we announce success.
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(10_000),
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+        to: email,
+        subject: `${code} — Zayuno kirish kodi`,
+        text: `Zayuno kirish kodi: ${code}. Kod 5 daqiqa amal qiladi. Kodni hech kimga bermang.`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:440px;margin:auto;padding:32px;color:#202020"><h2>Zayuno</h2><p>Kirish kodingiz</p><p style="font-size:36px;letter-spacing:8px;font-weight:bold">${code}</p><p style="color:#777">Kod 5 daqiqa amal qiladi. Kodni hech kimga bermang.</p></div>`,
+      }),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.id) throw new ServiceUnavailableException('Emailga kod yuborilmadi. Manzilni tekshirib, qayta urinib ko‘ring.');
+  }
+
   async sendEmailOtp(email: string) {
-    const cleanEmail = email?.toLowerCase().trim();
-    if (!cleanEmail || !cleanEmail.includes("@")) {
-      throw new UnauthorizedException("Yaroqli email kiritish shart.");
-    }
-    
-    const lastSent = await this.redis.get(`consumer:otp:sent:${cleanEmail}`);
-    if (lastSent) {
-      throw new UnauthorizedException("Iltimos, qayta yuborishdan oldin 1 daqiqa kuting.");
-    }
-
-    const otp = Math.floor(10000 + Math.random() * 90000).toString();
-    await this.redis.set(`consumer:otp:code:${cleanEmail}`, otp, 300);
-    await this.redis.set(`consumer:otp:sent:${cleanEmail}`, "1", 60);
-
-    if (process.env.NODE_ENV !== "production") {
-      this.logger.log(`[DEV OTP] Email: ${cleanEmail}, Code: ${otp}`);
-    }
-
-    const apiKey = process.env.RESEND_API_KEY;
-    if (apiKey) {
-      const { Resend } = require("resend");
-      const resend = new Resend(apiKey);
-      try {
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM || "onboarding@resend.dev",
-          to: cleanEmail,
-          subject: "Zayuno — kirish kodi",
-          html: `
-<div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
-  <h2 style="color: #0f172a;">Zayuno ilovasiga kirish</h2>
-  <p style="color: #334155; font-size: 16px;">Sizning tasdiqlash kodingiz:</p>
-  <h1 style="font-size: 36px; letter-spacing: 6px; color: #2563EB; margin: 16px 0;">${otp}</h1>
-  <p style="color: #64748b; font-size: 14px;">Ushbu kod 5 daqiqa davomida amal qiladi. Kodni hech kimga bermang!</p>
-</div>
-          `.trim()
-        });
-      } catch (err: any) {
-        this.logger.error(`Resend xatosi: ${err.message}`);
-      }
-    }
-    
-    return { success: true, message: "Kod yuborildi." };
+    const cleanEmail = this.normalizeOtpEmail(email);
+    return this.withEmailOtpLock(cleanEmail, async client => {
+      const retryAfterSeconds = await client.ttl(`consumer:otp:sent:${cleanEmail}`);
+      if (retryAfterSeconds > 0) throw new HttpException({ message: 'Qayta yuborishdan oldin bir daqiqa kuting.', retryAfterSeconds }, 429);
+      const code = randomInt(10000, 100000).toString();
+      await this.deliverEmailOtp(cleanEmail, code);
+      // Strict Redis operations: do not report success if the challenge cannot be stored.
+      const saved = await client.multi()
+        .set(`consumer:otp:code:${cleanEmail}`, this.otpDigest(cleanEmail, code), 'EX', 300)
+        .set(`consumer:otp:sent:${cleanEmail}`, '1', 'EX', 60)
+        .del(`consumer:otp:attempts:${cleanEmail}`)
+        .exec();
+      if (!saved || saved.some(([error]) => error)) throw new Error('OTP persistence failed');
+      return { success: true, message: 'Kod yuborildi.', codeLength: 5, expiresIn: 300, retryAfterSeconds: 60 };
+    });
   }
 
   async verifyEmailOtp(email: string, code: string) {
-    const cleanEmail = email?.toLowerCase().trim();
-    if (!cleanEmail || !code) throw new UnauthorizedException("Email va kod kiritilishi shart.");
-    
-    const validOtp = await this.redis.get(`consumer:otp:code:${cleanEmail}`);
-    if (!validOtp || validOtp !== code.trim()) {
-      throw new UnauthorizedException("Kod noto'g'ri yoki yaroqlilik muddati tugagan.");
-    }
-
-    await this.redis.del(`consumer:otp:code:${cleanEmail}`);
-    await this.redis.del(`consumer:otp:sent:${cleanEmail}`);
-
-    const user = await prisma.user.upsert({
-      where: { email: cleanEmail },
-      update: { isActive: true },
-      create: {
-        email: cleanEmail,
-        name: "Zayuno foydalanuvchisi",
-        passwordHash: "EMAIL_OTP_MANAGED",
-        role: UserRole.API_CONSUMER,
-        isActive: true,
-      },
+    const cleanEmail = this.normalizeOtpEmail(email);
+    if (typeof code !== 'string' || !/^\d{5}$/.test(code.trim())) throw new BadRequestException('5 xonali kodni kiriting.');
+    return this.withEmailOtpLock(cleanEmail, async client => {
+      const codeKey = `consumer:otp:code:${cleanEmail}`;
+      const attemptsKey = `consumer:otp:attempts:${cleanEmail}`;
+      const savedCode = await client.get(codeKey);
+      if (!savedCode) throw new UnauthorizedException('Kod muddati tugagan. Yangi kod so‘rang.');
+      const attempts = await client.incr(attemptsKey);
+      if (attempts === 1) await client.expire(attemptsKey, 300);
+      // Legacy five-digit challenges remain valid for their original five-minute TTL.
+      if (attempts > 5 || (savedCode !== this.otpDigest(cleanEmail, code.trim()) && savedCode !== code.trim())) {
+        if (attempts >= 5) await client.del(codeKey);
+        throw new UnauthorizedException(attempts >= 5 ? 'Urinishlar tugadi. Yangi kod so‘rang.' : 'Kod noto‘g‘ri. Tekshirib, qayta kiriting.');
+      }
+      const user = await prisma.user.upsert({
+        where: { email: cleanEmail },
+        update: { isActive: true },
+        create: { email: cleanEmail, name: 'Zayuno foydalanuvchisi', passwordHash: 'EMAIL_OTP_MANAGED', role: UserRole.API_CONSUMER, isActive: true },
+      });
+      // A transient session-storage failure must not consume the user's valid code.
+      const session = await this.issueSession(user);
+      await client.del(codeKey, attemptsKey);
+      return session;
     });
-
-    return this.issueSession(user);
   }
 
   async refreshSession(refreshToken: string) {
