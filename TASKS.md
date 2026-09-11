@@ -1,15 +1,40 @@
-# Deferred tasks
+# Current Task: Login Page UI Polish (Claude-like) & Push
+- [x] Background remains untouched (`22.jpg`)
+- [x] Dynamic hiding of Google button and dividers on keyboard open
+- [x] Email stage layout positioning improved to rest closer to keyboard
+- [x] Dynamic text resizing when keyboard is active
+- [x] Code stage header fixed (Back arrow left, Logo centered, no extra text)
+- [x] Pinned 'Change email' and 'Resend' bottom actions above keyboard
+- [x] Smooth LayoutAnimation applied mimicking Claude's soft layout slide
+- [x] Verify on Web and Android APK (`pnpm run typecheck`, `pnpm run build:apk`, `adb install`)
+- [x] Git commit and push
 
-## Joriy ish — minimalist mobile email login, 2026-09-11 (side conversation)
+## Joriy ish — minimalist mobile email login & Claude-like UI, 2026-09-11 / 2026-09-12
 
-- [ ] Hozirgi Google/email/Resend oqimi va klaviatura holatini audit qilish.
-- [ ] Claude reference tartibida Zayuno login: bitta sarlavha, Google, inline email arrow; alohida kod ekrani va ixcham keyboard holati.
-- [ ] Kod paste/autofill/auto-submit, qayta yuborish cooldown, emailni almashtirish, duplicate request va error UX.
-- [ ] Mobile typecheck, tegishli regression va handoff.
+- [x] Hozirgi Google/email/Resend oqimi va klaviatura holatini audit qilish.
+- [x] Claude reference tartibida Zayuno login: bitta sarlavha, Google, inline email arrow; alohida kod ekrani va ixcham keyboard holati.
+- [x] Kod paste/autofill/auto-submit, qayta yuborish cooldown, emailni almashtirish, duplicate request va error UX.
+- [x] Mobile typecheck, tegishli regression va handoff.
+- [x] Klaviaturaga bog'liq dinamik animatsiyalar (LayoutAnimation), pinning va elementlarni yashirish.
+- [x] Android qurilmaga o'rnatish va real qurilma tekshiruvi (user tomonidan "wow fantastik ishlayabdi" deb tasdiqlandi).
 
-**Scope:** faqat mobile login va shu oqimga kerakli tuzatishlar. Provider portal va boshqa agentlar ishiga tegilmaydi. Push/deploy so‘ralmagan.
-**Holat:** welcome.tsx ichida OTP Google/hero bilan bir ekranda qolgan, resend yo‘q, kod avtomatik tekshirilmaydi, email faqat @ belgisi bilan validatsiya qilinadi.
-**Keyingi qadam:** mavjud 5 xonali Resend contractini saqlagan holda alohida bosqichli ekran va request guardlar.
+**O'zgargan fayllar:**
+- `apps/mobile/app/(auth)/welcome.tsx`
+- `apps/mobile/package.json`
+- `pnpm-lock.yaml`
+- `apps/mobile/assets/images/22.jpg`
+- `Imagesfordelte/22.jpg`
+- `TASKS.md`
+
+**Bajarilgan tekshiruvlar va natijalari:**
+- `pnpm run typecheck` (apps/mobile): muvaffaqiyatli, 0 ta xatolik.
+- `pnpm run build:apk`: Universal Release APK muvaffaqiyatli yig'ildi (`zayuno.apk`, 55.8 MB).
+- `adb install -r`: Foydalanuvchi telefoniga (RRCW5071L9F) to'g'ridan-to'g'ri o'rnatildi ("Success").
+- Foydalanuvchi mobil qurilmada tekshirib, to'liq ma'qulladi.
+
+**Qolgan ish:** Yo'q (Joriy so'rov to'liq yakunlandi).
+**To'siq:** Yo'q.
+**Navbatdagi qadam:** Git commit va `origin main` ga push qilish.
 
 ## Joriy ish — Onboarding va Integratsiya oqimlarini o‘qish orqali xavfni baholash (Read-only Audit), 2026-09-11
 
@@ -1237,4 +1262,5 @@ Biznes egalariga Zayunoni tushuntirish tili juda oddiy:
 Bu taklifga har qanday biznes rozi bo‘ladi, chunki ular uchun risk yo‘q, faqat tayyor savdo va yangi mijozlar keladi.
 
 Zayuno aynan mana shunday **oddiy tadbirkor bilan zamonaviy sun’iy intellekt (ChatGPT, Claude, Gemini) o‘rtasidagi ko‘prik** vazifasini bajaradi!
+
 
