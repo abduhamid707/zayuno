@@ -1,3 +1,14 @@
+# Joriy ish — Shopla seller product delete xatosi (2026-09-12)
+- [x] `product.save is not a function` sababini yopish va seller ownershipni saqlash.
+- [x] Mahsulotda buyurtma bo‘lsa soft-delete, bo‘lmasa hard-delete ishlashini testlash.
+- [x] Shopla backend build/test va pushni yakunlash.
+
+**Sabab:** `findById()` stock ma’lumotlarini qo‘shib oddiy object qaytaradi; delete mutatsiyasi esa uni Mongoose document deb qabul qilib `.save()` chaqirgan.
+
+**Yechim:** Delete oqimi mutatsiya uchun `findDocument()` ishlatadi. Seller ownership tekshiruvi oldingidek saqlangan. `products.service.spec.ts`ga soft-delete va hard-delete regressiya testlari qo‘shildi.
+
+**Tekshiruv:** Shopla `npm run build` PASS; ProductsService Jest 5/5 PASS; `git diff --check` PASS.
+
 # Joriy ish — Shopla ↔ Zayuno production commerce oqimini kuchaytirish (2026-09-12)
 - [x] Noto‘g‘ri qo‘shimcha SKU/variantlarning savatga tushish sababini topish va cart integrityni qat’iy qilish.
 - [x] SKU/variant nomi, kodi, rasmi, narxi va mavjudligini Zayuno mijoz UI/API javoblarida aniq ko‘rsatish.
