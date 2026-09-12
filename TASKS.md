@@ -1,3 +1,11 @@
+# Joriy ish: Yangi APK build qilish va USB ADB orqali telefonga o‘rnatish (2026-09-13)
+
+- [x] USB orqali ulangan Android qurilmani (ADB) aniqlash va tekshirish (`RRCW5071L9F`, `uz.zayuno.mobile` v10 aniqlandi).
+- [x] Yangi interfeys va tugmalar uchun `apps/mobile/app.json` versionCode ni yangilash (v11).
+- [x] Yangi Universal Release APK ni yig‘ish (`build-apk.mjs` muvaffaqiyatli yakunlandi, `zayuno.apk` v11).
+- [x] Yig‘ilgan APK ni USB orqali telefonga o‘rnatish (`adb install -r`, versionCode=11 Success).
+- [x] Telefonda ilovani ishga tushirib tekshirish (`uz.zayuno.mobile` ekranda ochildi).
+
 # Bajarilgan: Food-first conversational ordering va aqlli AI tavsiya oqimi (2026-09-13)
 
 - [x] Non-food providerlar consumer discovery va tavsiyalardan chiqarildi (faqat food/restoranlar qoldi, Shopla kodi tegilmadi).
