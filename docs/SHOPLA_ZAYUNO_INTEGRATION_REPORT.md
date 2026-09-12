@@ -2,7 +2,8 @@
 
 **Sana:** 2026-09-12  
 **Holat:** pushga tayyor, production konfiguratsiyasi talab qilinadi  
-**Push/deploy:** bajarilmadi
+**Push:** bajarildi — Zayuno `851c4a7`, Shopla backend `12b3253`, Shopla seller panel `fa3d054`  
+**Deploy:** ushbu taskda bajarilmadi
 
 ## Natija
 

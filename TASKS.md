@@ -11,9 +11,10 @@
 
 **Tekshiruvlar:** Shopla Zayuno testlari 21/21 PASS; Payme receiver/callback integration 2/2 PASS; Zayuno certification va operation guardlari PASS; Zayuno SDK/API, Shopla backend va seller panel production buildlari PASS. Noto‘g‘ri e2e-only Jest buyrug‘i test faylini topmadi; o‘sha Payme suite to‘g‘ri runner bilan qayta ishga tushirilib 2/2 PASS bo‘ldi.
 
+**Push:** Zayuno `851c4a7`, Shopla backend `12b3253` va Shopla seller panel `fa3d054` commitlari `origin/main`ga 2026-09-12 kuni muvaffaqiyatli yuborildi.
 **Qolgan ish:** Kod bo‘yicha yo‘q. Production env qiymatlarini o‘rnatish, Mongo index yaratilishini kuzatish va production Payme sandbox/kichik real to‘lov smoke testi deploy bosqichiga tegishli.
 **To‘siq:** Yo‘q.
-**Keyingi qadam:** Git diffni yakuniy tekshirish, so‘ng foydalanuvchi topshirig‘i bilan commit/push.
+**Keyingi qadam:** Production deploy konfiguratsiyasini o‘rnatish va smoke test.
 
 # Bajarilgan: Shopla ↔ Zayuno integratsiyasidagi 7 ta kamchilik va xatoliklarni bartaraf etish (2026-09-12)
 - [x] 1. Do'kon ulanishini Zayuno platformasiga yuborish (Shopla -> Zayuno sync/onboarding endpoint va status sinxronizatsiyasi)
