@@ -757,7 +757,14 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['customerMessage', 'id', 'total', 'currency', 'expiresAt']
     },
     handler: async (args, client) => {
-      const quote = await client.requestQuote(args);
+      let destination = args.destination;
+      if (typeof destination === 'string') {
+        destination = { raw: destination };
+      }
+      const quote = await client.requestQuote({
+        ...args,
+        ...(destination ? { destination } : {})
+      });
       const customerMessage = formatCustomerQuote(quote);
       return {
         customerMessage,
@@ -823,11 +830,11 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           type: 'object',
           description: 'Customer contact information for action fulfillment.',
           properties: {
-            name: { type: 'string', description: 'Customer full name' },
+            name: { type: 'string', description: 'Customer full name (optional, defaults to "Mijoz")' },
             phone: { type: 'string', description: 'Customer phone number e.g. +998901234567' },
             email: { type: 'string', description: 'Optional customer email' }
           },
-          required: ['name', 'phone']
+          required: ['phone']
         },
         destination: {
           type: 'object',
@@ -882,8 +889,26 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     },
     handler: async (args, client) => {
       const idempotencyKey = args.idempotencyKey || getOrCreateActionIdempotencyKey(args.quoteId);
+      const rawPhone = String(args.customer?.phone || '').trim();
+      let phone = rawPhone;
+      if (/^\d{9}$/.test(phone)) {
+        phone = `+998${phone}`;
+      } else if (/^998\d{9}$/.test(phone)) {
+        phone = `+${phone}`;
+      }
+      const customer = {
+        name: args.customer?.name?.trim() || 'Mijoz',
+        phone,
+        ...(args.customer?.email ? { email: args.customer.email } : {})
+      };
+      let destination = args.destination;
+      if (typeof destination === 'string') {
+        destination = { raw: destination };
+      }
       const action = await client.createAction({
         ...args,
+        customer,
+        ...(destination ? { destination } : {}),
         idempotencyKey
       });
       const customerMessage = formatCustomerActionConfirmation(action);

@@ -548,8 +548,24 @@ async function main() {
   assert.deepEqual(reportedFlow.plan.itemRequests, parsedReportedSelection);
   assert.match(reportedFlow.directAnswer, /Xusnorik kombosi\*\* × 2/);
   assert.match(reportedFlow.directAnswer, /Tohir Sodiqov kombosi 1\*\* × 1/);
-  assert.match(reportedFlow.directAnswer, /telefon raqamingiz/);
+  assert.match(reportedFlow.directAnswer, /Buyurtma yarataymi/);
+  assert.equal(reportedFlow.interaction?.layout, "actions");
   assert.doesNotMatch(reportedFlow.directAnswer, /Menyuda hozir mavjud/);
+
+  const confirmedReportedFlow = await reportedFlowChat.processMessage({
+    prompt: "ha",
+    messages: [
+      {
+        role: "user",
+        content: "2 ta Xusnorik kombosi va 1 ta Tohir Sodiqov kombosi 1 kerak",
+      },
+      { role: "assistant", content: reportedFlow.directAnswer },
+    ],
+    userId: "reported-flow-user",
+    userEmail: "customer@example.com",
+    conversationId: "reported-flow-chat",
+  });
+  assert.match(confirmedReportedFlow.content, /telefon raqamingiz/);
 
   // Re-mock planWithAi for capabilities, provider listing, and off-topic tests
   (dynamicFoodChat as any).planWithAi = async (prompt: string) => {
@@ -761,6 +777,10 @@ async function main() {
             url: "https://pay.maxifood.example/checkout/1",
           },
         };
+      },
+      cancelAction: async (input: any) => {
+        assert.equal(input.actionId, "action-real-1");
+        return { status: "CANCELLED" };
       },
       getPaymentOptions: async () => [],
       getAction: async () => ({
@@ -1011,6 +1031,26 @@ async function main() {
     supportAnswer.content,
     /\[Support sahifasi\]\(https:\/\/maxifood\.example\/support\)/,
   );
+
+  const cancelOrderAnswer = await orderChat.processMessage({
+    prompt: "bekor qil",
+    messages: [],
+    userId: "order-user",
+  });
+  assert.match(cancelOrderAnswer.content, /bekor qilindi/i);
+  assert.equal(
+    orderStore.has("consumer:chat:active-action:order-user"),
+    false,
+    "active action must be cleared after cancellation",
+  );
+
+  const idleCancel = await orderChat.processMessage({
+    prompt: "bekor qil",
+    messages: [],
+    userId: "random-idle-user",
+  });
+  assert.match(idleCancel.content, /bekor qilindi/i);
+  assert.doesNotMatch(idleCancel.content, /mahsulot jamoasi/i);
 
   console.log(
     "Provider cache, dynamic food discovery, guarded order confirmation, payment handoff, parallel search, and complete grounded chat output passed.",

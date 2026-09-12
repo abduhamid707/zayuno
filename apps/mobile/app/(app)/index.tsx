@@ -175,6 +175,9 @@ export default function HomeScreen() {
   const [streamingText, setStreamingText] = useState("");
   const [streamingInteraction, setStreamingInteraction] =
     useState<ChatInteraction | null>(null);
+  const [actedActionMessageIds, setActedActionMessageIds] = useState<
+    Set<string>
+  >(new Set());
   const [selectedChoices, setSelectedChoices] = useState<InteractionChoice[]>(
     [],
   );
@@ -701,7 +704,7 @@ export default function HomeScreen() {
   };
 
   const renderMessage = useCallback(
-    ({ item }: { item: ChatMessage }) => {
+    ({ item, index }: { item: ChatMessage; index: number }) => {
       const mine = item.role === "user";
       if (mine) {
         return (
@@ -710,6 +713,13 @@ export default function HomeScreen() {
           </View>
         );
       }
+
+      const isActionLayout = item.interaction?.layout === "actions";
+      const shouldHideActions =
+        isActionLayout &&
+        (index < messages.length - 1 ||
+          isLoading ||
+          actedActionMessageIds.has(item.id));
 
       return (
         <View style={styles.assistantBlock}>
@@ -728,7 +738,7 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {item.interaction ? (
+          {item.interaction && !shouldHideActions ? (
             <View style={styles.interactionBlock}>
               {item.interaction.kind === "provider_list" ? (
                 <ProviderPickerCard
@@ -753,7 +763,15 @@ export default function HomeScreen() {
               ) : (
                 <InteractionCards
                   interaction={item.interaction}
-                  onSelect={selectChoice}
+                  onSelect={(choice) => {
+                    if (choice.groupId.startsWith("order:")) {
+                      setActedActionMessageIds((prev) =>
+                        new Set(prev).add(item.id),
+                      );
+                    }
+                    selectChoice(choice);
+                  }}
+                  disabled={isLoading}
                 />
               )}
             </View>
@@ -763,6 +781,8 @@ export default function HomeScreen() {
     },
     [
       isLoading,
+      messages.length,
+      actedActionMessageIds,
       handleSelectProvider,
       handleAddToCart,
       trayQuantities,
@@ -774,6 +794,7 @@ export default function HomeScreen() {
     clearTray();
     selectSession(session.id);
     setSelectedChoices([]);
+    setActedActionMessageIds(new Set());
     setInput("");
     setHistoryVisible(false);
   };
@@ -783,6 +804,7 @@ export default function HomeScreen() {
     analytics.trackNewChat();
     newChat();
     setSelectedChoices([]);
+    setActedActionMessageIds(new Set());
     setInput("");
     setHistoryVisible(false);
   };

@@ -1,4 +1,15 @@
-# Joriy ish: Yangi APK build qilish va USB ADB orqali telefonga o‘rnatish (2026-09-13)
+# Joriy ish: Tugmalarni yo‘qolishi, Buyurtmani bekor qilish va Botdek quruq javoblarni yo‘qotish (2026-09-13)
+
+- [x] Mobile: [Ha] / [Yo‘q] action tugmalari bosilganda darhol yo‘qolishi va eski xabarlarda bosilmaydigan qilish (jarayonni buzmaslik uchun).
+- [x] Backend: "Bekor qil" / "Otmen" aytilganda active/pending orderni bekor qilish (unmet demand bot xabari chiqmasligi, active action Redisdan tozalanib to‘g‘ri yopilishi).
+- [x] Backend: "Kombo nima ko‘rsata olasanmi?" kabi savollarga katalogdan taom/kombo tarkibini tabiiy ko‘rsatish ("Restoran tasdiqlamagan ma’lumotni taxmin qilmayman" quruq bot javobini butunlay olib tashlash, taom tavsifi va narxlarini tabiiy tushuntirish).
+- [x] Backend: `startOrderSelection` har qanday buyurtmada (kombo, lavash va b.) avval narx va [Ha] [Yo‘q] tugmali taklif ko‘rsatishi va faqat rozilikdan keyin kontakt/manzil so‘rashi kafolatlandi.
+- [x] MCP / ChatGPT: `customer.name` ni ixtiyoriy qilish (`Mijoz` fallback), 9 xonali telefonni xalqaro formatga to‘g‘rilash, manzilni qabul qilish va ChatGPTning yolg‘on xavfsizlik to‘sig‘ini yopish.
+- [x] Yangi Universal Release APK build qilindi (versionCode 12) va USB ADB orqali telefonga o‘rnatildi (`uz.zayuno.mobile` muvaffaqiyatli ochildi).
+- [x] Regressiya testlari (`test-provider-cache-and-consumer-chat.ts`, certification guards, contract DX parity) 100% PASS qildi.
+- [x] Serverga deploy qilish uchun commit va push bajarildi.
+
+# Bajarilgan: Yangi APK build qilish va USB ADB orqali telefonga o‘rnatish (2026-09-13)
 
 - [x] USB orqali ulangan Android qurilmani (ADB) aniqlash va tekshirish (`RRCW5071L9F`, `uz.zayuno.mobile` v10 aniqlandi).
 - [x] Yangi interfeys va tugmalar uchun `apps/mobile/app.json` versionCode ni yangilash (v11).
