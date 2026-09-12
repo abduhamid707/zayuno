@@ -455,6 +455,8 @@ export default function HomeScreen() {
       currency: item.currency || "UZS",
       providerSlug: item.providerSlug,
       offeringId: item.offeringId,
+      quantity: item.quantity,
+      sku: item.sku,
       prompt: `${item.title} (${item.quantity || 1} ta)`,
       groupId: `offerings:${item.providerSlug}`,
       multiSelect: true,

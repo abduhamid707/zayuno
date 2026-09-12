@@ -18,6 +18,9 @@ export type InteractionChoice = {
   emoji?: string;
   providerSlug?: string;
   offeringId?: string;
+  quantity?: number;
+  sku?: string;
+  variantId?: string;
   prompt: string;
   groupId: string;
   multiSelect?: boolean;
@@ -65,6 +68,8 @@ export type CatalogOfferingItem = {
   isAvailable?: boolean;
   variantsCount?: number;
   optionsCount?: number;
+  sku?: string;
+  variantLabel?: string;
 };
 
 export type CatalogSectionItem = {
@@ -100,6 +105,8 @@ export type TrayItem =
       currency?: string;
       imageUrl?: string;
       quantity: number;
+      sku?: string;
+      variantLabel?: string;
     }
   | {
       type: "note";

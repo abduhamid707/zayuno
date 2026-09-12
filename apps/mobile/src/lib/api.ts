@@ -172,12 +172,15 @@ function executeChatStream(
         messages,
         conversationId,
         selections: selections.map(
-          ({ id, kind, title, providerSlug, offeringId }) => ({
+          ({ id, kind, title, providerSlug, offeringId, quantity, sku, variantId }) => ({
             id,
             kind,
             title,
             providerSlug,
             offeringId,
+            quantity,
+            sku,
+            variantId,
           }),
         ),
       }),

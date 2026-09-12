@@ -41,6 +41,8 @@ export function addOffering(
       currency: offering.currency,
       imageUrl: offering.imageUrl,
       quantity: 1,
+      sku: offering.sku,
+      variantLabel: offering.variantLabel,
     },
   ];
 }

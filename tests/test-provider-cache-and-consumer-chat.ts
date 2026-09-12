@@ -793,6 +793,52 @@ async function main() {
   );
   const orderInternals = orderChat as any;
 
+  assert.equal(orderInternals.detectPendingCommand("Ha"), "confirm");
+  assert.equal(orderInternals.detectPendingCommand("Tasdiqlayman"), "confirm");
+  assert.equal(orderInternals.detectPendingCommand("подтверждаю"), "confirm");
+  assert.equal(orderInternals.detectPendingCommand("confirm"), "confirm");
+  assert.equal(orderInternals.detectPendingCommand("Bekor qiling"), "cancel");
+  assert.equal(orderInternals.detectLanguage("Покажите красные розы"), "ru");
+  assert.equal(orderInternals.detectLanguage("Show me red roses"), "en");
+
+  await orderInternals.startOrderSelection(
+    "structured-order-user",
+    "customer@example.com",
+    {
+      intent: "catalog_selection",
+      needsCatalog: true,
+      providerScope: "selected",
+      providerSlugs: ["maxifood-express"],
+      query: "",
+      quantity: 1,
+      limit: 10,
+      page: 0,
+      itemRequests: [],
+      allowCatalogFallback: true,
+      excludedOfferingIds: [],
+    },
+    [{
+      slug: "maxifood-express",
+      name: "MaxiFood Express",
+      fulfillmentMode: "DELIVERY",
+      offerings: [
+        { id: "burger-1", title: "Klassik Gamburger" },
+        { id: "burger-2", title: "Pishloqli Gamburger" },
+        { id: "burger-3", title: "Tovuqli Gamburger" },
+        { id: "burger-4", title: "Katta Gamburger" },
+      ],
+    }],
+    "structured-chat",
+    [{ providerSlug: "maxifood-express", offeringId: "burger-1", quantity: 2 }],
+    "uz",
+  );
+  const structuredState = JSON.parse(
+    orderStore.get("consumer:chat:pending-order:structured-order-user:structured-chat")!,
+  );
+  assert.equal(structuredState.items.length, 1, "structured cart selection must never add fuzzy extra items");
+  assert.equal(structuredState.items[0].offeringId, "burger-1");
+  assert.equal(structuredState.items[0].quantity, 2);
+
   // Mock interpretPendingTurn to avoid real Gemini calls
   orderInternals.interpretPendingTurn = async (prompt: string) => {
     if (prompt === "2") return { intent: "provide_details", choice: "2" };

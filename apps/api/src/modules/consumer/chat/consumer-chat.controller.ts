@@ -25,6 +25,9 @@ type ChatSelection = {
   title?: string;
   providerSlug?: string;
   offeringId?: string;
+  quantity?: number;
+  sku?: string;
+  variantId?: string;
 };
 
 type ChatBody = {

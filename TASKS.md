@@ -1,3 +1,24 @@
+# Joriy ish — Shopla ↔ Zayuno production commerce oqimini kuchaytirish (2026-09-12)
+- [x] Noto‘g‘ri qo‘shimcha SKU/variantlarning savatga tushish sababini topish va cart integrityni qat’iy qilish.
+- [x] SKU/variant nomi, kodi, rasmi, narxi va mavjudligini Zayuno mijoz UI/API javoblarida aniq ko‘rsatish.
+- [x] Tasdiqlashni katta-kichik harf va tabiiy iboralar bilan ishlatish; faol checkout kontekstini fallbackdan ustun qo‘yish.
+- [x] Foydalanuvchi qaysi tilda yozsa, javob va dinamik actionlar o‘sha tilda chiqishini ta’minlash.
+- [x] Shopla provider arizasini boshqa providerlar kabi DRAFT/review lifecycle’iga kiritish; admin approve/activate/pause boshqaruvini tekshirish.
+- [x] Shopla catalog/search mappingni statik matnlardan tozalab, product va SKU metadata orqali dinamik qilish.
+- [x] Tegishli unit/integration testlar va buildlarni bajarish.
+
+**Natija:** Mobil savat yuborgan `providerSlug + offeringId + quantity + SKU` endi serverda authoritative selection hisoblanadi; AI matnni qayta fuzzy qidirib ortiqcha mahsulot qo‘sha olmaydi. SKU va variant nomi kartada hamda quote’da ko‘rinadi. `Ha`, `Tasdiqlayman`, ruscha va inglizcha tasdiq/bekor qilish iboralari AI’dan oldin xavfsiz aniqlanadi. Deterministik va Gemini javoblari oxirgi user xabari tiliga moslandi. Shopla adapter product/variant/SKU/tag/kodlar bo‘yicha dinamik qidiradi, regex inputni escape qiladi, variant nomini takrorlamaydi va rasm yo‘q bo‘lsa soxta placeholder bermaydi.
+
+**Provider lifecycle tekshiruvi:** Yangi Shopla sync `DRAFT + PENDING_CERTIFICATION + isPublished=false` yaratadi. Sertifikatsiyadan keyin `PENDING_APPROVAL`, admin publish qilganda `ACTIVE`; admin request-changes/reject/suspend/reopen va Shopla disconnect orqali `DISABLED` boshqaruvi mavjud.
+
+**O‘zgargan Zayuno fayllari:** `apps/api/src/modules/consumer/chat/consumer-chat.controller.ts`, `apps/api/src/modules/consumer/chat/consumer-chat.service.ts`, `apps/mobile/app/(app)/index.tsx`, `apps/mobile/src/lib/api.ts`, `apps/mobile/src/lib/cart.ts`, `apps/mobile/src/lib/interaction.ts`, `apps/mobile/src/components/food/FoodProductCard.tsx`, `tests/test-provider-cache-and-consumer-chat.ts`.
+
+**O‘zgargan Shopla fayllari:** `src/modules/zayuno-provider/zayuno-provider.service.ts`, `src/modules/zayuno-provider/zayuno-provider.service.spec.ts`.
+
+**Tekshiruvlar:** `pnpm --filter @zayuno/api build` PASS; `pnpm --filter mobile typecheck` PASS; `pnpm exec tsx tests/test-provider-cache-and-consumer-chat.ts` PASS; Shopla `npm run build` PASS; Shopla Jest 16/16 PASS; ikkala repoda `git diff --check` PASS. Testlarda avvaldan mavjud Mongoose duplicate-index va mock catalog fallback warninglari chiqadi, natija PASS.
+
+**Qolgan ish:** Kod productionga deploy/push qilinmagan. Navbatdagi qadam — foydalanuvchi so‘rasa ikkala repoda commit/push va CI deploy natijasini tekshirish.
+
 # Bajarilgan: Zayuno Consumer Chat Shopla va Gullar uchun 100% ulandi va jonli ishga tushirildi (2026-09-12)
 - [x] Muammo manbasi: APK da hech qanday muammo yo'q; cheklov faqat backendda (`zayuno-api`) `consumer-chat.service.ts` da bo'lgan.
 - [x] `consumer-chat.service.ts` da `isFoodProvider` / `isEligibleProvider` filtri yangilandi: `COMMERCE`, `RETAIL` va `CATALOG` imkoniyatiga ega barcha faol do'konlar (Shopla `arzon`) qabul qilinadi.
