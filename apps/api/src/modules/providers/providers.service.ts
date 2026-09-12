@@ -759,6 +759,7 @@ export class ProvidersService {
       'ACTION_STATUS',
       'ACTION_CANCEL',
       'PAYMENT_OPTIONS',
+      'WEBHOOK',
     ];
 
     const existing = await prisma.provider.findUnique({ where: { slug: cleanSlug } });

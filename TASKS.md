@@ -1,3 +1,34 @@
+# Bajarilgan: Shopla Do'koni Zayunoda 100% Sertifikatsiyadan o'tdi va Nashr qilindi (2026-09-12)
+- [x] Sabab: Zayuno Capability Certification testida `catalog` testi `response.offerings.0.imageUrl` ob'ekt bo'lgani sababli yiqilayotgan edi (`OfferingSchema` qat'iy satr talab qiladi). Shuningdek, `WEBHOOK` imkoniyati yo'qligi sababli `isProductionReady: false` bo'lib turgan edi.
+- [x] Yechim: `brend-market` da `extractImageUrl` va `extractImageUrls` yordamchi funksiyalari qo'shilib, Shopla rasmlari to'g'ridan-to'g'ri URL satriga o'tkazildi. Yetkazib berish (delivery) va Payme preflight hisoblashlari mustahkamlandi.
+- [x] Zayuno API va Shopla backendga `WEBHOOK` imkoniyati qo'shildi.
+- [x] Natija: Zayuno Capability Compliance Certification: **13/13 TEST PASS (100%)**!
+  - `metadata`: PASS
+  - `health`: PASS
+  - `locations`: PASS
+  - `catalog`: PASS
+  - `offering`: PASS
+  - `search`: PASS
+  - `quote`: PASS
+  - `action-create`: PASS
+  - `action-idempotency`: PASS
+  - `action-status`: PASS
+  - `payment-options`: PASS
+  - `action-cancel`: PASS
+  - `webhook`: PASS
+- [x] Do'kon (`shopla-6a563fbfcb3d891b6ace6e80`, arzon) ko'rib chiqishga yuborildi (`submit-review`) va admin tomonidan rasman tasdiqlanib nashr qilindi (`publish`).
+- [x] Holat: `status: ACTIVE`, `isCertified: true`, `isPublished: true`, `reviewStatus: APPROVED`, `Active Locations: 1`. AI discovery'da to'liq ko'rinadi!
+
+# Joriy ish — Shopla uchun AI-qidiruvga tayyor gul katalogi seed scripti (2026-09-12)
+- [ ] Shopla product, SKU, stock va rasm saqlash kontraktini tekshirish.
+- [ ] 70 ta mazmunli gul mahsuloti va har biriga 2–5 SKU yaratadigan idempotent server scriptini yozish.
+- [ ] `D:\\Desktop\\gullar rasimlari` ichidagi rasmlarni xavfsiz yuklash va mahsulotlarga barqaror biriktirish.
+- [ ] Zayuno aniq topishi uchun kategoriya, qidiruv kalitlari, variant xususiyatlari va yetkazish ma’lumotlarini to‘ldirish.
+- [ ] Dry-run va haqiqiy yozish rejimlarini tekshirish; ishga tushirish buyrug‘ini yozish.
+
+**Hozirgi holat:** Shopla loyihasining aniq joylashuvi va serverdagi product/stock/image kontrakti tekshirilmoqda. Mavjud mahsulotlar o‘chirilmaydi; script bir necha marta ishga tushirilganda dublikat yaratmaydi.
+**Keyingi qadam:** Shopla repo va rasm yuklash modulidan foydalanib seed scriptini yozish.
+
 # Bajarilgan: Shopla ↔ Zayuno Server-to-Server Partner Sync muvaffaqiyatli ulandi (2026-09-12)
 - [x] Sabab: Production serverda `ZAYUNO_PARTNER_SECRET`, `ZAYUNO_API_URL` va `SHOPLA_PUBLIC_API_URL` o'zgaruvchilari bo'lmagani uchun Shopla do'kon arizasi Zayunoga yetib bormay `PARTNER_CONFIG_MISSING` xatosi bilan navbatda qolayotgan edi.
 - [x] Serverdagi `zayuno-api` va `brend-api` containerlariga xavfsiz `ZAYUNO_PARTNER_SECRET` o'rnatildi va qayta ishga tushirildi.
