@@ -584,6 +584,10 @@ export default function HomeScreen() {
   const selectChoice = useCallback(
     (choice: InteractionChoice) => {
       if (isLoading) return;
+      if (choice.groupId.startsWith("order:")) {
+        void sendMessage(choice.prompt, [], []);
+        return;
+      }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
         () => undefined,
       );

@@ -99,6 +99,20 @@ export function InteractionCards({
   const groups = (interaction.groups || []).filter((group) => group.choices.length > 0);
   if (!groups.length) return null;
 
+  if (interaction.layout === "actions") {
+    return <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 10 }}>
+      {groups.flatMap(group => group.choices).map((choice, index) => (
+        <Pressable key={`${choice.groupId}:${choice.id}`} accessibilityRole="button" accessibilityLabel={choice.title}
+          disabled={disabled || !onSelect} onPress={() => onSelect?.(choice)}
+          style={({ pressed }) => ({ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 22,
+            backgroundColor: index === 0 ? "#6752E8" : "#101526", borderWidth: 1,
+            borderColor: index === 0 ? "#8170F4" : "#30374E", opacity: disabled ? 0.5 : pressed ? 0.75 : 1 })}>
+          <Text style={{ color: "#F4F2FF", fontSize: 14, fontWeight: "600" }}>{choice.title}</Text>
+        </Pressable>
+      ))}
+    </View>;
+  }
+
   return (
     <View style={styles.root}>
       {interaction.title ? (

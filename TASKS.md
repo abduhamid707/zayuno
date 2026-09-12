@@ -1,3 +1,93 @@
+# Bajarilgan: Food-first conversational ordering va aqlli AI tavsiya oqimi (2026-09-13)
+
+- [x] Non-food providerlar consumer discovery va tavsiyalardan chiqarildi (faqat food/restoranlar qoldi, Shopla kodi tegilmadi).
+- [x] Menyu ko‘rish (`presentation: "menu"`) va tavsiya/buyurtma (`presentation: "recommend"`) niyatlari AI orqali ajratildi; katalog qidiruvi va rankingi (`rankCatalogForPlan`) kuchaytirildi (nom bo‘yicha aniq moslik yuqoriga chiqadi, kombolar pastga tushiriladi).
+- [x] Jonli narx/variant/miqdor bilan qisqa taklif va foydalanuvchi tilidagi [Ha] [Yo‘q] (Tasdiqlayman / Bekor qil) action tugmalari chiqarildi.
+- [x] Taklif roziligi ([Ha]) → telefon va manzil talablari → jonli quote tasdig‘i ([Ha] [Yo‘q]) → bitta uzluksiz order yaratish oqimi muvaffaqiyatli ishga tushirildi.
+- [x] Gemini model xatosi (429 quota) avtomatik `gemini-flash-latest` ga yo‘naltirilib to‘liq bartaraf etildi.
+- [x] Regressiya testlari (`test-provider-cache-and-consumer-chat.ts` 100% PASS), API va mobile build (`tsc --noEmit` PASS).
+- [x] Serverga deploy qilindi (`zayuno-api` konteyneri yangilandi) va jonli testlar o‘tkazildi:
+  - "menga 2 ta katta lavash buyurtma qil" → EVOS dan 2 ta katta lavash (82 000 UZS) taklifi va [Ha] [Yo‘q] tugmalari chiqdi.
+  - [Ha] bosilganda → telefon raqami va manzil so‘raldi.
+  - Raqam va manzil kiritilganda → to‘liq hisob-kitob (92 000 UZS) chiqib, yakuniy tasdiqlash so‘raldi.
+  - "EVOS lavashlarini korsat" → faqat EVOS lavashlari kartochka ko‘rinishida chiqdi (kombolarsiz).
+  - "3 kishiga 150minglik fast-food" → EVOS dan 3 kishilik set (126 000 UZS) taklifi va [Ha] [Yo‘q] tugmalari chiqdi.
+
+
+# Strategik qaror — Zayunoga provider kirishining ikki yo‘li (2026-09-13)
+
+Tushunaman. Hozir sen aslida **ikki xil onboarding modelini bitta narsadek ko‘rib yuboryapsan**. Shuning uchun chalkash.
+
+Ularni ajratib qo‘y:
+
+1. **Shopla orqali biznes yaratish**
+   Bu texnik bo‘lmagan bizneslar uchun.
+   Seller Shopla’da o‘z biznesini, katalogini, narxini, delivery’sini kiritadi. Shopla uni AI-ready provider qiladi.
+2. **Zayuno Universal Actions’ga to‘g‘ridan-to‘g‘ri ulanish**
+   Bu API’si bor yoki texnik jamoasi bor bizneslar uchun.
+   Masalan EVOS, yirik klinika, ticket provider, travel platform.
+   Ular Shopla’dan foydalanmaydi. To‘g‘ridan-to‘g‘ri Zayuno contract’iga ulanadi.
+
+Demak **ikkisidan bittasini tanlash shart emas**. Ular Zayuno’ga kirishning ikki yo‘li:
+
+```text
+             ZAYUNO
+            /      \
+           /        \
+   Direct Provider   Shopla Provider
+   Integration       Builder
+      ↑                 ↑
+ API bor biznes     API yo‘q biznes
+```
+
+Eng muhim qaror esa: **hozir qaysi birini asosiy qilish kerak?**
+
+Men senga hozir shuni tavsiya qilaman:
+
+> **Zayuno — asosiy loyiha. Shopla — Zayuno uchun provider onboarding kanallaridan biri.**
+
+Ya’ni Shopla’ni alohida katta vision bilan hozir yana kengaytirib yuborma.
+
+Keyingi 1–2 oy uchun:
+
+- yirik/API’li biznes → **Direct Zayuno integration**
+- kichik/no-code biznes → **Shopla → Connect with Zayuno**
+
+Shu bilan tamom.
+
+Arxitekturada esa bitta qoida:
+
+```text
+Direct integration ─┐
+                    ├── Zayuno canonical provider contract
+Shopla integration ─┘
+```
+
+Ikkalasi ham oxirida **bir xil Zayuno Provider Contract**ga keladi.
+
+Shunda sening kallangdagi savol:
+
+> “Shopla biznes platformami yoki Zayuno provider platformami?”
+
+degan emas.
+
+To‘g‘ri savol:
+
+> **“Bu provider Zayunoga qaysi yo‘l bilan kiradi?”**
+
+Javob faqat ikkita:
+
+- Direct
+- Via Shopla
+
+Men hozir Shopla’ni `university + clinic + real estate + service + booking`ga kengaytirishni **to‘xtatib turardim**. Avval hozirgi commerce Shopla → Zayuno flow’ni real ishlat. Keyin haqiqiy bizneslar “bizda API yo‘q” deb kelishni boshlasa, Shopla Provider Builder’ni kengaytirasan.
+
+Bitta jumlada strategiyang:
+
+> **Zayuno is the network. Shopla is one way for businesses to join the network.**
+
+Shu framingni ushlasang, ikki o‘rtada sarson bo‘lmaysan.
+
 # Joriy ish — Shopla seller product delete xatosi (2026-09-12)
 - [x] `product.save is not a function` sababini yopish va seller ownershipni saqlash.
 - [x] Mahsulotda buyurtma bo‘lsa soft-delete, bo‘lmasa hard-delete ishlashini testlash.

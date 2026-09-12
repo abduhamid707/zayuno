@@ -82,6 +82,7 @@ export type CatalogSectionItem = {
 export type ChatInteraction = {
   version: 1;
   kind: "choice_cards" | "provider_list" | "catalog_menu";
+  layout?: "actions";
   title?: string;
   subtitle?: string;
   groups?: InteractionGroup[];
