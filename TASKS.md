@@ -1,3 +1,14 @@
+# Bajarilgan: Zayuno Consumer Chat Shopla va Gullar uchun 100% ulandi va jonli ishga tushirildi (2026-09-12)
+- [x] Muammo manbasi: APK da hech qanday muammo yo'q; cheklov faqat backendda (`zayuno-api`) `consumer-chat.service.ts` da bo'lgan.
+- [x] `consumer-chat.service.ts` da `isFoodProvider` / `isEligibleProvider` filtri yangilandi: `COMMERCE`, `RETAIL` va `CATALOG` imkoniyatiga ega barcha faol do'konlar (Shopla `arzon`) qabul qilinadi.
+- [x] Gemini semantik router (`planWithAi`) tizim prompti yangilandi: endi AI gullar, sovg'alar, do'kon tovarlarini ham ko'radi va `shopla-*` provayderlariga to'g'ri bog'laydi.
+- [x] `findMentionedProviderSlugs` ga gullar (`gul`, `atirgul`, `pion`, `lola`, `orxideya`) va do'kon nomlari (`arzon`, `shopla`) xaritalandi.
+- [x] `matchFastIntentAnswer` va intro/emoji matnlari do'kon va gullarga moslashtirildi (`💐`, `Hozir mavjud gullar va mahsulotlar:`).
+- [x] Lokal build va testlar: `pnpm exec tsx tests/test-provider-cache-and-consumer-chat.ts` PASS, `pnpm --filter @zayuno/api build` PASS.
+- [x] Production serverga deploy qilindi (`zayuno-api` container).
+- [x] Haqiqiy foydalanuvchi (`qobuljonovmuxammadamin35@gmail.com`) nomidan jonli "Gullar bormi?" chat so'rovi yuborilib, `arzon` do'konining 10 ta saralangan atirgul mahsulotlari (rasmlari, 220,000 UZS dan 1,750,000 UZS gacha narxlari va savatga qo'shish kartalari bilan) qaytishi 100% isbotlandi!
+
+
 # Bajarilgan: Shopla Do'koni Zayunoda 100% Sertifikatsiyadan o'tdi va Nashr qilindi (2026-09-12)
 - [x] Sabab: Zayuno Capability Certification testida `catalog` testi `response.offerings.0.imageUrl` ob'ekt bo'lgani sababli yiqilayotgan edi (`OfferingSchema` qat'iy satr talab qiladi). Shuningdek, `WEBHOOK` imkoniyati yo'qligi sababli `isProductionReady: false` bo'lib turgan edi.
 - [x] Yechim: `brend-market` da `extractImageUrl` va `extractImageUrls` yordamchi funksiyalari qo'shilib, Shopla rasmlari to'g'ridan-to'g'ri URL satriga o'tkazildi. Yetkazib berish (delivery) va Payme preflight hisoblashlari mustahkamlandi.
