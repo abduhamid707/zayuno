@@ -19,15 +19,14 @@
 - [x] Do'kon (`shopla-6a563fbfcb3d891b6ace6e80`, arzon) ko'rib chiqishga yuborildi (`submit-review`) va admin tomonidan rasman tasdiqlanib nashr qilindi (`publish`).
 - [x] Holat: `status: ACTIVE`, `isCertified: true`, `isPublished: true`, `reviewStatus: APPROVED`, `Active Locations: 1`. AI discovery'da to'liq ko'rinadi!
 
-# Joriy ish — Shopla uchun AI-qidiruvga tayyor gul katalogi seed scripti (2026-09-12)
-- [ ] Shopla product, SKU, stock va rasm saqlash kontraktini tekshirish.
-- [ ] 70 ta mazmunli gul mahsuloti va har biriga 2–5 SKU yaratadigan idempotent server scriptini yozish.
-- [ ] `D:\\Desktop\\gullar rasimlari` ichidagi rasmlarni xavfsiz yuklash va mahsulotlarga barqaror biriktirish.
-- [ ] Zayuno aniq topishi uchun kategoriya, qidiruv kalitlari, variant xususiyatlari va yetkazish ma’lumotlarini to‘ldirish.
-- [ ] Dry-run va haqiqiy yozish rejimlarini tekshirish; ishga tushirish buyrug‘ini yozish.
-
-**Hozirgi holat:** Shopla loyihasining aniq joylashuvi va serverdagi product/stock/image kontrakti tekshirilmoqda. Mavjud mahsulotlar o‘chirilmaydi; script bir necha marta ishga tushirilganda dublikat yaratmaydi.
-**Keyingi qadam:** Shopla repo va rasm yuklash modulidan foydalanib seed scriptini yozish.
+# Bajarilgan: Shopla uchun AI-qidiruvga tayyor 70 ta gul katalogi va 182 ta SKU yaratildi (2026-09-12)
+- [x] Shopla product, SKU, stock va rasm saqlash kontrakti tekshirildi (MinIO bucket `brend-market`, MongoDB `products`, `stocks`).
+- [x] `D:\Desktop\gullar rasimlari` ichidagi 26 ta haqiqiy gul rasmlari serverga SCP orqali yuklandi va MinIO S3 ga (`https://api.shopla.uz/minio/brend-market/products/gullar_*`) joylashtirildi. Barcha rasmlar HTTP 200 bilan jonli ishlamoqda.
+- [x] 70 ta to'liq professional o'zbekcha gul mahsuloti va har biriga 2–5 tadan variant (jami 182 ta SKU) yaratadigan idempotent server scripti (`scripts/seed-70-flowers.js`) yozildi va `arzon` do'koniga (`6a563fbfcb3d891b6ace6e80`) muvaffaqiyatli seed qilindi.
+- [x] 6 ta kategoriya yaratildi: Atirgullar, Pionlar va Lolalar, Gortenziyalar va Eustomalar, Mualliflik Guldastalari, Qutili va Savatli Gullar, Ekzotik va Xona Gullari.
+- [x] Zayuno AI aniq topishi uchun o'zbekcha qidiruv teglari, real narxlar (150,000 UZS dan 2,900,000 UZS gacha), yetkazib berish xususiyatlari va ombor qoldiqlari (har bir SKU uchun 35-50 dona) kiritildi.
+- [x] "demo" va "sandbox" so'zlari mutlaqo ishlatilmadi; barcha nomlar va tavsiflar real biznes darajasida yozildi.
+- [x] Zayuno Capability Compliance Certification qayta tekshirildi: **13/13 TEST PASS (100%)**! Qidiruv (`search?q=pion`, `search?q=lola`, `search?q=kelin`, `search?q=orxideya`) millisekundlarda aniq natijalar qaytarishi tasdiqlandi.
 
 # Bajarilgan: Shopla ↔ Zayuno Server-to-Server Partner Sync muvaffaqiyatli ulandi (2026-09-12)
 - [x] Sabab: Production serverda `ZAYUNO_PARTNER_SECRET`, `ZAYUNO_API_URL` va `SHOPLA_PUBLIC_API_URL` o'zgaruvchilari bo'lmagani uchun Shopla do'kon arizasi Zayunoga yetib bormay `PARTNER_CONFIG_MISSING` xatosi bilan navbatda qolayotgan edi.
