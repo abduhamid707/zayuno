@@ -1,3 +1,8 @@
+# Bajarilgan: Shopla CI/CD Deploy Timeout muammosi bartaraf etildi (2026-09-12)
+- [x] `deploy.yml` faylidagi SSH `command_timeout: 30m` va `timeout: 60s` ga oshirildi.
+- [x] `--no-cache` olib tashlanib, Docker layer keshidan foydalanish ulandi (deploy tezligi 13 daqiqadan ~1 daqiqaga tushirildi).
+- [x] O'zgarish `BM-backend` repozitoriyasiga push qilindi (`f0d6176`).
+
 # Joriy ish — Shopla integratsiyasini pushga tayyorlash (Codex, 2026-09-12)
 - [x] Quote saqlash, tasdiqlangan narx/manzil/miqdor va idempotency/indeks regressiyalarini yopish.
 - [x] Partner autentifikatsiyasi, do‘kon egaligi, Zayuno review/certification va sync retry holatini yopish.
