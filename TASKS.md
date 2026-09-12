@@ -1,3 +1,8 @@
+# Bajarilgan: Shopla production deploy to'liq yakunlandi va tasdiqlandi (2026-09-12)
+- [x] Shopla Seller Admin (`https://admin.shopla.uz`): Yangi bundle (`assets/index-BKQT4Un_.js`) muvaffaqiyatli deploy bo'ldi. "Zayuno AI Integratsiyasi" va "Zayunoga ulanish" UI kartasi Sozlamalar (`/settings`) sahifasida faol.
+- [x] Shopla Backend API (`https://api.shopla.uz`): Yangi Zayuno Provider moduli (`/api/v1/zayuno/shops/:shopIdOrSlug/*`) to'liq ishlab turibdi (`Faol Zayuno do'koni topilmadi` xavfsizlik tekshiruvi ishlab tasdiqlandi).
+- [x] CI/CD quvurlari (`BM-backend` va `brend-admin`) muvaffaqiyatli yakunlandi.
+
 # Bajarilgan: Shopla seller panel production deploy to'g'rilandi va push qilindi (2026-09-12)
 - [x] Serverda git repository bo'lmagani sababli workflow endi to'g'ridan-to'g'ri GitHub runnerda `npm run build` qiladi.
 - [x] Yangi `dist` va `nginx.conf` SCP orqali serverga o'tkazilib, Docker Nginx konteyneriga o'rnatiladi.
