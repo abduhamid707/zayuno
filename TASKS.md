@@ -1,3 +1,8 @@
+# Bajarilgan: Shopla seller panel production deploy to'g'rilandi va push qilindi (2026-09-12)
+- [x] Serverda git repository bo'lmagani sababli workflow endi to'g'ridan-to'g'ri GitHub runnerda `npm run build` qiladi.
+- [x] Yangi `dist` va `nginx.conf` SCP orqali serverga o'tkazilib, Docker Nginx konteyneriga o'rnatiladi.
+- [x] O'zgarish `brend-admin` repozitoriyasiga push qilindi (`251c592`). Deploy vaqti 40 soniyagacha tushirildi va `index-BmfCWItt.js` (Zayuno kartasi bilan) chiqishi kafolatlandi.
+
 # Bajarilgan: Shopla CI/CD Deploy Timeout muammosi bartaraf etildi (2026-09-12)
 - [x] `deploy.yml` faylidagi SSH `command_timeout: 30m` va `timeout: 60s` ga oshirildi.
 - [x] `--no-cache` olib tashlanib, Docker layer keshidan foydalanish ulandi (deploy tezligi 13 daqiqadan ~1 daqiqaga tushirildi).
