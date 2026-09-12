@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, UnauthorizedException, Logger, Optional } from '@nestjs/common';
 import {
   prisma,
   ProviderStatus as DbProviderStatus,
@@ -53,7 +53,7 @@ import {
 } from '@zayuno/contracts';
 import { ProviderCertificationRunner, CertificationReport } from '@zayuno/provider-sdk';
 import * as bcrypt from 'bcryptjs';
-import { randomUUID, randomBytes } from 'crypto';
+import { randomUUID, randomBytes, timingSafeEqual } from 'crypto';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 
@@ -69,6 +69,8 @@ const REVIEW_REASON_CODES = new Set([
 
 @Injectable()
 export class ProvidersService {
+  private readonly logger = new Logger(ProvidersService.name);
+
   constructor(
     private registry: ProviderRegistryService,
     private unmetDemandService?: UnmetDemandService
@@ -663,6 +665,220 @@ export class ProvidersService {
     return {
       provider: this.mapToProviderInfo(created),
       credentials
+    };
+  }
+
+  /**
+   * Synchronize provider data and live state from partner e-commerce platforms (such as Shopla).
+   * Supports PENDING, APPROVED, DISCONNECTED, and REJECTED states.
+   */
+  async syncPartnerProvider(
+    input: {
+      platform: string;
+      shopId: string;
+      slug: string;
+      name: string;
+      logoUrl?: string;
+      baseUrl: string;
+      apiKey: string;
+      status: 'PENDING' | 'APPROVED' | 'DISCONNECTED' | 'REJECTED';
+      rejectionReason?: string;
+      capabilities?: any[];
+      type?: any;
+      metadata?: Record<string, any>;
+      revision?: number;
+    },
+    headers?: Record<string, any>,
+  ): Promise<{ success: boolean; slug: string; status: DbProviderStatus; reviewStatus: string; message: string }> {
+    const partnerSecret = process.env.ZAYUNO_PARTNER_SECRET;
+    if (!partnerSecret) {
+      throw new Error('ZAYUNO_PARTNER_SECRET is required for partner synchronization.');
+    }
+    const providedToken =
+      headers?.['x-partner-token'] ||
+      headers?.['x-platform-key'] ||
+      (typeof headers?.authorization === 'string'
+        ? headers.authorization.replace(/^Bearer\s+/i, '')
+        : null);
+
+    const expected = Buffer.from(partnerSecret);
+    const provided = Buffer.from(String(providedToken || ''));
+    if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
+      throw new UnauthorizedException('Invalid partner synchronization token');
+    }
+
+    if (
+      input.platform !== 'shopla' ||
+      !/^[a-f0-9]{24}$/i.test(input.shopId || '') ||
+      !input.slug ||
+      !input.baseUrl ||
+      !input.name?.trim() ||
+      typeof input.apiKey !== 'string' ||
+      input.apiKey.length < 32
+    ) {
+      throw new BadRequestException('Valid Shopla identity, slug, baseUrl, name and API key are required.');
+    }
+
+    const cleanSlug = input.slug.toLowerCase().trim();
+    if (cleanSlug !== `shopla-${input.shopId.toLowerCase()}`) {
+      throw new BadRequestException('Shopla provider slug must match its immutable shopId.');
+    }
+
+    let parsedBaseUrl: URL;
+    try {
+      parsedBaseUrl = new URL(input.baseUrl);
+    } catch {
+      throw new BadRequestException('Provider baseUrl must be a valid URL.');
+    }
+    if (parsedBaseUrl.username || parsedBaseUrl.password || parsedBaseUrl.search || parsedBaseUrl.hash) {
+      throw new BadRequestException('Provider baseUrl cannot contain credentials, query or fragment.');
+    }
+    const allowedOrigins = (process.env.SHOPLA_PARTNER_ORIGINS || '')
+      .split(',')
+      .map((value) => value.trim().replace(/\/$/, ''))
+      .filter(Boolean);
+    const isLocalDevelopment =
+      process.env.NODE_ENV !== 'production' &&
+      parsedBaseUrl.protocol === 'http:' &&
+      ['localhost', '127.0.0.1'].includes(parsedBaseUrl.hostname);
+    if (
+      (!isLocalDevelopment && parsedBaseUrl.protocol !== 'https:') ||
+      (!isLocalDevelopment && !allowedOrigins.includes(parsedBaseUrl.origin))
+    ) {
+      throw new BadRequestException('Shopla provider origin is not allowlisted.');
+    }
+
+    const defaultCaps = [
+      'METADATA',
+      'HEALTH',
+      'LOCATIONS',
+      'CATALOG',
+      'SEARCH',
+      'QUOTE',
+      'ACTION_CREATE',
+      'ACTION_STATUS',
+      'ACTION_CANCEL',
+      'PAYMENT_OPTIONS',
+    ];
+
+    const existing = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
+    const existingConfig = (existing?.config as Record<string, any>) || {};
+    const existingMetadata = (existing?.metadata as Record<string, any>) || {};
+    if (
+      existing &&
+      (existingConfig.platform !== 'shopla' || existingConfig.shopId !== input.shopId)
+    ) {
+      throw new ForbiddenException('Provider slug is owned by another integration.');
+    }
+
+    const incomingRevision = Number(input.revision || 0);
+    const storedRevision = Number(existingMetadata.partnerRevision || 0);
+    if (incomingRevision && incomingRevision < storedRevision) {
+      return {
+        success: true,
+        slug: cleanSlug,
+        status: existing!.status,
+        reviewStatus: String(existingMetadata.reviewStatus || 'DRAFT'),
+        message: 'Stale partner update ignored.',
+      };
+    }
+
+    let dbStatus: DbProviderStatus = DbProviderStatus.DRAFT;
+    let isPublished = false;
+    let reviewStatus = input.status === 'APPROVED' ? 'PENDING_CERTIFICATION' : 'PENDING_PARTNER_APPROVAL';
+    if (input.status === 'APPROVED' && existingMetadata.isPublished === true && existingMetadata.reviewStatus === 'APPROVED') {
+      dbStatus = DbProviderStatus.ACTIVE;
+      isPublished = true;
+      reviewStatus = 'APPROVED';
+    } else if (input.status === 'DISCONNECTED') {
+      dbStatus = DbProviderStatus.DISABLED;
+      reviewStatus = 'DISCONNECTED';
+    } else if (input.status === 'REJECTED') {
+      dbStatus = DbProviderStatus.SUSPENDED;
+      reviewStatus = 'REJECTED';
+    }
+
+    const encryptedSecret = encryptSecret(input.apiKey, this.getEncryptionKey());
+    const capabilities = defaultCaps.filter((capability) =>
+      !input.capabilities || input.capabilities.includes(capability),
+    ) as any;
+    const safeMetadata = {
+      description: typeof input.metadata?.description === 'string' ? input.metadata.description.slice(0, 2000) : undefined,
+      category: typeof input.metadata?.category === 'string' ? input.metadata.category.slice(0, 100) : undefined,
+    };
+
+    if (existing) {
+      await prisma.provider.update({
+        where: { slug: cleanSlug },
+        data: {
+          name: input.name || existing.name,
+          baseUrl: input.baseUrl || existing.baseUrl,
+          logoUrl: input.logoUrl !== undefined ? input.logoUrl : existing.logoUrl,
+          status: dbStatus,
+          adapterType: 'remote-http',
+          encryptedSecret,
+          capabilities,
+          config: {
+            ...((existing.config as Record<string, any>) || {}),
+            authMethod: 'API_KEY',
+            platform: 'shopla',
+            shopId: input.shopId,
+          },
+          metadata: {
+            ...((existing.metadata as Record<string, any>) || {}),
+            ...safeMetadata,
+            isPublished,
+            reviewStatus,
+            partnerRevision: incomingRevision || storedRevision,
+            partnerStatus: input.status,
+            rejectionReason: input.rejectionReason,
+            lastSyncedAt: new Date().toISOString(),
+          },
+        },
+      });
+    } else {
+      await prisma.provider.create({
+        data: {
+          slug: cleanSlug,
+          name: input.name || cleanSlug,
+          logoUrl: input.logoUrl || null,
+          status: dbStatus,
+          type: DbProviderType.COMMERCE,
+          adapterType: 'remote-http',
+          capabilities,
+          baseUrl: input.baseUrl,
+          encryptedSecret,
+          webhookSecret: randomBytes(32).toString('hex'),
+          config: {
+            authMethod: 'API_KEY',
+            platform: 'shopla',
+            shopId: input.shopId,
+          },
+          metadata: {
+            ...safeMetadata,
+            isPublished,
+            reviewStatus,
+            partnerRevision: incomingRevision,
+            partnerStatus: input.status,
+            rejectionReason: input.rejectionReason,
+            registeredAt: new Date().toISOString(),
+            lastSyncedAt: new Date().toISOString(),
+          },
+        },
+      });
+    }
+
+    this.registry.invalidateAdapterCache(cleanSlug);
+    this.logger.log(
+      `[PARTNER_SYNC] Synced provider "${cleanSlug}" from Shopla with status: ${dbStatus}`,
+    );
+
+    return {
+      success: true,
+      slug: cleanSlug,
+      status: dbStatus,
+      reviewStatus,
+      message: `Provider ${cleanSlug} synchronized successfully (${dbStatus})`,
     };
   }
 

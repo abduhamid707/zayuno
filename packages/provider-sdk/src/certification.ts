@@ -420,6 +420,13 @@ export class ProviderCertificationRunner {
       }, ['catalog'], 'LIFECYCLE_E2E');
     }
 
+    // Keep quote and action inputs identical so providers can safely bind a
+    // short-lived quote to the exact fulfillment request being certified.
+    const certificationDestination = {
+      raw: 'Toshkent shahri, Certification Test manzili',
+      region: 'tashkent'
+    };
+
     // 6. Quote Capability (MANDATORY)
     let testQuoteId: string | undefined;
     if (this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote) {
@@ -431,9 +438,10 @@ export class ProviderCertificationRunner {
           items: [{
             offeringId: testOfferingId,
             variantId: selectedTestVariantId,
-            quantity: 2,
+            quantity: 1,
             selectedOptions: selectedTestOptions
-          }]
+          }],
+          destination: certificationDestination
         });
 
         if (quote.total <= 0) throw new Error('Quote total must be a positive number.');
@@ -483,7 +491,7 @@ export class ProviderCertificationRunner {
 
     // 7. Action Create & Payment Handoff (MANDATORY)
     let createdActionId: string | undefined;
-    const testIdempKey = `cert_idemp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const testIdempKey = crypto.randomUUID();
 
     if (this.adapter.hasCapability(ProviderCapability.ACTION_CREATE) && this.adapter.createAction) {
       await this.runTest(results, 'action-create', 'Action Creation & Payment Handoff', ProviderCapability.ACTION_CREATE, true, async () => {
@@ -497,13 +505,11 @@ export class ProviderCertificationRunner {
             name: 'Certification Validator',
             phone: '+998901234567'
           },
-          destination: {
-            raw: 'Central Validation Zone, District 1'
-          },
+          destination: certificationDestination,
           items: [{
             offeringId: testOfferingId,
             variantId: selectedTestVariantId,
-            quantity: 2,
+            quantity: 1,
             selectedOptions: selectedTestOptions
           }],
           userConfirmed: true
@@ -534,14 +540,16 @@ export class ProviderCertificationRunner {
           idempotencyKey: testIdempKey,
           providerSlug: this.adapter.providerSlug,
           quoteId: testQuoteId!,
+          locationId: testLocationId,
           customer: {
             name: 'Certification Validator',
             phone: '+998901234567'
           },
+          destination: certificationDestination,
           items: [{
             offeringId: testOfferingId,
             variantId: selectedTestVariantId,
-            quantity: 2,
+            quantity: 1,
             selectedOptions: selectedTestOptions
           }],
           userConfirmed: true

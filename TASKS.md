@@ -1,4 +1,162 @@
-# Current Task: Fix GitHub Actions Production Deployment SSH Connection Reset
+# Joriy ish — Shopla integratsiyasini pushga tayyorlash (Codex, 2026-09-12)
+- [x] Quote saqlash, tasdiqlangan narx/manzil/miqdor va idempotency/indeks regressiyalarini yopish.
+- [x] Partner autentifikatsiyasi, do‘kon egaligi, Zayuno review/certification va sync retry holatini yopish.
+- [x] Payment konfiguratsiyasi, status va disconnect holatlarini tuzatish.
+- [x] Tegishli test/buildlar, integratsiya dalillari va deploy/migratsiya yo‘riqnomasini tayyorlash.
+- [x] Yakuniy hisobotni haqiqiy holatga moslash; push qilmasdan topshirish.
+
+**Natija:** Shopla-approved seller bir bosishda Zayuno `DRAFT / PENDING_CERTIFICATION` review'iga yuboriladi; faqat Zayuno certification va publishdan keyin mijozlarga chiqadi. Quote MongoDB TTL bilan durable, action quote inputiga va yangi narx/qoldiqqa bog‘langan, payment preflight side-effectlardan oldin ishlaydi, Payme callbackdan keyingi `PAID -> CONFIRMED` mapping tekshirildi. Partner sync secret/origin/ownership/revision bilan himoyalangan va retry qiladi.
+
+**O‘zgargan fayllar:** Zayuno: `.env.example`, `apps/api/src/modules/providers/providers.controller.ts`, `apps/api/src/modules/providers/providers.service.ts`, `packages/provider-sdk/src/certification.ts`, `tests/test-shopla-zayuno-e2e.ts`, `docs/SHOPLA_ZAYUNO_INTEGRATION_*.md`. Shopla backend: `.env.example`, `src/config/index.ts`, `src/app.module.ts`, `src/common/interceptors/transform.interceptor.ts`, `src/modules/orders/schemas/order.schema.ts`, `src/modules/shops/{schemas/shop.schema.ts,shops.controller.ts,shops.service.ts,tests/zayuno-integration.spec.ts}`, `src/modules/zayuno-provider/*`, `scripts/seed-e2e-shop.js`. Shopla admin: `src/api/shops.js`, `src/pages/SettingsPage.jsx`, `src/features/settings/ZayunoConnectionSection.jsx`.
+
+**Tekshiruvlar:** Shopla Zayuno testlari 21/21 PASS; Payme receiver/callback integration 2/2 PASS; Zayuno certification va operation guardlari PASS; Zayuno SDK/API, Shopla backend va seller panel production buildlari PASS. Noto‘g‘ri e2e-only Jest buyrug‘i test faylini topmadi; o‘sha Payme suite to‘g‘ri runner bilan qayta ishga tushirilib 2/2 PASS bo‘ldi.
+
+**Qolgan ish:** Kod bo‘yicha yo‘q. Production env qiymatlarini o‘rnatish, Mongo index yaratilishini kuzatish va production Payme sandbox/kichik real to‘lov smoke testi deploy bosqichiga tegishli.
+**To‘siq:** Yo‘q.
+**Keyingi qadam:** Git diffni yakuniy tekshirish, so‘ng foydalanuvchi topshirig‘i bilan commit/push.
+
+# Bajarilgan: Shopla ↔ Zayuno integratsiyasidagi 7 ta kamchilik va xatoliklarni bartaraf etish (2026-09-12)
+- [x] 1. Do'kon ulanishini Zayuno platformasiga yuborish (Shopla -> Zayuno sync/onboarding endpoint va status sinxronizatsiyasi)
+- [x] 2. Buyurtma va to'lov endpointlariga API kalit tekshiruvi (x-provider-api-key) va APPROVED holati majburiyatini qo'shish
+- [x] 3. Ombor integratsiyasi: StockService orqali haqiqiy zaxirani tekshirish, orderda band qilish (reserve) va bekor qilinganda bo'shatish (release)
+- [x] 4. Quote himoyasi va dinamik yetkazish: shop-delivery.util orqali manzil bo'yicha hisoblash, quote TTL (15 min) va narx buzilmasligini tekshirish
+- [x] 5. Payme sozlamasi tekshiruvi: merchant ID bo'lmasa xato qaytarish (uydirma fallbackni olib tashlash)
+- [x] 6. Takroriy order (idempotency) himoyasi: do'kon bo'yicha cheklash, payload hash solishtirish va Mongo DB darajasidagi atomik indeks
+- [x] 7. Controller prefix va variant fallback xatolarini tuzatish (ortiqcha api/v1 olib tashlash, noto'g'ri variantda 404 qaytarish)
+- [x] 8. Haqiqiy E2E integratsiya testi (mock HTTP serversiz, real Shopla backend va Zayuno SDK orqali oqimni sinash)
+
+**O'zgargan fayllar:**
+- `Zayuno`:
+  - `apps/api/src/modules/providers/providers.controller.ts` (POST /partner-sync qo'shildi)
+  - `apps/api/src/modules/providers/providers.service.ts` (syncPartnerProvider implement qilindi)
+  - `tests/test-shopla-zayuno-e2e.ts` (18 ta real E2E integratsiya testi yozildi)
+  - `docs/SHOPLA_ZAYUNO_INTEGRATION_REPORT.md` (kengaytirilgan audit va test hisoboti)
+  - `TASKS.md`
+- `Shopla (brend-market)`:
+  - `src/modules/shops/shops.service.ts` (syncWithZayunoPlatform ulandi)
+  - `src/modules/shops/schemas/shop.schema.ts` (zayunoIntegration subhujjati)
+  - `src/modules/shops/shops.controller.ts` (Seller va Admin ulanish endpointlari)
+  - `src/modules/orders/schemas/order.schema.ts` (idempotencyKey compound unique sparse index, originalTotal, sellerPayout)
+  - `src/common/interceptors/transform.interceptor.ts` (/zayuno va /payme endpointlarini unwrap saqlash)
+  - `src/modules/zayuno-provider/zayuno-provider.controller.ts` (prefix to'g'rilandi, x-provider-api-key guard o'rnatildi)
+  - `src/modules/zayuno-provider/zayuno-provider.service.ts` (StockService atomik reserve/release, quote TTL, Payme merchant tekshiruvi, scoped idempotency hash, variant 404)
+  - `src/modules/zayuno-provider/zayuno-provider.module.ts` (WarehouseModule import qilindi)
+  - `src/modules/zayuno-provider/zayuno-provider.service.spec.ts` (12 ta unit test)
+  - `src/modules/shops/tests/zayuno-integration.spec.ts` (6 ta unit test)
+  - `scripts/seed-e2e-shop.js` (E2E MongoDB fixture yordamchi skripti)
+
+**Bajarilgan tekshiruvlar va natijalari:**
+1. **Real E2E integratsiya testi (`tests/test-shopla-zayuno-e2e.ts`):** 18/18 PASS (100% toza).
+   - Mock HTTP server ishlatilmadi; real Shopla NestJS dev server (port 8001), real MongoDB va Zayuno Provider SDK adapteri ulandi.
+   - Barcha 18 ta qadam: Health, ProviderInfo, Locations, Catalog, Search, Offering, Variant 404 Security, Stock Availability (2 dona yetarli / 50 dona out-of-stock), Dynamic Quote (180,000 + 25,000 = 205,000 UZS), 401 Unauthenticated Gate, Direct Order Creation & Payme tiyin hisobi (20,500,000 tiyin), Real MongoDB Stock Reserved (1 dona), Idempotency Replay (takroriy zakaz yaratilmasligi va zaxira buzilmasligi), Idempotency Tamper Protection (o'zgartirilgan payload 409 bilan qaytarilishi), Action Status, Payment Options, Action Cancellation, va MongoDB Stock Release (0 ta zaxira, 10 ta mavjud qoldiq qayta tiklanishi).
+2. **Shopla Unit Testlar:**
+   - `src/modules/shops/tests/zayuno-integration.spec.ts`: 6/6 PASS.
+   - `src/modules/zayuno-provider/zayuno-provider.service.spec.ts`: 12/12 PASS.
+3. **Buildlar:**
+   - `brend-market`: `npm run build` (Exit code: 0).
+   - `Zayuno`: `pnpm --filter @zayuno/api build` (Exit code: 0).
+   - `Zayuno`: `pnpm --filter @zayuno/provider-sdk build` (Exit code: 0).
+
+**Qolgan ish:** Hech narsa. Barcha 7 ta kamchilik va 2 ta xatolik to'liq bartaraf etildi va real muhitda isbotlandi.
+**Qoida:** Git push va production deploy qilinmadi!
+**To'siq:** Yo'q.
+**Navbatdagi qadam:** Foydalanuvchiga bajarilgan ishlar va test dalillarini ko'rsatish hamda "OK, push qil" tasdig'ini kutish.
+
+# Bajarilgan: Shopla → Zayuno 7 bosqichli universal provider integratsiyasi (2026-09-12)
+- [x] 1-bosqich — Kod va kontraktni aniqlash (15 daqiqa)
+- [x] 2-bosqich — Seller ulanishi va admin tasdig‘i (25 daqiqa)
+- [x] 3-bosqich — Universal katalog va qidiruv (30 daqiqa)
+- [x] 4-bosqich — Quote va ishonchli order yaratish (35 daqiqa)
+- [x] 5-bosqich — Zayunodan to‘lov sahifasigacha (35 daqiqa)
+- [x] 6-bosqich — Oqimni boshidan oxirigacha tekshirish (25 daqiqa)
+- [x] 7-bosqich — Demo, deploy tayyorgarligi va yakuniy hisobot (15 daqiqa)
+
+**Scope:** `D:\works\DEV\Zayuno` va `D:\works\DEV\aa_startup_v1` (brend-market, brend-admin).
+**Qoida:** Push va production deploy qilinmadi! Barcha ishlar lokal branchda muvaffaqiyatli yakunlandi va hisobot taqdim etildi (`docs/SHOPLA_ZAYUNO_INTEGRATION_REPORT.md`).
+
+**Bajarilgan ishlar va natijalar:**
+1. **1-bosqich:** Kontrakt va arxitektura to'liq aniqlandi. `docs/SHOPLA_ZAYUNO_INTEGRATION_ARCHITECTURE.md` hujjati tuzildi. Entity mapping (`providerSlug = shopla-${shop._id}`, `offeringId = ${productId}:${variantId}`, valyuta: `UZS`), endpointlar va direct order lifecycle hujjatlashtirildi.
+2. **2-bosqich:** Shopla seller va admin integratsiyasi yaratildi:
+   - Backend (`brend-market`): `Shop` sxemasiga `zayunoIntegration` (status, providerSlug, apiKey, dates, rejectionReason) subdokumenti; `ShopsService` da ulanish, status, uzish, admin arizalarini ro'yxatlash va tasdiqlash/rad etish methodlari; `SellerShopController` va `AdminShopsController` da endpointlar qo'shildi.
+   - Frontend (`brend-admin`): `shopsApi` methodlari; `ZayunoConnectionSection.jsx` komponenti; `SettingsPage.jsx` ga ulandi.
+3. **3-bosqich:** Universal katalog va qidiruv moduli yaratildi:
+   - `brend-market/src/modules/zayuno-provider/` yangi NestJS moduli yaratildi (`zayuno-provider.module.ts`, `zayuno-provider.service.ts`, `zayuno-provider.controller.ts`).
+   - Endpointlar: `GET /health`, `GET /info` (`/provider-info`), `GET /locations`, `GET /catalog`, `GET /catalog/search` (`/search`), `GET /catalog/items/:id` (`/offerings/:id`), `POST /availability`.
+   - Mahsulot va variantlar Zayuno Provider Protocol v1 formatiga o'girildi.
+4. **4-bosqich:** Quote va direct order yaratish:
+   - `POST /quote`: subtotal, yetkazib berish narxi va jami summani UZS da hisoblovchi `NormalizedQuote` generatori.
+   - `POST /actions`: Foydalanuvchi savatchasini (Cart) bulg'amaydigan, to'g'ridan-to'g'ri Shopla DB da yangi `Order` ochuvchi va omborni band qiluvchi direct order creation mexanizmi. Idempotency kafolati ta'minlandi.
+   - `GET /actions/:id` va `POST /actions/:id/cancel` implement qilindi.
+5. **5-bosqich:** Payme to'lov tizimigacha integratsiya:
+   - `generatePaymeUrl`: buyurtma summasini tiyinga o'girib, `m=merchant;ac.order_id=id;a=tiyin` parametrlarini Base64 kodlab, `https://checkout.payme.uz/<hash>` havolasini yaratadi.
+   - `nextAction.url` va `paymentUrl` ga Payme checkout linki biriktirildi.
+   - `GET /payment-options` va `GET /actions/:id/payment-options` endpointlari qo'shildi.
+6. **6-bosqich:** Testlar va verifikatsiya (25/25 PASS):
+   - `brend-market/src/modules/shops/tests/zayuno-integration.spec.ts`: 6 ta test PASS (100%).
+   - `brend-market/src/modules/zayuno-provider/zayuno-provider.service.spec.ts`: 8 ta test PASS (100%).
+   - `Zayuno/tests/test-shopla-zayuno-e2e.ts`: Zayuno `RemoteHttpProviderAdapter` orqali 11 ta protokol tekshiruvi PASS (100%).
+7. **7-bosqich:** Build va yakuniy hisobot:
+   - `brend-market`: `nest build` muvaffaqiyatli yakunlandi.
+   - `brend-admin`: `vite build` muvaffaqiyatli yakunlandi.
+   - `docs/SHOPLA_ZAYUNO_INTEGRATION_REPORT.md` tayyorlandi.
+
+**O'zgargan va yangi fayllar:**
+- `brend-market/src/modules/zayuno-provider/zayuno-provider.module.ts` [YANGI]
+- `brend-market/src/modules/zayuno-provider/zayuno-provider.service.ts` [YANGI]
+- `brend-market/src/modules/zayuno-provider/zayuno-provider.controller.ts` [YANGI]
+- `brend-market/src/modules/zayuno-provider/zayuno-provider.service.spec.ts` [YANGI TEST]
+- `brend-market/src/modules/shops/tests/zayuno-integration.spec.ts` [YANGI TEST]
+- `brend-market/src/modules/shops/schemas/shop.schema.ts`
+- `brend-market/src/modules/shops/shops.service.ts`
+- `brend-market/src/modules/shops/shops.controller.ts`
+- `brend-market/src/app.module.ts`
+- `brend-admin/src/features/settings/ZayunoConnectionSection.jsx` [YANGI]
+- `brend-admin/src/api/shops.js`
+- `brend-admin/src/pages/SettingsPage.jsx`
+- `Zayuno/docs/SHOPLA_ZAYUNO_INTEGRATION_ARCHITECTURE.md` [YANGI]
+- `Zayuno/docs/SHOPLA_ZAYUNO_INTEGRATION_REPORT.md` [YANGI]
+- `Zayuno/tests/test-shopla-zayuno-e2e.ts` [YANGI TEST]
+- `TASKS.md`
+
+**Qolgan ish:** Hech narsa.
+**To'siq:** Yo'q.
+**Navbatdagi qadam:** Foydalanuvchiga hisobot berish va "OK, push qil" tasdig'ini kutish.
+
+# Bajarilgan: Shopla–Zayuno integratsiyasi uchun agent prompti (2026-09-12)
+- [x] 7 bosqichli, 180 daqiqalik integratsiya topshirig‘ini faylga yozish.
+- [x] Payment oqimi, test mezonlari, hisobot va push chegaralarini tekshirish.
+
+**Holat:** Topshiriq hujjati tayyor; integratsiya kodi o‘zgartirilmadi. 7 bosqich (15+25+30+35+35+25+15=180 daqiqa), payment va hisobot talablari tekshirildi.
+**Fayl:** `docs/SHOPLA_ZAYUNO_INTEGRATION_AGENT_PROMPT.md`
+**Keyingi qadam:** 7 bosqichli implementatsiyani boshlash.
+
+# Current Task: Document Shopla Technical Audit & Integration Architecture in TASKS.md
+- [x] Analyze Shopla (`D:\works\DEV\aa_startup_v1`) architecture and schemas (shop, products, stock, orders)
+- [x] Document checkout cart dependency bottleneck and direct order entry requirement
+- [x] Record 4-step implementation roadmap in TASKS.md
+- [x] Verify integrity of TASKS.md
+
+**O'zgargan fayllar:**
+- `TASKS.md`
+
+**Bajarilgan tekshiruvlar va natijalari:**
+- Shopla kodi auditi xulosalari, ombor rezervi, Payme integratsiyasi, checkout cart bog'liqligi va Zayuno universal adapteri rejasi `TASKS.md` ga to'liq kiritildi.
+
+**Qolgan ish:** Yo'q (audit va arxitektura qayd etildi).
+**To'siq:** Yo'q.
+**Navbatdagi qadam:** Foydalanuvchi bilan integratsiyaning birinchi bosqichini boshlashga kelishish.
+
+# Previous Task: Record Play Market and App Store Release Readiness Audit & Launch Strategy into TASKS.md
+- [x] Read end of TASKS.md
+- [x] Append comprehensive Play Market / App Store audit, 10 release gates and soft launch strategy to TASKS.md
+- [x] Verify integrity and consistency of TASKS.md
+
+# Previous Task: Append Strategic Payment & Transaction Fulfillment Architecture to TASKS.md
+- [x] Read end of TASKS.md and prepare exact verbatim text
+- [x] Append the strategic architecture note to the bottom of TASKS.md
+- [x] Verify file formatting and integrity
+
+# Previous Task: Fix GitHub Actions Production Deployment SSH Connection Reset
 - [x] Inspect deploy-production.yml and rollback-production.yml SSH connection handling
 - [x] Implement OpenSSH ControlMaster (multiplexing) to eliminate rapid new connections
 - [x] Add resilient SSH connection parameters (ServerAliveInterval, ConnectTimeout, ConnectionAttempts)
@@ -6,20 +164,7 @@
 - [x] Streamline file transfer into a single atomic tar-over-SSH pipeline
 - [x] Clean up SSH multiplexing socket upon workflow completion
 - [x] Update rollback-production.yml with matching resilient SSH configuration
-- [x] Verify workflow YAML syntax and push to GitHub
-
-**O'zgargan fayllar:**
-- `.github/workflows/deploy-production.yml`
-- `.github/workflows/rollback-production.yml`
-- `TASKS.md`
-
-**Bajarilgan tekshiruvlar va natijalari:**
-- PyYAML linter orqali `.github/workflows/deploy-production.yml` va `.github/workflows/rollback-production.yml` sintaksisi tekshirildi (ikkisi ham VALID).
-- SSH ControlMaster, ConnectionAttempts=5, ConnectTimeout=20 va eksponentsial orqaga chekinish (retry) orqali `kex_exchange_identification: read: Connection reset by peer` muammosi bartaraf qilindi.
-
-**Qolgan ish:** Push qilish va workflow natijasini kuzatish.
-**To'siq:** Yo'q.
-**Navbatdagi qadam:** Git commit va `origin main` ga push.
+- [x] Verify workflow YAML syntax and push to GitHub (`95756d9`)
 
 # Previous Task: Login Page UI Polish (Claude-like) & Push
 - [x] Background remains untouched (`22.jpg`)
@@ -1286,4 +1431,234 @@ Bu taklifga har qanday biznes rozi bo‘ladi, chunki ular uchun risk yo‘q, faq
 
 Zayuno aynan mana shunday **oddiy tadbirkor bilan zamonaviy sun’iy intellekt (ChatGPT, Claude, Gemini) o‘rtasidagi ko‘prik** vazifasini bajaradi!
 
+---
 
+## Strategik Tavsiya: Real Provider Transactionlari va Payment Arxitekturasi
+
+Ko‘rdim. Bu fayl aslida oldingi audit va strategik xulosalarni jamlagan. Eng muhim nuqta: **Zayuno uchun hozir “ko‘proq protokol qo‘shish” emas, real provider bilan transactionni ishonchli ishlatish birinchi o‘rinda** deb xulosa qilingan.
+
+Shu nuqtadan kelib chiqib, payment bo‘yicha ham men sizlarga quyidagi yo‘lni tavsiya qilaman:
+
+```text
+HOZIR
+Zayuno
+  ↓
+Provider create_order
+  ↓
+payment_url
+  ↓
+Click / Payme / Provider checkout
+  ↓
+User pays
+```
+
+**Buni hozir o‘zgartirmang.**
+
+Keyin abstraction:
+
+```text
+payment_method
+├── redirect
+├── embedded
+├── tokenized
+└── agent_authorized
+```
+
+qilib qo‘ying.
+
+Bu sizga kelajakda UCP/AP2/Stripe/PayPal kabi ekotizimlar bilan moslashish imkonini beradi, lekin bugungi Click/Payme flow'ni buzmaydi.
+
+Fayldagi yana bir juda to‘g‘ri fikrni alohida ta'kidlayman: **“contract tekshirildi” ≠ “to‘liq transaction ishladi.”** Webhook, payment, provider acceptance va fulfillmentni alohida bosqichlar sifatida o‘lchash kerak.
+
+Shuning uchun Zayuno transaction statusini taxminan:
+
+```text
+QUOTE
+  ↓
+ORDER_CREATED
+  ↓
+PAYMENT_PENDING
+  ↓
+PAID
+  ↓
+PROVIDER_ACCEPTED
+  ↓
+PREPARING
+  ↓
+FULFILLED
+```
+
+qilib, har bir o'tishda **source + timestamp + failure reason + correlation/request ID** saqlagan bo‘lardim.
+
+Bu keyinchalik sizning eng qimmatli aktivlaringizdan biriga aylanishi mumkin: **AI nima degani emas, AI aytgan narsani real dunyoda qanchalik ishonchli bajarganingiz.**
+
+Fayldagi asosiy strategik xulosa ham aynan shu: 3–5 ta real provider bilan bajarilgan orderlar, provider ROI va fulfillmentni isbotlash logotiplar sonidan muhimroq.
+
+---
+
+## Do‘konlar Auditi: Google Play Market va Apple App Store Chiqarish Tayyorgarligi
+
+### 🛑 Qisqa va aniq javob:
+1. **Telegram yoki veb-sayt orqali to‘g‘ridan-to‘g‘ri tarqatishga:** ✅ **HA, 100% TAYYOR.** Hozirgi `zayuno.apk` telefonlarda a'lo darajada ishlayapti, do'stlarga yoki testerlarga tarqatsangiz bo'ladi.
+2. **Google Play Market’ga yuklashga:** ❌ **YO‘Q, HOZIRCHA TAYYOR EMAS (2 ta jiddiy to'siq bor).**
+3. **Apple App Store’ga yuklashga:** ❌ **UMUMAN TAYYOR EMAS (Hali iOS loyihasi ham yaratilmagan).**
+
+---
+
+### 🔍 1. Google Play Store bo‘yicha to‘siqlar (Qattiq audit)
+
+#### ❌ 1-to‘siq: Play Market `.apk` qabul qilmaydi!
+* **Qoida:** 2021-yil avgustdan boshlab Google yangi ilovalar uchun `.apk` formatini **butunlay bekor qilgan**.
+* **Holat:** Play Console’ga faqat **`.aab` (Android App Bundle)** yuklash shart. Hozir biz yig‘gan fayl esa oddiy Universal `.apk`. Agar uni Google Play’ga yuklashga urinsangiz, Console darhol: *"You uploaded an APK. You must upload an Android App Bundle"* degan xatolik beradi.
+* *Yechim:* `./gradlew bundleRelease` yoki `eas build -p android --profile production` orqali `.aab` yig'ish kerak.
+
+#### ❌ 2-to‘siq: Release Keystore (Imzo) xatosi
+* **Fayl:** `apps/mobile/android/app/build.gradle` (118-qator)
+* **Kod holati:**
+  ```groovy
+  release {
+      signingConfig signingConfigs.debug
+  }
+  ```
+* **Muammo:** Hozirgi release build `debug.keystore` bilan imzolanyapti. Google Play Console debug kaliti bilan imzolangan ilovani **qabul qilmaydi va rad etadi**.
+* *Yechim:* Haqiqiy `release.keystore` (ishlab chiqarish kaliti) yaratilishi yoki EAS Credentials orqali avtomatlashtirilishi kerak.
+
+#### ⚠️ 3-to‘siq: Google Play siyosati (20 tester talabi)
+* Agar Google Play Developer akkauntingiz 2023-yil noyabrdan keyin ochilgan shaxsiy (Personal) akkaunt bo'lsa, Google ilovani birdan Production'ga chiqarishga ruxsat bermaydi.
+* Kamida **20 ta tester bilan 14 kun davomida Closed Testing** o'tkazish majburiy.
+
+---
+
+### 🍏 2. Apple App Store bo‘yicha to‘siqlar (Qattiq audit)
+
+#### ❌ 1-to‘siq: iOS buildi loyihada umuman yo'q!
+* `apps/mobile` ichida faqat `android` papkasi bor, `ios` papkasi umuman mavjud emas.
+* Ilova hali biror marta ham Mac / Xcode / iOS simulatorida yoki haqiqiy iPhone'da yig'ilmagan va test qilinmagan.
+
+#### ❌ 2-to‘siq: "Sign in with Apple" talabi (Apple Review Guideline 4.8) — 100% Rad etilish kafolati!
+* **Qoida:** Apple App Store Review Guideline 4.8 bandiga binoan: Agar ilovada biror uchinchi tomon ijtimoiy login tizimi (masalan, **Google Sign-In**) bo‘lsa, u holda ilovada **"Sign in with Apple" (Apple orqali kirish) tugmasi ham teng huquqli tarzda bo‘lishi SHART**.
+* **Holat:** Bizda faqat Google va Email bor, Apple login umuman ulanmagan. App Store review jamoasi buni ko'rishi bilan birinchi kundanoq **Reject** qiladi.
+
+#### ❌ 3-to‘siq: `eas.json` da iOS profili yo'q
+* `eas.json` ichida faqat Android ko'rsatilgan. iOS uchun App Store Connect jamoa ID'si (Team ID), Bundle Identifier sertifikatlari kiritilmagan.
+
+---
+
+### ✅ Nimalar 100% to‘g‘ri va do‘kon talablariga javob beradi?
+
+Tekshiruv davomida ilovangizda quyidagi narsalar do‘konlar qoidasiga to‘liq moslab, to‘g‘ri tayyorlab qo‘yilgani aniqlandi:
+
+1. **Target SDK & ABIs:** `targetSdkVersion: 36` va `compileSdkVersion: 36` (Google Play eng kamida 34-35 talab qiladi, sizda eng so'nggi 36 o'rnatilgan). Barcha 64-bit arxitekturalar (`arm64-v8a`, `x86_64`) mavjud.
+2. **Hisobni o‘chirish (Account Deletion):** Apple va Google 2022-yildan hisob yaratiladigan har bir ilovada ichki hisobni o'chirishni talab qiladi. Bizda `AccountSheet.tsx` ichida `https://zayuno.uz/delete-account` ga olib boruvchi **"Hisobni o‘chirish"** tugmasi bor. Bu ajoyib.
+3. **Huquqiy havolalar:** `https://zayuno.uz/privacy` va `https://zayuno.uz/terms` havola qilingan.
+4. **Grafika va Ikonkalar:** `play-store/icon-512.png` (32-bit alpha) va `feature-graphic-1024x500.png` tayyorlangan va `pnpm run play:check` testidan 100% o'tdi.
+5. **Ruxsatnomalar (Permissions):** Keraksiz xavfli ruxsatnomalar (`READ_EXTERNAL_STORAGE`, `SYSTEM_ALERT_WINDOW`) bloklangan, bu esa Google Play auditidan oson o'tishga yordam beradi.
+
+---
+
+### 📋 Xulosa va tavsiya:
+
+| Maqsad | Hozirgi holat | Nima qilish kerak? |
+| :--- | :--- | :--- |
+| **Telegram / Do'stlarga tarqatish** | 🟢 **Tayyor** | `D:\works\DEV\Zayuno\zayuno.apk` ni bemalol jo'natavering. |
+| **Google Play Market** | 🟡 **80% tayyor** | 1. Production Keystore yaratish.<br>2. `.apk` emas, `.aab` bundle yig'ish.<br>3. Play Console'ga yuklash. |
+| **Apple App Store** | 🔴 **Tayyor emas (30%)** | 1. iOS loyihasini generatsiya qilish (`prebuild`).<br>2. "Sign in with Apple" modulini qo'shish.<br>3. Apple Developer akkauntiga ulab build qilish. |
+
+---
+
+## Strategik Yondashuv: Soft Launch va 10 ta Release Gate
+
+Ha, texnik jihatdan hozir chiqarish mumkin, lekin men Zayuno’ni hali “mass-market launch” sifatida chiqarishni tavsiya qilmayman.
+Men buni ikki bosqichga ajratardim:
+
+### 1. App Store: ha, hozir submit qilish mumkin
+Apple review qiladigan asosiy narsalar: app ishlashi, login/test account bo‘lsa reviewer uchun ishlashi, privacy, account deletion, payment flow va asosiy funksiyalar. Apple account yaratishga ruxsat beradigan app ichida account deletion boshlash imkonini ham talab qiladi. ([Apple Developer](https://developer.apple.com/app-store/review/guidelines/?utm_source=chatgpt.com))
+
+Zayuno uchun ayniqsa reviewer quyidagilarni ko‘rishi mumkin:
+- AI → restoran tanlash → cart → quote → confirmation → order
+- real order yaratish
+- payment URL ga chiqish
+- order status
+- cancellation/error holatlari
+- privacy policy
+- support contact
+- account deletion
+- demo/test provider ishlashi
+
+**Muhim:** App Review uchun “AI ovqat buyurtma qiladi” degan flow haqiqatan oxirigacha ishlashi kerak. Reviewer Order bosib, server tomonda qora tuynukka tushib qolmasin. 😄
+
+### 2. Google Play: ha, lekin account turiga qarash kerak
+Agar Play Console developer account personal va 2023-yil 13-noyabrdan keyin ochilgan bo‘lsa, production'ga chiqishdan oldin kamida 12 tester bilan 14 kunlik closed test talab qilinadi. ([Google Help](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en&utm_source=chatgpt.com))
+Yana yangi app uchun Android target talablari ham bor: hozir yangi Google Play app'lari Android 16 / API 36 target qilishi kerak. ([Google Help](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en&utm_source=chatgpt.com))
+
+### Lekin mening asosiy javobim: chiqaring, faqat “soft launch” qilib
+Sizlarda hozir eng katta savol:
+“App Store'da turishi mumkinmi?” emas. “Odam appni yuklab, haqiqiy ovqat buyurtma qilib, muammosiz olib oladimi?”
+Agar bunga javob ha bo‘lsa, store'ga chiqish juda foydali.
+
+Men hozirgi Zayuno uchun:
+**P0:**
+- iOS → App Store
+- Android → Play Store
+- 3–5 ta haqiqiy provider
+- real order
+- real payment
+- fulfillment tracking
+- cancellation/recovery
+- analytics
+
+**Launchni katta qilmaslik.**
+Masalan:
+*Zayuno — AI siz uchun ovqat buyurtma qiladi.*
+10,000 user olishga urinishdan ko‘ra, dastlab **100 ta real user → 300 ta real order → 90%+ fulfilled** kabi signal olish ancha qimmatli.
+
+### Men hozir release oldidan 10 ta gate qo‘yardim
+
+| Gate | Holat |
+| :--- | :---: |
+| Login/signup | ✅ |
+| Account deletion | ✅ |
+| Privacy / Terms | ✅ |
+| Real provider | ✅ |
+| Real payment | ✅ |
+| Quote expiry/revalidation | ✅ |
+| Duplicate order protection | 🔴 **juda muhim** |
+| Failed provider recovery | 🔴 **juda muhim** |
+| Order status | ✅ |
+| Crash/error analytics | ✅ |
+
+Sizning oldingi auditdagi texnik risklar ham aynan shu joylarda: idempotency testining to‘g‘ri kontrakti, real webhook delivery, fake address/phone, quantity hardcode, SSRF/timeout/response-size va HMAC verification kabi narsalarni production'ga chiqishdan oldin yopish kerak.
+
+### Qisqa verdict:
+* 🟢 **App Store:** chiqarishga tayyorlashni boshlang.
+* 🟢 **Play Market:** chiqarishga tayyorlashni boshlang, lekin testing/account requirement'ni tekshiring.
+* 🟡 **Public marketing launch:** men hali shoshilmasdim.
+* 🔴 **Real order/payment/failure recovery** stabil bo‘lmasa, store'ga chiqarish faqat chiroyli vitringa aylanadi.
+
+Agar xohlasangiz, keyingi qadamda men Zayuno uchun **“App Store + Play Marketga chiqarishdan oldingi 30 punktlik launch checklist”**ni tuzib beraman, aynan sizlarning hozirgi arxitekturangizga moslab.
+
+---
+
+## Shopla (`D:\works\DEV\aa_startup_v1`) Integratsiya Auditi va Arxitekturasi
+
+**Xulosa: Shopla’da kerakli asos bor. Zayunoga ulash mumkin, lekin “bir tugmada ulanish” integratsiyasi hali tayyor emas.**
+
+### Mavjud komponentlar holati:
+| Qism | Koddagi holat | Fayl manbasi |
+|---|---|---|
+| Do‘konlar | Seller, filiallar, ish vaqti, tasdiqlash holati mavjud | `brend-market/src/modules/shops/schemas/shop.schema.ts:245` |
+| Katalog | Mahsulotlar, variantlar, narxlar, rasmlar mavjud | `brend-market/src/modules/products/schemas/product.schema.ts:234` |
+| Ombor | Qoldiq va buyurtma uchun atomik rezerv qilish mavjud | `brend-market/src/modules/warehouse/stock.service.ts:837` |
+| Buyurtma | Checkout, bitta do‘konni tanlash, takroriy so‘rovni aniqlash mavjud | `brend-market/src/modules/orders/orders.service.ts:239` |
+| To‘lov | Payme integratsiyasi va payment link yaratish kodi mavjud | `brend-market` Payme controller |
+| Zayuno ulanishi | Backend va frontend kodida hali mavjud emas | Hali yozilmagan |
+
+### ⚠️ Eng muhim texnik detal (Critical Architecture Gap):
+Mavjud checkout (`orders.service.ts:239`) mijozning Shopla sessiyasidagi shaxsiy savatidan (`Cart`) ishlaydi.
+Zayuno orqali AI agent tomonidan buyurtma berilganda, mijozning veb-saytdagi savatini buzib yubormaslik uchun Shopla backendida **Direct/Headless Order** kirish nuqtasi (`items: [{ variantId, quantity }]` bilan to'g'ridan-to'g'ri buyurtma yaratuvchi endpoint) ochilishi shart.
+
+### Rejalashtirilgan 4 ta asosiy qadam:
+1. **Direct Order API (`brend-market`):** Savatga bog'lanmagan, atomik ombor rezervi va Payme to'lov havolasini qaytaruvchi API endpoint.
+2. **Universal Shopla Adapter (`Zayuno`):** Zayuno Provider SDK asosida har qanday Shopla do'koni uchun universal proxy vazifasini bajaruvchi adapter.
+3. **Seller panelida ulanish (`brend-admin`):** Sotuvchi kabinetiga "Zayunoga ulanish" tugmasi va status indikatori.
+4. **Sinxronizatsiya va Webhook:** Narx va qoldiqlar uchun Shopla yagona haqiqat manbai (Source of Truth) bo'lib qoladi; buyurtma statusi o'zgarganda Zayunoga webhook orqali xabar boradi.

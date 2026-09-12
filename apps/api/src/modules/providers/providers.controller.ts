@@ -79,6 +79,12 @@ export class ProvidersController {
     return this.providersService.registerProvider(body, request.user);
   }
 
+  @Post('partner-sync')
+  @ApiOperation({ summary: 'Synchronize provider status and credentials from partner commerce platforms (e.g. Shopla)' })
+  async syncPartnerProvider(@Body() body: any, @Req() request: any) {
+    return this.providersService.syncPartnerProvider(body, request.headers);
+  }
+
   @Post('integration/generate-secret')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
