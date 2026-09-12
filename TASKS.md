@@ -1,3 +1,9 @@
+# Bajarilgan: Shopla ↔ Zayuno Server-to-Server Partner Sync muvaffaqiyatli ulandi (2026-09-12)
+- [x] Sabab: Production serverda `ZAYUNO_PARTNER_SECRET`, `ZAYUNO_API_URL` va `SHOPLA_PUBLIC_API_URL` o'zgaruvchilari bo'lmagani uchun Shopla do'kon arizasi Zayunoga yetib bormay `PARTNER_CONFIG_MISSING` xatosi bilan navbatda qolayotgan edi.
+- [x] Serverdagi `zayuno-api` va `brend-api` containerlariga xavfsiz `ZAYUNO_PARTNER_SECRET` o'rnatildi va qayta ishga tushirildi.
+- [x] Shopla avtomatik sinxronizatsiya qildi: `[ZAYUNO_SYNC_SUCCESS] Shop 6a563fbfcb3d891b6ace6e80 synced: APPROVED/PENDING_CERTIFICATION`.
+- [x] Zayuno PostgreSQL bazasida `shopla-6a563fbfcb3d891b6ace6e80` (arzon do'koni) yaratildi va `admin.zayuno.uz` da External Providers ro'yxatida chiqdi.
+
 # Bajarilgan: Shopla production deploy to'liq yakunlandi va tasdiqlandi (2026-09-12)
 - [x] Shopla Seller Admin (`https://admin.shopla.uz`): Yangi bundle (`assets/index-BKQT4Un_.js`) muvaffaqiyatli deploy bo'ldi. "Zayuno AI Integratsiyasi" va "Zayunoga ulanish" UI kartasi Sozlamalar (`/settings`) sahifasida faol.
 - [x] Shopla Backend API (`https://api.shopla.uz`): Yangi Zayuno Provider moduli (`/api/v1/zayuno/shops/:shopIdOrSlug/*`) to'liq ishlab turibdi (`Faol Zayuno do'koni topilmadi` xavfsizlik tekshiruvi ishlab tasdiqlandi).
