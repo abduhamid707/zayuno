@@ -169,9 +169,9 @@ function AssistantAvatar() {
 
 export default function HomeScreen() {
   const [input, setInput] = useState("");
-  const [lastFailed, setLastFailed] = useState<string | null>(null);
+  const [lastFailed, setLastFailed] = useState<{ value: string; choices: InteractionChoice[]; tray: TrayItem[] } | null>(null);
   const sendLockRef = useRef(false);
-  const sendMessageRef = useRef<(value: string) => void>(() => undefined);
+  const sendMessageRef = useRef<(value: string, choices?: InteractionChoice[], tray?: TrayItem[]) => void>(() => undefined);
   const [streamingText, setStreamingText] = useState("");
   const [streamingInteraction, setStreamingInteraction] =
     useState<ChatInteraction | null>(null);
@@ -563,8 +563,9 @@ export default function HomeScreen() {
       if (error?.name !== "AbortError") {
         analytics.trackError(error, "chat_stream");
         analytics.trackChatResponse({ latencyMs, success: false });
-        setLastFailed(prompt);
-        setSelectedChoices(submittedChoices);
+        setLastFailed({ value, choices: [...choices], tray: [...currentTray] });
+        setSelectedChoices(choices);
+        setTrayItems(currentTray);
         addMessage({
           role: "assistant",
           content:
@@ -572,6 +573,8 @@ export default function HomeScreen() {
             "Hozir javob bera olmadim. Internetni tekshirib, qayta urinib ko‘ring.",
           latencyMs,
         });
+      } else {
+        addMessage({ role: "assistant", content: "Javob to‘xtatildi.", latencyMs });
       }
     } finally {
       abortRef.current = null;
@@ -580,15 +583,15 @@ export default function HomeScreen() {
       sendLockRef.current = false;
     }
   };
-  sendMessageRef.current = (value) => {
-    void sendMessage(value);
+  sendMessageRef.current = (value, choices, tray) => {
+    void sendMessage(value, choices, tray);
   };
 
   const selectChoice = useCallback(
     (choice: InteractionChoice) => {
       if (isLoading) return;
       if (choice.groupId.startsWith("order:")) {
-        void sendMessage(choice.prompt, [], []);
+        sendMessageRef.current("", [choice], []);
         return;
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
@@ -958,7 +961,7 @@ export default function HomeScreen() {
               )
             ) : lastFailed ? (
               <Pressable
-                onPress={() => sendMessage(lastFailed)}
+                onPress={() => sendMessage(lastFailed.value, lastFailed.choices, lastFailed.tray)}
                 style={styles.retry}
               >
                 <Ionicons name="refresh" size={16} color="#8B7CFF" />

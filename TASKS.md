@@ -1,3 +1,22 @@
+# Joriy ish — Reportlar bo‘yicha tabiiy food oqimi, faqat Gemini 3.5 Flash-Lite (2026-09-13)
+
+- [x] Modelni yashirin almashtirish va AI xatosida umumiy katalogga qaytarishni olib tashlash.
+- [x] Menyu/tavsiya niyatlari, bir nechta kategoriya, umumiy budjet va vaqt shartlarini saqlash.
+- [x] Mos jonli mahsulotlar, qisqa tabiiy javob, taklif va yakuniy tasdiq oqimini implement qilish; asosiy offline regressiyalar PASS.
+- [x] Mobile timeout/abort xabari, qayta yuborishda savatni takror qo‘shmaslik va eski action tugmasining stage tekshiruvi implement qilindi.
+- [ ] Oxirgi qo‘shimchalardan keyingi yakuniy build/UI tekshiruvi — foydalanuvchi «tekshiruvlar shart emas, tez yakunla» degani uchun davom ettirilmadi.
+- [ ] Commit/push/deploy va yangi APK — ushbu ishda bajarilmadi.
+
+**Holat:** routing faqat Gemini 3.5 Flash-Lite orqali; AI xatosi endi katalog/orderga aylantirilmaydi. Katalog kesilmaydi, har kategoriya coverage bilan tekshiriladi. Budjet (yetkazish bilan jami) quote va action chegarasida tekshiriladi; scheduled vaqt faqat provider e’lon qilgan parametrga bog‘lanadi. Eski tasdiq tugmasi serverda rad etiladi. Mobile timeout/abort/retry yaxshilandi. Shopla tegilmadi.
+
+**Tekshiruv:** API build va mobile typecheck PASS. `test-food-conversation-intent.ts` va `test-provider-cache-and-consumer-chat.ts` PASS. Eski testdagi umumiy katalog qaytarish va 4-off-topic xabarda sukut saqlash talablari yangi intent testlari bilan almashtirildi; cache va order/payment testlari saqlandi. Jonli Gemini baholash mahalliy katalog fixture bilan ketmoqda (haqiqiy order yaratilmaydi): pitsa menyusi, lavash+burger, 2 ta katta lavash tasdiq tugmalari muvaffaqiyatli. Dastlab model coverage indekslarini berib `items`ni bo‘sh qoldirdi; menu endi shu aniq coverage indekslaridan quriladi. Navbatdagi qadam: jonli til/budjet/vaqt misollarini tugatish va yakuniy diff/build. Push/deploy/APK bajarilmadi.
+
+**Yakunlash / handoff:** foydalanuvchi qo‘shimcha tekshiruvlarni to‘xtatishni so‘radi. Yuqoridagi PASS natijalari avvalgi tekshirilgan holatga tegishli; eng so‘nggi o‘zgarishlar ustidan yakuniy tekshiruv qilinmadi. `food-request.ts` yagona model va budjet yordamchilarini saqlaydi. `consumer-chat.service.ts`da semantic routing, to‘liq katalog/coverage, alohida grounded javob, 30 daqiqalik conversation-scoped shartlar, quote/action budjet gate va provider schema orqali vaqt talabi bor. `consumer-memory.service.ts` ham shu modelga bog‘landi. Controller/API/mobile orqali action groupId uzatiladi; mobile abort/timeout/retry holati yoziladi. Testlar: `test-food-conversation-intent.ts`, yangilangan `test-provider-cache-and-consumer-chat.ts`, ixtiyoriy `eval-food-conversation-live.ts --live` (faqat lokal katalog, haqiqiy order yo‘q).
+
+**Tashqi cheklov:** jonli sinovda Gemini 3.5 Flash-Lite kaliti free-tier 15 request/minute kvotasiga urildi (429). Boshqa modelga o‘tish yo‘q; quota uchun darhol qayta so‘rash ham o‘chirildi. Production yuklamasi uchun Google loyihasida kvotani oshirish kerak. Navbatdagi agent faqat foydalanuvchi so‘rasa yakuniy diff/build, keyin commit/push qiladi. Shopla kodi o‘zgartirilmagan.
+
+**Oxirgi olingan natija:** avval boshlangan jonli baholash yakunlangan: 6/6 PASS (pitsa menyusi, lavash+burger, 2 katta lavash, kechga 50 minglik pitsa uchun scheduling cheklovi, 3 kishiga 150 minglik taklif, ruscha menyu). Taxminan 3–3.5 soniya/so‘rov, faqat mahalliy katalog fixture. Yangi tekshiruv boshlanmadi; haqiqiy provider bilan end-to-end va telefon UI tekshiruvi bajarilmadi.
+
 # Joriy ish: Tugmalarni yo‘qolishi, Buyurtmani bekor qilish va Botdek quruq javoblarni yo‘qotish (2026-09-13)
 
 - [x] Mobile: [Ha] / [Yo‘q] action tugmalari bosilganda darhol yo‘qolishi va eski xabarlarda bosilmaydigan qilish (jarayonni buzmaslik uchun).

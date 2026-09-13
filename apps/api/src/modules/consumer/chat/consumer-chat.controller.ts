@@ -21,6 +21,7 @@ type ConversationMessage = {
 
 type ChatSelection = {
   id?: string;
+  groupId?: string;
   kind?: string;
   title?: string;
   providerSlug?: string;

@@ -80,6 +80,7 @@ function executeChatStream(
   selections: InteractionChoice[],
   signal?: AbortSignal,
 ): Promise<StreamChatResult> {
+  if (signal?.aborted) return Promise.reject(abortError());
   const baseUrl = getApiBaseUrl();
   if (!baseUrl) {
     return Promise.reject(new ApiError(0, "Server manzili sozlanmagan."));
@@ -119,7 +120,7 @@ function executeChatStream(
           } else if (event.type === "done") {
             didComplete = true;
           } else if (event.type === "error") {
-            streamError = new ApiError(xhr.status || 503, event.message);
+            streamError = new ApiError(503, event.message);
           }
         } catch {
           streamError = new ApiError(502, "Server javobini o‘qib bo‘lmadi.");
@@ -131,6 +132,7 @@ function executeChatStream(
     signal?.addEventListener("abort", handleAbort, { once: true });
 
     xhr.open("POST", `${baseUrl}/api/v1/consumer/chat/stream`, true);
+    xhr.timeout = 75_000;
     xhr.setRequestHeader("Accept", "text/event-stream");
     xhr.setRequestHeader("Content-Type", "application/json");
     const token = useAuthStore.getState().accessToken;
@@ -162,6 +164,10 @@ function executeChatStream(
       signal?.removeEventListener("abort", handleAbort);
       reject(new ApiError(0, "Internet yoki server bilan aloqa uzildi."));
     };
+    xhr.ontimeout = () => {
+      signal?.removeEventListener("abort", handleAbort);
+      reject(new ApiError(504, "Javob olish cho‘zildi. Qayta urinib ko‘ring."));
+    };
     xhr.onabort = () => {
       signal?.removeEventListener("abort", handleAbort);
       reject(abortError());
@@ -172,8 +178,9 @@ function executeChatStream(
         messages,
         conversationId,
         selections: selections.map(
-          ({ id, kind, title, providerSlug, offeringId, quantity, sku, variantId }) => ({
+          ({ id, groupId, kind, title, providerSlug, offeringId, quantity, sku, variantId }) => ({
             id,
+            groupId,
             kind,
             title,
             providerSlug,

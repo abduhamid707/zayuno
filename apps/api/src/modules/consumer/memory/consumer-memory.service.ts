@@ -15,6 +15,7 @@ import {
   scrubSensitiveString,
 } from "@zayuno/shared";
 import { ProductAnalyticsService } from "../../analytics/product-analytics.service";
+import { CONSUMER_GEMINI_MODEL } from "../chat/food-request";
 
 const CONSENT_VERSION = "consumer-memory-v1";
 const ANALYSIS_BATCH_SIZE = 10;
@@ -57,8 +58,7 @@ export class ConsumerMemoryService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly productAnalytics?: ProductAnalyticsService) {
     const key = process.env.GEMINI_API_KEY?.trim();
-    const modelName =
-      process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
+    const modelName = CONSUMER_GEMINI_MODEL;
     this.model = key
       ? new GoogleGenerativeAI(key).getGenerativeModel({
           model: modelName,
