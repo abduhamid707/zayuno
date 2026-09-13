@@ -4,8 +4,8 @@ export const WORKSPACE_NAV: { id: WorkspaceTab; title: string; detail: string; g
   { id: 'overview', title: 'Boshlash', detail: 'Integratsiya yo‘li', group: 'Workspace' },
   { id: 'apps', title: 'Mening biznesim', detail: 'Buyurtmalar va API', group: 'Workspace' },
   { id: 'docs', title: 'Hujjatlar', detail: 'Qo‘llanma va API reference', group: 'Dasturchi uchun' },
-  { id: 'sandbox', title: 'Sandbox', detail: 'Namunaviy buyurtma oqimi', group: 'Dasturchi uchun' },
-  { id: 'certification', title: 'API tekshiruvi', detail: 'Contract va certification', group: 'Dasturchi uchun' },
+  { id: 'sandbox', title: 'Sinov muhiti', detail: 'Namunaviy buyurtma oqimi', group: 'Dasturchi uchun' },
+  { id: 'certification', title: 'Integratsiyani tekshirish', detail: 'Contract va certification', group: 'Dasturchi uchun' },
   { id: 'inspector', title: 'So‘rovlar jurnali', detail: 'Trace va xatolar', group: 'Dasturchi uchun' }
 ];
 

@@ -1,4 +1,63 @@
-# Joriy ish — Reportlar bo‘yicha tabiiy food oqimi, faqat Gemini 3.5 Flash-Lite (2026-09-13)
+# Joriy ish — Provider portal sidebar (2026-09-13)
+
+- [x] Navigatsiyani ixchamlashtirish, katta promo kartalar o‘rniga tushunarli havolalar va qidiruv qo‘shish.
+- [x] Hisob qismini pastda, navigatsiyani mustaqil scroll bilan saqlash; mobile va klaviatura holatlari.
+- [x] Portal build va browserda ko‘rinishni tekshirish; natijani yozish.
+- [ ] Foydalanuvchi tasdig‘idan keyin commit va GitHub’ga push qilish.
+
+**Holat / handoff:** provider portal sidebar yakunlandi. `WorkspaceShell.tsx`da ixcham workspace konteksti, Ctrl+K qidiruvi, aniq guruhlangan navigatsiya, kichik AI Kit actioni va pastki hisob/ulanish qismi joriy qilindi. `workspace-model.ts`da `Sandbox` → `Sinov muhiti`, `API tekshiruvi` → `Integratsiyani tekshirish` deb tushunarli nomlandi. `workspace.css`da 248px desktop sidebar, mustaqil navigation scrolli, active holat, fokus/hover holatlari va mobile overflow tuzatildi.
+
+**Tekshiruv:** `pnpm --filter @zayuno/provider-portal build` PASS; `git diff --check` PASS. Lokal brauzerda desktop va 390×844 mobile viewport ko‘rildi: navigatsiya, AI Kit va biznesni ulash qismi ekranga sig‘adi, mobile gorizontal scroll yo‘q. Vite faqat avvaldan mavjud katta chunk va `postcss.config.js` module-type warninglarini chiqardi. Commit/push/deploy bajarilmadi.
+
+# Reja — Shaxsiy AI yordamchi va provider imkoniyatlariga asoslangan boshqaruv (2026-09-13)
+
+- [x] Foydalanuvchi yuborgan ikki matnni quyida to‘liq saqlash.
+- [ ] Quyidagi reja bo‘yicha agent va ilova matnlarini yangilash — hali bajarilmadi.
+
+**Holat / handoff:** bu topshiriqda faqat `TASKS.md`ga matn ko‘chirildi. Foydalanuvchi mavjud food oqimi yaxshi ishlayotganini tasdiqladi; uni saqlash kerak. Kod, build va deploy bajarilmadi. Navbatdagi qadam — alohida implementation topshirig‘ida quyidagi rejani amalga oshirish.
+
+## Foydalanuvchi yuborgan to‘liq matn
+
+Ha, bu yerda **biznes fokusimiz bilan AI’ning texnik imkoniyatini ajratishimiz kerak.** Oldingi “faqat food” talabini agentning doimiy chekloviga aylantirish keyingi providerlarni ulashni qiyinlashtiradi.
+
+**Marketingda restoranlarga fokuslanamiz. Agent esa ulangan va tasdiqlangan providerlar imkoniyatiga qarab ishlaydi.**
+
+1. **Agent o‘z imkoniyatlarini providerlardan biladi.** Qaysi kataloglar mavjud, nimalarni qidirish, buyurtma qilish, bron qilish yoki bekor qilish mumkin — bular provider contract’da ko‘rsatiladi. “Men faqat food bilan ishlayman” degan qat’iy prompt kerak emas.
+2. **Har yangi biznes uchun alohida AI yozmaymiz.** Gul do‘koni ham katalog → variant → narx → yetkazish → buyurtma oqimidan foydalansa, mavjud umumiy mexanizm ishlashi kerak. Mahsulot nomlarini kodga qo‘shib yurmaymiz.
+3. **Yangi imkoniyat ba’zan yangi texnik qo‘llab-quvvatlash talab qiladi.** Masalan, chipta uchun o‘rindiq tanlash, vaqtincha band qilish va band muddati kerak bo‘lishi mumkin. Buni faqat promptni almashtirib hal qilolmaymiz. Lekin imkoniyatni bir marta umumiy qilib qo‘shamiz — keyingi mos providerlar ham foydalanadi.
+4. **Provider kerakli ma’lumotlarni o‘zi belgilaydi.** Yetkazish uchun manzil, bron uchun sana/vaqt, chipta uchun yo‘lovchi ma’lumotlari. Agent faqat shu amal uchun yetishmayotgan ma’lumotni so‘raydi. Narx va mavjudlikni providerdan tekshiradi, mijoz tasdig‘idan keyin amal bajaradi.
+5. **Imkoniyat haqidagi javob ham dinamik bo‘ladi.** Hozir restoranlar faol bo‘lsa: “Taom topish va buyurtma berishda yordam beraman.” Gul do‘koni tasdiqlangach, gullar ham imkoniyatlar qatoriga qo‘shiladi. Ulanmagan xizmatni va’da qilmaydi.
+6. **“Biznesingizni qo‘shing” reklamasi ariza yig‘ishga xizmat qilishi mumkin.** Turli bizneslar ariza topshiradi → imkoniyatlari tekshiriladi → qo‘llab-quvvatlanadiganlari tasdiqlanadi. Hali ishlamaydigan xizmatlar mijoz qidiruviga chiqmaydi; ularga aniq kutilayotgan holat ko‘rsatiladi.
+
+**Men hozir shuni qilardim:** ishlayotgan food oqimini saqlab, agentdagi food-only cheklovni **tasdiqlangan provider imkoniyatlariga asoslangan boshqaruvga** almashtiramiz. Restoranlar birinchi bozorimiz bo‘lib qoladi, yangi xizmatlar esa umumiy contract orqali kiradi.
+
+Shunda har safar “endi gulni ham tushunadigan qil” demaymiz. Provider mos imkoniyatlarini taqdim etsa, agent ulardan foydalanadi.
+
+Ha, **“Zayuno — shaxsiy AI yordamchingiz”** degan ta’rif mos. Uning amaliy imkoniyatlari esa ulangan, faol providerlarga qarab kengayadi. Hozir yaxshi ishlayotgan ovqat buyurtma qilish oqimini saqlaymiz.
+
+Ekrandagi matnni shunday qilamiz:
+
+> **Sizning shaxsiy AI yordamchingiz**
+>
+> Nima kerakligini yozing. Sizga mosini topishga va ishni bajarishga yordam beraman.
+
+Pastdagi takliflar real imkoniyatlardan chiqadi. Hozir restoranlar faol bo‘lsa, taom va buyurtma haqidagi takliflar turadi. Gul do‘koni qo‘shilganda, mos gul takliflari ham paydo bo‘ladi.
+
+**“Nimalar qila olasan?”** savoliga ham tayyor, o‘zgarmaydigan ro‘yxat bermaydi. Masalan, hozir:
+
+> “Taom topaman, budjetingizga mos variantlarni tavsiya qilaman va buyurtma berishga yordam beraman. Nima kerak?”
+
+Keyinchalik yangi providerlar faollashganda shu javob avtomatik kengayadi. **Agent faqat tekshirilgan imkoniyatlarni aytadi**, buyurtma yoki to‘lov bajarilganini esa provider tasdiqlaganidan keyin bildiradi.
+
+Shu yo‘l bilan Zayuno umumiy yordamchi sifatida taniladi, har bir xizmatdagi ishlash sifati esa hozirgi food oqimidek aniq bo‘ladi.
+
+# Joriy ish: Zayuno Admin panellarini ishga tushirish va UI ustida ishlash (2026-09-13)
+
+- [ ] Zayuno Admin Panel (`apps/admin`, port 3000) va Provider Portal (`apps/provider-portal`, port 3001) ni dev rejimida ishga tushirish.
+- [ ] API backend (`apps/api`, port 4000) ni zarur hollarda ishga tushirish va admin proxy/ulanishlarini tekshirish.
+- [ ] Admin panel UI ko‘rinishi va dizaynini tahlil qilish, foydalanuvchi talabiga ko‘ra UI ni yangilash va chiroyli qilish.
+
+# Bajarilgan: Reportlar bo‘yicha tabiiy food oqimi, faqat Gemini 3.5 Flash-Lite (2026-09-13)
 
 - [x] Modelni yashirin almashtirish va AI xatosida umumiy katalogga qaytarishni olib tashlash.
 - [x] Menyu/tavsiya niyatlari, bir nechta kategoriya, umumiy budjet va vaqt shartlarini saqlash.

@@ -29,23 +29,36 @@ export function WorkspaceShell({ activeTab, onNavigate, onSearch, onAiKit, signe
   return <div className="workspace-shell">
     <a className="skip-link" href="#workspace-main">Asosiy kontentga o‘tish</a>
     <aside className={`workspace-sidebar ${menuOpen ? 'is-open' : ''}`} inert={isMobile && !menuOpen} aria-label="Asosiy navigation">
-      <a href="/?tab=overview" className="workspace-brand" onClick={event => { event.preventDefault(); onNavigate('overview'); }}>
-        <img src="/logo2.webp" alt="" width="40" height="40" />
-        <span><strong>ZAYUNO<span className="brand-period">.</span></strong><small>Partner workspace</small></span>
-      </a>
+      <div className="sidebar-header">
+        <a href="/?tab=overview" className="workspace-brand" onClick={event => { event.preventDefault(); onNavigate('overview'); }}>
+          <img src="/logo2.webp" alt="" width="36" height="36" />
+          <span><strong>ZAYUNO<span className="brand-period">.</span></strong><small>Provider workspace</small></span>
+        </a>
+      </div>
       <button type="button" className="sidebar-close icon-button" aria-label="Menuni yopish" onClick={() => setMenuOpen(false)}><X size={20} /></button>
-      <div className="workspace-context"><span className="context-symbol">Z</span><span>Provider portal<small>Integratsiya va boshqaruv</small></span><span className="version-tag">v1</span></div>
-      <nav>
+      <div className="workspace-context" aria-label="Joriy workspace">
+        <span className="context-symbol">Z</span>
+        <span className="context-copy"><strong>Provider portal</strong><small>Integratsiya markazi</small></span>
+        <span className="version-tag">v1</span>
+      </div>
+      <button type="button" className="sidebar-search" onClick={onSearch}>
+        <Search size={16} /><span>Qidirish</span><kbd>Ctrl K</kbd>
+      </button>
+      <nav className="sidebar-navigation" aria-label="Workspace bo‘limlari">
         {['Workspace', 'Dasturchi uchun'].map(group => <div className="nav-section" key={group}>
-          <p className="nav-section-label">{group}</p>
+          <p className="nav-section-label">{group === 'Workspace' ? 'Boshqaruv' : 'Integratsiya'}</p>
           {WORKSPACE_NAV.filter(item => item.group === group).map(item => {
             const Icon = icons[item.id];
-            return <a key={item.id} href={`/?tab=${item.id}`} aria-current={activeTab === item.id ? 'page' : undefined} className={`workspace-nav-item ${activeTab === item.id ? 'active' : ''}`} onClick={event => { if (!event.ctrlKey && !event.metaKey) { event.preventDefault(); onNavigate(item.id); setMenuOpen(false); } }}><Icon size={18} /><span>{item.title}</span>{activeTab === item.id && <span className="active-dot" />}</a>;
+            return <a key={item.id} href={`/?tab=${item.id}`} aria-current={activeTab === item.id ? 'page' : undefined} className={`workspace-nav-item ${activeTab === item.id ? 'active' : ''}`} onClick={event => { if (!event.ctrlKey && !event.metaKey) { event.preventDefault(); onNavigate(item.id); setMenuOpen(false); } }}><span className="nav-item-icon"><Icon size={17} /></span><span>{item.title}</span>{activeTab === item.id && <span className="active-indicator" />}</a>;
           })}
         </div>)}
       </nav>
       <div className="sidebar-bottom">
-        <button className="agent-kit-card" onClick={() => { setMenuOpen(false); onAiKit(); }}><Sparkles size={20} /><strong>AI bilan tezroq ulang</strong><span>Codex, Claude yoki boshqa agent uchun tayyor brief.</span><small>AI Kit’ni ochish <ArrowUpRight size={14} /></small></button>
+        <button className="sidebar-ai-action" onClick={() => { setMenuOpen(false); onAiKit(); }}>
+          <span className="sidebar-ai-icon"><Sparkles size={17} /></span>
+          <span><strong>AI Kit</strong><small>Agent bilan integratsiya qiling</small></span>
+          <ArrowUpRight size={15} aria-hidden="true" />
+        </button>
         {signedIn ? <div className="workspace-account"><span className="account-avatar">{(account || 'P').slice(0, 1).toUpperCase()}</span><span title={account}>{account || 'Partner'}<small>Provider hisobi</small></span><button className="icon-button" onClick={onLogout} aria-label="Hisobdan chiqish"><LogOut size={17} /></button></div> : <div className="sidebar-help">Hali hisobingiz yo‘qmi?<button onClick={() => onNavigate('onboarding')}>Biznesingizni ulang <ArrowRight size={14} /></button></div>}
       </div>
     </aside>
