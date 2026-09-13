@@ -3,11 +3,11 @@
 - [x] Navigatsiyani ixchamlashtirish, katta promo kartalar o‘rniga tushunarli havolalar va qidiruv qo‘shish.
 - [x] Hisob qismini pastda, navigatsiyani mustaqil scroll bilan saqlash; mobile va klaviatura holatlari.
 - [x] Portal build va browserda ko‘rinishni tekshirish; natijani yozish.
-- [ ] Foydalanuvchi tasdig‘idan keyin commit va GitHub’ga push qilish.
+- [x] Foydalanuvchi tasdig‘idan keyin commit va GitHub’ga push qilish.
 
 **Holat / handoff:** provider portal sidebar yakunlandi. `WorkspaceShell.tsx`da ixcham workspace konteksti, Ctrl+K qidiruvi, aniq guruhlangan navigatsiya, kichik AI Kit actioni va pastki hisob/ulanish qismi joriy qilindi. `workspace-model.ts`da `Sandbox` → `Sinov muhiti`, `API tekshiruvi` → `Integratsiyani tekshirish` deb tushunarli nomlandi. `workspace.css`da 248px desktop sidebar, mustaqil navigation scrolli, active holat, fokus/hover holatlari va mobile overflow tuzatildi.
 
-**Tekshiruv:** `pnpm --filter @zayuno/provider-portal build` PASS; `git diff --check` PASS. Lokal brauzerda desktop va 390×844 mobile viewport ko‘rildi: navigatsiya, AI Kit va biznesni ulash qismi ekranga sig‘adi, mobile gorizontal scroll yo‘q. Vite faqat avvaldan mavjud katta chunk va `postcss.config.js` module-type warninglarini chiqardi. Commit/push/deploy bajarilmadi.
+**Tekshiruv:** `pnpm --filter @zayuno/provider-portal build` PASS; `git diff --check` PASS. Lokal brauzerda desktop va 390×844 mobile viewport ko‘rildi: navigatsiya, AI Kit va biznesni ulash qismi ekranga sig‘adi, mobile gorizontal scroll yo‘q. Vite faqat avvaldan mavjud katta chunk va `postcss.config.js` module-type warninglarini chiqardi. Sidebar `4e629a9` commit bilan `origin/main`ga push qilindi; production deploy holati bu ishda tekshirilmadi.
 
 # Reja — Shaxsiy AI yordamchi va provider imkoniyatlariga asoslangan boshqaruv (2026-09-13)
 
