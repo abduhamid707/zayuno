@@ -1,3 +1,44 @@
+# Joriy ish — Provider portal Google OAuth va sessiya implementatsiya prompti (2026-09-13)
+
+- [x] Joriy provider auth, himoyalangan route va sidebar holatini prompt uchun qayd etish.
+- [x] Boshqa AI agent bajarishi uchun 7 bosqichli, xavfsizlik va UX talablari aniq prompt faylini yaratish.
+- [x] Promptni to‘liqlik va format bo‘yicha tekshirish, `git diff --check` natijasini qayd etish.
+
+**Holat / handoff:** `PROVIDER_AUTH_GOOGLE_SESSION_AGENT_PROMPT.md` yaratildi. Unda Google OAuth, email/password + ichki OTP/magic-link tasdig‘i, HttpOnly cookie sessiyasi, sidebar/route himoyasi, migratsiya, security testlari, browser QA va tashqi Google Console setupigacha bo‘lgan 7 bosqich yozildi. Faylda aynan 7 ta implementatsiya bosqichi bor; `git diff --check` PASS. Joriy topshiriq faqat promptga tegishli; mavjud provider portal UI o‘zgarishlari saqlandi, auth kodi o‘zgartirilmadi.
+
+# Joriy ish — Provider auth oqimini real implementatsiya qilish (2026-09-13)
+
+- [x] Auth va route/sidebar mavjud holatini koddan tasdiqlash.
+- [x] Signed-out sidebar navigatsiyasini protected bo‘limlardan tozalash.
+- [x] Signed-out direct protected route uchun auth redirect oqimini tuzatish.
+- [x] Backend session bootstrap/logout va login/verify uchun HttpOnly cookie bridge qo‘shish.
+- [x] Google OAuth hamda email auth oqimini yagona UI/client bilan ulash.
+- [x] Auth oqimi, build va `git diff --check`ni bajarish.
+
+**Holat / handoff:** `WorkspaceShell.tsx`da signed-out holatda faqat `Boshlash` va `Hujjatlar` ko‘rsatiladi; bo‘sh Integratsiya guruhi yashiriladi. `App.tsx`da signed-out foydalanuvchi protected deep-link ochsa, `auth` sahifasiga ichki `returnTo` bilan yo‘naltiriladi; muvaffaqiyatli login keyin ruxsat etilgan route’ga qaytadi. API’da Google OAuth start/callback, email login/verify, HttpOnly access/refresh cookie, `/session`, `/refresh` va `/logout` endpointlari bor; JWT strategy cookie fallbackni qo‘llaydi. Google OAuth verified email bo‘yicha provider owner sifatida upsert qilinadi. Frontend sessiyani cookie orqali bootstrap qiladi, 10 daqiqada refresh rotationni chaqiradi va provider token/user yozuvlarini localStorage’dan olib tashladi. `.env.example`larda callback sozlamalari bor. Provider portal va API build PASS, `git diff --check` PASS.
+
+# Joriy ish — Provider portal overview sahifasini kuchaytirish (2026-09-13)
+
+- [x] Hero matni va asosiy actionni provider oladigan real natijaga yo‘naltirish.
+- [x] Integratsiya oqimi, ishonch signallari va joriy bosqich progressini aniq ko‘rsatish.
+- [x] Dasturchi/AI agent resurslarini ixchamlashtirish va vizual iyerarxiyani yaxshilash.
+- [x] Desktop hamda mobile ko‘rinishni moslashtirish.
+- [x] Provider portal build, `git diff --check` va lokal brauzer tekshiruvini bajarish.
+
+**Holat / handoff:** `WorkspaceOverview.tsx`da provider natijasini aniq aytadigan hero, hisob holatiga bog‘langan CTA, jonli buyurtma oqimi, ishonch signallari va 3 bosqichli real progress qo‘shildi. Developer/AI brief qismi qisqartirildi, resurslar ixchamlashtirildi. `workspace.css`da shu bloklarning desktop/mobile iyerarxiyasi yangilandi; avvalgi sidebar/header o‘zgarishlari saqlandi.
+
+**Tekshiruv:** `pnpm --filter @zayuno/provider-portal build` PASS; `git diff --check` PASS. Lokal in-app brauzerda desktop va 390×844 mobile ko‘rinishlar tekshirildi: hero/CTA/flow birinchi ekranda aniq, progress va pastki developer resurslari o‘qiladi, gorizontal overflow yo‘q, scroll vaqtida header sticky qoladi. Browser console errorlari yo‘q. Vite faqat avvaldan mavjud katta chunk va `postcss.config.js` module-type warninglarini chiqardi. Commit/push/deploy bajarilmadi.
+
+# Joriy ish — Provider portal sticky header (2026-09-13)
+
+- [x] Headerni ixcham, doim ko‘rinadigan va joriy sahifani aniq ko‘rsatadigan qilish.
+- [x] Qidiruv, hujjatlar va kirish actionlarini desktop/mobile uchun moslashtirish.
+- [x] Portal build hamda desktop/mobile browser ko‘rinishini tekshirish.
+
+**Holat / handoff:** `WorkspaceShell.tsx`da breadcrumb o‘rniga sahifa iconi, nomi va qisqa izohi bo‘lgan header qo‘yildi; Hujjatlar, Qidirish va Kirish actionlari tartiblandi. `workspace.css`da header 60px desktop/56px mobile bo‘ldi, blur/focus/hover holatlari va responsive qisqarish qo‘shildi. `workspace-shell`ning `overflow-x: hidden` qoidasi sticky’ni buzayotgani real scroll testida topilib, `overflow-x: clip`ga almashtirildi.
+
+**Tekshiruv:** `pnpm --filter @zayuno/provider-portal build` PASS; `git diff --check` PASS. Lokal brauzerda desktop hamda 390×844 mobile viewport ko‘rildi va sahifa pastiga scroll qilinganda header tepada qolishi tasdiqlandi. Vite avvaldan mavjud katta chunk va `postcss.config.js` module-type warninglarini chiqardi. Commit/push/deploy bajarilmadi.
+
 # Joriy ish — Provider portal sidebar (2026-09-13)
 
 - [x] Navigatsiyani ixchamlashtirish, katta promo kartalar o‘rniga tushunarli havolalar va qidiruv qo‘shish.
@@ -51,10 +92,20 @@ Keyinchalik yangi providerlar faollashganda shu javob avtomatik kengayadi. **Age
 
 Shu yo‘l bilan Zayuno umumiy yordamchi sifatida taniladi, har bir xizmatdagi ishlash sifati esa hozirgi food oqimidek aniq bo‘ladi.
 
+# Joriy ish: Provider Portal Google OAuth sozlash va tekshirish (2026-09-13)
+
+- [x] Google Cloud Console’dagi mavjud `Web client 1` uchun Authorized JavaScript origins va Redirect URIni sozlash bo‘yicha qo‘llanma berish.
+- [x] Lokal `.env` va `apps/api/.env` fayllariga Google Provider OAuth o‘zgaruvchilarini kiritish.
+- [x] API serverni qayta ishga tushirish va Google start URL redirectini tekshirish.
+- [x] Loyihani build va git diff tekshiruvlaridan o‘tkazib, GitHub’ga commit va push qilish.
+- [ ] Foydalanuvchi Google login tugmasini bosib to‘liq kirishni tekshirish.
+
+**Holat / handoff:** Provider portal va API uchun Google OAuth oqimi, cookie sessiyalari, himoyalangan navigatsiya va landing sahifasi to‘liq tayyorlandi. `@zayuno/api`, `@zayuno/provider-portal` va `@zayuno/admin` paketlari muvaffaqiyatli build bo‘ldi (`git diff --check` PASS). O‘zgarishlar GitHub `main` branchiga push qilinmoqda. Maxfiy kalitlar gitga kiritilmadi.
+
 # Joriy ish: Zayuno Admin panellarini ishga tushirish va UI ustida ishlash (2026-09-13)
 
-- [ ] Zayuno Admin Panel (`apps/admin`, port 3000) va Provider Portal (`apps/provider-portal`, port 3001) ni dev rejimida ishga tushirish.
-- [ ] API backend (`apps/api`, port 4000) ni zarur hollarda ishga tushirish va admin proxy/ulanishlarini tekshirish.
+- [x] Zayuno Admin Panel (`apps/admin`, port 3000) va Provider Portal (`apps/provider-portal`, port 3001) ni dev rejimida ishga tushirish.
+- [x] API backend (`apps/api`, port 4000) ni zarur hollarda ishga tushirish va admin proxy/ulanishlarini tekshirish.
 - [ ] Admin panel UI ko‘rinishi va dizaynini tahlil qilish, foydalanuvchi talabiga ko‘ra UI ni yangilash va chiroyli qilish.
 
 # Bajarilgan: Reportlar bo‘yicha tabiiy food oqimi, faqat Gemini 3.5 Flash-Lite (2026-09-13)

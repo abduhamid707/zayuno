@@ -46,6 +46,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
 
+  const handleGoogleLogin = () => {
+    const returnTo = new URLSearchParams(window.location.search).get('returnTo') || '/?tab=apps';
+    window.location.assign(`${apiBase}/api/v1/auth/google/start?returnTo=${encodeURIComponent(returnTo)}`);
+  };
+
   // Handle Login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +67,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     try {
       const res = await fetch(`${apiBase}/api/v1/auth/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, password })
       });
@@ -79,8 +85,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
         throw new Error('Autentifikatsiya tokeni olinmadi.');
       }
 
-      localStorage.setItem('zayuno_provider_token', data.accessToken);
-      localStorage.setItem('zayuno_provider_user', JSON.stringify(data.user));
       onLoginSuccess(data.accessToken, data.user);
     } catch (err: any) {
       setError(err.message || 'Kirishda xatolik yuz berdi.');
@@ -105,6 +109,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     try {
       const res = await fetch(`${apiBase}/api/v1/auth/verify-email`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: cleanToken })
       });
@@ -135,6 +140,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     try {
       const res = await fetch(`${apiBase}/api/v1/auth/resend-verification`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase() })
       });
@@ -292,6 +298,15 @@ export const AuthView: React.FC<AuthViewProps> = ({
             {/* Login Form */}
             {mode === 'login' && (
               <form onSubmit={handleLogin} className="space-y-4 text-xs">
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full bg-white hover:bg-slate-100 disabled:opacity-50 text-slate-900 font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <span className="font-bold text-base">G</span> Google bilan davom etish
+                </button>
+                <div className="flex items-center gap-3 text-[10px] text-slate-500"><span className="h-px bg-slate-800 flex-1" /><span>yoki email bilan</span><span className="h-px bg-slate-800 flex-1" /></div>
                 <div>
                   <label className="block text-slate-300 mb-1 font-medium">Email</label>
                   <div className="relative">

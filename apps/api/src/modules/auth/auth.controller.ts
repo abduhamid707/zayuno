@@ -1,4 +1,6 @@
-import { Controller, Post, Get, Body, UseGuards, Param, Delete, Query, ForbiddenException } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Param, Delete, Query, ForbiddenException, Res, Req } from '@nestjs/common';
+import { Request } from 'express';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -9,6 +11,49 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  private setAccessCookie(response: Response, accessToken: string) {
+    response.cookie('zayuno_provider_access', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
+      path: '/',
+      maxAge: 15 * 60 * 1000,
+    });
+  }
+
+  private setRefreshCookie(response: Response, refreshToken: string) {
+    response.cookie('zayuno_provider_refresh', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/api/v1/auth',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+  }
+
+  private readCookie(request: Request, name: string) {
+    const item = String(request.headers.cookie || '').split(';').map(value => value.trim()).find(value => value.startsWith(`${name}=`));
+    return item ? decodeURIComponent(item.slice(name.length + 1)) : undefined;
+  }
+
+  @Get('google/start')
+  @ApiOperation({ summary: 'Start Google OAuth for provider portal' })
+  async googleStart(@Query('returnTo') returnTo?: string, @Res() response?: Response) {
+    const url = await this.authService.googleAuthorizationUrl(returnTo || '/?tab=apps');
+    return response!.redirect(url);
+  }
+
+  @Get('google/callback')
+  @ApiOperation({ summary: 'Complete Google OAuth for provider portal' })
+  async googleCallback(@Query('code') code: string, @Query('state') state: string, @Res() response: Response) {
+    const result = await this.authService.googleCallback(code, state);
+    this.setAccessCookie(response, result.accessToken);
+    this.setRefreshCookie(response, result.refreshToken);
+    const portal = process.env.PROVIDER_PORTAL_URL || process.env.PROVIDER_PORTAL_BASE_URL || 'http://localhost:3001';
+    const destination = /^\/\?tab=(apps|onboarding|overview)$/.test(result.returnTo) ? result.returnTo : '/?tab=apps';
+    return response.redirect(`${portal}${destination}`);
+  }
+
   @Post('register-owner')
   @ApiOperation({ summary: 'Self-service registration for Provider Owners' })
   async registerOwner(@Body() body: { email: string; password: string; name: string }) {
@@ -17,8 +62,11 @@ export class AuthController {
 
   @Post('verify-email')
   @ApiOperation({ summary: 'Verify email address using one-time token' })
-  async verifyEmail(@Body() body: { token: string }) {
-    return this.authService.verifyEmail(body.token);
+  async verifyEmail(@Body() body: { token: string }, @Res({ passthrough: true }) response: Response) {
+    const result = await this.authService.verifyEmail(body.token);
+    if (result.accessToken) this.setAccessCookie(response, result.accessToken);
+    if (result.refreshToken) this.setRefreshCookie(response, result.refreshToken);
+    return result;
   }
 
   @Post('resend-verification')
@@ -39,8 +87,37 @@ export class AuthController {
 
   @Post('login')
   @ApiOperation({ summary: 'Login for Admin and Provider Users' })
-  async login(@Body() body: { email: string; password: string }) {
-    return this.authService.login(body.email, body.password);
+  async login(@Body() body: { email: string; password: string }, @Res({ passthrough: true }) response: Response) {
+    const result = await this.authService.login(body.email, body.password);
+    this.setAccessCookie(response, result.accessToken);
+    this.setRefreshCookie(response, result.refreshToken);
+    return result;
+  }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Rotate provider portal refresh session' })
+  async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const result = await this.authService.refreshProviderSession(this.readCookie(request, 'zayuno_provider_refresh') || '');
+    this.setAccessCookie(response, result.accessToken);
+    this.setRefreshCookie(response, result.refreshToken);
+    return result;
+  }
+
+  @Get('session')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore the current provider portal session' })
+  async session(@Req() request: Request, @CurrentUser() user: any) {
+    return { authenticated: true, accessToken: this.readCookie(request, 'zayuno_provider_access') || null, user };
+  }
+
+  @Post('logout')
+  @ApiOperation({ summary: 'Clear the provider portal session cookie' })
+  async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    await this.authService.revokeProviderSession(this.readCookie(request, 'zayuno_provider_refresh'));
+    response.clearCookie('zayuno_provider_access', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/' });
+    response.clearCookie('zayuno_provider_refresh', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/api/v1/auth' });
+    return { success: true };
   }
 
   @Post('change-password')

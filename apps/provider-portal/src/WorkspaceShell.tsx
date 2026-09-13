@@ -25,7 +25,10 @@ export function WorkspaceShell({ activeTab, onNavigate, onSearch, onAiKit, signe
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
   }, [onSearch]);
-  const title = WORKSPACE_NAV.find(item => item.id === activeTab)?.title || (activeTab === 'auth' ? 'Hisobga kirish' : 'Biznesni ulash');
+  const activeItem = WORKSPACE_NAV.find(item => item.id === activeTab);
+  const title = activeItem?.title || (activeTab === 'auth' ? 'Hisobga kirish' : 'Biznesni ulash');
+  const detail = activeItem?.detail || (activeTab === 'auth' ? 'Provider hisobingizga kiring' : 'Yangi provider integratsiyasini boshlang');
+  const ActiveIcon = icons[activeTab] || Compass;
   return <div className="workspace-shell">
     <a className="skip-link" href="#workspace-main">Asosiy kontentga o‘tish</a>
     <aside className={`workspace-sidebar ${menuOpen ? 'is-open' : ''}`} inert={isMobile && !menuOpen} aria-label="Asosiy navigation">
@@ -45,13 +48,17 @@ export function WorkspaceShell({ activeTab, onNavigate, onSearch, onAiKit, signe
         <Search size={16} /><span>Qidirish</span><kbd>Ctrl K</kbd>
       </button>
       <nav className="sidebar-navigation" aria-label="Workspace bo‘limlari">
-        {['Workspace', 'Dasturchi uchun'].map(group => <div className="nav-section" key={group}>
-          <p className="nav-section-label">{group === 'Workspace' ? 'Boshqaruv' : 'Integratsiya'}</p>
-          {WORKSPACE_NAV.filter(item => item.group === group).map(item => {
-            const Icon = icons[item.id];
-            return <a key={item.id} href={`/?tab=${item.id}`} aria-current={activeTab === item.id ? 'page' : undefined} className={`workspace-nav-item ${activeTab === item.id ? 'active' : ''}`} onClick={event => { if (!event.ctrlKey && !event.metaKey) { event.preventDefault(); onNavigate(item.id); setMenuOpen(false); } }}><span className="nav-item-icon"><Icon size={17} /></span><span>{item.title}</span>{activeTab === item.id && <span className="active-indicator" />}</a>;
-          })}
-        </div>)}
+        {['Workspace', 'Dasturchi uchun'].map(group => {
+          const visibleItems = WORKSPACE_NAV.filter(item => item.group === group && (signedIn || item.id === 'overview' || item.id === 'docs'));
+          if (!visibleItems.length) return null;
+          return <div className="nav-section" key={group}>
+            <p className="nav-section-label">{group === 'Workspace' ? 'Boshqaruv' : 'Integratsiya'}</p>
+            {visibleItems.map(item => {
+              const Icon = icons[item.id];
+              return <a key={item.id} href={`/?tab=${item.id}`} aria-current={activeTab === item.id ? 'page' : undefined} className={`workspace-nav-item ${activeTab === item.id ? 'active' : ''}`} onClick={event => { if (!event.ctrlKey && !event.metaKey) { event.preventDefault(); onNavigate(item.id); setMenuOpen(false); } }}><span className="nav-item-icon"><Icon size={17} /></span><span>{item.title}</span>{activeTab === item.id && <span className="active-indicator" />}</a>;
+            })}
+          </div>;
+        })}
       </nav>
       <div className="sidebar-bottom">
         <button className="sidebar-ai-action" onClick={() => { setMenuOpen(false); onAiKit(); }}>
@@ -65,8 +72,16 @@ export function WorkspaceShell({ activeTab, onNavigate, onSearch, onAiKit, signe
     {menuOpen && <button className="sidebar-backdrop" onClick={() => setMenuOpen(false)} aria-label="Menuni yopish" />}
     <div className="workspace-body">
       <header className="workspace-topbar">
-        <div className="workspace-breadcrumb"><button className="mobile-menu icon-button" aria-label="Menuni ochish" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><Menu size={20} /></button><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{title}</strong></div>
-        <div className="topbar-actions"><button className="global-search" aria-label="Hujjatlardan izlash" onClick={onSearch}><Search size={16} /><span>Hujjatlardan izlash</span><kbd>Ctrl K</kbd></button>{!signedIn && <button className="quiet-button" onClick={() => onNavigate('auth')}>Kirish <ArrowUpRight size={14} /></button>}</div>
+        <div className="topbar-leading">
+          <button className="mobile-menu icon-button" aria-label="Menuni ochish" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><Menu size={19} /></button>
+          <span className="topbar-page-icon" aria-hidden="true"><ActiveIcon size={16} /></span>
+          <span className="topbar-page-copy"><strong>{title}</strong><small>{detail}</small></span>
+        </div>
+        <div className="topbar-actions">
+          {activeTab !== 'docs' && <button className="topbar-docs-button" onClick={() => onNavigate('docs')}><BookOpen size={15} /><span>Hujjatlar</span></button>}
+          <button className="global-search" aria-label="Hujjatlar va sahifalardan qidirish" onClick={onSearch}><Search size={16} /><span>Qidirish</span><kbd>Ctrl K</kbd></button>
+          {!signedIn && <button className="quiet-button" onClick={() => onNavigate('auth')}>Kirish <ArrowUpRight size={14} /></button>}
+        </div>
       </header>
       <main id="workspace-main" className={`workspace-main ${activeTab === 'docs' ? 'workspace-docs-main' : ''}`}>{children}</main>
       <footer className="workspace-footer"><span>Zayuno · Provider Contract v1</span><a href="/llms.txt">Agentlar uchun /llms.txt <ArrowUpRight size={12} /></a><a href="/docs/">Docs index <ArrowUpRight size={12} /></a></footer>

@@ -12,7 +12,13 @@ function getJwtSecret(): string {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: (request: any) => {
+        const headerToken = ExtractJwt.fromAuthHeaderAsBearerToken()(request);
+        if (headerToken) return headerToken;
+        const cookieHeader = String(request?.headers?.cookie || '');
+        const cookie = cookieHeader.split(';').map((part: string) => part.trim()).find((part: string) => part.startsWith('zayuno_provider_access='));
+        return cookie ? decodeURIComponent(cookie.slice('zayuno_provider_access='.length)) : null;
+      },
       ignoreExpiration: false,
       secretOrKey: getJwtSecret(),
     });

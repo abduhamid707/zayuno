@@ -477,8 +477,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
       // Use accessToken from verify-email response (auto-login)
       if (verifyData.accessToken && verifyData.user) {
-        localStorage.setItem('zayuno_provider_token', verifyData.accessToken);
-        localStorage.setItem('zayuno_provider_user', JSON.stringify(verifyData.user));
         onAuthSuccess(verifyData.accessToken, verifyData.user);
       } else if (password) {
         // Fallback: attempt login with password if verify didn't return token
@@ -489,8 +487,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         });
         const loginData = await loginRes.json();
         if (loginRes.ok && loginData.accessToken) {
-          localStorage.setItem('zayuno_provider_token', loginData.accessToken);
-          localStorage.setItem('zayuno_provider_user', JSON.stringify(loginData.user));
           onAuthSuccess(loginData.accessToken, loginData.user);
         }
       }
@@ -537,7 +533,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const handleGenerateSecret = async () => {
     try {
       setLoading(true);
-      const authToken = token || localStorage.getItem('zayuno_provider_token');
+      const authToken = token;
       const res = await fetch(`${apiBase}/api/v1/providers/integration/generate-secret`, {
         method: 'POST',
         headers: {
@@ -649,7 +645,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
     try {
       const cleanUrl = raw.replace(/\/+$/, '');
-      const token = localStorage.getItem('zayuno_provider_token');
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
       };
@@ -827,7 +822,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
 
   const handleSaveCertificationSettings = async () => {
     const cleanSlug = slug.trim().toLowerCase();
-    const authToken = token || localStorage.getItem('zayuno_provider_token');
+    const authToken = token;
     if (!businessValid || !integrationValid) { setCertError(Object.values({ ...businessValidation, ...integrationValidation }).join(' ')); return; }
     if (!authToken || !cleanSlug || !baseUrl.trim()) {
       setCertError('Provider slug, API Base URL va faol hisob talab qilinadi.');
@@ -912,7 +907,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
 
     setLoading(true);
     try {
-      const authToken = token || localStorage.getItem('zayuno_provider_token');
+      const authToken = token;
       if (!authToken) {
         throw new Error('Iltimos, avval hisobingizga kiring.');
       }
@@ -998,7 +993,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
     setCertError(null);
     setSuccessMsg(null);
     try {
-      const authToken = token || localStorage.getItem('zayuno_provider_token');
+      const authToken = token;
       const res = await fetch(`${apiBase}/api/v1/providers/${encodeURIComponent(targetSlug)}/certify`, {
         method: 'POST',
         headers: {
@@ -1030,7 +1025,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
     setSubmittingReview(true);
     setError(null);
     try {
-      const authToken = token || localStorage.getItem('zayuno_provider_token');
+      const authToken = token;
       const res = await fetch(`${apiBase}/api/v1/providers/${encodeURIComponent(targetSlug)}/submit-review`, {
         method: 'POST',
         headers: {

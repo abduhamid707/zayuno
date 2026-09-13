@@ -87,13 +87,40 @@ const TRANSACTIONAL_MANDATORY_CAPABILITIES = [
 const MANDATORY_PROVIDER_CAPABILITIES = new Set(TRANSACTIONAL_MANDATORY_CAPABILITIES);
 
 export default function App() {
-  const [token, setToken] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('zayuno_provider_token') || '' : ''));
-  const [userProfile, setUserProfile] = useState<any>(() => {
-    try {
-      const raw = localStorage.getItem('zayuno_provider_user');
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  });
+  const [token, setToken] = useState('');
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE}/api/v1/auth/session`, { credentials: 'include' })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        if (cancelled || !data?.authenticated || !data.accessToken) return;
+        setToken(data.accessToken);
+        setUserProfile(data.user || null);
+      })
+      .catch(() => undefined)
+      .finally(() => { if (!cancelled) setAuthReady(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    const refresh = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/auth/refresh`, { method: 'POST', credentials: 'include' });
+        if (!response.ok) throw new Error('refresh failed');
+        const data = await response.json();
+        if (data.accessToken) setToken(data.accessToken);
+        if (data.user) setUserProfile(data.user);
+      } catch {
+        // Keep the current UI stable for transient network errors; the next protected request will re-authenticate.
+      }
+    };
+    const timer = window.setInterval(refresh, 10 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, [token]);
 
   // Auth form state
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -159,6 +186,19 @@ export default function App() {
     window.addEventListener('popstate', onBack);
     return () => window.removeEventListener('popstate', onBack);
   }, []);
+
+  // Protected provider routes should enter the real auth screen directly.
+  // Keep the requested internal route so a successful sign-in can return there.
+  useEffect(() => {
+    const protectedTabs = new Set<WorkspaceTab>(['apps', 'sandbox', 'certification', 'inspector']);
+    if (!authReady || token || !protectedTabs.has(activeTab)) return;
+    const returnTo = `/?tab=${activeTab}`;
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', 'auth');
+    url.searchParams.set('returnTo', returnTo);
+    window.history.replaceState({}, '', url.toString());
+    setActiveTab('auth');
+  }, [activeTab, authReady, token]);
 
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
@@ -323,6 +363,7 @@ export default function App() {
     try {
       const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password })
       });
@@ -330,9 +371,7 @@ export default function App() {
       if (!response.ok || !data.accessToken) {
         throw new Error(data.message || 'Kirishda xatolik yuz berdi.');
       }
-      localStorage.setItem('zayuno_provider_token', data.accessToken);
       if (data.user) {
-        localStorage.setItem('zayuno_provider_user', JSON.stringify(data.user));
         setUserProfile(data.user);
       }
       setToken(data.accessToken);
@@ -380,6 +419,7 @@ export default function App() {
     try {
       const response = await fetch(`${API_BASE}/api/v1/auth/verify-email`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: verifyTokenInput.trim() })
       });
@@ -389,8 +429,6 @@ export default function App() {
       }
       // Auto-login if verify-email returns accessToken
       if (data.accessToken && data.user) {
-        localStorage.setItem('zayuno_provider_token', data.accessToken);
-        localStorage.setItem('zayuno_provider_user', JSON.stringify(data.user));
         setToken(data.accessToken);
         setUserProfile(data.user);
         setAuthModalOpen(false);
@@ -431,8 +469,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('zayuno_provider_token');
-    localStorage.removeItem('zayuno_provider_user');
+    void fetch(`${API_BASE}/api/v1/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => undefined);
     setToken('');
     setUserProfile(null);
     setActiveTab('overview');
@@ -863,12 +900,19 @@ export default function App() {
               setUserProfile(user);
               if (typeof window !== 'undefined') {
                 const url = new URL(window.location.href);
+                const requestedReturn = url.searchParams.get('returnTo') || '';
+                const returnMatch = requestedReturn.match(/^\/\?tab=(apps|sandbox|certification|inspector)$/);
+                const nextTab = (returnMatch?.[1] || 'apps') as WorkspaceTab;
                 url.searchParams.delete('verifyToken');
                 url.searchParams.delete('token');
+                url.searchParams.delete('returnTo');
                 window.history.replaceState({}, '', url.toString());
+                refetchProvider();
+                setActiveTab(nextTab);
+              } else {
+                refetchProvider();
+                setActiveTab('apps');
               }
-              refetchProvider();
-              setActiveTab('apps');
             }}
             onStartOnboarding={() => setActiveTab('onboarding')}
             onOpenDocs={() => setActiveTab('docs')}
