@@ -1,6 +1,7 @@
-﻿# Feed Up Asoschisi Bilan Birinchi Jonli Uchrashuv va Validatsiya (2026-09-14)
+# Feed Up Asoschisi Bilan Birinchi Jonli Uchrashuv va Validatsiya (2026-09-14)
 
-> **Tarixiy tamg‘a (Milestone):** Do‘kondan qaytayotganda Feed Up asoschisi bilan tasodifiy uchrashuv, Zayuno taklifi, olingan haqiqiy bozor signali va qiymat taklifi (Value Proposition) tahlili.
+> **Tarixiy tamg‘a (Milestone):** Do‘kondan qaytayotganda Feed Up asoschisi bilan tasodifiy uchrashuv, Zayuno taklifi, olingan haqiqiy bozor signali va qiymat taklifi (Value Proposition) tahlili.  
+> **Batafsil tahliliy qo‘llanma:** [`docs/BIRINCHI_UCHRASHUV_FEED_UP_NATIJASI.md`](file:///d:/works/DEV/Zayuno/docs/BIRINCHI_UCHRASHUV_FEED_UP_NATIJASI.md)
 
 ---
 
