@@ -19,8 +19,14 @@ export class AuthService {
   ) {}
 
   private async issueProviderSession(user: { id: string; email: string; name: string; role: UserRole; providerId: string | null }, familyId: string = randomUUID()) {
+    let activeRole = user.role;
+    if (activeRole === UserRole.API_CONSUMER) {
+      activeRole = UserRole.PROVIDER_OWNER;
+      await prisma.user.update({ where: { id: user.id }, data: { role: UserRole.PROVIDER_OWNER } });
+      user.role = UserRole.PROVIDER_OWNER;
+    }
     const sessionId = randomUUID();
-    const base = { sub: user.id, email: user.email, role: user.role, providerId: user.providerId };
+    const base = { sub: user.id, email: user.email, role: activeRole, providerId: user.providerId };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync({ ...base, type: 'access' }, { expiresIn: PROVIDER_ACCESS_TTL_SECONDS }),
       this.jwtService.signAsync({ ...base, type: 'refresh', jti: sessionId, familyId }, { expiresIn: PROVIDER_REFRESH_TTL_SECONDS, secret: this.getRefreshSecret() })
@@ -83,7 +89,27 @@ export class AuthService {
     const profile: any = await profileResponse.json().catch(() => null);
     if (!profileResponse.ok || profile?.email_verified !== true || !profile?.email || !profile?.sub) throw new UnauthorizedException('Google hisobingiz tasdiqlanmadi.');
     const email = String(profile.email).trim().toLowerCase();
-    const user = await prisma.user.upsert({ where: { email }, update: { name: String(profile.name || profile.given_name || email), isActive: true }, create: { email, name: String(profile.name || profile.given_name || email), passwordHash: 'OAUTH_GOOGLE_MANAGED', role: UserRole.PROVIDER_OWNER, isActive: true }, include: { provider: true } });
+    const existing = await prisma.user.findUnique({ where: { email } });
+    let roleToSet: UserRole = UserRole.PROVIDER_OWNER;
+    if (existing && (existing.role === UserRole.SUPER_ADMIN || existing.role === UserRole.ADMIN)) {
+      roleToSet = existing.role;
+    }
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {
+        name: String(profile.name || profile.given_name || email),
+        role: roleToSet,
+        isActive: true
+      },
+      create: {
+        email,
+        name: String(profile.name || profile.given_name || email),
+        passwordHash: 'OAUTH_GOOGLE_MANAGED',
+        role: UserRole.PROVIDER_OWNER,
+        isActive: true
+      },
+      include: { provider: true }
+    });
     return { ...(await this.issueProviderSession(user)), returnTo: JSON.parse(stateRecord).returnTo };
   }
 

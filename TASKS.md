@@ -92,7 +92,18 @@ Keyinchalik yangi providerlar faollashganda shu javob avtomatik kengayadi. **Age
 
 Shu yo‘l bilan Zayuno umumiy yordamchi sifatida taniladi, har bir xizmatdagi ishlash sifati esa hozirgi food oqimidek aniq bo‘ladi.
 
-# Joriy ish: Production serverda Google OAuth konfiguratsiyasini tuzatish (2026-09-16)
+# Joriy ish: Provider Portal 403 Forbidden va rol yangilanishini tuzatish (2026-09-16)
+
+- [x] `apps/api/src/modules/auth/auth.service.ts` da Google OAuth orqali kirgan mavjud `API_CONSUMER` foydalanuvchini `PROVIDER_OWNER` roliga ko‘tarish (admin rollarni saqlagan holda).
+- [x] `auth.service.ts`dagi `issueProviderSession` va `refreshProviderSession`da ham `API_CONSUMER` rolidagi hisobni avtomatik `PROVIDER_OWNER`ga yangilash.
+- [x] `apps/provider-portal/src/App.tsx`da 403 va unassigned provider xatoliklarini to‘g‘ri boshqarish.
+- [x] Production bazadagi `jroboforex@gmail.com` foydalanuvchisi rolini `PROVIDER_OWNER`ga o‘zgartirish.
+- [x] Yangilangan kodni serverga sinxronlash va tekshirish.
+- [x] Git commit va push qilish.
+
+**Holat / handoff:** Provider Portalda (`developers.zayuno.uz`) `GET /api/v1/providers/me` 403 Forbidden xatosi sababi aniqlandi: foydalanuvchi (`jroboforex@gmail.com`) avval mobil/consumer app orqali ro‘yxatdan o‘tganligi sababli bazada uning roli `API_CONSUMER` bo‘lib qolgan; `RolesGuard` esa faqat `PROVIDER_OWNER`, `PROVIDER_DEVELOPER`, `ADMIN` va `SUPER_ADMIN`ga ruxsat beradi. `auth.service.ts`da provider portaldan kiruvchi consumer akkauntlarni avtomatik `PROVIDER_OWNER`ga yangilash kiritildi. `App.tsx`da xatolik boshqaruvi mustahkamlandi. Production DBda foydalanuvchi roli `PROVIDER_OWNER`ga yangilandi. `@zayuno/api` va `@zayuno/provider-portal` build PASS, `git diff --check` PASS. O‘zgarishlar commit va push qilindi.
+
+# Bajarilgan: Production serverda Google OAuth konfiguratsiyasini tuzatish (2026-09-16)
 
 - [x] `apps/api/src/modules/auth/auth.service.ts` faylida callback URI uchun aqlli fallback qo‘shish.
 - [x] `docker-compose.prod.yml` fayliga Google Provider OAuth o‘zgaruvchilarini kiritish.

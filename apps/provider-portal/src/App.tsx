@@ -489,11 +489,21 @@ export default function App() {
         return res.json();
       } catch (error) {
         // A verified new account has no application yet; show its first business step.
-        if (error instanceof Error && error.message === 'Your account is not assigned to a provider application yet.') return null;
+        if (
+          error instanceof Error &&
+          (error.message === 'Your account is not assigned to a provider application yet.' ||
+            error.message.includes('not assigned to a provider') ||
+            error.message.includes('Requires one of roles') ||
+            error.message.includes('403') ||
+            error.message.includes('404'))
+        ) {
+          return null;
+        }
         throw error;
       }
     },
-    enabled: !!token
+    enabled: !!token,
+    retry: 1
   });
 
   const providerRequiresLocations = requiresActiveLocations(
