@@ -40,9 +40,25 @@ export class AuthService {
     return secret;
   }
 
+  private getGoogleOAuthClientId() {
+    return process.env.GOOGLE_PROVIDER_CLIENT_ID?.trim() || process.env.GOOGLE_WEB_CLIENT_ID?.trim() || process.env.GOOGLE_CLIENT_ID?.trim();
+  }
+
+  private getGoogleOAuthClientSecret() {
+    return process.env.GOOGLE_PROVIDER_CLIENT_SECRET?.trim() || process.env.GOOGLE_CLIENT_SECRET?.trim();
+  }
+
+  private getGoogleOAuthRedirectUri() {
+    const fromEnv = process.env.GOOGLE_PROVIDER_REDIRECT_URI?.trim();
+    if (fromEnv) return fromEnv;
+    const isProd = process.env.NODE_ENV === 'production';
+    const apiPublicUrl = process.env.API_PUBLIC_URL?.trim() || (isProd ? 'https://api.zayuno.uz' : 'http://localhost:4000');
+    return `${apiPublicUrl.replace(/\/$/, '')}/api/v1/auth/google/callback`;
+  }
+
   async googleAuthorizationUrl(returnTo = '/?tab=apps') {
-    const clientId = process.env.GOOGLE_PROVIDER_CLIENT_ID?.trim() || process.env.GOOGLE_WEB_CLIENT_ID?.trim() || process.env.GOOGLE_CLIENT_ID?.trim();
-    const redirectUri = process.env.GOOGLE_PROVIDER_REDIRECT_URI?.trim();
+    const clientId = this.getGoogleOAuthClientId();
+    const redirectUri = this.getGoogleOAuthRedirectUri();
     if (!clientId || !redirectUri) throw new BadRequestException('Google OAuth hali sozlanmagan.');
     const state = randomUUID();
     await this.redis.set(`provider:oauth:state:${state}`, JSON.stringify({ returnTo: /^\/\?tab=(apps|onboarding|overview)$/.test(returnTo) ? returnTo : '/?tab=apps' }), 600);
@@ -56,9 +72,9 @@ export class AuthService {
     const stateRecord = await this.redis.get(stateKey);
     await this.redis.del(stateKey);
     if (!stateRecord) throw new UnauthorizedException('Google OAuth sessiyasi muddati tugagan.');
-    const clientId = process.env.GOOGLE_PROVIDER_CLIENT_ID?.trim() || process.env.GOOGLE_WEB_CLIENT_ID?.trim() || process.env.GOOGLE_CLIENT_ID?.trim();
-    const clientSecret = process.env.GOOGLE_PROVIDER_CLIENT_SECRET?.trim() || process.env.GOOGLE_CLIENT_SECRET?.trim();
-    const redirectUri = process.env.GOOGLE_PROVIDER_REDIRECT_URI?.trim();
+    const clientId = this.getGoogleOAuthClientId();
+    const clientSecret = this.getGoogleOAuthClientSecret();
+    const redirectUri = this.getGoogleOAuthRedirectUri();
     if (!clientId || !clientSecret || !redirectUri) throw new BadRequestException('Google OAuth hali sozlanmagan.');
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(10_000), body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }) });
     const tokens: any = await tokenResponse.json().catch(() => null);

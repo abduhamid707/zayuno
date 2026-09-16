@@ -92,7 +92,17 @@ Keyinchalik yangi providerlar faollashganda shu javob avtomatik kengayadi. **Age
 
 Shu yo‘l bilan Zayuno umumiy yordamchi sifatida taniladi, har bir xizmatdagi ishlash sifati esa hozirgi food oqimidek aniq bo‘ladi.
 
-# Joriy ish: Feed Up uchrashuviga Yandex/Alisa raqobati, xatolar javobgarligi va "Ilovangni chiqar" signalini qo‘shish (2026-09-14)
+# Joriy ish: Production serverda Google OAuth konfiguratsiyasini tuzatish (2026-09-16)
+
+- [x] `apps/api/src/modules/auth/auth.service.ts` faylida callback URI uchun aqlli fallback qo‘shish.
+- [x] `docker-compose.prod.yml` fayliga Google Provider OAuth o‘zgaruvchilarini kiritish.
+- [x] Production server (`158.220.100.58`) dagi `.env` va konteyner muhitini yangilab, `zayuno-api`ni qayta ishga tushirish.
+- [x] `https://api.zayuno.uz/api/v1/auth/google/start` endpointini tekshirish (`HTTP 302 Found` Google OAuth consent page).
+- [x] Git commit va push qilish.
+
+**Holat / handoff:** Production serverdagi (`api.zayuno.uz`) `Google OAuth hali sozlanmagan` 400 xatosi sababi aniqlandi: `docker-compose.prod.yml` va serverdagi `.env` faylida `GOOGLE_PROVIDER_REDIRECT_URI` hamda `GOOGLE_PROVIDER_CLIENT_SECRET` kiritilmagan bo‘lgan. Koddagi `auth.service.ts`ga aqlli fallback qo‘shildi, `docker-compose.prod.yml` yangilandi, serverdagi `zayuno-api` konteyneriga o‘zgaruvchilar ulanib, qayta ishga tushirildi. `https://api.zayuno.uz/api/v1/auth/google/start` sinovdan o‘tkazildi va Google hisob tanlash sahifasiga 302 redirect berayotgani tasdiqlandi. Sirlar kiritilmadi.
+
+# Bajarilgan: Feed Up uchrashuviga Yandex/Alisa raqobati, xatolar javobgarligi va "Ilovangni chiqar" signalini qo‘shish (2026-09-14)
 
 - [x] `docs/BIRINCHI_UCHRASHUV_FEED_UP_NATIJASI.md` va `FEED_UP_FOUNDER_MEETING.md`ga yangi tafsilotlarni qo‘shish:
   - Yandex/Alisa savoli va Zayunoning infratuzilma qatlami (Provider Action Infrastructure) sifatidagi javobi;
