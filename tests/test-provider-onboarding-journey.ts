@@ -135,14 +135,45 @@ async function main() {
     assert.equal(regResult.provider.isCertified, false);
     assert.equal(regResult.provider.isPublished, false);
 
-    // 3. Discovery Check: DRAFT provider MUST NOT appear in find/list
-    console.log('  3. Verifying uncertified DRAFT provider is invisible to AI discovery...');
+    // A provider-owner account can have one managed provider in this schema.
+    // A second application must explain that account relationship; it must not
+    // be confused with a duplicate requested slug.
+    console.log('  3. Verifying assigned-account conflict explains the real blocker...');
+    const assignedProvider = {
+      id: 'provider_assigned_active',
+      slug: 'existing-business',
+      name: 'Existing Business',
+      status: ProviderStatus.ACTIVE
+    };
+    dbUsers.set('owner_assigned_active', { id: 'owner_assigned_active', providerId: assignedProvider.id });
+    dbProviders.set(assignedProvider.slug, assignedProvider as any);
+    await assert.rejects(
+      () => providersService.registerProvider({
+        name: 'New Provider',
+        slug: 'new-provider',
+        baseUrl: 'https://coffee-time-sandbox.shopla.uz',
+        apiSecret: 'not-needed-for-official-sandbox',
+        supportContact: { email: 'support@new-provider.uz' },
+        capabilities: ['METADATA' as any, 'HEALTH' as any, 'CATALOG' as any]
+      }, { id: 'owner_assigned_active', role: UserRole.PROVIDER_OWNER }),
+      (error: any) => {
+        const response = error.getResponse();
+        assert.equal(response.error, 'PROVIDER_ACCOUNT_ASSIGNED');
+        assert.equal(response.assignedProvider?.slug, 'existing-business');
+        assert.match(String(response.message), /Yangi biznes arizasi yaratilmagan/i);
+        return true;
+      },
+      'The error must name the assigned provider and make clear that the requested slug was not created.'
+    );
+
+    // 4. Discovery Check: DRAFT provider MUST NOT appear in find/list
+    console.log('  4. Verifying uncertified DRAFT provider is invisible to AI discovery...');
     const activeProviders = await providersService.listProviders();
     const found = activeProviders.find(p => p.slug === 'fast-deliveries');
     assert.equal(found, undefined, 'DRAFT provider must be invisible in discovery');
 
-    // 4. Submit for review without certification -> should be prevented or flagged
-    console.log('  4. Verifying review submission requirements...');
+    // 5. Submit for review without certification -> should be prevented or flagged
+    console.log('  5. Verifying review submission requirements...');
     const saved = dbProviders.get('fast-deliveries');
     assert.equal(isProviderPublished(saved), false);
 

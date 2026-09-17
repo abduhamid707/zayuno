@@ -499,7 +499,15 @@ export class ProvidersService {
           if (assigned.status === ProviderStatus.DRAFT) {
             existingOwnerDraft = assigned;
           } else {
-            throw new BadRequestException('This provider-owner account is already assigned to an active provider. Ask an administrator to create or transfer another provider account.');
+            throw new BadRequestException({
+              error: 'PROVIDER_ACCOUNT_ASSIGNED',
+              message: `Bu hisob allaqachon “${assigned.name}” biznesiga ulangan. Yangi biznes arizasi yaratilmagan.`,
+              assignedProvider: {
+                name: assigned.name,
+                slug: assigned.slug,
+                status: assigned.status
+              }
+            });
           }
         }
       }

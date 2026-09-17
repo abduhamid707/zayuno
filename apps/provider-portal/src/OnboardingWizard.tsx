@@ -50,6 +50,12 @@ type CredentialHandoff = {
   sandboxWebhookSecret?: string;
 };
 
+type AssignedProviderConflict = {
+  name: string;
+  slug: string;
+  status?: string;
+};
+
 function downloadJsonArtifact(filename: string, value: unknown) {
   const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
   const href = URL.createObjectURL(blob);
@@ -376,6 +382,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [assignedProviderConflict, setAssignedProviderConflict] = useState<AssignedProviderConflict | null>(null);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const businessValidation = businessErrors({ businessName, supportPhone, supportTelegram, supportEmail, supportUrl, supportNote });
@@ -388,7 +395,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const integrationSaved = Boolean(savedFingerprint && savedFingerprint === fingerprint && !apiSecret && businessValid && integrationValid);
   const maxStep = reachableOnboardingStep(businessValid, integrationSaved, Boolean(certReport?.isProductionReady));
   useEffect(() => { setCurrentStep(step => step === 3 && showCertificationSettings && businessValid ? step : Math.min(step, maxStep)); }, [maxStep, showCertificationSettings, businessValid]);
-  useEffect(() => { setSuccessMsg(null); setFieldErrors({}); setError(null); }, [fingerprint, currentStep]);
+  useEffect(() => { setSuccessMsg(null); setFieldErrors({}); setError(null); setAssignedProviderConflict(null); }, [fingerprint, currentStep]);
   useEffect(() => { setUrlCheckResult({ status: 'idle', message: '' }); }, [baseUrl, authMethod, apiSecret]);
   const showValidation = (errors: Record<string, string>) => {
     setFieldErrors(errors);
@@ -1101,6 +1108,15 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
 
       const data = await res.json();
       if (!res.ok) {
+        if (data?.code === 'PROVIDER_ACCOUNT_ASSIGNED') {
+          const assigned = data?.details?.assignedProvider;
+          setAssignedProviderConflict({
+            name: assigned?.name || 'mavjud biznesingiz',
+            slug: assigned?.slug || '',
+            status: assigned?.status
+          });
+          return;
+        }
         throw new Error(data?.message || 'Provider arizasini yaratishda xatolik yuz berdi.');
       }
 
@@ -1279,6 +1295,22 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <div className="flex-1">{error}</div>
         </div>
+      )}
+      {assignedProviderConflict && (
+        <section role="alert" className="rounded-2xl border border-amber-400/35 bg-amber-950/25 p-5 text-sm text-amber-50 shadow-lg shadow-amber-950/10 animate-fadeIn">
+          <div className="flex items-start gap-3">
+            <Building2 className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-amber-100">Bu hisob boshqa biznesga ulangan</p>
+              <p className="mt-1.5 leading-6 text-amber-50/90"><strong>{assignedProviderConflict.name}</strong>{assignedProviderConflict.slug ? ` (${assignedProviderConflict.slug})` : ''} hozir shu account bilan boshqariladi. Shu sabab <strong>{slug.trim() || 'yangi provider'}</strong> arizasi yaratilmagan.</p>
+              <p className="mt-2 leading-6 text-amber-100/80">Bir provider account bitta biznes uchun ishlaydi. Yangi biznesni ulash uchun unga alohida owner account bering yoki admin orqali accountni ko‘chiring.</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" onClick={() => onNavigateTab('apps')} className="inline-flex items-center gap-1.5 rounded-xl bg-amber-300 px-3.5 py-2 text-xs font-bold text-slate-950 transition hover:bg-amber-200"><Building2 className="h-3.5 w-3.5" /> Mening biznesimni ochish</button>
+                <button type="button" onClick={() => setAssignedProviderConflict(null)} className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200/30 px-3.5 py-2 text-xs font-semibold text-amber-100 transition hover:bg-amber-100/10">Boshqa account bilan davom etish</button>
+              </div>
+            </div>
+          </div>
+        </section>
       )}
       {successMsg && (
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-start gap-2.5 animate-fadeIn">

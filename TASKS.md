@@ -2326,14 +2326,15 @@ Agar xohlasang, keyingi qadamda men Zayuno vs Yandex vs Google vs OpenAI vs Clau
 # Joriy ish — iTicket.uz real mock provider serveri va onboarding sinovi (2026-09-17)
 
 - [x] iTicket.uz real tadbirlari va chiptalari bilan to‘liq Zayuno Provider API Protocol serverini yaratish (`scripts/iticket-mock-server.mjs`).
-- [x] Serverni ishga tushirish (port 3005) va HTTPS tunnellari (`https://21007258e259f5.lhr.life` hamda `https://fznfc-45-9-230-75.free.pinggy.net`) bilan ta’minlash.
+- [x] Serverni ishga tushirish (port 3005) va doimiy HTTPS tunnel (`https://e446d264da9c55.lhr.life`) bilan ta’minlash.
 - [ ] Provider Onboarding Step 2 va Step 3 (moslik va test chaqiruvlari)ni muvaffaqiyatli tekshiruvdan o‘tkazish.
 - [ ] Yakuniy natijalarni va tekshiruv hisobotini berish.
 
 **Holat / handoff:** Mock server (`scripts/iticket-mock-server.mjs`) yangilandi:
 1. `GET /provider-info` javobidan `fulfillmentMode` chiqarib tashlandi va canonical schema ga to'liq moslandi.
 2. `POST /actions` da `idempotencyKey` bo'yicha kesh xotiradan original buyurtmani qaytarish (Idempotency Protection) qo'shildi va takroriy so'rovlar bir xil action qaytarishi test qilindi (PASS).
-Aktiv tunnellari: `https://21007258e259f5.lhr.life` va `https://fznfc-45-9-230-75.free.pinggy.net`.
+Aktiv tunnel: `https://e446d264da9c55.lhr.life` (20 soniyalik keepalive bilan).
+
 
 
 
@@ -2380,3 +2381,13 @@ Aktiv tunnellari: `https://21007258e259f5.lhr.life` va `https://fznfc-45-9-230-7
 - [x] `main` branch’ini `origin`ga push qilish va natijani yozish.
 
 **Holat / handoff:** Bajarildi. Provider API, portal UX, testlar va iTicket mock server `eb14cc3 feat(provider): streamline review and integration flow` commitiga yig‘ildi hamda `origin/main`ga muvaffaqiyatli push qilindi. Tekshiruvlar: provider portal va API buildlari, review dashboard UX, credential UX/security, onboarding/auth hamda provider onboarding journey testlari, `git diff --check`; iTicket mock server `GET /health` — `HEALTHY`.
+
+# Joriy ish — Production provider-account blokini tushunarli qilish va deploy (2026-09-17)
+
+- [x] Boshqa providerga biriktirilgan account uchun API’dan aniq, xavfsiz xato kodi va provider ma’lumotini qaytarish.
+- [x] Onboarding’da xom xato o‘rniga sabab, mavjud biznes va keyingi amalli tushunarli karta ko‘rsatish.
+- [x] API va provider portal test/buildlarini bajarish, so‘ng production pipeline’ga push qilish.
+- [ ] GitHub Actions production deploymentini ishga tushirish yoki avtomatik release natijasini tasdiqlash.
+- [ ] Production sahifasida yangi xato holatini tekshirish.
+
+**Holat / handoff:** API endi `PROVIDER_ACCOUNT_ASSIGNED` kodini, accountga ulangan providerning xavfsiz nomi/slugini va “yangi biznes arizasi yaratilmagan” ma’lumotini qaytaradi. Portal bu xatoni amaliy kartaga aylantiradi: mavjud biznesni ochish yoki boshqa owner account bilan davom etish yo‘li beriladi. PASS: `pnpm --filter @zayuno/api build`, `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-provider-onboarding-journey.ts`, `pnpm exec tsx tests/test-review-dashboard-ux.ts`, `pnpm exec tsx tests/test-credential-ux-and-security.ts`, `pnpm exec tsx tests/test-onboarding-and-auth-flow.ts`, `git diff --check`. Keyingi qadam — push avtomatik boshlaydigan GitHub Actions build/deploy release’ini tasdiqlash va productionda tekshirish.
