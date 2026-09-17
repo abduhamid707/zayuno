@@ -481,7 +481,11 @@ export class ProvidersService {
     }));
   }
 
-  async registerProvider(input: RegisterProviderInput, owner?: { id?: string; role?: UserRole }): Promise<{ provider: ProviderInfo; credentials: ProviderCredentials }> {
+  async registerProvider(input: RegisterProviderInput, owner?: { id?: string; role?: UserRole }): Promise<{
+    provider: ProviderInfo;
+    credentials?: ProviderCredentials;
+    credentialHandoff: { newlyIssued: boolean; message: string };
+  }> {
     const registration = RegisterProviderInputSchema.safeParse(input);
     if (!registration.success) throw new BadRequestException(registration.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
     input = registration.data;
@@ -588,23 +592,17 @@ export class ProvidersService {
         await prisma.user.update({ where: { id: owner.id }, data: { providerId: updated.id } });
       }
 
-      const existingKey = await prisma.apiKey.findFirst({
-        where: { providerId: updated.id, isActive: true }
-      });
-      const sandboxSecret = updated.webhookSecret || `zy_sb_sec_${Math.random().toString(36).substring(2, 12)}`;
-
       return {
         provider: this.mapToProviderInfo(updated),
-        credentials: {
-          providerSlug: cleanSlug,
-          sandboxApiKey: existingKey?.keyPrefix ? `${existingKey.keyPrefix}...` : 'zy_test_sandbox_key',
-          sandboxWebhookSecret: sandboxSecret
+        credentialHandoff: {
+          newlyIssued: false,
+          message: 'Maxfiy kalitlar faqat yaratilgan paytda ko‘rsatiladi. Mavjud kalitlar qayta ochilmaydi.'
         }
       };
     }
 
     const sandboxKey = generateApiKey(false);
-    const sandboxSecret = `zy_sb_sec_${Math.random().toString(36).substring(2, 12)}`;
+    const sandboxSecret = `zy_whsec_${randomBytes(32).toString('base64url')}`;
     const secretToEncrypt = input.apiSecret || this.registry.resolveSandboxTestCredential(input.baseUrl, cleanSlug) || sandboxSecret;
     const encryptedSecret = encryptSecret(secretToEncrypt, this.getEncryptionKey());
 
@@ -667,7 +665,11 @@ export class ProvidersService {
 
     return {
       provider: this.mapToProviderInfo(created),
-      credentials
+      credentials,
+      credentialHandoff: {
+        newlyIssued: true,
+        message: 'Zayuno developer API key va webhook imzo kaliti faqat shu javobda ko‘rsatiladi.'
+      }
     };
   }
 
@@ -911,7 +913,7 @@ export class ProvidersService {
 
     const normalizedSupport = normalizeSupportContact(input.supportContact);
     const sandboxKey = generateApiKey(false);
-    const webhookSecret = `zy_sb_sec_${Math.random().toString(36).slice(2, 14)}`;
+    const webhookSecret = `zy_whsec_${randomBytes(32).toString('base64url')}`;
     const encryptedSecret = encryptSecret(webhookSecret, this.getEncryptionKey());
     const passwordHash = await bcrypt.hash(input.temporaryPassword, 12);
     const result = await prisma.$transaction(async tx => {
@@ -1010,9 +1012,14 @@ export class ProvidersService {
         direction: 'Zayuno -> Provider Server (Zayuno provayderingiz serveriga so‘rov yuborayotganda ushbu maxfiy kalitdan foydalanadi)'
       },
       zayunoApiKeys: existingKeys,
-      sandboxApiKey: existingKeys[0]?.keyPrefix ? `${existingKeys[0].keyPrefix}...` : 'zy_test_sandbox_key',
-      sandboxWebhookSecret: provider.webhookSecret,
-      webhookSecret: provider.webhookSecret,
+      webhookSigning: {
+        enabled: provider.capabilities.includes(ProviderCapability.WEBHOOK),
+        configured: Boolean(provider.webhookSecret)
+      },
+      credentialHandoff: {
+        canRevealExistingSecrets: false,
+        message: 'Maxfiy kalitlar qayta ko‘rsatilmaydi. Yangi API key yarating yoki webhook imzo kalitini yangilang.'
+      },
       instructions: {
         providerAuthNote: 'Bu secret Zayunodan sizning serveringizga keluvchi so‘rovlarni tekshirish uchun.',
         zayunoApiKeyNote: 'Bu zy_test_... kalitlari esa sizning tizimingizdan Zayuno API chaqirish uchun.'

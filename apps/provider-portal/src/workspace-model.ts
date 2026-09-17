@@ -17,6 +17,7 @@ export function getIntegrationState(signedIn: boolean, provider?: {
   const connected = !!provider?.slug && !!provider.baseUrl;
   const certified = provider?.metadata?.isCertified === true;
   const active = provider?.status === 'ACTIVE';
+  const reviewStatus = String(provider?.metadata?.reviewStatus || 'DRAFT');
   const steps = [
     { title: 'Biznes va mijoz yordami', description: 'Biznes nomi, rasmiy sayt va mijoz ko‘radigan yordam kanallarini kiriting.', complete: signedIn && !!provider?.slug },
     { title: 'Online API’ni ulang', description: 'Public HTTPS API manzilini kiriting va /health holatini tekshiring.', complete: connected },
@@ -29,5 +30,8 @@ export function getIntegrationState(signedIn: boolean, provider?: {
   if (active) return { steps, label: 'Dashboardni ochish', description: 'Buyurtmalar, to‘lov holati va integratsiya salomatligini kuzating.', tab: 'apps' as WorkspaceTab, step: 4, status: 'Faol provider' };
   if (!connected) return { steps, label: 'API manzilini ulash', description: 'Public HTTPS API manzilini va authentication sozlamalarini kiriting.', tab: 'onboarding' as WorkspaceTab, step: 2, status: 'API kutilmoqda' };
   if (!certified) return { steps, label: 'API tekshiruvini ochish', description: 'Server ulangan. Contractga mosligini certification bilan tekshiring.', tab: 'onboarding' as WorkspaceTab, step: 3, status: 'Tekshiruv kutilmoqda' };
-  return { steps, label: 'Review holatini ko‘rish', description: 'API tekshiruvi o‘tgan. Ariza reviewdan so‘ng real mijozlarga ochiladi.', tab: 'onboarding' as WorkspaceTab, step: 4, status: provider.metadata?.reviewStatus || 'Review uchun tayyor' };
+  if (reviewStatus === 'PENDING_APPROVAL') {
+    return { steps, label: 'Ariza holatini ko‘rish', description: 'Arizangiz ko‘rib chiqilmoqda. Tasdiqlangach AI mijozlarga ochiladi.', tab: 'apps' as WorkspaceTab, step: 4, status: 'Ko‘rib chiqilmoqda' };
+  }
+  return { steps, label: 'Reviewga yuborish', description: 'API tekshiruvi o‘tgan. Arizani yuboring, tasdiqlangach real mijozlarga ochiladi.', tab: 'onboarding' as WorkspaceTab, step: 4, status: 'Reviewga tayyor' };
 }

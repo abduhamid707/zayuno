@@ -253,6 +253,8 @@ export default function App() {
   const [createdCredentials, setCreatedCredentials] = useState<any>(null);
   const [selectedProviderActionId, setSelectedProviderActionId] = useState<string | null>(null);
   const [dashboardSection, setDashboardSection] = useState<'orders' | 'integration'>('orders');
+  const [reviewEditMode, setReviewEditMode] = useState(false);
+  const [advancedDeveloperSettingsOpen, setAdvancedDeveloperSettingsOpen] = useState(false);
   const [actionFilters, setActionFilters] = useState({
     query: '', status: 'ALL', paymentStatus: 'ALL', from: '', to: '', sort: 'newest'
   });
@@ -295,6 +297,12 @@ export default function App() {
     loading: boolean;
     copied: boolean;
   }>({ isOpen: false, secret: '', loading: false, copied: false });
+  const [issuedApiKeyModal, setIssuedApiKeyModal] = useState<{
+    isOpen: boolean;
+    apiKey: string;
+    loading: boolean;
+    copied: boolean;
+  }>({ isOpen: false, apiKey: '', loading: false, copied: false });
 
   // URL Query Sync
   useEffect(() => {
@@ -359,6 +367,27 @@ export default function App() {
     } catch (err: any) {
       setRotatedSecretModal({ isOpen: false, secret: '', loading: false, copied: false });
       alert(err?.message || 'Webhook secretni yangilashda xatolik yuz berdi');
+    }
+  };
+
+  const handleCreateDeveloperApiKey = async () => {
+    if (!provider) return;
+    setIssuedApiKeyModal({ isOpen: true, apiKey: '', loading: true, copied: false });
+    try {
+      const res = await apiFetch('/api/v1/auth/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Provider developer key (${provider.slug})`,
+          isLive: provider.status === 'ACTIVE'
+        })
+      });
+      const data = await res.json();
+      if (!data?.apiKey) throw new Error('Yangi Zayuno API key yaratilmadi.');
+      setIssuedApiKeyModal({ isOpen: true, apiKey: data.apiKey, loading: false, copied: false });
+    } catch (err: any) {
+      setIssuedApiKeyModal({ isOpen: false, apiKey: '', loading: false, copied: false });
+      alert(err?.message || 'Zayuno API key yaratilmadi.');
     }
   };
 
@@ -517,6 +546,12 @@ export default function App() {
     providerData?.type as ProviderType | undefined,
     (providerData?.fulfillmentMode || providerData?.metadata?.fulfillmentMode) as ProviderFulfillmentMode | undefined
   );
+  const providerReviewStatus = String(providerData?.metadata?.reviewStatus || 'DRAFT');
+  const isPendingReview = providerReviewStatus === 'PENDING_APPROVAL';
+  const isProviderActive = providerData?.status === 'ACTIVE';
+  const usesTransactionalFlow = integrationForm.capabilities.some(capability =>
+    ['QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK'].includes(capability)
+  );
   const dashboardProvider = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (providerData?.slug && dashboardProvider.current !== providerData.slug) {
@@ -524,6 +559,12 @@ export default function App() {
       setDashboardSection(providerData.status === 'ACTIVE' ? 'orders' : 'integration');
     }
   }, [providerData?.slug, providerData?.status]);
+  useEffect(() => {
+    if (!isPendingReview) setReviewEditMode(false);
+  }, [isPendingReview]);
+  useEffect(() => {
+    if (activeTab === 'onboarding' && isPendingReview) setActiveTab('apps');
+  }, [activeTab, isPendingReview]);
   const integrationState = getIntegrationState(!!token, providerData);
 
   const { data: providerDashboard, isFetching: dashboardFetching, isError: dashboardFailed, refetch: refetchDashboard } = useQuery({
@@ -536,7 +577,7 @@ export default function App() {
       params.set('limit', '50');
       return (await apiFetch(`/api/v1/providers/me/dashboard?${params.toString()}`)).json();
     },
-    enabled: !!token && !!providerData?.slug
+    enabled: !!token && !!providerData?.slug && isProviderActive
   });
 
   const { data: selectedProviderAction, isFetching: actionDetailLoading } = useQuery({
@@ -623,6 +664,8 @@ export default function App() {
     onSuccess: async () => {
       setIntegrationForm(current => ({ ...current, apiSecret: '', webhookSecret: '' }));
       await refetchProvider();
+      setReviewEditMode(false);
+      setDashboardSection('integration');
     }
   });
 
@@ -918,17 +961,17 @@ export default function App() {
                     <div className="flex items-center gap-3">
                       <h2 className="text-2xl font-extrabold text-white tracking-tight">{provider.name}</h2>
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border ${
-                        provider.status === 'ACTIVE'
+                        isProviderActive
                           ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                          : provider.status === 'DRAFT'
-                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                          : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                          : isPendingReview
+                          ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                          : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                       }`}>
-                        {provider.status === 'ACTIVE' ? '● JONLI / ACTIVE' : `● ${provider.status}`}
+                        {isProviderActive ? '● JONLI' : isPendingReview ? '◌ KO‘RIB CHIQILMOQDA' : '● SOZLANMOQDA'}
                       </span>
-                      {provider.metadata?.isCertified && (
+                      {provider.metadata?.isCertified && !isPendingReview && (
                         <span className="bg-sky-500/15 text-sky-300 border border-sky-500/30 px-2 py-0.5 rounded-full text-[11px] font-medium flex items-center gap-1">
-                          <ShieldCheck className="w-3 h-3" /> Sertifikatlangan
+                          <ShieldCheck className="w-3 h-3" /> API sinovi o‘tgan
                         </span>
                       )}
                     </div>
@@ -955,8 +998,50 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Health / Temporary Unavailability Banner */}
-                {provider.status !== 'ACTIVE' && (
+                {isPendingReview ? (
+                  <section aria-label="Ariza ko‘rib chiqilmoqda" className="overflow-hidden rounded-3xl border border-sky-500/30 bg-gradient-to-br from-sky-950/45 via-indigo-950/30 to-slate-900/70 shadow-xl shadow-sky-950/20">
+                    <div className="border-b border-sky-500/20 px-6 py-5 sm:px-7">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex gap-3.5">
+                          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-sky-400/30 bg-sky-400/10 text-sky-300">
+                            <Clock className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.18em] text-sky-300">Review jarayoni</p>
+                            <h3 className="mt-1 text-lg font-bold text-white">Arizangiz ko‘rib chiqilmoqda</h3>
+                            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-300">API sinovi muvaffaqiyatli o‘tdi. Zayuno jamoasi integratsiyangizni tekshiryapti; tasdiqlangach biznesingiz AI mijozlarga ochiladi.</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setReviewEditMode(true); setDashboardSection('integration'); }}
+                          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-900/80 px-3.5 py-2 text-xs font-semibold text-slate-100 transition hover:border-indigo-400 hover:bg-slate-800"
+                        >
+                          <Sliders className="h-3.5 w-3.5 text-indigo-300" /> API va kalitlarni boshqarish
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 p-5 sm:grid-cols-3 sm:p-6">
+                      {[
+                        { label: 'API sertifikatlash', detail: 'Muvaffaqiyatli yakunlandi', done: true },
+                        { label: 'Ariza yuborildi', detail: provider.metadata?.submittedAt ? new Date(provider.metadata.submittedAt).toLocaleString('uz-UZ') : 'Navbatga qo‘shildi', done: true },
+                        { label: 'AI mijozlarga ochish', detail: 'Tasdiqlangach faollashadi', done: false }
+                      ].map(step => (
+                        <div key={step.label} className="rounded-2xl border border-slate-700/80 bg-slate-950/45 p-3.5">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-white">
+                            {step.done ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <Lock className="h-4 w-4 text-slate-500" />}
+                            {step.label}
+                          </div>
+                          <p className="mt-1.5 text-[11px] leading-4 text-slate-400">{step.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex flex-col gap-2 border-t border-sky-500/15 px-6 py-4 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                      <span>Hozir hech narsa yuborishingiz shart emas. Sozlamani o‘zgartirsangiz, review qayta boshlanadi.</span>
+                      <button type="button" onClick={() => { setSelectedDoc('contract-reference'); setActiveTab('docs'); }} className="font-semibold text-sky-300 hover:text-sky-200">API hujjatlarini ochish →</button>
+                    </div>
+                  </section>
+                ) : provider.status !== 'ACTIVE' && (
                   <div className="dashboard-next-step">
                     <div>
                       <h3>{integrationState.status}</h3>
@@ -1015,6 +1100,8 @@ export default function App() {
                   </div>
                 )}
 
+                {isProviderActive && (
+                  <>
                 {/* Modern KPI Cards */}
                 {dashboardFailed && (
                   <div className="workspace-notice" role="alert">
@@ -1052,79 +1139,39 @@ export default function App() {
                     onClick={() => setDashboardSection('integration')}
                     className="flex items-center gap-2"
                   >
-                    <span>⚙️ API Sozlamalari & Credentiallar</span>
+                    <span>⚙️ API ulanishi</span>
                   </button>
                 </nav>
+                  </>
+                )}
 
-                <section hidden={dashboardSection !== 'integration'} aria-label="API sozlamalari va nashr" className="space-y-6">
-                  {/* AI Quick Handoff Banner */}
-                  <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-slate-900/60 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
-                    <div className="flex items-start gap-3.5">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-                        <Sparkles className="w-5 h-5 text-amber-300" />
+                {(!isPendingReview || reviewEditMode) && (
+                <section hidden={isProviderActive && dashboardSection !== 'integration'} aria-label="API sozlamalari va nashr" className="space-y-6">
+                  {isPendingReview && reviewEditMode && (
+                    <div className="flex flex-col gap-3 rounded-2xl border border-amber-500/35 bg-amber-950/25 p-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-start gap-2.5 text-amber-100">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                        <div><strong className="block">Review jarayoni to‘xtatiladi</strong><span className="mt-0.5 block leading-5 text-amber-100/80">API sozlamasini saqlash certification va review holatini yangidan boshlaydi. Faqat o‘zgartirish zarur bo‘lsa saqlang.</span></div>
                       </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                          <span>AI Agent bilan 5 daqiqada integratsiya</span>
-                          <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-mono px-2 py-0.5 rounded-full border border-indigo-500/30">Claude · Cursor · Codex</span>
-                        </h4>
-                        <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                          AI agentingiz bormi? Zayuno AI Kit orqali tayyor brief va OpenAPI schema oling. Agentingiz backend kodingizga to‘liq mos keluvchi Zayuno adapterini mustaqil yozib beradi.
-                        </p>
-                      </div>
+                      <button type="button" onClick={() => setReviewEditMode(false)} className="shrink-0 font-semibold text-amber-200 hover:text-white">Review holatiga qaytish</button>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setAiKitOpen(true)}
-                        className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-600/20 transition flex items-center gap-2"
-                      >
-                        <Sparkles className="w-4 h-4 text-amber-300" />
-                        AI Kit’ni ochish
-                      </button>
-                      <a
-                        href="/llms.txt"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3 py-2.5 text-xs font-medium text-slate-200 transition flex items-center gap-1.5"
-                      >
-                        <Terminal className="w-3.5 h-3.5 text-indigo-400" />
-                        /llms.txt
-                      </a>
-                    </div>
-                  </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Provider Info Card */}
-                  <div className="lg:col-span-1 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
-                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-indigo-400" /> Provider account
-                    </h3>
-                    <p className="text-xs leading-5 text-slate-400">
-                      Bu account <strong className="text-slate-200">{provider.name}</strong> provideriga biriktirilgan.
-                    </p>
-                    <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs space-y-1">
-                      <div><span className="text-slate-500">Status:</span> <strong className="ml-1 text-indigo-300">{provider.status}</strong></div>
-                      <div><span className="text-slate-500">Review:</span> <strong className="ml-1 text-indigo-300">{provider.metadata?.reviewStatus || 'DRAFT'}</strong></div>
-                      <div><span className="text-slate-500">Sertifikatlangan:</span> <strong className="ml-1 text-emerald-400">{provider.metadata?.isCertified ? 'HA' : 'YO‘Q'}</strong></div>
-                    </div>
-                  </div>
-
-                  {/* Integration Settings Form */}
-                  <div className="lg:col-span-2 space-y-6">
+                  )}
+                <div className="space-y-6">
+                  {/* Business-safe integration settings. Developer-only controls stay collapsed below. */}
+                  <div className="space-y-6">
                     <div className="bg-slate-900/60 border border-indigo-500/30 rounded-2xl p-6 space-y-5">
                       <div>
                         <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                          <Globe className="w-4 h-4 text-indigo-400" /> Integration sozlamalari
+                          <Globe className="w-4 h-4 text-indigo-400" /> API ulanishi
                         </h3>
                         <p className="mt-1 text-xs text-slate-400">
-                          Provider backend manzili va uning credentiallarini shu yerda ulang. Saqlanganda oldingi certification bekor qilinadi.
+                          Bu yerga dasturchingiz bergan API manzilni kiriting. Kalitlar va texnik sozlamalar pastdagi alohida bo‘limda.
                         </p>
                       </div>
 
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <label className="block text-xs text-slate-400">Provider API Base URL (HTTPS)</label>
+                          <label className="block text-xs font-medium text-slate-200">Sizning API manzilingiz</label>
                           <button
                             type="button"
                             onClick={() => {
@@ -1144,7 +1191,25 @@ export default function App() {
                           disabled={provider.status === 'ACTIVE'}
                           className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-indigo-500 disabled:opacity-50"
                         />
-                        {integrationForm.baseUrl.trim() && !integrationForm.baseUrl.toLowerCase().includes('sandbox') && (
+                        <p className="mt-1.5 text-[11px] leading-5 text-slate-500">Masalan: <code className="text-slate-400">https://api.biznesingiz.uz/zayuno</code>. Bu manzilni odatda dasturchi beradi.</p>
+                      </div>
+
+                      <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-3.5">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                        <div><p className="text-xs font-semibold text-white">Mijozlar uchun xizmat</p><p className="mt-1 text-[11px] leading-5 text-slate-400">{usesTransactionalFlow ? 'Mijozlar katalogingizni ko‘radi, narxni aniqlaydi va buyurtma yuboradi.' : 'Mijozlar katalogingizni ko‘radi. Buyurtma yaratish hozir yoqilmagan.'}</p></div>
+                      </div>
+
+                      <button
+                        type="button"
+                        aria-expanded={advancedDeveloperSettingsOpen}
+                        onClick={() => setAdvancedDeveloperSettingsOpen(open => !open)}
+                        className="flex w-full items-center justify-between rounded-2xl border border-slate-700 bg-slate-950/55 px-4 py-3 text-left transition hover:border-indigo-400/60 hover:bg-slate-900"
+                      >
+                        <span className="flex items-center gap-2.5"><Code2 className="h-4 w-4 text-indigo-300" /><span><span className="block text-xs font-semibold text-white">Dasturchi sozlamalari</span><span className="mt-0.5 block text-[11px] text-slate-500">Kalitlar, webhook va texnik tekshiruv</span></span></span>
+                        <span className="text-xs font-semibold text-indigo-300">{advancedDeveloperSettingsOpen ? 'Yopish' : 'Ochish'}</span>
+                      </button>
+
+                      {advancedDeveloperSettingsOpen && integrationForm.baseUrl.trim() && !integrationForm.baseUrl.toLowerCase().includes('sandbox') && (
                           <div className="mt-2.5 rounded-xl border border-slate-800/80 bg-slate-950/80 p-3 space-y-1.5">
                             <div className="flex items-center justify-between">
                               <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5">
@@ -1171,8 +1236,9 @@ export default function App() {
                             </pre>
                           </div>
                         )}
-                      </div>
-
+                      {advancedDeveloperSettingsOpen && (
+                      <div className="space-y-5 rounded-2xl border border-slate-800 bg-slate-950/35 p-4">
+                        <p className="text-[11px] leading-5 text-slate-400"><strong className="text-slate-200">Faqat dasturchi uchun.</strong> Bu sozlamalar serverni Zayuno bilan xavfsiz bog‘laydi. Ishonchingiz bo‘lmasa, AI Kit promptini yoki ushbu sahifani dasturchingizga bering.</p>
                       {/* Sandbox Notification if sandbox domain is selected */}
                       {(integrationForm.baseUrl.toLowerCase().includes('sandbox') || integrationForm.baseUrl.toLowerCase().includes('shopla.uz')) ? (
                         <div className="p-3.5 rounded-xl bg-sky-950/30 border border-sky-500/40 text-xs text-sky-200 space-y-1 animate-fadeIn">
@@ -1188,8 +1254,8 @@ export default function App() {
                           <div className="space-y-1">
                             <div className="flex items-center justify-between">
                               <label className="block text-xs text-slate-300 font-medium flex items-center gap-1">
-                                <span>Provider API key / token</span>
-                                <span title="Bu sizning serveringizni Zayuno so‘rovlaridan himoya qiladigan kalit. Uni sizning dasturchingiz backend sozlamalarida yaratadi va Zayuno portalga bir marta kiritadi." className="cursor-help text-slate-500 hover:text-indigo-400">
+                                <span>Zayuno → sizning serveringiz kaliti</span>
+                                <span title="Zayuno sizning API’ingizga yuborgan so‘rovni tekshirish uchun ishlatiladi. Bu kalitni dasturchingiz yaratadi va server tomonida saqlaydi." className="cursor-help text-slate-500 hover:text-indigo-400">
                                   <HelpCircle className="w-3.5 h-3.5" />
                                 </span>
                               </label>
@@ -1201,7 +1267,7 @@ export default function App() {
                                 }}
                                 className="text-[10px] text-indigo-400 hover:text-indigo-300"
                               >
-                                Qayerdan olaman? →
+                                Qo‘llanma →
                               </button>
                             </div>
                             <input
@@ -1223,8 +1289,8 @@ export default function App() {
                           <div className="space-y-1">
                             <div className="flex items-center justify-between">
                               <label className="block text-xs text-slate-300 font-medium flex items-center gap-1">
-                                <span>Webhook HMAC secret</span>
-                                <span title="Bu kalit Zayuno’ga yuboriladigan order/status webhooklar haqiqatan sizning serveringizdan kelganini tasdiqlaydi." className="cursor-help text-slate-500 hover:text-emerald-400">
+                                <span>Webhook imzo kaliti</span>
+                                <span title="Sizning serveringiz Zayuno’ga yuborgan buyurtma holati haqiqiy ekanini tasdiqlaydi." className="cursor-help text-slate-500 hover:text-emerald-400">
                                   <HelpCircle className="w-3.5 h-3.5" />
                                 </span>
                               </label>
@@ -1251,7 +1317,7 @@ export default function App() {
                                 onClick={handleRotateWebhookSecret}
                                 disabled={provider.status === 'ACTIVE'}
                                 className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-[11px] font-semibold shrink-0 transition flex items-center gap-1"
-                                title="Webhook HMAC secretni xavfsiz almashtirish"
+                                title="Webhook imzo kalitini xavfsiz almashtirish"
                               >
                                 <RefreshCw className="w-3 h-3" />
                                 <span>Yangilash</span>
@@ -1261,92 +1327,48 @@ export default function App() {
                         </div>
                       )}
 
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-semibold text-white">Capabilities & Profile</p>
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setIntegrationForm(current => ({
-                                ...current,
-                                capabilities: Array.from(new Set([
-                                  ...READONLY_CAPABILITIES,
-                                  ...(providerRequiresLocations ? ['LOCATIONS'] : [])
-                                ]))
-                              }))}
-                              className="px-2.5 py-1 rounded-lg text-[10px] font-mono border border-sky-500/30 bg-sky-950/30 text-sky-300 hover:bg-sky-900/40 transition"
-                            >
-                              Discovery / Read-only
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setIntegrationForm(current => ({
-                                ...current,
-                                capabilities: Array.from(new Set([
-                                  ...TRANSACTIONAL_MANDATORY_CAPABILITIES,
-                                  ...(providerRequiresLocations ? ['LOCATIONS'] : [])
-                                ]))
-                              }))}
-                              className="px-2.5 py-1 rounded-lg text-[10px] font-mono border border-emerald-500/30 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-900/40 transition"
-                            >
-                              Transactional
-                            </button>
+                      <div className="flex flex-col gap-3 rounded-2xl border border-violet-500/25 bg-violet-950/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-start gap-2.5">
+                          <div className="mt-0.5 rounded-xl border border-violet-400/25 bg-violet-400/10 p-2 text-violet-200"><Key className="h-4 w-4" /></div>
+                          <div>
+                            <h4 className="text-xs font-bold text-white">Sizning serveringiz → Zayuno kaliti</h4>
+                            <p className="mt-1 max-w-xl text-[11px] leading-5 text-slate-400">Sizning serveringiz Zayuno API’ga murojaat qilishi uchun kerak. Mavjud kalit qayta ko‘rsatilmaydi; yangi kalit faqat yaratilgan paytda bir marta ochiladi.</p>
                           </div>
                         </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          {PROVIDER_CAPABILITIES.map(capability => {
-                            const isReadOnlyMandatory = READONLY_CAPABILITIES.includes(capability);
-                            const isLocationMandatory = capability === 'LOCATIONS' && providerRequiresLocations;
-                            const isTransactionalMandatory = TRANSACTIONAL_MANDATORY_CAPABILITIES.includes(capability) || isLocationMandatory;
-                            const checked = integrationForm.capabilities.includes(capability);
-                            return (
-                              <label key={capability} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] cursor-pointer transition ${checked ? (isTransactionalMandatory ? 'border-indigo-500/40 bg-indigo-950/40 text-indigo-200' : 'border-emerald-500/40 bg-emerald-950/30 text-emerald-300') : 'border-slate-800 bg-slate-950 text-slate-400'}`}>
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  disabled={provider.status === 'ACTIVE' || isLocationMandatory}
-                                  onChange={event => setIntegrationForm(current => ({
-                                    ...current,
-                                    capabilities: event.target.checked
-                                      ? [...new Set([...current.capabilities, capability])]
-                                      : current.capabilities.filter(value => value !== capability)
-                                  }))}
-                                />
-                                {capability}
-                                {isReadOnlyMandatory && <span className="text-[9px] text-sky-400 font-mono">RO</span>}
-                                {isLocationMandatory && <span className="text-[9px] text-amber-300 font-mono">REQUIRED</span>}
-                              </label>
-                            );
-                          })}
-                        </div>
-                        <p className="mt-1 text-[11px] text-slate-500">
-                          Discovery profili uchun [METADATA, HEALTH, CATALOG] yetarli. Tranzaksion xizmatlar uchun barcha 7 ta capability talab qilinadi.
-                          {providerRequiresLocations && ' Bu jismoniy xizmat bo‘lgani uchun LOCATIONS ham majburiy va avtomatik saqlanadi.'}
-                        </p>
+                        <button
+                          type="button"
+                          onClick={handleCreateDeveloperApiKey}
+                          disabled={issuedApiKeyModal.loading}
+                          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-violet-400/35 bg-violet-500/15 px-3.5 py-2 text-xs font-semibold text-violet-100 transition hover:bg-violet-500/25 disabled:opacity-50"
+                        >
+                          <Key className="h-3.5 w-3.5" /> {issuedApiKeyModal.loading ? 'Yaratilmoqda...' : 'Yangi API key yaratish'}
+                        </button>
                       </div>
+
+                      </div>
+                      )}
 
                       <button
                         onClick={() => updateIntegrationMutation.mutate()}
                         disabled={updateIntegrationMutation.isPending || provider.status === 'ACTIVE' || !integrationForm.baseUrl.trim()}
                         className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-xl text-xs transition-all"
                       >
-                        {updateIntegrationMutation.isPending ? 'Tekshirilmoqda va saqlanmoqda...' : 'Integrationni saqlash'}
+                        {updateIntegrationMutation.isPending ? 'Tekshirilmoqda va saqlanmoqda...' : 'O‘zgarishlarni saqlash'}
                       </button>
                       {provider.status === 'ACTIVE' && <p className="text-xs text-amber-300">ACTIVE provider sozlamalarini o‘zgartirishdan oldin Operations uni suspend qilishi kerak.</p>}
                       {updateIntegrationMutation.isError && <p className="text-xs text-rose-400">{(updateIntegrationMutation.error as Error).message}</p>}
                       {updateIntegrationMutation.isSuccess && <p className="text-xs text-emerald-400">Integration saqlandi. Endi certificationni qayta ishga tushiring.</p>}
                     </div>
 
-                    {/* Default Provider Review Card */}
-                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
+                    {/* Certification and review controls belong only to the editable, pre-review state. */}
+                    {!isProviderActive && !isPendingReview && <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="text-base font-semibold text-white">{provider.name}</h3>
                           <p className="text-xs text-slate-400 font-mono">Slug: {provider.slug}</p>
                         </div>
-                        <span className="bg-emerald-500/20 text-emerald-300 text-xs px-2.5 py-1 rounded-full border border-emerald-500/30">
-                          {provider.status}
+                        <span className="bg-amber-500/15 text-amber-300 text-xs px-2.5 py-1 rounded-full border border-amber-500/30">
+                          Sozlanmoqda
                         </span>
                       </div>
 
@@ -1382,13 +1404,14 @@ export default function App() {
                       </div>
                       {submitReviewMutation.isError && <p className="text-xs text-rose-400">{(submitReviewMutation.error as Error).message}</p>}
                       {submitReviewMutation.isSuccess && <p className="text-xs text-emerald-400">Ariza admin review’ga yuborildi.</p>}
-                    </div>
+                    </div>}
                   </div>
                 </div>
 
                 {/* Actions Dashboard Table */}
                 </section>
-                <section hidden={dashboardSection !== 'orders'} aria-label="Buyurtmalar">
+                )}
+                {isProviderActive && <section hidden={dashboardSection !== 'orders'} aria-label="Buyurtmalar">
                 <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
@@ -1547,6 +1570,7 @@ export default function App() {
                   </div>
                 </div>
                 </section>
+                }
               </div>
             )}
           </div>
@@ -2060,6 +2084,42 @@ export default function App() {
                     Yopish
                   </button>
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {issuedApiKeyModal.isOpen && (
+        <div className="fixed inset-0 z-[95] grid place-items-center overflow-y-auto bg-black/85 p-4 backdrop-blur-md animate-fadeIn" role="dialog" aria-modal="true" aria-labelledby="issued-api-key-title">
+          <div className="my-8 w-full max-w-lg rounded-2xl border border-violet-500/30 bg-slate-900 p-6 shadow-2xl space-y-5">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-3">
+              <div className="space-y-1">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-violet-300"><Key className="h-3.5 w-3.5" /> Xavfsizlik kaliti</span>
+                <h3 id="issued-api-key-title" className="text-base font-bold text-white">Yangi Zayuno API key</h3>
+              </div>
+              <button type="button" onClick={() => setIssuedApiKeyModal(modal => ({ ...modal, isOpen: false }))} className="rounded-full bg-slate-800 p-1.5 text-xs text-slate-400 transition hover:bg-slate-700 hover:text-white" aria-label="Kalit oynasini yopish">✕</button>
+            </div>
+
+            {issuedApiKeyModal.loading ? (
+              <div className="space-y-3 py-8 text-center"><RefreshCw className="mx-auto h-6 w-6 animate-spin text-violet-300" /><p className="text-xs text-slate-300">Yangi kalit yaratilmoqda…</p></div>
+            ) : (
+              <div className="space-y-4 text-xs">
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-amber-100">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-300"><AlertTriangle className="h-3.5 w-3.5" /> Bu qiymat faqat bir marta ko‘rsatiladi</div>
+                  <p className="mt-1 text-[11px] leading-relaxed">Kalitni darhol backend serveringizning <code className="rounded bg-black/30 px-1 font-mono">ZAYUNO_API_KEY</code> muhit o‘zgaruvchisiga saqlang. Uni frontend, Git, URL yoki AI chatga yubormang.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400">Zayuno developer API key</label>
+                  <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono">
+                    <span className="min-w-0 truncate text-xs text-white select-all">{issuedApiKeyModal.apiKey}</span>
+                    <button type="button" onClick={() => { navigator.clipboard.writeText(issuedApiKeyModal.apiKey); setIssuedApiKeyModal(modal => ({ ...modal, copied: true })); setTimeout(() => setIssuedApiKeyModal(modal => ({ ...modal, copied: false })), 3000); }} className="flex shrink-0 items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 font-sans text-xs font-semibold text-white transition hover:bg-violet-500">
+                      {issuedApiKeyModal.copied ? <Check className="h-3.5 w-3.5 text-emerald-200" /> : <Copy className="h-3.5 w-3.5" />}{issuedApiKeyModal.copied ? 'Nusxalandi!' : 'Nusxa olish'}
+                    </button>
+                  </div>
+                </div>
+                <p className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-[11px] leading-5 text-slate-400">Bu kalit serveringizdan Zayuno REST API’ga so‘rov yuborish uchun ishlatiladi. Zayuno sizning API’ingizga yuboradigan <code className="text-sky-300">x-provider-api-key</code> bilan aralashtirmang.</p>
+                <div className="pt-1 text-right"><button type="button" onClick={() => setIssuedApiKeyModal(modal => ({ ...modal, isOpen: false }))} className="rounded-xl bg-slate-800 px-5 py-2 text-xs font-semibold text-white hover:bg-slate-700">Saqladim</button></div>
               </div>
             )}
           </div>

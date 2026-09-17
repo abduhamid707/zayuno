@@ -173,7 +173,27 @@ async function main() {
   );
   console.log('    ✓ AI integration brief accurately guides developer on secrets handling.');
 
-  console.log('\n🎉 ALL 8 CREDENTIAL UX & ZERO-SECRET SECURITY TESTS PASSED CLEANLY!\n');
+  // --------------------------------------------------------------------------
+  // Test 9: One-time Handoff Must Never Fall Back to a Fake or Recovered Secret
+  // --------------------------------------------------------------------------
+  console.log('  [9/9] Verifying one-time credential handoff never renders fake or recovered secrets...');
+  assert.ok(
+    !wizardContent.includes('zy_test_sandbox_key'),
+    'The onboarding UI must never render a hardcoded placeholder as an API key'
+  );
+  assert.ok(
+    !providersServiceContent.includes("sandboxApiKey: existingKey?.keyPrefix") &&
+    !providersServiceContent.includes('sandboxWebhookSecret: provider.webhookSecret'),
+    'Credential lookup must not reconstruct or reveal values after the original handoff'
+  );
+  assert.ok(
+    providersServiceContent.includes('canRevealExistingSecrets: false') &&
+    wizardContent.includes('Dasturchi buni qanday ishlatadi?'),
+    'The recovery state must explain the secure next action and the direction of each credential'
+  );
+  console.log('    ✓ One-time credential handoff is real and its recovery flow is explicit.');
+
+  console.log('\n🎉 ALL 9 CREDENTIAL UX & ZERO-SECRET SECURITY TESTS PASSED CLEANLY!\n');
 }
 
 main().catch(err => {

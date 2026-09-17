@@ -171,7 +171,7 @@ export class ProvidersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.PROVIDER_OWNER, UserRole.PROVIDER_DEVELOPER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Retrieve sandbox API credentials and webhook secrets' })
+  @ApiOperation({ summary: 'Retrieve non-secret credential status and API key prefixes for the provider' })
   async getCredentials(@Param('slug') slug: string, @Req() request: any) {
     return this.providersService.getProviderCredentials(slug, request.user);
   }

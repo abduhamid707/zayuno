@@ -129,7 +129,7 @@ async function main() {
     );
 
     assert.ok(regResult.credentials.sandboxApiKey.startsWith('zy_test_'));
-    assert.ok(regResult.credentials.sandboxWebhookSecret.startsWith('zy_sb_sec_'));
+    assert.ok(regResult.credentials.sandboxWebhookSecret.startsWith('zy_whsec_'));
     assert.equal(regResult.provider.slug, 'fast-deliveries');
     assert.equal(regResult.provider.status, ProviderStatus.DRAFT);
     assert.equal(regResult.provider.isCertified, false);

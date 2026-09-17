@@ -2322,3 +2322,61 @@ Agar xohlasang, keyingi qadamda men Zayuno vs Yandex vs Google vs OpenAI vs Clau
 - [x] Provider portal va API buildlari hamda auth oqimi regressiya tekshiruvini bajarish.
 
 **Holat / handoff:** Bajarildi. `onboarding`, ilovalar, sandbox, sertifikatlash va so‘rovlar inspektori sessiyasiz ochilmaydi; to‘g‘ridan-to‘g‘ri onboarding manzili alohida ro‘yxatdan o‘tish sahifasiga qaytadi. Kirish/ro‘yxatdan o‘tish endi workspace shell, sidebar va marketing bloklarisiz; Google va email oqimlari foydalaniladigan manzilga qaytaradi. Email bilan yangi provider darhol sessiyaga kiradi, email tasdiqlashi talab qilinmaydi. Brauzerda anonim onboarding redirecti va kirish rejimiga o‘tish tekshirildi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm --filter @zayuno/api build`, `pnpm exec tsx tests/test-auth-and-verification.ts`, `pnpm exec tsx tests/test-onboarding-and-auth-flow.ts`, `git diff --check`. Build faqat avvaldan mavjud PostCSS module-type hamda katta chunk warninglarini berdi.
+
+# Joriy ish — iTicket.uz real mock provider serveri va onboarding sinovi (2026-09-17)
+
+- [x] iTicket.uz real tadbirlari va chiptalari bilan to‘liq Zayuno Provider API Protocol serverini yaratish (`scripts/iticket-mock-server.mjs`).
+- [x] Serverni ishga tushirish (port 3005) va HTTPS tunnellari (`https://21007258e259f5.lhr.life` hamda `https://fznfc-45-9-230-75.free.pinggy.net`) bilan ta’minlash.
+- [ ] Provider Onboarding Step 2 va Step 3 (moslik va test chaqiruvlari)ni muvaffaqiyatli tekshiruvdan o‘tkazish.
+- [ ] Yakuniy natijalarni va tekshiruv hisobotini berish.
+
+**Holat / handoff:** Mock server (`scripts/iticket-mock-server.mjs`) yangilandi:
+1. `GET /provider-info` javobidan `fulfillmentMode` chiqarib tashlandi va canonical schema ga to'liq moslandi.
+2. `POST /actions` da `idempotencyKey` bo'yicha kesh xotiradan original buyurtmani qaytarish (Idempotency Protection) qo'shildi va takroriy so'rovlar bir xil action qaytarishi test qilindi (PASS).
+Aktiv tunnellari: `https://21007258e259f5.lhr.life` va `https://fznfc-45-9-230-75.free.pinggy.net`.
+
+
+
+# Joriy ish — Haqiqiy sandbox credential oqimi (2026-09-17)
+
+- [x] Onboarding yakunida demo credential o‘rniga backendda xavfsiz sandbox API key va webhook secret yaratish.
+- [x] Credentiallarni faqat shu javobda ko‘rsatish, keyingi ko‘rishda esa qayta ochilmasligini ta’minlash.
+- [x] Portalda bo‘sh yoki statik credentiallarni chiqarmaslik hamda keyinchalik yangilash yo‘lini aniq ko‘rsatish.
+- [x] API/portal buildlari va credential oqimi testlarini bajarish.
+
+**Holat / handoff:** Bajarildi. Yangi provider uchun backend haqiqiy Zayuno developer API key hamda kriptografik webhook imzo kalitini yaratadi va faqat yaratish/yangilash javobida qaytaradi. Mavjud credentiallar hech qachon qayta ochilmaydi; portal o‘rniga yangi key yoki webhook imzo kalitini yaratish yo‘lini beradi. UI ikki yo‘nalishni ajratib tushuntiradi: Zayuno → provider API uchun 2-qadamdagi provider secret, provider server → Zayuno uchun developer API key, status webhooklari uchun HMAC imzosi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm --filter @zayuno/api build`, `pnpm exec tsx tests/test-credential-ux-and-security.ts`, `pnpm exec tsx tests/test-onboarding-and-auth-flow.ts`, `pnpm exec tsx tests/test-provider-onboarding-journey.ts`, `git diff --check`. Build faqat avvaldan mavjud PostCSS module-type hamda katta chunk warninglarini berdi.
+
+# Joriy ish — Review holati va provider dashboard UX (2026-09-17)
+
+- [x] Reviewga yuborilgan provider uchun aniq, zid bo‘lmagan pending-review holatini ko‘rsatish.
+- [x] Review paytida buyurtma metrikalari va jadvali hamda katta sozlama formasini yashirib, keyingi amallarni aniq berish.
+- [x] Credential recovery actionlarini onboarding yakunidan API sozlamalaridagi xavfsizlik bo‘limiga ko‘chirish.
+- [x] Portal build, tegishli regressiya testlari va diff tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. `PENDING_APPROVAL` endi foydalanuvchiga “Arizangiz ko‘rib chiqilmoqda” holati sifatida ko‘rinadi: API sertifikatlash, ariza yuborilishi va AI mijozlarga ochilish bosqichlari bitta ravshan progress kartasida. Review paytida buyurtma KPI/jadvali va katta sozlama formasi chiqmaydi, `/dashboard` so‘rovi ham faqat `ACTIVE` provider uchun yuboriladi. Sozlama kerak bo‘lsa provider aniq “API va kalitlarni boshqarish” actionini bosadi; saqlash reviewni qayta boshlashini oldindan ko‘radi. Yangi developer API key va webhook boshqaruvi onboarding yakunidan olib tashlanib, `Biznesim → API sozlamalari va credentiallar` ichidagi xavfsizlik bo‘limiga ko‘chirildi; yangi API key bir marta ko‘rsatiladigan modalda beriladi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-review-dashboard-ux.ts`, `pnpm exec tsx tests/test-credential-ux-and-security.ts`, `pnpm exec tsx tests/test-provider-onboarding-journey.ts`, `git diff --check`. Build faqat avvaldan mavjud PostCSS module-type va katta chunk warninglarini berdi. Brauzerning yangi sessiyasida login cookie yo‘q edi, shuning uchun autentifikatsiyalangan live previewga kira olmadim; TypeScript build va review UX regressiya testi o‘tdi.
+
+# Joriy ish — API sozlamalarini biznes uchun soddalashtirish (2026-09-17)
+
+- [x] Oddiy biznes egasiga ko‘rinadigan API sozlamalaridan keraksiz texnik bloklarni olib tashlash.
+- [x] cURL, keylar, HMAC va capability sozlamalarini bitta yopiladigan dasturchi bo‘limiga joylashtirish.
+- [x] Integratsiya turi va saqlash actionini sodda, tushunarli tilga o‘tkazish.
+- [x] Portal build va UX regressiya tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. API settings endi biznes egasi uchun ixcham: API manzili, mijozlarga ko‘rinadigan xizmat ta’rifi va “O‘zgarishlarni saqlash” actioni qoladi. Bo‘sh `Provider account` kartasi, `Capabilities & Profile`, protocol checkboxlari, `Discovery / Read-only` va `Transactional` tanlovlari olib tashlandi; current capability konfiguratsiyasi saqlanadi va backendga o‘zgarmasdan yuboriladi. cURL, provider API key, webhook imzo kaliti va Zayuno developer API key “Dasturchi sozlamalari” ochilganda ko‘rinadi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-review-dashboard-ux.ts`, `pnpm exec tsx tests/test-credential-ux-and-security.ts`, `git diff --check`. Build faqat avvaldan mavjud PostCSS module-type va katta chunk warninglarini berdi.
+
+# Joriy ish — Review holati yo‘nalishi (2026-09-17)
+
+- [x] Pending reviewdagi overview actionini onboarding yakuni emas, review holati ko‘rinadigan biznes sahifasiga yo‘naltirish.
+- [x] Overview progressida xom backend review kodlarini odam tushunadigan holatlarga almashtirish.
+- [x] Eski `onboarding&step=4` URL’i pending reviewda ochilsa biznes sahifasiga qaytarish.
+- [x] Portal build, review UX testi va diff tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. Provider arizasi `PENDING_APPROVAL` bo‘lsa overview actioni endi “Ariza holatini ko‘rish” deb chiqadi va bevosita `Biznesim`dagi “Arizangiz ko‘rib chiqilmoqda” kartasiga olib boradi; xom backend kodi ko‘rsatilmaydi. Hali ariza yuborilmagan provider uchun alohida “Reviewga yuborish” actioni qoladi. Oldingi `onboarding&step=4` URL’i pending arizada avtomatik `Biznesim`ga qaytadi, shu sababli eskirgan ekranda review’ni qayta yuborish tugmasi chiqmaydi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-review-dashboard-ux.ts`, `pnpm exec tsx tests/test-onboarding-and-auth-flow.ts`, `git diff --check`. Build faqat oldindan mavjud PostCSS module-type va katta chunk warninglarini berdi.
+
+# Joriy ish — Provider portal o‘zgarishlarini push qilish (2026-09-17)
+
+- [x] Joriy provider API, portal, test va iTicket mock-server diffini yakuniy tekshirish.
+- [x] Tekshirilgan o‘zgarishlarni bitta commitga yig‘ish.
+- [ ] `main` branch’ini `origin`ga push qilish va natijani yozish.
+
+**Holat / handoff:** Tekshiruvlar o‘tdi: provider portal va API buildlari, review dashboard UX, credential UX/security, onboarding/auth hamda provider onboarding journey testlari, `git diff --check`; iTicket mock server `GET /health` ham `HEALTHY` qaytardi. Joriy o‘zgarishlar `aa9cc92 feat(provider): streamline review and integration flow` commitiga yig‘ildi; keyingi qadam — `origin/main`ga push.

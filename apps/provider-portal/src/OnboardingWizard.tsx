@@ -44,6 +44,12 @@ import {
 
 const DRAFT_STORAGE_KEY = 'zayuno_onboarding_draft';
 
+type CredentialHandoff = {
+  providerSlug: string;
+  sandboxApiKey?: string;
+  sandboxWebhookSecret?: string;
+};
+
 function downloadJsonArtifact(filename: string, value: unknown) {
   const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
   const href = URL.createObjectURL(blob);
@@ -358,22 +364,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [copiedCertificationFix, setCopiedCertificationFix] = useState<number | null>(null);
 
   // Step 4: Review & Credentials
-  const [createdCredentials, setCreatedCredentials] = useState<{
-    providerSlug: string;
-    sandboxApiKey: string;
-    sandboxWebhookSecret: string;
-  } | null>(() => {
-    if (initialProvider?.slug) {
-      return {
-        providerSlug: initialProvider.slug,
-        sandboxApiKey: 'zy_test_sandbox_key',
-        sandboxWebhookSecret: initialProvider.webhookSecret || ''
-      };
-    }
-    return null;
-  });
+  // Raw credentials exist only in the register / rotate response. Never rebuild
+  // this state from provider data: the backend intentionally cannot reveal old secrets.
+  const [createdCredentials, setCreatedCredentials] = useState<CredentialHandoff | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const registeredProviderSlug = (createdCredentials?.providerSlug || slug || initialProvider?.slug || '').trim().toLowerCase();
+  const requiresWebhookSigning = capabilityProfile === 'transactional';
 
   // Status & Errors
   const [loading, setLoading] = useState(false);
@@ -495,6 +492,19 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       setCopiedField(fieldName);
       setTimeout(() => setCopiedField(null), 2500);
     } catch {}
+  };
+
+  const handleCopyCredentialSetup = async () => {
+    if (!createdCredentials?.sandboxApiKey && !createdCredentials?.sandboxWebhookSecret) return;
+    const webhookEndpoint = `${apiBase.replace(/\/$/, '')}/api/v1/webhooks/${registeredProviderSlug}`;
+    const lines = [
+      '# Zayuno server sozlamalari',
+      createdCredentials.sandboxApiKey ? `ZAYUNO_API_KEY=${createdCredentials.sandboxApiKey}` : '',
+      createdCredentials.sandboxWebhookSecret ? `ZAYUNO_WEBHOOK_SECRET=${createdCredentials.sandboxWebhookSecret}` : '',
+      '',
+      `# Webhook endpoint: ${webhookEndpoint}`
+    ].filter(Boolean).join('\n');
+    await copyToClipboard(lines, 'setup');
   };
 
   // --------------------------------------------------------------------------
@@ -1097,16 +1107,9 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
       if (data.credentials) {
         setCreatedCredentials(data.credentials);
       } else {
-        // Fetch newly created sandbox credentials
-        try {
-          const credsRes = await fetch(`${apiBase}/api/v1/providers/${cleanSlug}/credentials`, {
-            headers: { Authorization: `Bearer ${authToken}` }
-          });
-          if (credsRes.ok) {
-            const credsData = await credsRes.json();
-            setCreatedCredentials(credsData);
-          }
-        } catch {}
+        // Existing credentials are deliberately not recoverable. Showing a
+        // prefix or an empty secret here would look usable while being neither.
+        setCreatedCredentials(null);
       }
 
       onProviderCreated(data.provider || data);
@@ -2677,7 +2680,7 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
             <button
               type="button"
               onClick={() => {
-                if (!createdCredentials) {
+                if (!registeredProviderSlug) {
                   setError('Iltimos, avval 2-qadamda API sozlamalarini saqlang.');
                   setCurrentStep(2);
                   return;
@@ -2697,7 +2700,7 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
       {/* --------------------------------------------------------------------- */}
       {currentStep === 4 && (
         <div className="space-y-6 animate-fadeIn">
-          {!createdCredentials ? (
+          {!registeredProviderSlug ? (
             <div className="p-8 rounded-3xl bg-amber-950/20 border border-amber-500/30 text-center space-y-4 max-w-lg mx-auto animate-fadeIn">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
                 <AlertCircle className="w-6 h-6" />
@@ -2722,68 +2725,90 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
                 <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30 shadow-lg shadow-emerald-950/50">
                   <CheckCircle2 className="w-7 h-7" />
                 </div>
-                <h3 className="text-xl font-bold text-white">Arizangiz tayyor va saqlandi!</h3>
+                <h3 className="text-xl font-bold text-white">{createdCredentials ? 'Kalitlaringiz tayyor' : 'Arizangiz saqlandi'}</h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Provider arizangiz yaratildi. Quyida sizning sandbox integratsiya kalitlaringiz berilgan.
+                  {createdCredentials
+                    ? 'Quyidagi maxfiy qiymatlarni hozir saqlang. Sahifani yopgandan keyin ularni qayta ochib bo‘lmaydi.'
+                    : 'Integratsiyangiz saqlangan. Maxfiy kalitlar xavfsizlik uchun qayta ko‘rsatilmaydi.'}
                 </p>
               </div>
 
-              {/* Credentials Box */}
+              {/* Credential handoff: raw values are rendered only from a fresh issue/rotation response. */}
               <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                    <Key className="w-4 h-4 text-amber-400" /> Sandbox Credentiallari
+                    <Key className="w-4 h-4 text-amber-400" /> Dasturchi uchun Zayuno kalitlari
                   </span>
-                  <span className="text-[10px] font-mono bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded border border-amber-500/20">
-                    Bir marta ko‘rsatiladi
-                  </span>
+                  {createdCredentials && <span className="text-[10px] font-mono bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded border border-amber-500/20">Faqat bir marta</span>}
                 </div>
 
                 <div className="space-y-2 text-xs font-mono">
                   <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
                     <span className="text-slate-400">Provider Slug:</span>
-                    <span className="text-indigo-300 font-bold">{createdCredentials.providerSlug}</span>
+                    <span className="text-indigo-300 font-bold">{registeredProviderSlug}</span>
                   </div>
 
-                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
-                    <div className="truncate pr-2">
-                      <span className="text-slate-400 block text-[10px]">Sandbox API Key:</span>
-                      <span className="text-white text-xs">{createdCredentials.sandboxApiKey}</span>
+                  {createdCredentials?.sandboxApiKey && (
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                      <div className="truncate pr-2">
+                        <span className="text-slate-400 block text-[10px]">Zayuno Developer API Key:</span>
+                        <span className="text-white text-xs select-all">{createdCredentials.sandboxApiKey}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(createdCredentials.sandboxApiKey!, 'key')}
+                        className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                        aria-label="Zayuno API key nusxalash"
+                      >
+                        {copiedField === 'key' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(createdCredentials.sandboxApiKey, 'key')}
-                      className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-                    >
-                      {copiedField === 'key' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
+                  )}
 
-                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
-                    <div className="truncate pr-2">
-                      <span className="text-slate-400 block text-[10px]">Sandbox Webhook Secret:</span>
-                      <span className="text-white text-xs">{createdCredentials.sandboxWebhookSecret}</span>
+                  {requiresWebhookSigning && createdCredentials?.sandboxWebhookSecret && (
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                      <div className="truncate pr-2">
+                        <span className="text-slate-400 block text-[10px]">Webhook imzo kaliti:</span>
+                        <span className="text-white text-xs select-all">{createdCredentials.sandboxWebhookSecret}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(createdCredentials.sandboxWebhookSecret!, 'sec')}
+                        className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                        aria-label="Webhook imzo kalitini nusxalash"
+                      >
+                        {copiedField === 'sec' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(createdCredentials.sandboxWebhookSecret, 'sec')}
-                      className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-                    >
-                      {copiedField === 'sec' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
+                  )}
                 </div>
+
+                {createdCredentials ? (
+                  <button
+                    type="button"
+                    onClick={handleCopyCredentialSetup}
+                    className="w-full mt-1 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-2 transition"
+                  >
+                    {copiedField === 'setup' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copiedField === 'setup' ? 'Sozlama nusxalandi' : 'Dasturchi uchun .env sozlamasini nusxalash'}
+                  </button>
+                ) : (
+                  <div className="mt-1 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-[11px] leading-5 text-slate-400">
+                    Oldingi raw qiymatlar xavfsizlik uchun qayta ochilmaydi. Yangi developer API key yoki webhook imzo kalitini <strong className="text-slate-200">Biznesim → API sozlamalari va credentiallar</strong> bo‘limidan yarating. U yerda kalitning vazifasi va serverga qo‘yish qadami ham ko‘rsatiladi.
+                  </div>
+                )}
               </div>
 
-              {/* Credential Usage Guidance */}
+              {/* Clear credential direction: the provider's own API secret and Zayuno credentials do different jobs. */}
               <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs space-y-2">
                 <h4 className="font-semibold text-white flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" /> Credentiallardan foydalanish va xavfsizlik:
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" /> Dasturchi buni qanday ishlatadi?
                 </h4>
-                <div className="space-y-1.5 text-[11px] text-slate-300">
-                  <p><strong>1. Provider API key:</strong> Dasturchi serveringizning <code className="text-sky-300 font-mono">.env</code> muhitiga joylaydi va Zayunodan kelgan <code className="text-sky-300 font-mono">x-provider-api-key</code> headerini tekshiradi.</p>
-                  <p><strong>2. Webhook HMAC secret:</strong> Serveringiz Zayunoga buyurtma holati yangilanishini yuborganda payloadni HMAC-SHA256 bilan imzolash uchun ishlatiladi.</p>
-                  <p className="text-amber-400"><strong>3. Xavfsizlik:</strong> Hech qachon ushbu kalitlarni chat, frontend JS bundle, URL parametri yoki Git repozitoriyaga joylamang.</p>
+                <div className="space-y-2 text-[11px] text-slate-300 leading-relaxed">
+                  <p><strong>1. Zayuno → sizning API’ingiz:</strong> 2-qadamda kiritilgan <code className="text-sky-300 font-mono">Provider API key</code> serveringizning <code className="text-sky-300 font-mono">.env</code> faylida turadi. <code className="text-sky-300 font-mono">/health</code>, <code className="text-sky-300 font-mono">/catalog</code> va buyurtma endpointlari kelgan <code className="text-sky-300 font-mono">x-provider-api-key</code> headerini shu qiymat bilan tekshiradi.</p>
+                  <p><strong>2. Sizning serveringiz → Zayuno:</strong> yuqoridagi <code className="text-indigo-300 font-mono">ZAYUNO_API_KEY</code> faqat Zayuno REST API chaqiruvlari uchun ishlatiladi. Uni o‘z endpointlaringizni himoyalash uchun ishlatmang.</p>
+                  {requiresWebhookSigning && <p><strong>3. Buyurtma statusi:</strong> event JSON’ining raw body’sini <code className="text-indigo-300 font-mono">ZAYUNO_WEBHOOK_SECRET</code> bilan HMAC-SHA256 imzolang, keyin <code className="break-all text-indigo-300 font-mono">POST {apiBase.replace(/\/$/, '')}/api/v1/webhooks/{registeredProviderSlug}</code> ga <code className="text-indigo-300 font-mono">x-zayuno-signature</code> headeri bilan yuboring.</p>}
+                  <p className="text-amber-400"><strong>Xavfsizlik:</strong> bu qiymatlarni faqat backend <code className="font-mono">.env</code> fayliga saqlang. Frontend, Git, URL yoki AI chatga yubormang.</p>
                 </div>
               </div>
 
