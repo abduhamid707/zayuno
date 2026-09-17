@@ -2377,6 +2377,6 @@ Aktiv tunnellari: `https://21007258e259f5.lhr.life` va `https://fznfc-45-9-230-7
 
 - [x] Joriy provider API, portal, test va iTicket mock-server diffini yakuniy tekshirish.
 - [x] Tekshirilgan o‘zgarishlarni bitta commitga yig‘ish.
-- [ ] `main` branch’ini `origin`ga push qilish va natijani yozish.
+- [x] `main` branch’ini `origin`ga push qilish va natijani yozish.
 
-**Holat / handoff:** Tekshiruvlar o‘tdi: provider portal va API buildlari, review dashboard UX, credential UX/security, onboarding/auth hamda provider onboarding journey testlari, `git diff --check`; iTicket mock server `GET /health` ham `HEALTHY` qaytardi. Joriy o‘zgarishlar `aa9cc92 feat(provider): streamline review and integration flow` commitiga yig‘ildi; keyingi qadam — `origin/main`ga push.
+**Holat / handoff:** Bajarildi. Provider API, portal UX, testlar va iTicket mock server `eb14cc3 feat(provider): streamline review and integration flow` commitiga yig‘ildi hamda `origin/main`ga muvaffaqiyatli push qilindi. Tekshiruvlar: provider portal va API buildlari, review dashboard UX, credential UX/security, onboarding/auth hamda provider onboarding journey testlari, `git diff --check`; iTicket mock server `GET /health` — `HEALTHY`.
