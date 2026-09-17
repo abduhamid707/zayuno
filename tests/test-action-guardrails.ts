@@ -24,6 +24,7 @@ async function main() {
   assert.ok(createTool, 'create_action must be advertised.');
   assert.ok(createTool.inputSchema.required?.includes('quoteId'), 'create_action must require quoteId.');
   assert.ok(createTool.inputSchema.required?.includes('userConfirmed'), 'create_action must require confirmation.');
+  assert.ok(!createTool.inputSchema.required?.includes('customer'), 'create_action must not require contact for every provider.');
 
   await assertRejects({ ...valid, userConfirmed: undefined }, 'Explicit user confirmation is required');
   await assertRejects({ ...valid, quoteId: undefined }, 'verified quoteId is required');

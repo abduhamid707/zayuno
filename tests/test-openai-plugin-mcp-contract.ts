@@ -304,7 +304,7 @@ async function main() {
     get_offering: ['providerSlug', 'offeringId'],
     check_availability: ['providerSlug', 'items'],
     request_quote: ['providerSlug', 'items'],
-    create_action: ['providerSlug', 'quoteId', 'items', 'customer', 'userConfirmed'],
+    create_action: ['providerSlug', 'quoteId', 'items', 'userConfirmed'],
     get_action: ['actionId'],
     cancel_action: ['actionId'],
     get_payment_options: ['actionId']

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Logger,
@@ -45,6 +46,12 @@ export class ConsumerChatController {
   private readonly logger = new Logger(ConsumerChatController.name);
 
   constructor(private readonly chatService: ConsumerChatService) {}
+
+  @Get("quick-actions")
+  @ApiOperation({ summary: "Get capability-aware home-screen quick actions" })
+  quickActions() {
+    return this.chatService.getQuickActions();
+  }
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -137,8 +144,19 @@ export class ConsumerChatController {
   }
 
   private publicErrorMessage(error: any): string {
-    return error?.status === HttpStatus.BAD_REQUEST
-      ? "Xabarni tekshirib, yana bir marta yuboring."
-      : "Zayuno hozir javob bera olmadi. Birozdan so‘ng qayta urinib ko‘ring.";
+    if (error?.status === HttpStatus.BAD_REQUEST) {
+      const message = String(error?.message || "");
+      if (/1[–-]1200/.test(message)) {
+        return "Xabar 1 200 belgidan uzun. Ro‘yxatni qismlarga bo‘lib yuboring.";
+      }
+      if (/bitta faol hamkor/i.test(message)) {
+        return "Bir so‘rovda bitta hamkor tanlang. Boshqa hamkor uchun yangi so‘rov yuboring.";
+      }
+      if (/expired/i.test(message)) {
+        return "Bu tanlovning muddati tugagan. Katalogdan qayta tanlang.";
+      }
+      return "Xabardagi ma’lumotni aniqlashtirib, yana yuboring.";
+    }
+    return "Zayuno hozir javob bera olmadi. Birozdan so‘ng qayta urinib ko‘ring.";
   }
 }

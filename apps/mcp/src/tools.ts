@@ -765,7 +765,10 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         ...args,
         ...(destination ? { destination } : {})
       });
-      const customerMessage = formatCustomerQuote(quote);
+      const provider = typeof client.getProvider === 'function'
+        ? await client.getProvider(args.providerSlug).catch(() => undefined)
+        : undefined;
+      const customerMessage = formatCustomerQuote(quote, provider);
       return {
         customerMessage,
         ...quote
@@ -776,7 +779,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 11. create_action
   {
     name: 'create_action',
-    description: 'Execute an action with the external provider. MUST only be called after request_quote and AFTER the user has explicitly reviewed and confirmed the quote. Returns pre-formatted customerMessage with secure checkout link. The AI assistant must present customerMessage directly to the customer and keep actionId/tokens internal.',
+    description: 'Execute an action with the external provider. MUST only be called after request_quote and AFTER the user has explicitly reviewed and confirmed the quote. Include customer contact or destination only when the quote or provider contract requires it. Returns a pre-formatted customerMessage with secure checkout link. The AI assistant must present customerMessage directly to the customer and keep actionId/tokens internal.',
     annotations: {
       readOnlyHint: false,
       openWorldHint: true,
@@ -828,13 +831,12 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         },
         customer: {
           type: 'object',
-          description: 'Customer contact information for action fulfillment.',
+          description: 'Customer contact information only when the provider declares it is required for this action.',
           properties: {
             name: { type: 'string', description: 'Customer full name (optional, defaults to "Mijoz")' },
-            phone: { type: 'string', description: 'Customer phone number e.g. +998901234567' },
+            phone: { type: 'string', description: 'Customer phone number when the provider requires it, e.g. +998901234567' },
             email: { type: 'string', description: 'Optional customer email' }
-          },
-          required: ['phone']
+          }
         },
         destination: {
           type: 'object',
@@ -861,7 +863,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           description: 'Explicit confirmation flag acknowledging pricing review by user (must be true).'
         }
       },
-      required: ['providerSlug', 'quoteId', 'items', 'customer', 'userConfirmed']
+      required: ['providerSlug', 'quoteId', 'items', 'userConfirmed']
     },
     outputSchema: {
       type: 'object',
@@ -896,11 +898,13 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       } else if (/^998\d{9}$/.test(phone)) {
         phone = `+${phone}`;
       }
-      const customer = {
-        name: args.customer?.name?.trim() || 'Mijoz',
-        phone,
-        ...(args.customer?.email ? { email: args.customer.email } : {})
-      };
+      const customer = phone
+        ? {
+            name: args.customer?.name?.trim() || 'Mijoz',
+            phone,
+            ...(args.customer?.email ? { email: args.customer.email } : {}),
+          }
+        : undefined;
       let destination = args.destination;
       if (typeof destination === 'string') {
         destination = { raw: destination };
@@ -911,7 +915,10 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         ...(destination ? { destination } : {}),
         idempotencyKey
       });
-      const customerMessage = formatCustomerActionConfirmation(action);
+      const provider = typeof client.getProvider === 'function'
+        ? await client.getProvider(args.providerSlug).catch(() => undefined)
+        : undefined;
+      const customerMessage = formatCustomerActionConfirmation(action, provider);
       return {
         customerMessage,
         actionId: action.publicId || action.id,
@@ -958,7 +965,10 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     },
     handler: async (args, client) => {
       const action = await client.getAction(args.actionId);
-      const customerMessage = formatCustomerActionStatus(action);
+      const provider = action?.providerSlug && typeof client.getProvider === 'function'
+        ? await client.getProvider(action.providerSlug).catch(() => undefined)
+        : undefined;
+      const customerMessage = formatCustomerActionStatus(action, provider);
       return {
         customerMessage,
         actionId: action.publicId || action.id,

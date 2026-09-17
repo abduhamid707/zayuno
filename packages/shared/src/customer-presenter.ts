@@ -12,17 +12,35 @@ export interface CustomerQuoteFormatOptions {
   isTicket?: boolean;
 }
 
+function isTicketPresentation(value: any, providerInfo?: any): boolean {
+  const providerIdentity = [
+    providerInfo?.type,
+    providerInfo?.category,
+    providerInfo?.name,
+    providerInfo?.slug,
+    providerInfo?.metadata?.category,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return (
+    providerInfo?.type === 'TICKETING' ||
+    /ticket|chipta|event|concert/i.test(providerIdentity) ||
+    value?.fulfillmentType === 'DIGITAL_TICKET' ||
+    Boolean(value?.parameters?.tripId || value?.parameters?.trainNumber || value?.parameters?.origin)
+  );
+}
+
 /**
  * Returns the dynamic service message bucket based on the available service count.
  */
 export function getDynamicServiceMessage(count?: number | null, isStale?: boolean): string {
   if (count === null || count === undefined || isStale || isNaN(count) || count <= 0) {
-    return 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.';
+    return 'Faol hamkorlar katalogidan sizga mos variantni topib beraman.';
   }
 
-  if (count <= 24) return 'O‘nlab taomlar orasidan sizga mosini topib beraman.';
-  if (count <= 199) return '100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin.';
-  return 'Yuzlab taom va ichimlik orasidan didingizga mosini topib beraman.';
+  if (count <= 24) return 'O‘nlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.';
+  if (count <= 199) return '100 dan ortiq mahsulot va xizmat orasidan tanlashingiz mumkin.';
+  return 'Yuzlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.';
 }
 
 /**
@@ -30,7 +48,7 @@ export function getDynamicServiceMessage(count?: number | null, isStale?: boolea
  */
 export function getWelcomeMessage(serviceCount?: number | null, isStale?: boolean): string {
   const dynamicMessage = getDynamicServiceMessage(serviceCount, isStale);
-  return `Assalomu alaykum! Zayuno bilan sevimli restoraningizdan ovqat buyurtma qilish oson.\n\n${dynamicMessage} Menyu, narx, yetkazib berish va buyurtma holatini bir chatda boshqaramiz. Bugun nima yegingiz kelyapti?`;
+  return `Assalomu alaykum! Zayuno orqali tasdiqlangan hamkorlar xizmatlaridan foydalanish oson.\n\n${dynamicMessage} Katalog, narx, provider talablari va buyurtma holatini bitta chatda boshqaramiz. Nima kerakligini yozing.`;
 }
 
 /**
@@ -147,10 +165,7 @@ export function formatUzbekCurrency(amount: number, currency = 'UZS'): string {
 export function formatCustomerQuote(quote: any, providerInfo?: any): string {
   if (!quote) return 'Kotirovka hisoblandi.';
 
-  const isTicket =
-    providerInfo?.type === 'TICKETING' ||
-    quote.fulfillmentType === 'DIGITAL_TICKET' ||
-    Boolean(quote.parameters?.tripId || quote.parameters?.trainNumber || quote.parameters?.origin);
+  const isTicket = isTicketPresentation(quote, providerInfo);
 
   if (isTicket) {
     const origin = quote.parameters?.origin || quote.parameters?.from || quote.metadata?.origin || quote.parameters?.departureStation;
@@ -210,6 +225,18 @@ export function formatCustomerQuote(quote: any, providerInfo?: any): string {
       parts.push('Tafsilotlar checkout sahifasida tasdiqlanadi.');
     }
 
+    if (Array.isArray(quote.lines) && quote.lines.length > 0) {
+      for (const line of quote.lines) {
+        const title = line.variantTitle || line.variantName
+          ? `${line.offeringTitle || line.title || 'Chipta'} — ${line.variantTitle || line.variantName}`
+          : line.offeringTitle || line.title || 'Chipta';
+        const amount = line.lineTotal || line.total || (line.unitPrice * (line.quantity || 1)) || 0;
+        parts.push(`${title} × ${line.quantity || 1} — ${formatUzbekCurrency(amount, quote.currency)}`);
+      }
+    }
+    if (quote.totalFees && quote.totalFees > 0) {
+      parts.push(`Servis / bronlash to‘lovi: ${formatUzbekCurrency(quote.totalFees, quote.currency)}`);
+    }
     const totalText = formatUzbekCurrency(quote.total || quote.subtotal || 0, quote.currency);
     parts.push(`Jami: ${totalText}`);
     parts.push('');
@@ -235,14 +262,16 @@ export function formatCustomerQuote(quote: any, providerInfo?: any): string {
   }
 
   if (quote.totalFees && quote.totalFees > 0) {
-    lines.push(`Yetkazib berish / xizmat haqi: ${formatUzbekCurrency(quote.totalFees, quote.currency)}`);
+    const delivery = String(providerInfo?.fulfillmentMode || quote.fulfillmentType || '').toUpperCase() === 'DELIVERY';
+    lines.push(`${delivery ? 'Yetkazib berish haqi' : 'Xizmat haqi'}: ${formatUzbekCurrency(quote.totalFees, quote.currency)}`);
   }
 
   const grandTotal = formatUzbekCurrency(quote.total || quote.subtotal || 0, quote.currency);
   lines.push(`Jami: ${grandTotal}`);
 
   if (quote.estimatedDurationMinutes) {
-    lines.push(`Yetkazish: taxminan ${quote.estimatedDurationMinutes} daqiqa`);
+    const delivery = String(providerInfo?.fulfillmentMode || quote.fulfillmentType || '').toUpperCase() === 'DELIVERY';
+    lines.push(`${delivery ? 'Yetkazish' : 'Taxminiy bajarilish vaqti'}: taxminan ${quote.estimatedDurationMinutes} daqiqa`);
   }
 
   lines.push('');
@@ -257,10 +286,7 @@ export function formatCustomerQuote(quote: any, providerInfo?: any): string {
 export function formatCustomerActionConfirmation(action: any, providerInfo?: any): string {
   if (!action) return 'Buyurtmangiz yaratildi. To‘lov kutilmoqda.';
 
-  const isTicket =
-    providerInfo?.type === 'TICKETING' ||
-    action.fulfillmentType === 'DIGITAL_TICKET' ||
-    Boolean(action.parameters?.tripId || action.parameters?.trainNumber);
+  const isTicket = isTicketPresentation(action, providerInfo);
 
   const isCoffeeTime =
     providerInfo?.slug === 'coffee-time' ||
@@ -293,10 +319,7 @@ export function formatCustomerActionConfirmation(action: any, providerInfo?: any
 export function formatCustomerActionStatus(action: any, providerInfo?: any): string {
   if (!action) return 'Buyurtma ma’lumoti topilmadi.';
 
-  const isTicket =
-    providerInfo?.type === 'TICKETING' ||
-    action.fulfillmentType === 'DIGITAL_TICKET' ||
-    Boolean(action.parameters?.tripId || action.parameters?.trainNumber);
+  const isTicket = isTicketPresentation(action, providerInfo);
 
   const status = String(action.status || '').toUpperCase();
   const paymentStatus = String(action.paymentStatus || '').toUpperCase();
@@ -343,7 +366,7 @@ export function formatCustomerActionStatus(action: any, providerInfo?: any): str
  * Formats cancellation result into customer-facing copy.
  */
 export function formatCustomerActionCancellation(result: any, providerInfo?: any): string {
-  const isTicket = providerInfo?.type === 'TICKETING';
+  const isTicket = isTicketPresentation(result, providerInfo);
   if (isTicket) {
     return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga yangi chipta topib beraman.';
   }
@@ -357,7 +380,7 @@ export function formatCustomerAvailability(result: any, providerInfo?: any): str
   if (!result) return 'Mavjudlik tekshirildi.';
   if (result.isAvailable) {
     if (Array.isArray(result.availableItems) && result.availableItems.length > 0) {
-      const isTicket = providerInfo?.type === 'TICKETING';
+      const isTicket = isTicketPresentation(result, providerInfo);
       if (isTicket && result.availableItems[0]?.metadata?.recommendedSeats?.length) {
         const seats = result.availableItems[0].metadata.recommendedSeats.map((s: any) => `${s.number}-joy`).join(', ');
         return `Joylar mavjud (${seats}). Kotirovka hisoblashga tayyormisiz?`;
@@ -379,31 +402,36 @@ export function formatCustomerAvailability(result: any, providerInfo?: any): str
  */
 export function formatCustomerProviders(providers: any[]): string {
   if (!Array.isArray(providers) || providers.length === 0) {
-    return 'Hozircha mos restoran yoki fast-food topilmadi.';
+    return 'Hozircha mos faol hamkor topilmadi.';
   }
   const names = providers.map(p => p.name || p.slug).filter(Boolean);
   if (names.length === 1) {
-    return `"${names[0]}" topildi. Menyusini ko‘rishni xohlaysizmi?`;
+    return `"${names[0]}" topildi. Katalogini ko‘rishni xohlaysizmi?`;
   }
-  return `Mavjud restoranlar: ${names.slice(0, 5).join(', ')}. Qaysi birining menyusini ochamiz?`;
+  return `Mavjud hamkorlar: ${names.slice(0, 5).join(', ')}. Qaysi birining katalogini ochamiz?`;
 }
 
 /**
  * Formats single provider metadata for customer.
  */
 export function formatCustomerProvider(provider: any): string {
-  if (!provider) return 'Restoran ma’lumoti topilmadi.';
-  const name = provider.name || provider.slug || 'Restoran';
+  if (!provider) return 'Hamkor ma’lumoti topilmadi.';
+  const name = provider.name || provider.slug || 'Hamkor';
   const desc = provider.description ? ` (${provider.description})` : '';
-  return `"${name}"${desc}. Menyusini ko‘rishni xohlaysizmi?`;
+  return `"${name}"${desc}. Katalogini ko‘rishni xohlaysizmi?`;
 }
 
 /**
  * Formats provider capability summary for customer.
  */
 export function formatCustomerCapabilities(capabilities: string[], providerName?: string): string {
-  const name = providerName ? `"${providerName}"` : 'Ushbu restoran';
-  return `${name} menyusini ko‘rish, narxni hisoblash va ovqat buyurtma qilish mumkin.`;
+  const name = providerName ? `"${providerName}"` : 'Ushbu hamkor';
+  const normalized = new Set((capabilities || []).map(capability => String(capability).toUpperCase()));
+  const actions = ['Katalogni ko‘rish'];
+  if (normalized.has('SEARCH')) actions.push('qidirish');
+  if (normalized.has('QUOTE')) actions.push('narxni hisoblash');
+  if (normalized.has('ACTION_CREATE')) actions.push('amalni bajarish');
+  return `${name} orqali ${actions.join(', ')} mumkin.`;
 }
 
 /**
@@ -467,5 +495,5 @@ export function formatCustomerError(error?: unknown): string {
  * Formats general conversational response when user asks about capabilities.
  */
 export function formatCustomerGeneralHelp(): string {
-  return 'Men restoran tanlash, menyudan taom topish, aniq narxni hisoblash, buyurtma berish va holatini kuzatishda yordam beraman. Bugun nima yegingiz kelyapti?';
+  return 'Faol hamkorlar katalogidan mos variant topaman, aniq narxini tekshiraman va provider ruxsat bergan bo‘lsa keyingi amalni bajarishga yordam beraman. Nima kerakligini yozing.';
 }

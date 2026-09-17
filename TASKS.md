@@ -1,3 +1,13 @@
+# Joriy ish — iTicket.UZ provayder mock serveri va real Mangu 5 integratsiyasi (2026-09-17)
+
+- [x] iTicket.uz dan real ma'lumotlar (Mangu 5 MMA Humo Arena, Toshkent City Sayilgoh, Imom Buxoriy muzeyi, Islom sivilizatsiyasi markazi, Yalla ansambli)ni olish.
+- [x] Mock server (`scripts/iticket-mock-server.mjs`) katalogiga Mangu 5 va boshqa real tadbirlarni to'liq narxlar, sektorlar, chiptalar soni va rasmlari bilan qo'shish.
+- [x] Zayuno Provider v1 contract talablariga moslash (fulfillmentMode: REMOTE, idempotency protection).
+- [x] Cloudflare tunnel orqali serverni barqaror public URLga ulash va barcha endpointlarni (/health, /provider-info, /catalog, /search, /quote, /actions) tekshirish.
+- [x] Mock serverdagi sun'iy 10 000 UZS "Servis va bronlash to‘lovi"ni olib tashlash va sof chipta narxiga (0 fee) o'tkazish.
+
+**Holat / handoff:** Mock server yangilandi va 3005 portda qayta ishga tushirildi. Cloudflare tunnel orqali `https://important-nations-motels-trainers.trycloudflare.com` public URL'i barqaror ishlamoqda. Real iticket.uz tadbirlari, ayniqsa MANGU 5 (Humo Arena, 26-sentabr 2026, 50 000 - 1 000 000 UZS) to'liq katalogda mavjud. Sun'iy 10 000 so'm fee olib tashlandi; endi chipta narxi (50 000 UZS) to'liq jami summaga teng (total: 50 000, fees: 0). Barcha testlar muvaffaqiyatli o'tdi.
+
 # Joriy ish — API ulash diagnostikasi va AI fix-brief UX (2026-09-17)
 
 - [x] `/health` tekshiruvini aniq status, sabab, kutilgan javob va keyingi qadam bilan ko‘rsatish.
@@ -2326,14 +2336,14 @@ Agar xohlasang, keyingi qadamda men Zayuno vs Yandex vs Google vs OpenAI vs Clau
 # Joriy ish — iTicket.uz real mock provider serveri va onboarding sinovi (2026-09-17)
 
 - [x] iTicket.uz real tadbirlari va chiptalari bilan to‘liq Zayuno Provider API Protocol serverini yaratish (`scripts/iticket-mock-server.mjs`).
-- [x] Serverni ishga tushirish (port 3005) va doimiy HTTPS tunnel (`https://e446d264da9c55.lhr.life`) bilan ta’minlash.
+- [x] Serverni ishga tushirish (port 3005) va rasmiy doimiy Cloudflare HTTPS tunnel (`https://important-nations-motels-trainers.trycloudflare.com`) bilan ta’minlash.
 - [ ] Provider Onboarding Step 2 va Step 3 (moslik va test chaqiruvlari)ni muvaffaqiyatli tekshiruvdan o‘tkazish.
 - [ ] Yakuniy natijalarni va tekshiruv hisobotini berish.
 
-**Holat / handoff:** Mock server (`scripts/iticket-mock-server.mjs`) yangilandi:
-1. `GET /provider-info` javobidan `fulfillmentMode` chiqarib tashlandi va canonical schema ga to'liq moslandi.
-2. `POST /actions` da `idempotencyKey` bo'yicha kesh xotiradan original buyurtmani qaytarish (Idempotency Protection) qo'shildi va takroriy so'rovlar bir xil action qaytarishi test qilindi (PASS).
-Aktiv tunnel: `https://e446d264da9c55.lhr.life` (20 soniyalik keepalive bilan).
+**Holat / handoff:** Mock server (`scripts/iticket-mock-server.mjs`) 3005-portda ishlab turibdi. Rasmiy `cloudflared` (Cloudflare Tunnel) orqali `https://important-nations-motels-trainers.trycloudflare.com` manzili ulandi. `/health` va `/provider-info` tekshirildi, 200 HEALTHY qaytmoqda.
+
+
+
 
 
 
@@ -2391,3 +2401,14 @@ Aktiv tunnel: `https://e446d264da9c55.lhr.life` (20 soniyalik keepalive bilan).
 - [x] Production sahifasida yangi xato holatini tekshirish.
 
 **Holat / handoff:** Bajarildi va productionga chiqdi. API endi `PROVIDER_ACCOUNT_ASSIGNED` kodini, accountga ulangan providerning xavfsiz nomi/slugini va “yangi biznes arizasi yaratilmagan” ma’lumotini qaytaradi. Portal bu xatoni amaliy kartaga aylantiradi: mavjud biznesni ochish yoki boshqa owner account bilan davom etish yo‘li beriladi. `cadeb94 fix(provider): clarify account assignment conflicts` `origin/main`ga push qilindi. GitHub Actions [production release #181](https://github.com/abduhamid707/zayuno/actions/runs/35240468005) SUCCESS: `api`, `worker` va `provider-portal` qayta yaratildi. Jonli `developers.zayuno.uz` bundle’ida `PROVIDER_ACCOUNT_ASSIGNED` va “Bu hisob boshqa biznesga ulangan” matni borligi HTTP orqali tasdiqlandi; alohida yangi brauzer sessiyasida login cookie bo‘lmagani uchun autentifikatsiyalangan xatoni ekranda qayta yuborish amalga oshirilmadi. PASS: `pnpm --filter @zayuno/api build`, `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-provider-onboarding-journey.ts`, `pnpm exec tsx tests/test-review-dashboard-ux.ts`, `pnpm exec tsx tests/test-credential-ux-and-security.ts`, `pnpm exec tsx tests/test-onboarding-and-auth-flow.ts`, `git diff --check`.
+# Joriy ish — Universal mijoz chat oqimi va mobile tezkor actionlar (2026-09-17)
+
+- [x] Mijoz chatidagi provider tanlovini qat’iy saqlash, boshqa provider mahsulotiga sakrashni to‘xtatish.
+- [x] Food-only prompt va delivery taxminlarini provider capability/fulfillment ma’lumotlariga asoslangan umumiy oqimga o‘tkazish.
+- [x] Mobile bosh sahifadagi tezkor actionlarni faol providerlar va real capabilitylardan dinamik, tezkor va qayta-bosishga chidamli qilish.
+- [x] Ticket/e-ticket oqimida delivery so‘ramaslik hamda quote taqdimotini fulfillment turiga mos qilish.
+- [x] API va mobile tekshiruvlarini bajarish, yakuniy holatni shu faylga qayd etish.
+
+**Chegara:** `scripts/iticket-mock-server.mjs` foydalanuvchining test provideri; bu ishda o‘zgartirilmaydi. Uning sun’iy fee’i provider tomonda olib tashlangan.
+
+**Holat / handoff:** Bajarildi. `ConsumerChatService` endi faqat `CATALOG` capability’li faol providerlar bilan ishlaydi, aniq tanlangan providerni keyingi typo/follow-up xabarida saqlaydi va faqat provider e’lon qilgan fulfillment/contact talablarini so‘raydi. iTicket kabi REMOTE/e-ticket providerda yetkazib berish manzili hamda telefon avtomatik so‘ralmaydi; fee faqat provider quote’ida bo‘lsa chiqadi. MCP `create_action` endi contactni global majburiyat qilmaydi; quote/provider talab qilsa yuboradi. Mobile home tezkor tugmalari `/api/v1/consumer/chat/quick-actions` orqali jonli providerlardan darhol olinadi, generik fallback bor va so‘rov yuborilayotganda qayta bosilmaydi. O‘zgargan fayllar: consumer chat API/service, providers service, MCP server/tools, shared customer presenter, mobile home/catalog/i18n va regression testlar. PASS: `pnpm --filter @zayuno/api build`, `pnpm --filter mobile typecheck`, `pnpm --filter @zayuno/shared build`, `pnpm --filter @zayuno/mcp build`, `pnpm exec tsx tests/test-consumer-universal-provider-flow.ts`, `tests/test-customer-experience-and-presenter.ts`, `tests/test-action-guardrails.ts`, `tests/test-coffee-time-availability-and-customer-mode.ts`, `tests/test-openai-plugin-mcp-contract.ts`, `git diff --check`. iTicket mock va `bin/cloudflared.exe` foydalanuvchi o‘zgarishlari sifatida ajratilgan; commitga kiritilmaydi.

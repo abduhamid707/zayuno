@@ -74,28 +74,24 @@ type QuickSuggestion = {
   color: string;
   key?: string;
   type?: string;
+  prompt?: string;
 };
 
 const defaultSuggestions: QuickSuggestion[] = [
   {
-    label: "Restoranlarni ko‘rsat",
-    icon: "restaurant-outline" as const,
-    color: "#FF9D45",
+    label: "Nimalar qila olasan?",
+    icon: "sparkles-outline" as const,
+    color: "#A996FF",
   },
   {
-    label: "Lavash va burgerlarni ko‘rsat",
-    icon: "fast-food-outline" as const,
+    label: "Faol hamkorlarni ko‘rsat",
+    icon: "storefront-outline" as const,
+    color: "#5AB7FF",
+  },
+  {
+    label: "Kataloglarni ko‘rsat",
+    icon: "grid-outline" as const,
     color: "#46D37B",
-  },
-  {
-    label: "Pitsalarni ko‘rsat",
-    icon: "pizza-outline" as const,
-    color: "#B05CFF",
-  },
-  {
-    label: "Sushi va rollarni ko‘rsat",
-    icon: "fish-outline" as const,
-    color: "#5590FF",
   },
 ];
 
@@ -203,9 +199,9 @@ export default function HomeScreen() {
   const [reportSending, setReportSending] = useState(false);
   const [reportSentId, setReportSentId] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
-  const [quickSuggestions, setQuickSuggestions] = useState<
-    QuickSuggestion[] | null
-  >(null);
+  const [quickSuggestions, setQuickSuggestions] = useState<QuickSuggestion[]>(
+    fallbackSuggestions,
+  );
   const screenRef = useRef<View>(null);
   const lastShakeRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -374,43 +370,76 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!user?.id) return;
-    setQuickSuggestions(null);
-    const timer = setTimeout(
-      () => {
-        void apiFetch<{
-          suggestions?: Array<{ key: string; label: string; type: string }>;
-        }>("/api/v1/consumer/memory/suggestions")
-          .then((result) => {
-            const personalized = (result.suggestions || []).map(
-              (item, index) => ({
-                key: item.key,
-                type: item.type,
-                label: item.label,
-                icon: (index === 0
-                  ? "sparkles-outline"
-                  : "restaurant-outline") as keyof typeof Ionicons.glyphMap,
-                color: index === 0 ? "#A996FF" : "#46D37B",
-              }),
-            );
-            setQuickSuggestions(
-              personalized.length
-                ? [...personalized, ...defaultSuggestions].slice(0, 3)
-                : fallbackSuggestions,
-            );
-            personalized.forEach((item, position) =>
-              analytics.trackSuggestion({
-                event: "shown",
-                type: item.type || "personalized",
-                personalized: true,
-                position,
-              }),
-            );
-          })
-          .catch(() => setQuickSuggestions(fallbackSuggestions));
-      },
-      suggestionRefreshBucket > 0 ? 8_000 : 0,
-    );
-    return () => clearTimeout(timer);
+    let active = true;
+    void Promise.all([
+      apiFetch<{
+        actions?: Array<{
+          key: string;
+          label: string;
+          prompt?: string;
+          type?: string;
+        }>;
+      }>("/api/v1/consumer/chat/quick-actions").catch(() => ({ actions: [] })),
+      apiFetch<{
+        suggestions?: Array<{ key: string; label: string; type: string }>;
+      }>("/api/v1/consumer/memory/suggestions").catch(() => ({
+        suggestions: [],
+      })),
+    ]).then(([quickResult, memoryResult]) => {
+      if (!active) return;
+      const iconFor = (type = "catalog") => {
+        if (type === "ticket") return "ticket-outline" as const;
+        if (type === "booking") return "calendar-outline" as const;
+        if (type === "food") return "restaurant-outline" as const;
+        return "storefront-outline" as const;
+      };
+      const colorFor = (type = "catalog") => {
+        if (type === "ticket") return "#B687FF";
+        if (type === "booking") return "#52D6C9";
+        if (type === "food") return "#FF9D45";
+        return "#5AB7FF";
+      };
+      const liveActions: QuickSuggestion[] = (quickResult.actions || []).map(
+        (item) => ({
+          key: item.key,
+          type: item.type || "catalog",
+          label: item.label,
+          prompt: item.prompt || item.label,
+          icon: iconFor(item.type),
+          color: colorFor(item.type),
+        }),
+      );
+      const personalized: QuickSuggestion[] = (memoryResult.suggestions || []).map(
+        (item) => ({
+          key: item.key,
+          type: item.type || "personalized",
+          label: item.label,
+          prompt: item.label,
+          icon: "sparkles-outline" as const,
+          color: "#A996FF",
+        }),
+      );
+      const unique = [...liveActions, ...personalized, ...fallbackSuggestions]
+        .filter(
+          (item, index, all) =>
+            all.findIndex(
+              (candidate) => candidate.key === item.key || candidate.label === item.label,
+            ) === index,
+        )
+        .slice(0, 3);
+      setQuickSuggestions(unique);
+      personalized.forEach((item, position) =>
+        analytics.trackSuggestion({
+          event: "shown",
+          type: item.type || "personalized",
+          personalized: true,
+          position: liveActions.length + position,
+        }),
+      );
+    });
+    return () => {
+      active = false;
+    };
   }, [suggestionRefreshBucket, user?.id]);
 
   useEffect(() => {
@@ -816,17 +845,19 @@ export default function HomeScreen() {
     <View style={styles.emptyState}>
       <View style={styles.hero}>
         <Ionicons name="sparkles" size={38} color="#7668F6" />
-        <Text style={styles.heroEyebrow}>AI FOOD ASSISTANT</Text>
-        <Text style={styles.greeting}>Bugun nima yegingiz kelyapti?</Text>
+        <Text style={styles.heroEyebrow}>SIZNING AI YORDAMCHINGIZ</Text>
+        <Text style={styles.greeting}>Bugun nima kerak?</Text>
         <Text style={styles.subtitle}>
-          Sevimli restoraningizni tanlang yoki xohlagan taomingizni yozing.
+          Kerakli narsani yozing. Faol hamkorlar orasidan mosini topib,
+          keyingi qadamni birga bajaramiz.
         </Text>
       </View>
 
       <View style={styles.suggestionList}>
-        {(quickSuggestions || []).map((suggestion) => (
+        {quickSuggestions.map((suggestion) => (
           <Pressable
             key={suggestion.label}
+            disabled={isLoading}
             onPress={() => {
               if (suggestion.key) {
                 trackSuggestion(
@@ -838,11 +869,12 @@ export default function HomeScreen() {
                   quickSuggestions?.indexOf(suggestion),
                 );
               }
-              sendMessage(suggestion.label);
+              void sendMessage(suggestion.prompt || suggestion.label);
             }}
             style={({ pressed }) => [
               styles.suggestion,
               pressed && styles.suggestionPressed,
+              isLoading && styles.suggestionDisabled,
             ]}
           >
             <Ionicons
@@ -1355,6 +1387,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(18,24,43,0.9)",
     borderColor: "rgba(124,103,255,0.4)",
   },
+  suggestionDisabled: { opacity: 0.48 },
   suggestionText: {
     flex: 1,
     color: "#E7E9F1",

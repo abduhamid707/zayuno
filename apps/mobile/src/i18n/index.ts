@@ -1,28 +1,28 @@
 ﻿export const uz = {
   common: {
     appName: "Zayuno",
-    tagline: "AI orqali ovqat buyurtma qilishning yangi usuli",
+    tagline: "AI orqali tasdiqlangan xizmatlardan foydalanishning yangi usuli",
     send: "Yuborish",
     cancel: "Bekor qilish",
     confirm: "Tasdiqlash",
     retry: "Qayta urinish",
     loading: "Yuklanmoqda...",
     errorTitle: "Xatolik yuz berdi",
-    searchPlaceholder: "Qanday taom xohlaysiz?",
+    searchPlaceholder: "Nima kerakligini yozing…",
     offlineNotice:
       "Internet aloqasi yo‘q. Ma‘lumotlar oflayn rejimda ko‘rsatilmoqda.",
   },
   welcome: {
     title: "Zayuno",
     subtitle:
-      "Restoranlar, menyular va buyurtmalar bitta aqlli chatda.",
+      "Hamkorlar, kataloglar va buyurtmalar bitta aqlli chatda.",
     googleButton: "Google bilan davom etish",
     termsNotice:
       "Davom etish orqali siz Maxfiylik siyosati va Foydalanish shartlariga rozilik bildirasiz.",
   },
   chat: {
     greeting:
-      "Assalomu alaykum! Bugun nima yegingiz kelyapti? Restoran yoki taom nomini yozing.",
+      "Assalomu alaykum! Nima kerakligini yozing. Faol hamkorlardan mos variantni topaman.",
     suggestions: [],
   },
   actions: {

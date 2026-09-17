@@ -21,39 +21,39 @@ async function main() {
   // 1. 7 ta faol offering -> food-first copy
   {
     const msg7 = getDynamicServiceMessage(7);
-    assert.equal(msg7, 'O‘nlab taomlar orasidan sizga mosini topib beraman.');
+    assert.equal(msg7, 'O‘nlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.');
     const welcome7 = getWelcomeMessage(7);
-    assert.match(welcome7, /sevimli restoraningizdan ovqat buyurtma qilish oson/);
-    assert.match(welcome7, /O‘nlab taomlar orasidan sizga mosini topib beraman\./);
+    assert.match(welcome7, /tasdiqlangan hamkorlar xizmatlaridan foydalanish oson/);
+    assert.match(welcome7, /O‘nlab mahsulot va xizmatlar orasidan sizga mosini topib beraman\./);
   }
 
   // 2. 45 ta -> 100 gacha food inventory copy
   {
     const msg45 = getDynamicServiceMessage(45);
-    assert.equal(msg45, '100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin.');
+    assert.equal(msg45, '100 dan ortiq mahsulot va xizmat orasidan tanlashingiz mumkin.');
     const welcome45 = getWelcomeMessage(45);
-    assert.match(welcome45, /100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin\./);
+    assert.match(welcome45, /100 dan ortiq mahsulot va xizmat orasidan tanlashingiz mumkin\./);
   }
 
   // 3. 154 ta -> food inventory copy
   {
     const msg154 = getDynamicServiceMessage(154);
-    assert.equal(msg154, '100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin.');
+    assert.equal(msg154, '100 dan ortiq mahsulot va xizmat orasidan tanlashingiz mumkin.');
   }
 
   // 4. Katta kataloglar -> overclaim qilmaydigan food copy
   {
     const msg742 = getDynamicServiceMessage(742);
-    assert.equal(msg742, 'Yuzlab taom va ichimlik orasidan didingizga mosini topib beraman.');
+    assert.equal(msg742, 'Yuzlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.');
 
     const msg350 = getDynamicServiceMessage(350);
-    assert.equal(msg350, 'Yuzlab taom va ichimlik orasidan didingizga mosini topib beraman.');
+    assert.equal(msg350, 'Yuzlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.');
 
     const msg1500 = getDynamicServiceMessage(1500);
-    assert.equal(msg1500, 'Yuzlab taom va ichimlik orasidan didingizga mosini topib beraman.');
+    assert.equal(msg1500, 'Yuzlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.');
 
     const msg6000 = getDynamicServiceMessage(6000);
-    assert.equal(msg6000, 'Yuzlab taom va ichimlik orasidan didingizga mosini topib beraman.');
+    assert.equal(msg6000, 'Yuzlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.');
   }
 
   // 5. sandbox/demo offeringlar countga kirmaydi
@@ -124,12 +124,12 @@ async function main() {
 
     const totalAvailable = computeAvailableServiceCount(providers);
     assert.equal(totalAvailable, 37, 'Only real published offerings (25 + 12 = 37) should be counted.');
-    assert.equal(getDynamicServiceMessage(totalAvailable), '100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin.');
+    assert.equal(getDynamicServiceMessage(totalAvailable), '100 dan ortiq mahsulot va xizmat orasidan tanlashingiz mumkin.');
   }
 
   // 6. stale/unknown count raqamsiz matn beradi
   {
-    const fallback = 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.';
+    const fallback = 'Faol hamkorlar katalogidan sizga mos variantni topib beraman.';
     assert.equal(getDynamicServiceMessage(null), fallback);
     assert.equal(getDynamicServiceMessage(undefined), fallback);
     assert.equal(getDynamicServiceMessage(0), fallback);
@@ -179,7 +179,7 @@ async function main() {
     const foodCopy = formatCustomerQuote(foodQuote);
     assert.match(foodCopy, /Buyurtma hisob-kitobi:/);
     assert.match(foodCopy, /X Set × 2 — 118 000 so‘m/);
-    assert.match(foodCopy, /Yetkazib berish \/ xizmat haqi: 15 000 so‘m/);
+    assert.match(foodCopy, /Yetkazib berish haqi: 15 000 so‘m/);
     assert.match(foodCopy, /Jami: 133 000 so‘m/);
     assert.match(foodCopy, /Buyurtmani tasdiqlaysizmi\?/);
   }
@@ -411,7 +411,7 @@ async function main() {
 
     const physicalCount = computeAvailableServiceCount([physicalProviderNoLoc]);
     assert.equal(physicalCount, 0, 'Physical delivery provider without active locations must NOT be counted.');
-    assert.equal(getDynamicServiceMessage(physicalCount), 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.');
+    assert.equal(getDynamicServiceMessage(physicalCount), 'Faol hamkorlar katalogidan sizga mos variantni topib beraman.');
   }
 
   // 17. get_welcome_message MCP tool handler returns customerMessage and matches dynamic API welcomeMessage
@@ -434,7 +434,7 @@ async function main() {
     assert.ok(result.customerMessage, 'customerMessage must be present in get_welcome_message response.');
     assert.equal(result.customerMessage, mockDynamicInfo.welcomeMessage, 'customerMessage must equal dynamic API welcomeMessage.');
     assert.equal(result.availableServiceCount, 154);
-    assert.equal(result.dynamicServiceMessage, '100 dan ortiq taom va ichimlik orasidan tanlashingiz mumkin.');
+    assert.equal(result.dynamicServiceMessage, '100 dan ortiq mahsulot va xizmat orasidan tanlashingiz mumkin.');
   }
 
   // 18. get_welcome_message API error fallback
@@ -450,10 +450,10 @@ async function main() {
 
     const fallbackResult = await welcomeTool.handler({}, failingClient);
     assert.ok(fallbackResult.customerMessage, 'customerMessage must be present on API error.');
-    assert.match(fallbackResult.customerMessage, /Hamkor restoranlar menyusidan sizga mos taomni topib beraman\./);
+    assert.match(fallbackResult.customerMessage, /Faol hamkorlar katalogidan sizga mos variantni topib beraman\./);
     assert.doesNotMatch(fallbackResult.customerMessage, /O‘nlab/);
     assert.equal(fallbackResult.availableServiceCount, null);
-    assert.equal(fallbackResult.dynamicServiceMessage, 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.');
+    assert.equal(fallbackResult.dynamicServiceMessage, 'Faol hamkorlar katalogidan sizga mos variantni topib beraman.');
   }
 
   // 19. Hardcoded "O‘nlab" is not used in static instructions

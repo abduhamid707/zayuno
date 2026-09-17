@@ -106,12 +106,7 @@ export class ProvidersService {
         include: { locations: true }
       });
 
-      const foodProviders = providers.filter((provider: any) => {
-        const type = String(provider?.type || '').toUpperCase();
-        const category = String(provider?.metadata?.category || '').toLowerCase();
-        return type === 'FOOD' || category.includes('food') || category.includes('restaurant');
-      });
-      const count = computeAvailableServiceCount(foodProviders);
+      const count = computeAvailableServiceCount(providers);
       const dynamicServiceMessage = getDynamicServiceMessage(count);
       const welcomeMessage = getWelcomeMessage(count);
 

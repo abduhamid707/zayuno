@@ -68,7 +68,7 @@ export const InChatCatalogWidget = memo(function InChatCatalogWidget({
         }}
       />
 
-      <Text style={styles.hint}>Mahsulotni bosing · savatga qo‘shiladi</Text>
+      <Text style={styles.hint}>Variantni bosing · so‘rovga qo‘shiladi</Text>
       <View style={styles.sections}>
         {filteredSections.map((section) => (
           <View key={section.categorySlug} style={styles.sectionBlock}>
@@ -116,9 +116,9 @@ export const InChatCatalogWidget = memo(function InChatCatalogWidget({
 
         {filteredSections.length === 0 ? (
           <View style={styles.emptyResults}>
-            <Ionicons name="fast-food-outline" size={24} color="#6C7693" />
+            <Ionicons name="cube-outline" size={24} color="#6C7693" />
             <Text style={styles.emptyText}>
-              Ushbu bo‘limda taomlar mavjud emas
+              Ushbu bo‘limda hozir variantlar mavjud emas
             </Text>
           </View>
         ) : null}
