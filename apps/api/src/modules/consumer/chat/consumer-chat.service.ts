@@ -2358,17 +2358,21 @@ LIVE_CATALOG=${JSON.stringify(facts)}`, { timeout: timeoutMs }));
         }
       }
     }
+    const supportHint = this.formatActionSupportHint(
+      state.language,
+      action.supportContact,
+    );
 
     if (paymentLinks.length > 0) {
-      if (state.language === "ru") return `Заказ успешно отправлен в **${this.cleanMarkdownText(state.providerName)}**. Номер: **${reference}**\n\nСпособы оплаты:\n${paymentLinks.join("\n")}`;
-      if (state.language === "en") return `Your order was sent successfully to **${this.cleanMarkdownText(state.providerName)}**. Reference: **${reference}**\n\nPayment methods:\n${paymentLinks.join("\n")}`;
-      return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga muvaffaqiyatli yuborildi! Raqam: **${reference}**\n\nTo‘lov usullari:\n${paymentLinks.join("\n")}`;
+      if (state.language === "ru") return `Заказ успешно отправлен в **${this.cleanMarkdownText(state.providerName)}**. Номер: **${reference}**\n\nСпособы оплаты:\n${paymentLinks.join("\n")}${supportHint}`;
+      if (state.language === "en") return `Your order was sent successfully to **${this.cleanMarkdownText(state.providerName)}**. Reference: **${reference}**\n\nPayment methods:\n${paymentLinks.join("\n")}${supportHint}`;
+      return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga muvaffaqiyatli yuborildi! Raqam: **${reference}**\n\nTo‘lov usullari:\n${paymentLinks.join("\n")}${supportHint}`;
     }
 
     if (paymentUrl) {
-      return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga yuborildi. Raqam: **${reference}**\n\n[To‘lov qilish](${paymentUrl})`;
+      return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga yuborildi. Raqam: **${reference}**\n\n[To‘lov qilish](${paymentUrl})${supportHint}`;
     }
-    return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga yuborildi. Raqam: **${reference}**.`;
+    return `Buyurtmangiz **${this.cleanMarkdownText(state.providerName)}**ga yuborildi. Raqam: **${reference}**.${supportHint}`;
   }
 
   private async interpretPendingTurn(
@@ -3183,9 +3187,49 @@ USER=${JSON.stringify(prompt)}`;
     if (supportUrl) rows.push(`- [Support sahifasi](${supportUrl})`);
     if (support.workingHours)
       rows.push(`- Ish vaqti: ${this.cleanMarkdownText(support.workingHours)}`);
+    const note = support.supportNote
+      ? `\n\n${this.cleanMarkdownText(support.supportNote)}`
+      : "";
     return rows.length
-      ? `${name} provider ro‘yxatdan o‘tkazgan rasmiy support kontaktlari:\n\n${rows.join("\n")}`
+      ? `${name} provider ro‘yxatdan o‘tkazgan rasmiy support kontaktlari:\n\n${rows.join("\n")}${note}`
       : `${name} rasmiy support kontaktini Zayunoga taqdim etmagan.`;
+  }
+
+  private formatActionSupportHint(
+    language: "uz" | "ru" | "en" | undefined,
+    support: any,
+  ): string {
+    if (!support) return "";
+    const contacts: string[] = [];
+    if (support.phone) {
+      const phone = this.cleanMarkdownText(support.phone);
+      contacts.push(`[${phone}](tel:${phone.replace(/[^\d+]/g, "")})`);
+    }
+    if (support.telegram) {
+      const telegram = this.cleanMarkdownText(support.telegram);
+      const url = telegram.startsWith("http")
+        ? this.safeHttpUrl(telegram)
+        : `https://t.me/${telegram.replace(/^@/, "")}`;
+      if (url) contacts.push(`[Telegram](${url})`);
+    }
+    if (support.email) {
+      const email = this.cleanMarkdownText(support.email);
+      contacts.push(`[${email}](mailto:${email})`);
+    }
+    const supportUrl = this.safeHttpUrl(support.supportUrl);
+    if (supportUrl) contacts.push(`[Support](${supportUrl})`);
+    if (!contacts.length && !support.supportNote) return "";
+
+    const note = support.supportNote
+      ? ` ${this.cleanMarkdownText(support.supportNote)}`
+      : "";
+    if (language === "ru") {
+      return `\n\nЕсли по заказу понадобится помощь: ${contacts.join(", ") || "обратитесь к провайдеру"}.${note}`;
+    }
+    if (language === "en") {
+      return `\n\nNeed help with this order? ${contacts.join(", ") || "Contact the provider"}.${note}`;
+    }
+    return `\n\nBuyurtma bo‘yicha yordam kerak bo‘lsa: ${contacts.join(", ") || "providerga murojaat qiling"}.${note}`;
   }
 
   private formatLiveActionStatus(

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowUpRight, BookOpen, FlaskConical, LayoutDashboard, Compass, Activity, ShieldCheck, Sparkles, Search, LogOut, Menu, X, ArrowRight } from 'lucide-react';
+import { ArrowUpRight, BookOpen, FlaskConical, LayoutDashboard, Compass, Activity, ShieldCheck, Sparkles, Search, LogOut, LogIn, Menu, X, ArrowRight, PlugZap } from 'lucide-react';
 import { WORKSPACE_NAV, WorkspaceTab } from './workspace-model';
 
-const icons = { overview: Compass, apps: LayoutDashboard, docs: BookOpen, sandbox: FlaskConical, certification: ShieldCheck, inspector: Activity, onboarding: ArrowRight, auth: ArrowRight };
+const icons = { overview: Compass, apps: LayoutDashboard, docs: BookOpen, sandbox: FlaskConical, certification: ShieldCheck, inspector: Activity, onboarding: PlugZap, auth: LogIn };
 
 export function WorkspaceShell({ activeTab, onNavigate, onSearch, onAiKit, signedIn, account, onLogout, children }: {
   activeTab: WorkspaceTab; onNavigate: (tab: WorkspaceTab) => void; onSearch: () => void;
@@ -80,7 +80,7 @@ export function WorkspaceShell({ activeTab, onNavigate, onSearch, onAiKit, signe
         <div className="topbar-actions">
           {activeTab !== 'docs' && <button className="topbar-docs-button" onClick={() => onNavigate('docs')}><BookOpen size={15} /><span>Hujjatlar</span></button>}
           <button className="global-search" aria-label="Hujjatlar va sahifalardan qidirish" onClick={onSearch}><Search size={16} /><span>Qidirish</span><kbd>Ctrl K</kbd></button>
-          {!signedIn && <button className="quiet-button" onClick={() => onNavigate('auth')}>Kirish <ArrowUpRight size={14} /></button>}
+          {!signedIn && <button className="quiet-button" onClick={() => onNavigate('auth')}><LogIn size={14} /> Kirish</button>}
         </div>
       </header>
       <main id="workspace-main" className={`workspace-main ${activeTab === 'docs' ? 'workspace-docs-main' : ''}`}>{children}</main>

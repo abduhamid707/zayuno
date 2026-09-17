@@ -534,7 +534,10 @@ export class ProvidersService {
       throw new BadRequestException('Provider API credential is required. Generate or enter a key before continuing.');
     }
     const normalizedSupport = normalizeSupportContact(input.supportContact);
-    const fulfillmentMode = input.fulfillmentMode || defaultFulfillmentModeForProviderType(input.type);
+    // Self-service v1 connects a public online API. Branches, maps and physical
+    // fulfilment are intentionally not a registration requirement; existing
+    // providers keep their stored fulfilment metadata unchanged.
+    const fulfillmentMode = ProviderFulfillmentMode.REMOTE;
 
     // If updating an existing draft for this owner, persist updates idempotently
     if (existingOwnerDraft) {
@@ -554,7 +557,7 @@ export class ProvidersService {
         },
         metadata: {
           ...((existingOwnerDraft.metadata as Record<string, any>) || {}),
-          category: input.category || 'general',
+          category: input.category || 'online_services',
           geography: input.geography || ['UZ'],
           description: input.description,
           supportContact: normalizedSupport,
@@ -624,7 +627,7 @@ export class ProvidersService {
           supportContact: normalizedSupport
         },
         metadata: {
-          category: input.category || 'general',
+          category: input.category || 'online_services',
           geography: input.geography || ['UZ'],
           description: input.description,
           supportContact: normalizedSupport,
@@ -917,7 +920,7 @@ export class ProvidersService {
         status: ProviderStatus.DRAFT, adapterType: input.baseUrl ? 'remote-http' : 'sandbox',
         capabilities: input.capabilities, baseUrl: input.baseUrl, encryptedSecret, webhookSecret,
         config: { authMethod: input.authMethod, authConfig: input.authConfig || {}, webhookUrl: input.webhookUrl, supportContact: normalizedSupport },
-        metadata: { category: input.category || 'general', geography: input.geography || ['UZ'], description: input.description, supportContact: normalizedSupport, fulfillmentMode: input.fulfillmentMode || defaultFulfillmentModeForProviderType(input.type), isCertified: false, isPublished: false, reviewStatus: 'DRAFT', registeredAt: new Date().toISOString() }
+        metadata: { category: input.category || 'online_services', geography: input.geography || ['UZ'], description: input.description, supportContact: normalizedSupport, fulfillmentMode: ProviderFulfillmentMode.REMOTE, isCertified: false, isPublished: false, reviewStatus: 'DRAFT', registeredAt: new Date().toISOString() }
       }});
       const owner = await tx.user.create({ data: { id: randomUUID(), email: input.ownerEmail.trim().toLowerCase(), name: input.ownerName.trim(), passwordHash, role: UserRole.PROVIDER_OWNER, providerId: provider.id, isActive: true } });
       await tx.apiKey.create({ data: { name: `Provider sandbox key (${slug})`, keyHash: sandboxKey.keyHash, keyPrefix: sandboxKey.keyPrefix, role: UserRole.PROVIDER_DEVELOPER, userId: owner.id, providerId: provider.id, isActive: true } });

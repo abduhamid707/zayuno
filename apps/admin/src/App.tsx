@@ -168,7 +168,11 @@ export default function App() {
     category: 'general',
     geography: 'UZ',
     baseUrl: '',
-    supportContact: '',
+    supportPhone: '',
+    supportTelegram: '',
+    supportEmail: '',
+    supportUrl: '',
+    supportNote: '',
     webhookUrl: '',
     ownerName: '',
     ownerEmail: '',
@@ -718,7 +722,13 @@ export default function App() {
             .filter(Boolean),
           baseUrl: providerForm.baseUrl.trim() || undefined,
           webhookUrl: providerForm.webhookUrl.trim() || undefined,
-          supportContact: providerForm.supportContact.trim() || undefined,
+          supportContact: {
+            phone: providerForm.supportPhone.trim() || undefined,
+            telegram: providerForm.supportTelegram.trim() || undefined,
+            email: providerForm.supportEmail.trim() || providerForm.ownerEmail.trim() || undefined,
+            supportUrl: providerForm.supportUrl.trim() || undefined,
+            supportNote: providerForm.supportNote.trim() || undefined,
+          },
         }),
       });
       return res.json();
@@ -735,7 +745,11 @@ export default function App() {
         category: 'general',
         geography: 'UZ',
         baseUrl: '',
-        supportContact: '',
+        supportPhone: '',
+        supportTelegram: '',
+        supportEmail: '',
+        supportUrl: '',
+        supportNote: '',
         webhookUrl: '',
         ownerName: '',
         ownerEmail: '',
@@ -1717,6 +1731,62 @@ export default function App() {
                       placeholder="Biznes va uning xizmatlarini qisqacha yozing."
                     />
                   </label>
+                  <div className="rounded-xl border border-indigo-500/25 bg-indigo-950/20 p-4 space-y-3">
+                    <div>
+                      <h4 className="text-xs font-bold text-white">Mijozga ko‘rinadigan yordam kanallari</h4>
+                      <p className="mt-1 text-[11px] text-slate-400">Buyurtma yaratilgach mijoz shu telefon, Telegram, email va rasmiy saytni ko‘radi. Kamida bittasi kerak; bo‘sh qoldirilgan email o‘rniga provider egasining emaili ishlatiladi.</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <label className="text-xs text-slate-300">
+                        Telefon
+                        <input
+                          value={providerForm.supportPhone}
+                          onChange={(e) => setProviderForm({ ...providerForm, supportPhone: e.target.value })}
+                          className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                          placeholder="+998901234567"
+                        />
+                      </label>
+                      <label className="text-xs text-slate-300">
+                        Telegram
+                        <input
+                          value={providerForm.supportTelegram}
+                          onChange={(e) => setProviderForm({ ...providerForm, supportTelegram: e.target.value })}
+                          className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                          placeholder="@business_support"
+                        />
+                      </label>
+                      <label className="text-xs text-slate-300">
+                        Yordam emaili
+                        <input
+                          type="email"
+                          value={providerForm.supportEmail}
+                          onChange={(e) => setProviderForm({ ...providerForm, supportEmail: e.target.value })}
+                          className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                          placeholder="support@business.uz"
+                        />
+                      </label>
+                      <label className="text-xs text-slate-300">
+                        Rasmiy sayt yoki yordam sahifasi
+                        <input
+                          type="url"
+                          value={providerForm.supportUrl}
+                          onChange={(e) => setProviderForm({ ...providerForm, supportUrl: e.target.value })}
+                          className="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                          placeholder="https://business.uz/yordam"
+                        />
+                      </label>
+                    </div>
+                    <label className="block text-xs text-slate-300">
+                      Mijozga ko‘rinadigan qisqa izoh
+                      <textarea
+                        maxLength={500}
+                        value={providerForm.supportNote}
+                        onChange={(e) => setProviderForm({ ...providerForm, supportNote: e.target.value })}
+                        className="mt-1.5 min-h-16 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                        placeholder="Masalan: Buyurtma raqamingizni yuboring, jamoamiz yordam beradi."
+                      />
+                    </label>
+                  </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-300">
                       Capabilities
@@ -1998,18 +2068,9 @@ export default function App() {
                             </div>
                             <div>
                               <span className="text-slate-500">
-                                Type / Fulfillment:
+                                Integratsiya modeli:
                               </span>{' '}
-                              {p.type}{' '}
-                              {p.fulfillmentMode
-                                ? `(${p.fulfillmentMode})`
-                                : ''}
-                            </div>
-                            <div>
-                              <span className="text-slate-500">
-                                Faol filiallar:
-                              </span>{' '}
-                              {p.activeLocationsCount ?? 0}
+                              <span className="text-emerald-300">Online API</span>
                             </div>
                             {p.metadata?.healthMonitoring && (
                               <div className="flex items-center gap-2 pt-1">
@@ -2043,6 +2104,19 @@ export default function App() {
                               </div>
                             )}
                           </div>
+
+                          {(p.supportContact?.phone || p.supportContact?.telegram || p.supportContact?.email || p.supportContact?.supportUrl || p.supportContact?.supportNote) && (
+                            <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-3 text-xs space-y-2">
+                              <div className="font-semibold text-indigo-100">Mijozga ko‘rinadigan yordam</div>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-slate-300">
+                                {p.supportContact?.phone && <a href={`tel:${p.supportContact.phone}`} className="hover:text-white">☎ {p.supportContact.phone}</a>}
+                                {p.supportContact?.telegram && <a href={`https://t.me/${String(p.supportContact.telegram).replace(/^@/, '')}`} target="_blank" rel="noreferrer" className="hover:text-white">◉ {p.supportContact.telegram}</a>}
+                                {p.supportContact?.email && <a href={`mailto:${p.supportContact.email}`} className="hover:text-white">✉ {p.supportContact.email}</a>}
+                                {p.supportContact?.supportUrl && <a href={p.supportContact.supportUrl} target="_blank" rel="noreferrer" className="hover:text-white">↗ Rasmiy sayt</a>}
+                              </div>
+                              {p.supportContact?.supportNote && <p className="border-t border-indigo-500/15 pt-2 text-slate-400">{p.supportContact.supportNote}</p>}
+                            </div>
+                          )}
 
                           <div
                             className={`rounded-xl border p-3 text-xs ${p.discoveryReady ? 'border-emerald-500/30 bg-emerald-950/20 text-emerald-200' : 'border-amber-500/30 bg-amber-950/20 text-amber-100'}`}

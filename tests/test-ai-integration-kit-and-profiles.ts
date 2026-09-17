@@ -11,6 +11,7 @@ import {
 import { ProviderCertificationRunner } from '../packages/provider-sdk/src/certification.ts';
 import {
   generateAiPrompt,
+  generateUniversalAiPrompt,
   generateContractJson,
   GOAL_OPTIONS,
   FRAMEWORK_OPTIONS
@@ -190,7 +191,9 @@ async function runTests() {
   assert.ok(prompt.includes('## 5. Security & Privacy Rules'), 'Prompt must contain Security Rules section');
   assert.ok(prompt.includes('## 6. Framework-Specific Task'), 'Prompt must contain Framework-Specific Task section');
   assert.ok(prompt.includes('## 7. Verification Steps'), 'Prompt must contain Verification Steps section');
-  assert.ok(prompt.includes('## 9. Constraints'), 'Prompt must contain Constraints section');
+  assert.ok(prompt.includes('## 8. Constraints'), 'Prompt must contain Constraints section');
+  assert.ok(prompt.includes('public online API integrations'), 'Prompt must constrain the current self-service flow to online APIs');
+  assert.ok(!prompt.includes('Physical Locations:'), 'Prompt must not require physical locations for online onboarding');
   console.log('✅ 3.1 AI Prompt contains all mandatory structured sections');
 
   // Test 3.2: Framework-specific instructions
@@ -207,7 +210,16 @@ async function runTests() {
   assert.ok(goPrompt.includes('hmac.New'), 'Go prompt should include hmac.New');
   console.log('✅ 3.2 Framework-specific code skeletons generated correctly for Node, Python, PHP, and Go');
 
-  // Test 3.3: Strict Privacy & Zero Secret Leakage Verification
+  const universalPrompt = generateUniversalAiPrompt({
+    slug: 'universal-provider',
+    capabilities: transCaps
+  });
+  assert.ok(universalPrompt.includes('Work project-first'), 'Universal prompt must require project-first inspection');
+  assert.ok(universalPrompt.includes('Detect the actual language, framework and package manager yourself'), 'Universal prompt must not require a framework picker');
+  assert.ok(!universalPrompt.includes('Framework-Specific Task'), 'Universal prompt must not prescribe a framework');
+  console.log('✅ 3.3 Universal prompt adapts to the existing codebase without a framework selector');
+
+  // Test 3.4: Strict Privacy & Zero Secret Leakage Verification
   const sensitiveProvider = {
     slug: 'secure-corp',
     name: 'Secure Corp',
@@ -247,15 +259,15 @@ async function runTests() {
   assert.ok(sensitivePrompt.includes('Bearer [REDACTED]'), 'Prompt must replace tokens with [REDACTED]');
   assert.ok(!sensitivePrompt.includes('zy_live_agent_secret_key_12345'), 'Prompt must omit the original key');
   assert.ok(sensitivePrompt.includes('key=[REDACTED_CREDENTIAL]'), 'Prompt must use the central credential redaction marker');
-  console.log('✅ 3.3 Strict privacy & zero secret leakage verified: all credentials, tokens, and PII are redacted');
+  console.log('✅ 3.4 Strict privacy & zero secret leakage verified: all credentials, tokens, and PII are redacted');
 
-  // Test 3.4: Contract JSON generation
+  // Test 3.5: Contract JSON generation
   const contractJson = generateContractJson(sensitiveProvider);
   const parsedJson = JSON.parse(contractJson);
   assert.equal(parsedJson.provider.slug, 'secure-corp');
   assert.equal(parsedJson.provider.secret, undefined, 'Contract JSON must not contain secrets');
   assert.equal(parsedJson.provider.apiKey, undefined, 'Contract JSON must not contain API keys');
-  console.log('✅ 3.4 Contract JSON export schema verified with zero secrets');
+  console.log('✅ 3.5 Contract JSON export schema verified with zero secrets');
 
   console.log('\n🎉 ALL AI INTEGRATION KIT & PROFILE TESTS PASSED SUCCESSFULLY!\n');
 }

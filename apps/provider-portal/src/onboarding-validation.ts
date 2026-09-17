@@ -1,14 +1,29 @@
-export type BusinessFields = { businessName: string; supportPhone: string; supportTelegram: string; supportEmail: string };
+export type BusinessFields = {
+  businessName: string;
+  supportPhone: string;
+  supportTelegram: string;
+  supportEmail: string;
+  supportUrl: string;
+  supportNote: string;
+};
 export function businessErrors(fields: BusinessFields): Record<string, string> {
   const errors: Record<string, string> = {};
   if (fields.businessName.trim().length < 2) errors.businessName = 'Biznes nomi kamida 2 belgidan iborat bo‘lsin.';
   const phone = fields.supportPhone.trim();
   const telegram = fields.supportTelegram.trim();
   const email = fields.supportEmail.trim();
-  if (!phone && !telegram && !email) errors.supportPhone = 'Kamida bitta aloqa usulini kiriting.';
+  const supportUrl = fields.supportUrl.trim();
+  if (!phone && !telegram && !email && !supportUrl) errors.supportPhone = 'Kamida bitta mijoz yordam kanalini kiriting.';
   if (phone && !/^\+?[\d\s()-]{7,22}$/.test(phone)) errors.supportPhone = 'Telefon raqamini tekshiring, masalan +998901234567.';
   if (telegram && !/^(?:@|https:\/\/t\.me\/)?[a-zA-Z][a-zA-Z0-9_]{4,31}$/.test(telegram)) errors.supportTelegram = 'Telegram username kiriting: @business_support.';
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.supportEmail = 'Email manzilini tekshiring.';
+  if (supportUrl) {
+    try {
+      const url = new URL(supportUrl);
+      if (url.protocol !== 'https:' || url.username || url.password) throw new Error();
+    } catch { errors.supportUrl = 'Rasmiy sayt yoki yordam sahifasining public HTTPS manzilini kiriting.'; }
+  }
+  if (fields.supportNote.trim().length > 500) errors.supportNote = 'Mijozga ko‘rinadigan izoh 500 belgidan oshmasin.';
   return errors;
 }
 
@@ -26,9 +41,8 @@ export function integrationErrors(fields: { slug: string; baseUrl: string; apiSe
   return errors;
 }
 
-export function reachableOnboardingStep(authenticated: boolean, businessValid: boolean, integrationSaved: boolean, certified: boolean): number {
-  if (!authenticated) return 2;
-  if (!businessValid) return 3;
-  if (!integrationSaved) return 4;
-  return certified ? 6 : 5;
+export function reachableOnboardingStep(businessValid: boolean, integrationSaved: boolean, certified: boolean): number {
+  if (!businessValid) return 1;
+  if (!integrationSaved) return 2;
+  return certified ? 4 : 3;
 }

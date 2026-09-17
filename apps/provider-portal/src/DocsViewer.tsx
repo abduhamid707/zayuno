@@ -11,6 +11,38 @@ interface DocsViewerProps {
   onOpenAiKit?: () => void;
   searchRequest?: number;
 }
+
+const CORE_ENDPOINTS = [
+  {
+    method: 'GET',
+    path: '/health',
+    title: 'Salomatlik tekshiruvi',
+    docId: 'base-url',
+    desc: 'Server faolligi va versiyasini tekshirish ping endpointi.',
+  },
+  {
+    method: 'GET',
+    path: '/catalog',
+    title: 'Katalog & Mahsulotlar',
+    docId: 'catalog',
+    desc: 'AI agentlar qidirishi mumkin bo‘lgan offeringlar va filiallar.',
+  },
+  {
+    method: 'POST',
+    path: '/quote',
+    title: 'Dinamik Narx Olish',
+    docId: 'quotes',
+    desc: 'Haqiqiy narx, qoldiq va yetkazib berish hisob-kitobi.',
+  },
+  {
+    method: 'POST',
+    path: '/actions',
+    title: 'Buyurtmani Yaratish',
+    docId: 'actions',
+    desc: 'Mijoz tasdiqlagan buyurtmani xavfsiz qabul qilish va to‘lov.',
+  },
+];
+
 export function DocsViewer({ selectedDoc, onSelectDoc, onOpenAiKit, searchRequest = 0 }: DocsViewerProps) {
   const [query, setQuery] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
@@ -48,6 +80,50 @@ export function DocsViewer({ selectedDoc, onSelectDoc, onOpenAiKit, searchReques
   const index = DOCS_MENU.findIndex(item => item.id === selectedDoc);
   return <div className="docs-workspace">
     <div className="docs-heading"><div><span className="section-kicker">DEVELOPER DOCUMENTATION</span><h1>Quring. Ulang. Ishga tushiring.</h1><p>Dasturchi uchun aniq yo‘l. AI agent uchun aniq contract.</p></div><button className="secondary-button" onClick={onOpenAiKit}><Sparkles size={16} /> AI Kit</button></div>
+
+    {/* Core 4 Endpoints Banner */}
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-2.5">
+        <span className="text-[11px] font-mono uppercase font-semibold text-slate-400 tracking-wider">
+          Asosiy Protokol Endpointlari
+        </span>
+        <span className="text-[11px] text-slate-500 font-mono">API CONTRACT v1</span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {CORE_ENDPOINTS.map(ep => (
+          <button
+            key={ep.path}
+            type="button"
+            onClick={() => selectDoc(ep.docId)}
+            className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-850 transition-all text-left group shadow-lg"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                  ep.method === 'GET'
+                    ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                    : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                }`}
+              >
+                {ep.method}
+              </span>
+              <ArrowUpRight
+                size={13}
+                className="text-slate-500 group-hover:text-indigo-300 transition-colors"
+              />
+            </div>
+            <div className="font-mono text-xs font-bold text-white group-hover:text-indigo-200 transition-colors">
+              {ep.path}
+            </div>
+            <div className="text-xs font-semibold text-slate-300 mt-1">{ep.title}</div>
+            <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
+              {ep.desc}
+            </p>
+          </button>
+        ))}
+      </div>
+    </div>
+
     <div className="docs-search-row"><label className="docs-search"><Search size={18} /><input ref={inputRef} aria-label="Hujjatlardan qidirish" placeholder="Izlang: HMAC, quote, API key, 401…" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') setQuery(''); }} />{query && <button aria-label="Qidiruvni tozalash" onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={16} /></button>}</label><a href="/llms.txt" className="docs-agent-link">/llms.txt <ArrowUpRight size={14} /></a></div>
     <div className="docs-quick-chips">
       <span className="chips-label">Tezkor mavzular:</span>

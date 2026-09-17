@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CheckCircle2,
   ArrowRight,
@@ -36,12 +37,8 @@ import { businessErrors, integrationErrors, reachableOnboardingStep } from './on
 import { DocsViewer } from './DocsViewer';
 import {
   createProviderOpenApiDocument,
-  defaultFulfillmentModeForProviderType,
   getProviderProtocolEndpoints,
-  ProviderFulfillmentMode,
-  ProviderType,
   PROVIDER_CONTRACT_VERSION,
-  requiresActiveLocations,
   ZAYUNO_WEBHOOK_INGESTION_PATH
 } from '@zayuno/contracts';
 
@@ -81,6 +78,73 @@ export function isOfficialSandboxUrl(url?: string): boolean {
   }
 }
 
+const HEALTH_RESPONSE_EXAMPLE = `{
+  "status": "HEALTHY",
+  "latencyMs": 18,
+  "timestamp": "2026-09-17T10:00:00.000Z"
+}`;
+
+type HealthGuidance = {
+  title: string;
+  cause: string;
+  expected: string;
+  steps: string[];
+};
+
+function getHealthGuidance(status: string, checkedUrl: string): HealthGuidance {
+  switch (status) {
+    case 'HEALTHY':
+      return {
+        title: 'Health endpoint tayyor',
+        cause: `${checkedUrl} public serverdan JSON bilan javob berdi.`,
+        expected: 'Keyingi bosqichda catalog va tanlangan contract endpointlari tekshiriladi.',
+        steps: ['API sozlamalarini saqlang.', 'Contract tekshiruvini ishga tushiring.'],
+      };
+    case 'NOT_FOUND':
+      return {
+        title: '/health topilmadi',
+        cause: 'Base URL noto‘g‘ri yo‘lga qaragan yoki serverda GET /health route yaratilmagan.',
+        expected: `Zayuno aynan GET ${checkedUrl} so‘roviga 200 JSON kutadi.`,
+        steps: ['Base URLdan /health qismini olib tashlang.', 'Backendda GET /health route yarating.', 'Deploy qiling va “Qayta tekshirish”ni bosing.'],
+      };
+    case 'AUTH_REQUIRED':
+      return {
+        title: 'Server kalit kutyapti',
+        cause: 'Serverga yetib borildi, lekin /health 401 yoki 403 bilan qaytdi.',
+        expected: 'Portalda tanlangan auth usuliga mos server-side credential kiritilgan bo‘lishi kerak.',
+        steps: ['Auth usulini server bilan bir xil qiling.', 'Kalitni portalga kiriting yoki yangilang.', 'Kalitni frontend, Git yoki AI chatiga yubormang.'],
+      };
+    case 'SCHEMA_MISMATCH':
+      return {
+        title: 'Server topildi, lekin javob formati noto‘g‘ri',
+        cause: 'Ko‘pincha server HTML sahifa/proxy xatosi qaytargan yoki JSON ichida majburiy health maydonlari yo‘q.',
+        expected: `200 OK va aynan mana shunga o‘xshash JSON:\n${HEALTH_RESPONSE_EXAMPLE}`,
+        steps: ['Response Content-Type va JSON body’ni tekshiring.', 'status, latencyMs va ISO timestamp maydonlarini qaytaring.', 'AI fix briefini nusxalab dasturchiga yoki AI agentga yuboring.'],
+      };
+    case 'FORBIDDEN_ADDRESS':
+      return {
+        title: 'Public manzil kerak',
+        cause: 'Private IP, loopback yoki ichki tarmoq manziliga tashqaridan xavfsiz ulanib bo‘lmaydi.',
+        expected: 'Internetdan ochiq public HTTPS domen.',
+        steps: ['Public domain yoki tunnel/deploy manzilidan foydalaning.', 'DNS va TLS sertifikatini tekshiring.', 'Keyin qayta tekshiring.'],
+      };
+    case 'INVALID_URL':
+      return {
+        title: 'Base URL noto‘g‘ri',
+        cause: 'URL formati yoki yo‘li Zayuno ulanish qoidalariga mos emas.',
+        expected: 'Masalan: https://api.biznesingiz.uz/zayuno — /health qismini kiritmang.',
+        steps: ['HTTPS bilan boshlanadigan API root manzilini kiriting.', 'URL ichidan username, password va /health qismini olib tashlang.'],
+      };
+    default:
+      return {
+        title: 'Serverga ulanib bo‘lmadi',
+        cause: 'DNS, TLS, firewall, deploy yoki serverning javob vaqti muammosi bo‘lishi mumkin.',
+        expected: `GET ${checkedUrl} 5 soniya ichida 200 JSON qaytarishi kerak.`,
+        steps: ['Server loglarini tekshiring.', 'Domen va TLS sertifikatini tekshiring.', 'Health endpointni brauzer/curl bilan tekshirib, qayta urinib ko‘ring.'],
+      };
+  }
+}
+
 interface OnboardingWizardProps {
   apiBase: string;
   token: string;
@@ -102,44 +166,39 @@ const InfoTooltip: React.FC<{
 }> = ({ text, docId, onOpenDoc }) => {
   const [open, setOpen] = useState(false);
   return (
-    <span className="relative inline-flex items-center ml-1.5 align-middle">
+    <span
+      className="relative inline-flex items-center ml-1.5 align-middle"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <button
         type="button"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
         className="text-slate-400 hover:text-indigo-400 p-0.5 rounded-full transition-colors focus:outline-none"
         aria-label="Qo‘shimcha ma’lumot"
+        aria-expanded={open}
       >
         <HelpCircle className="w-3.5 h-3.5" />
       </button>
       {open && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-slate-950 border border-slate-700 text-[11px] text-slate-300 rounded-xl shadow-2xl z-50 animate-fadeIn pointer-events-auto leading-relaxed text-left normal-case font-normal block">
-          <span>{text}</span>
-          {docId && onOpenDoc && (
-            <button
-              type="button"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); onOpenDoc(docId); }}
-              className="mt-2 text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 text-[10px]"
-            >
-              Batafsil qo‘llanma →
-            </button>
-          )}
+        <span className="absolute bottom-full left-1/2 z-50 w-64 -translate-x-1/2 pb-2 animate-fadeIn pointer-events-auto block">
+          <span role="tooltip" className="block rounded-xl border border-slate-700 bg-slate-950 p-3 text-left text-[11px] font-normal leading-relaxed text-slate-300 shadow-2xl normal-case">
+            <span>{text}</span>
+            {docId && onOpenDoc && (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(false); onOpenDoc(docId); }}
+                className="mt-2 text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1 text-[10px]"
+              >
+                Batafsil qo‘llanma →
+              </button>
+            )}
+          </span>
         </span>
       )}
     </span>
   );
 };
-
-const CATEGORIES = [
-  { id: 'general_services', providerType: 'SERVICES', label: 'Umumiy xizmatlar (General Services)', desc: 'Konsultatsiya, maishiy va professional xizmatlar' },
-  { id: 'food_delivery', providerType: 'DELIVERY', label: 'Taom yetkazib berish (Food Delivery)', desc: 'Restoranlar, kafelar va tayyor ovqatlar' },
-  { id: 'logistics', providerType: 'DELIVERY', label: 'Kuryer va logistika (Logistics)', desc: 'Yuk tashish, shahar ichida yetkazish va posilka' },
-  { id: 'retail', providerType: 'RETAIL', label: 'Savdo va do‘konlar (Commerce & Retail)', desc: 'Mahsulotlar, kiyim-kechak, elektronika va buyumlar' },
-  { id: 'bookings', providerType: 'BOOKINGS', label: 'Xizmatlarni bron qilish (Bookings)', desc: 'Salonlar, tibbiyot, sport va band qilish xizmatlari' },
-  { id: 'railway_tickets', providerType: 'TICKETING', label: 'Chiptalar va transport (Ticketing)', desc: 'Poyezd, avtobus va tadbirlar chiptalari' },
-  { id: 'digital', providerType: 'DIGITAL', label: 'Raqamli xizmatlar (Digital Services)', desc: 'Obunalar, dasturiy ta’minot va raqamli tovarlar' }
-];
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   apiBase,
@@ -154,7 +213,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   initialVerifyToken = '',
   initialProvider
 }) => {
-  // Read deep-link parameters from URL if present (?tab=onboarding&step=5&provider=my-slug)
+  // Read deep-link parameters from URL. `flow=provider-v2` identifies the four-step flow.
   const getInitialParams = () => {
     if (typeof window === 'undefined') return { step: null, provider: null };
     try {
@@ -162,8 +221,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       const stepStr = url.searchParams.get('step');
       const stepVal = stepStr ? parseInt(stepStr, 10) : null;
       const prov = url.searchParams.get('provider');
+      const isCurrentFlow = url.searchParams.get('flow') === 'provider-v2';
+      const normalizedStep = stepVal
+        ? (isCurrentFlow ? stepVal : Math.max(1, stepVal - 2))
+        : null;
       return {
-        step: stepVal && stepVal >= 1 && stepVal <= 6 ? stepVal : null,
+        step: normalizedStep && normalizedStep >= 1 && normalizedStep <= 4 ? normalizedStep : null,
         provider: prov ? prov.trim().toLowerCase() : null
       };
     } catch {
@@ -188,45 +251,44 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
   // Current Step determination
   const [currentStep, setCurrentStep] = useState<number>(() => {
-    if (urlParams.step) {
-      if (token && urlParams.step < 3) return 3;
-      return urlParams.step;
-    }
+    if (urlParams.step) return urlParams.step;
     if (initialProvider?.slug) {
-      return 5;
+      if (initialProvider.metadata?.isCertified || initialProvider.metadata?.lastCertificationReport?.isProductionReady) return 4;
+      return initialProvider.baseUrl ? 3 : 2;
     }
     if (savedDraft?.currentStep && savedDraft.currentStep >= 1 && savedDraft.currentStep <= 6) {
-      if (token && savedDraft.currentStep < 3) return 3;
-      return savedDraft.currentStep;
+      return savedDraft.flowVersion === 2
+        ? Math.min(savedDraft.currentStep, 4)
+        : Math.max(1, savedDraft.currentStep - 2);
     }
-    if (token) return Math.max(3, initialStep);
-    return initialStep;
+    return initialStep > 2 ? initialStep - 2 : 1;
   });
 
-  // Step 1: Account Creation
+  // Auth runs before this wizard. These legacy fields remain only for restoring old drafts.
   const [fullName, setFullName] = useState(savedDraft?.fullName || '');
   const [email, setEmail] = useState(initialEmail || savedDraft?.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Step 2: Email Verification
+  // Legacy verification fields are retained until old drafts naturally expire.
   const [verifyToken, setVerifyToken] = useState(initialVerifyToken);
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Step 3: Business Profile
+  // Step 1: Business Profile
   const [logoUrl, setLogoUrl] = useState(initialProvider?.logoUrl || savedDraft?.logoUrl || '');
   const [businessName, setBusinessName] = useState(initialProvider?.name || savedDraft?.businessName || '');
-  const [category, setCategory] = useState(initialProvider?.category || initialProvider?.metadata?.category || savedDraft?.category || 'general_services');
-  const initialProviderType = (CATEGORIES.find(item => item.id === (initialProvider?.category || initialProvider?.metadata?.category || savedDraft?.category || 'general_services'))?.providerType || 'SERVICES') as ProviderType;
-  const [fulfillmentMode, setFulfillmentMode] = useState<ProviderFulfillmentMode>(
-    initialProvider?.fulfillmentMode || initialProvider?.metadata?.fulfillmentMode || savedDraft?.fulfillmentMode || defaultFulfillmentModeForProviderType(initialProviderType)
-  );
+  // Public self-service is intentionally online-only in v1. Type, category and
+  // fulfilment are canonical backend defaults, not questions businesses must answer.
+  const category = 'online_services';
+  const providerType = 'SERVICES';
   const [description, setDescription] = useState(initialProvider?.description || initialProvider?.metadata?.description || savedDraft?.description || '');
   const [supportPhone, setSupportPhone] = useState(initialProvider?.supportContact?.phone || savedDraft?.supportPhone || '');
   const [supportTelegram, setSupportTelegram] = useState(initialProvider?.supportContact?.telegram || savedDraft?.supportTelegram || '');
   const [supportEmail, setSupportEmail] = useState(initialProvider?.supportContact?.email || savedDraft?.supportEmail || '');
+  const [supportUrl, setSupportUrl] = useState(initialProvider?.supportContact?.supportUrl || savedDraft?.supportUrl || '');
+  const [supportNote, setSupportNote] = useState(initialProvider?.supportContact?.supportNote || savedDraft?.supportNote || '');
 
-  // Step 4: Integration Details
+  // Step 2: Integration Details
   const [slug, setSlug] = useState(urlParams.provider || initialProvider?.slug || savedDraft?.slug || '');
   const [baseUrl, setBaseUrl] = useState(initialProvider?.baseUrl || savedDraft?.baseUrl || '');
   const [credentialMode, setCredentialMode] = useState<'auto' | 'byo'>('auto');
@@ -253,13 +315,39 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [urlCheckResult, setUrlCheckResult] = useState<{
     status: 'idle' | 'success' | 'warning' | 'https_required' | 'not_found' | 'error';
     message: string;
+    code?: string;
+    checkedUrl?: string;
+    statusCode?: number;
+    latencyMs?: number;
+    guidance?: HealthGuidance;
   }>({ status: 'idle', message: '' });
   const [copiedBrief, setCopiedBrief] = useState(false);
+  const [copiedHealthFix, setCopiedHealthFix] = useState(false);
+  const [showHealthReport, setShowHealthReport] = useState(false);
 
   // In-Wizard Docs Modal/Drawer State (Prevents losing wizard context)
   const [activeDocsDrawer, setActiveDocsDrawer] = useState<string | null>(null);
 
-  // Step 5: In-Wizard Certification Runner State
+  useEffect(() => {
+    if (!showHealthReport && !activeDocsDrawer) return;
+
+    const originalOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (showHealthReport) setShowHealthReport(false);
+      else setActiveDocsDrawer(null);
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [showHealthReport, activeDocsDrawer]);
+
+  // Step 3: In-Wizard Certification Runner State
   const [certLoading, setCertLoading] = useState(false);
   const [certReport, setCertReport] = useState<any | null>(() => {
     return initialProvider?.metadata?.lastCertificationReport || null;
@@ -269,7 +357,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [savingCertificationSettings, setSavingCertificationSettings] = useState(false);
   const [copiedCertificationFix, setCopiedCertificationFix] = useState<number | null>(null);
 
-  // Step 6: Review & Credentials
+  // Step 4: Review & Credentials
   const [createdCredentials, setCreatedCredentials] = useState<{
     providerSlug: string;
     sandboxApiKey: string;
@@ -293,16 +381,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const businessValidation = businessErrors({ businessName, supportPhone, supportTelegram, supportEmail });
+  const businessValidation = businessErrors({ businessName, supportPhone, supportTelegram, supportEmail, supportUrl, supportNote });
   const integrationValidation = integrationErrors({ slug, baseUrl, apiSecret, hasSavedSecret, sandbox: isOfficialSandboxUrl(baseUrl), generatedSecret, confirmed: hasConfirmedSavedSecret });
   if (logoUrl && !/^https:\/\//i.test(logoUrl) && !/^data:image\/(png|jpeg|webp);base64,/i.test(logoUrl)) businessValidation.logoUrl = 'Logo uchun HTTPS manzil yoki rasm faylidan foydalaning.';
   const businessValid = Object.keys(businessValidation).length === 0;
   const integrationValid = Object.keys(integrationValidation).length === 0;
-  const fingerprint = JSON.stringify([businessName.trim(), category, fulfillmentMode, description.trim(), supportPhone.trim(), supportTelegram.trim(), supportEmail.trim(), logoUrl, slug.trim(), baseUrl.trim(), authMethod, capabilityProfile]);
+  const fingerprint = JSON.stringify([businessName.trim(), description.trim(), supportPhone.trim(), supportTelegram.trim(), supportEmail.trim(), supportUrl.trim(), supportNote.trim(), logoUrl, slug.trim(), baseUrl.trim(), authMethod, capabilityProfile]);
   const [savedFingerprint, setSavedFingerprint] = useState(initialProvider?.id ? fingerprint : '');
   const integrationSaved = Boolean(savedFingerprint && savedFingerprint === fingerprint && !apiSecret && businessValid && integrationValid);
-  const maxStep = reachableOnboardingStep(Boolean(token), businessValid, integrationSaved, Boolean(certReport?.isProductionReady));
-  useEffect(() => { setCurrentStep(step => step === 5 && showCertificationSettings && businessValid ? step : Math.min(step, maxStep)); }, [maxStep, showCertificationSettings, businessValid]);
+  const maxStep = reachableOnboardingStep(businessValid, integrationSaved, Boolean(certReport?.isProductionReady));
+  useEffect(() => { setCurrentStep(step => step === 3 && showCertificationSettings && businessValid ? step : Math.min(step, maxStep)); }, [maxStep, showCertificationSettings, businessValid]);
   useEffect(() => { setSuccessMsg(null); setFieldErrors({}); setError(null); }, [fingerprint, currentStep]);
   useEffect(() => { setUrlCheckResult({ status: 'idle', message: '' }); }, [baseUrl, authMethod, apiSecret]);
   const showValidation = (errors: Record<string, string>) => {
@@ -318,6 +406,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     const url = new URL(window.location.href);
     url.searchParams.set('tab', 'onboarding');
     url.searchParams.set('step', String(currentStep));
+    url.searchParams.set('flow', 'provider-v2');
     if (slug.trim()) {
       url.searchParams.set('provider', slug.trim());
     } else {
@@ -335,17 +424,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         fullName,
         email,
         businessName,
-        category,
-        fulfillmentMode,
         description,
         supportPhone,
         supportTelegram,
         supportEmail,
+        supportUrl,
+        supportNote,
         slug,
         baseUrl,
         authMethod,
         capabilityProfile,
         currentStep,
+        flowVersion: 2,
         // Credentials and workflow completion are never restored from local drafts.
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
@@ -356,12 +446,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     fullName,
     email,
     businessName,
-    category,
-    fulfillmentMode,
     description,
     supportPhone,
     supportTelegram,
     supportEmail,
+    supportUrl,
+    supportNote,
     slug,
     baseUrl,
     authMethod,
@@ -376,13 +466,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     if (initialEmail) setEmail(initialEmail);
     if (initialVerifyToken) setVerifyToken(initialVerifyToken);
   }, [initialEmail, initialVerifyToken]);
-
-  // If user is authenticated, skip Step 1 and Step 2 and navigate directly to Step 3 (Business Profile)
-  useEffect(() => {
-    if (token) {
-      setCurrentStep(prev => (prev < 3 ? 3 : prev));
-    }
-  }, [token]);
 
   // Handle Resend Cooldown Timer
   useEffect(() => {
@@ -401,7 +484,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       .trim()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
-    setSlug(autoSlug);
+    // A non-Latin name still needs a stable ID, but changing the visible name
+    // must never generate a new ID on every keypress.
+    setSlug((current: string) => autoSlug || current || `business-${Math.random().toString(36).slice(2, 8)}`);
   };
 
   const copyToClipboard = async (text: string, fieldName: string) => {
@@ -518,17 +603,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   };
 
   // --------------------------------------------------------------------------
-  // STEP 3: Business Details
+  // STEP 1: Business Details
   // --------------------------------------------------------------------------
   const handleBusinessStepNext = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!businessValid) { showValidation(businessValidation); return; }
-    setCurrentStep(4);
+    setCurrentStep(2);
   };
 
   // --------------------------------------------------------------------------
-  // STEP 4 Helpers: Base URL health testing, Secret Generation, and AI Brief copy
+  // STEP 2 Helpers: Base URL health testing, Secret Generation, and AI Brief copy
   // --------------------------------------------------------------------------
   const handleGenerateSecret = async () => {
     try {
@@ -628,14 +713,31 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
       if (isPrivateHost && !isDevEnv) {
         setUrlCheckResult({
           status: 'error',
-          message: '⚠️ Xavfsizlik: Private IP yoki ichki tarmoq manzillarini tekshirib bo‘lmaydi. Haqiqiy public HTTPS domen kiriting.'
+          code: 'FORBIDDEN_ADDRESS',
+          checkedUrl: `${raw.replace(/\/+$/, '')}/health`,
+          message: '⚠️ Xavfsizlik: Private IP yoki ichki tarmoq manzillarini tekshirib bo‘lmaydi. Haqiqiy public HTTPS domen kiriting.',
+          guidance: getHealthGuidance('FORBIDDEN_ADDRESS', `${raw.replace(/\/+$/, '')}/health`)
+        });
+        return;
+      }
+      if (/\/health\/?$/i.test(u.pathname)) {
+        const checkedUrl = raw.replace(/\/+$/, '');
+        setUrlCheckResult({
+          status: 'warning',
+          code: 'INVALID_URL',
+          checkedUrl,
+          message: 'Base URL ichida /health bor. Zayuno /health’ni avtomatik qo‘shadi — bu qiymatdan /health qismini olib tashlang.',
+          guidance: getHealthGuidance('INVALID_URL', checkedUrl)
         });
         return;
       }
     } catch {
       setUrlCheckResult({
         status: 'error',
-        message: 'Noto‘g‘ri URL formati kiritildi.'
+        code: 'INVALID_URL',
+        checkedUrl: raw,
+        message: 'Noto‘g‘ri URL formati kiritildi.',
+        guidance: getHealthGuidance('INVALID_URL', raw)
       });
       return;
     }
@@ -645,6 +747,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
     try {
       const cleanUrl = raw.replace(/\/+$/, '');
+      const checkedUrl = `${cleanUrl}/health`;
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
       };
@@ -662,37 +765,32 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         })
       });
 
-      const data = await res.json();
-      if (data.status === 'HEALTHY') {
-        setUrlCheckResult({
-          status: 'success',
-          message: data.message || '✅ Ulanish muvaffaqiyatli! Server /health endpointida 200 OK qaytardi va HealthSchema talablariga to‘liq javob berdi.'
-        });
-      } else if (data.status === 'NOT_FOUND') {
-        setUrlCheckResult({
-          status: 'not_found',
-          message: data.message || '❌ /health endpointi topilmadi (404 Not Found). Backend yo‘nalishini tekshiring.'
-        });
-      } else if (data.status === 'AUTH_REQUIRED') {
-        setUrlCheckResult({
-          status: 'warning',
-          message: data.message || '⚠️ Serverga ulanish muvaffaqiyatli, ammo /health endpointi autentifikatsiya talab qilmoqda.'
-        });
-      } else if (data.status === 'SCHEMA_MISMATCH') {
-        setUrlCheckResult({
-          status: 'warning',
-          message: data.message || '⚠️ Server /health da 200 OK qaytardi, ammo javob formati Zayuno HealthCheckResultSchema talablariga mos kelmadi.'
-        });
-      } else {
-        setUrlCheckResult({
-          status: 'error',
-          message: data.message || '❌ Server javob bermadi yoki /health ga ulanish bloklandi.'
-        });
-      }
+      const data = await res.json().catch(() => ({}));
+      const code = typeof data.status === 'string' ? data.status : 'UNREACHABLE';
+      const status = code === 'HEALTHY'
+        ? 'success'
+        : code === 'NOT_FOUND'
+          ? 'not_found'
+          : code === 'AUTH_REQUIRED' || code === 'SCHEMA_MISMATCH' || code === 'INVALID_URL'
+            ? 'warning'
+            : 'error';
+      setUrlCheckResult({
+        status,
+        code,
+        checkedUrl,
+        statusCode: typeof data.statusCode === 'number' ? data.statusCode : undefined,
+        latencyMs: typeof data.latencyMs === 'number' ? data.latencyMs : undefined,
+        message: data.message || 'Server javob bermadi yoki /health ga ulanish bloklandi.',
+        guidance: getHealthGuidance(code, checkedUrl)
+      });
     } catch (err: any) {
+      const checkedUrl = `${raw.replace(/\/+$/, '')}/health`;
       setUrlCheckResult({
         status: 'error',
-        message: '❌ Server javob bermadi yoki tekshirish xizmati bilan ulanishda xatolik yuz berdi.'
+        code: 'UNREACHABLE',
+        checkedUrl,
+        message: 'Server javob bermadi yoki tekshirish xizmati bilan ulanishda xatolik yuz berdi.',
+        guidance: getHealthGuidance('UNREACHABLE', checkedUrl)
       });
     } finally {
       setTestingUrl(false);
@@ -702,9 +800,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const handleCopyIntegrationBrief = () => {
     const isTrans = capabilityProfile === 'transactional';
     const profile = isTrans ? 'TRANSACTIONAL' : 'DISCOVERY_READONLY';
-    const selectedCategory = CATEGORIES.find(c => c.id === category);
-    const canonicalProviderType = selectedCategory?.providerType || 'SERVICES';
-    const locationRequired = requiresActiveLocations(canonicalProviderType as ProviderType, fulfillmentMode);
     const endpoints = getProviderProtocolEndpoints(profile)
       .filter(endpoint => endpoint.required)
       .map((endpoint, index) => {
@@ -724,28 +819,36 @@ Provider Contract: v${PROVIDER_CONTRACT_VERSION}
 
 Biznes nomi: ${businessName.trim() || 'Mening Biznesim'}
 Provider Slug: ${slug.trim() || 'my-provider-slug'}
-Biznes toifasi (UI): ${selectedCategory?.label || category}
-Provider type (CANONICAL API ENUM): ${canonicalProviderType}
-Tanlangan rejim: ${isTrans ? 'Variant B — Topish va buyurtma berish (TRANSACTIONAL)' : 'Variant A — Faqat topish va ko‘rish (DISCOVERY)'}
-Xizmat bajarilish usuli: ${fulfillmentMode}${locationRequired ? ' (LOCATIONS majburiy)' : ' (filial majburiy emas)'}
+Provider type (CANONICAL API ENUM): SERVICES
+Tanlangan imkoniyat: ${isTrans ? 'Topish, aniq narx olish va buyurtma yaratish (TRANSACTIONAL)' : 'Faqat topish va ko‘rsatish (DISCOVERY)'}
 Autentifikatsiya formati: ${authMethod} (${authMethod === 'API_KEY' ? 'X-API-KEY header: x-provider-api-key' : authMethod === 'BEARER_TOKEN' ? 'Authorization: Bearer token' : 'HMAC-SHA256 imzosi: x-zayuno-signature'})
 
 --------------------------------------------------------------------------------
-1. INTEGRATSIYA MAQSADI
+1. AVVAL HUJJATLARNI O‘QING
 --------------------------------------------------------------------------------
-Zayuno AI agentlar (ChatGPT, Claude, autonomous workerlar) uchun neytral harakat platformasidir.
-AI agentlar foydalanuvchi talabiga asosan sizning xizmatlaringizni topadi, kotirovka oladi va buyurtma yaratadi.
+- Boshlash: https://partners.zayuno.uz/?tab=docs&doc=getting-started
+- To‘liq Provider Contract: https://partners.zayuno.uz/?tab=docs&doc=contract-reference
+- Auth va kalitlar: https://partners.zayuno.uz/?tab=docs&doc=auth
+- Quote, action va idempotency: https://partners.zayuno.uz/?tab=docs&doc=actions
+- Xatolar va retry qoidalari: https://partners.zayuno.uz/?tab=docs&doc=errors
+- Machine-readable OpenAPI 3.1: https://partners.zayuno.uz/openapi.json
+
+Ushbu linklarni avval fetch qilib, contractdagi schema va misollarga mos ishlang. Aniqlik yetishmasa taxmin qilmang.
 
 --------------------------------------------------------------------------------
-2. TALAB ETILADIGAN CANONICAL API ENDPOINTLAR (HTTPS)
+2. INTEGRATSIYA MAQSADI
+--------------------------------------------------------------------------------
+Zayuno AI agentlari foydalanuvchi xohlagan narsani sizning haqiqiy katalogingizdan topadi.
+${isTrans ? 'Narxni provider hisoblaydi; foydalanuvchi tasdiqlagach buyurtma yaratiladi va to‘lov providerning o‘z checkoutiga beriladi.' : 'Agent katalogingizni topib, aniq va yangilanadigan ma’lumotni ko‘rsatadi; buyurtma yaratmaydi.'}
+
+Bu v1 faqat public online API integratsiyasidir. Filial, xarita, delivery radiusi yoki offline flow yozmang.
+
+--------------------------------------------------------------------------------
+3. TALAB ETILADIGAN CANONICAL API ENDPOINTLAR (HTTPS)
 --------------------------------------------------------------------------------
 ${endpoints}
 
 MUHIM:
-- UI'dagi biznes toifasi va API'dagi provider type bir xil matn emas. API javobida faqat canonical enum ishlating: RETAIL, DELIVERY, SERVICES, BOOKINGS, TICKETING, DIGITAL, COMMERCE yoki OTHER.
-- Masalan, "Kuryer va logistika (Logistics)" tanlangan bo'lsa JSON ichida "type": "DELIVERY" qaytaring. LOGISTICS canonical enum emas va ishlatilmasin.
-- Ushbu integratsiya uchun to'g'ri qiymat: "type": "${canonicalProviderType}".
-${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajariladi. LOCATIONS capability, GET /locations va kamida bitta isActive=true filial majburiy. Aks holda provider AI qidiruvida ko‘rinmaydi.' : '- Bu masofaviy xizmat. LOCATIONS faqat haqiqatan filiallar mavjud bo‘lsa e’lon qilinadi.'}
 - Katalog offeringlarida "providerId", "offeringCode", "title", "basePrice", "currency" va "isAvailable" maydonlari majburiydir.
 - GET /offerings/:id bitta mahsulot tafsilotini aynan OfferingSchema formatida qaytarishi shart.
 - Quote javobi "id" va itemized "lines" qaytaradi (formula: total == subtotal + totalFees - totalDiscount).
@@ -753,7 +856,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
 - Provider webhook endpoint ochmaydi. Status eventlarini Zayuno'ga POST ${ZAYUNO_WEBHOOK_INGESTION_PATH} orqali yuboradi.
 
 --------------------------------------------------------------------------------
-3. CREDENTIAL VA MAXFIYLIK QOIDALARI
+4. CREDENTIAL VA MAXFIYLIK QOIDALARI
 --------------------------------------------------------------------------------
 - Provider API key: Dasturchi o'zi yaratadi va o'z serverining environment variable'iga (.env) qo'yadi hamda Zayuno portalga bir marta kiritadi.
 - Webhook secret: Zayuno handoff orqali taqdim etadi va serverning .env fayliga saqlanadi.
@@ -761,17 +864,65 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
 - To'lov chegarasi: Zayuno hech qachon to'lov kartalari ma'lumotlarini qabul qilmaydi. To'lov providerning o'z checkout havolasi (NextAction) orqali amalga oshiriladi.
 
 --------------------------------------------------------------------------------
-4. QO'LLANMALAR VA AVTOMATIK TEST
+5. TUGALLANGAN ISH MEZONI
 --------------------------------------------------------------------------------
-- Base URL va Endpointlar qo'llanmasi: https://partners.zayuno.uz/?tab=docs&doc=base-url
-- Autentifikatsiya va Kalitlar qo'llanmasi: https://partners.zayuno.uz/?tab=docs&doc=auth
-- Avtomatlashtirilgan sertifikatlash testi: https://partners.zayuno.uz/?tab=certification
-- OpenAPI 3.1 va Postman Collection: https://partners.zayuno.uz/openapi.json
+- GET /health public HTTPS’da contractga mos javob beradi.
+- Yuqoridagi majburiy endpointlar haqiqiy provider ma’lumoti bilan ishlaydi.
+- ${isTrans ? 'Quote, action, idempotency, provider checkout handoff va webhook holatlari ishlaydi.' : 'Katalog va offering tafsiloti yangilanadigan ma’lumot bilan ishlaydi.'}
+- Portal ichidagi Moslik tekshiruvining barcha majburiy testlari PASS bo‘ladi.
+- Secretlar chat, Git yoki browser bundle’ga tushmagan bo‘ladi.
 `;
 
     navigator.clipboard.writeText(brief);
     setCopiedBrief(true);
     setTimeout(() => setCopiedBrief(false), 3000);
+  };
+
+  const handleCopyHealthFixBrief = async () => {
+    const result = urlCheckResult;
+    const guidance = result.guidance;
+    if (!guidance || !result.checkedUrl) return;
+    const brief = `# ZAYUNO HEALTH CHECK — TUZATISH BRIEFI
+
+Maqsad: Zayuno provider API uchun GET /health endpointini contractga mos holatga keltirish.
+
+## Tekshiruv natijasi
+- Tekshirilgan URL: ${result.checkedUrl}
+- Kod: ${result.code || 'UNREACHABLE'}
+- HTTP status: ${result.statusCode ?? 'olinmadi'}
+- Javob vaqti: ${result.latencyMs !== undefined ? `${result.latencyMs} ms` : 'olinmadi'}
+- Portal xabari: ${result.message}
+
+## Nima xato
+${guidance.cause}
+
+## Kutilayotgan holat
+${guidance.expected}
+
+## Tuzatish rejasi
+${guidance.steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}
+
+## Canonical /health javobi
+HTTP 200
+Content-Type: application/json
+${HEALTH_RESPONSE_EXAMPLE}
+
+## Muhim qoidalar
+- Base URL API root bo‘lsin; URL oxiriga /health yozilmasin, Zayuno uni o‘zi qo‘shadi.
+- Secret, API key, bearer token yoki real mijoz ma’lumotini bu chatga yubormang.
+- Avval rasmiy schema va misollarni o‘qing:
+  - https://partners.zayuno.uz/?tab=docs&doc=base-url
+  - https://partners.zayuno.uz/?tab=docs&doc=contract-reference
+  - https://partners.zayuno.uz/openapi.json
+
+Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonical contractga mos kod yozing.`;
+    try {
+      await navigator.clipboard.writeText(brief);
+      setCopiedHealthFix(true);
+      setTimeout(() => setCopiedHealthFix(false), 3000);
+    } catch {
+      setError('Fix briefni nusxalab bo‘lmadi. Brauzer clipboard ruxsatini tekshiring.');
+    }
   };
 
   const handleDownloadOpenApi = () => {
@@ -780,8 +931,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
 
   const buildCertificationFixArtifact = (test: any) => {
     const profile = capabilityProfile === 'transactional' ? 'TRANSACTIONAL' : 'DISCOVERY_READONLY';
-    const selectedCategory = CATEGORIES.find(item => item.id === category);
-    const canonicalType = selectedCategory?.providerType || 'SERVICES';
+    const canonicalType = providerType;
     const endpoint = getProviderProtocolEndpoints(profile).find(item =>
       item.capability === test.capability ||
       (test.endpoint && item.path === test.endpoint)
@@ -840,8 +990,6 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       const capabilities = capabilityProfile === 'transactional'
         ? ['METADATA', 'HEALTH', 'CATALOG', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK']
         : ['METADATA', 'HEALTH', 'CATALOG'];
-      const providerType = (CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES') as ProviderType;
-      if (requiresActiveLocations(providerType, fulfillmentMode) && !capabilities.includes('LOCATIONS')) capabilities.push('LOCATIONS');
       const res = await fetch(`${apiBase}/api/v1/providers/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
@@ -851,7 +999,6 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
           slug: cleanSlug,
           description: description.trim() || undefined,
           type: providerType,
-          fulfillmentMode,
           category,
           geography: ['UZ'],
           baseUrl: baseUrl.trim(),
@@ -861,7 +1008,9 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
           supportContact: {
             phone: supportPhone.trim() || undefined,
             telegram: supportTelegram.trim() || undefined,
-            email: supportEmail.trim() || email.trim() || undefined
+            email: supportEmail.trim() || email.trim() || undefined,
+            supportUrl: supportUrl.trim() || undefined,
+            supportNote: supportNote.trim() || undefined
           }
         })
       });
@@ -883,14 +1032,14 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
   };
 
   // --------------------------------------------------------------------------
-  // STEP 4: Integration Submission (Register Provider)
+  // STEP 2: Integration Submission (Register Provider)
   // --------------------------------------------------------------------------
   const handleRegisterProvider = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
 
-    if (!businessValid) { setCurrentStep(3); showValidation(businessValidation); return; }
+    if (!businessValid) { setCurrentStep(1); showValidation(businessValidation); return; }
     if (!integrationValid) { showValidation(integrationValidation); return; }
     const cleanSlug = slug.trim().toLowerCase();
     if (!cleanSlug || !/^[a-z0-9-]+$/.test(cleanSlug)) {
@@ -902,8 +1051,6 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       capabilityProfile === 'transactional'
         ? ['METADATA', 'HEALTH', 'CATALOG', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'WEBHOOK']
         : ['METADATA', 'HEALTH', 'CATALOG'];
-    const providerType = (CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES') as ProviderType;
-    if (requiresActiveLocations(providerType, fulfillmentMode) && !capabilities.includes('LOCATIONS')) capabilities.push('LOCATIONS');
 
     setLoading(true);
     try {
@@ -925,10 +1072,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
           logoUrl: logoUrl || null,
           slug: cleanSlug,
           description: description.trim() || undefined,
-          // Human-readable category labels never become wire enum values.
-          // For example, "Digital Services" maps to the canonical `DIGITAL` value.
           type: providerType,
-          fulfillmentMode,
           category: category,
           geography: ['UZ'],
           baseUrl: baseUrl.trim() || undefined,
@@ -938,7 +1082,9 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
           supportContact: {
             phone: supportPhone.trim() || undefined,
             telegram: supportTelegram.trim() || undefined,
-            email: supportEmail.trim() || email.trim() || undefined
+            email: supportEmail.trim() || email.trim() || undefined,
+            supportUrl: supportUrl.trim() || undefined,
+            supportNote: supportNote.trim() || undefined
           }
         })
       });
@@ -969,8 +1115,8 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       setGeneratedSecret('');
       setApiSecret('');
       setShowSecretInput(false);
-      setSuccessMsg('Provider DRAFT arizasi saqlandi! Endi 5-qadamda sertifikatlash testlarini bajaring.');
-      setCurrentStep(5);
+      setSuccessMsg('Provider DRAFT arizasi saqlandi! Endi 3-qadamda sertifikatlash testlarini bajaring.');
+      setCurrentStep(3);
     } catch (err: any) {
       setError(err.message || 'Arizani yaratishda xatolik yuz berdi.');
     } finally {
@@ -979,13 +1125,13 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
   };
 
   // --------------------------------------------------------------------------
-  // STEP 5: In-Wizard Certification Runner
+  // STEP 3: In-Wizard Certification Runner
   // --------------------------------------------------------------------------
   const handleRunCertification = async () => {
     if (!integrationSaved) { setCertError('O‘zgargan API sozlamalarini avval saqlang.'); return; }
     const targetSlug = slug.trim() || createdCredentials?.providerSlug;
     if (!targetSlug) {
-      setCertError('Provider topilmadi. Iltimos, 4-qadamda arizani saqlang.');
+      setCertError('Provider topilmadi. Iltimos, 2-qadamda arizani saqlang.');
       return;
     }
 
@@ -1045,7 +1191,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
     }
   };
 
-  const isStepAccessible = (stepNum: number): boolean => stepNum <= maxStep && !(Boolean(token) && stepNum < 3);
+  const isStepAccessible = (stepNum: number): boolean => stepNum <= maxStep;
   const handleStepClick = (stepNum: number) => {
     if (loading || certLoading || savingCertificationSettings) return;
     if (isStepAccessible(stepNum)) { setCurrentStep(stepNum); setSuccessMsg(null); }
@@ -1056,12 +1202,10 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
   };
 
   const stepsList = [
-    { num: 1, title: 'Hisob', subtitle: 'Account' },
-    { num: 2, title: 'Tasdiqlash', subtitle: 'Email' },
-    { num: 3, title: 'Biznes', subtitle: 'Profile' },
-    { num: 4, title: 'Integratsiya', subtitle: 'API & Slug' },
-    { num: 5, title: 'Sertifikat', subtitle: 'Sandbox' },
-    { num: 6, title: 'Ko‘rib chiqish', subtitle: 'Review' }
+    { num: 1, title: 'Biznes', subtitle: 'Profil va yordam' },
+    { num: 2, title: 'API ulash', subtitle: 'Online API' },
+    { num: 3, title: 'Moslik', subtitle: 'Contract testi' },
+    { num: 4, title: 'Ko‘rib chiqish', subtitle: 'Review' }
   ];
 
   return (
@@ -1095,9 +1239,9 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
         </div>
 
         {/* Progress Bar & Steps Tabs */}
-        <div className="grid grid-cols-6 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {stepsList.map(s => {
-            const isCompleted = (Boolean(token) && s.num <= 2) || (s.num === 3 && businessValid) || (s.num === 4 && integrationSaved) || (s.num === 5 && integrationSaved && Boolean(certReport?.isProductionReady));
+            const isCompleted = (s.num === 1 && businessValid) || (s.num === 2 && integrationSaved) || (s.num === 3 && integrationSaved && Boolean(certReport?.isProductionReady));
             const isCurrent = currentStep === s.num;
             const accessible = isStepAccessible(s.num);
             return (
@@ -1143,7 +1287,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       {/* --------------------------------------------------------------------- */}
       {/* STEP 1: Account Creation                                              */}
       {/* --------------------------------------------------------------------- */}
-      {currentStep === 1 && (
+      {false && (
         Boolean(token) ? (
           <div className="space-y-6 animate-fadeIn">
             <div className="space-y-1">
@@ -1276,7 +1420,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       {/* --------------------------------------------------------------------- */}
       {/* STEP 2: Email Verification                                            */}
       {/* --------------------------------------------------------------------- */}
-      {currentStep === 2 && (
+      {false && (
         Boolean(token) ? (
           <div className="space-y-6 animate-fadeIn">
             <div className="space-y-1">
@@ -1371,12 +1515,12 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       {/* --------------------------------------------------------------------- */}
       {/* STEP 3: Business Details                                              */}
       {/* --------------------------------------------------------------------- */}
-      {currentStep === 3 && (
+      {currentStep === 1 && (
         <form noValidate onSubmit={handleBusinessStepNext} className="space-y-6 animate-fadeIn">
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-white">3. Biznes va Xizmat Ma’lumotlari</h3>
+            <h3 className="text-lg font-bold text-white">1. Biznes va mijoz yordam ma’lumotlari</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              AI agentlar foydalanuvchiga xizmatingizni to‘g‘ri tavsiya qilishi uchun asosiy ma’lumotlarni kiriting.
+              Mijoz buyurtma bergach kimga va qayerga murojaat qilishini aniq ko‘rsatamiz. Filial, manzil va offline jarayonlar bu integratsiyada so‘ralmaydi.
             </p>
           </div>
 
@@ -1397,71 +1541,36 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1 font-medium">Xizmat Toifasi (Category) *</label>
-                <select
-                  value={category}
-                  onChange={e => {
-                    const nextCategory = e.target.value;
-                    const nextType = (CATEGORIES.find(item => item.id === nextCategory)?.providerType || 'SERVICES') as ProviderType;
-                    setCategory(nextCategory);
-                    setFulfillmentMode(defaultFulfillmentModeForProviderType(nextType));
-                  }}
+                <label className="block text-slate-300 mb-1 font-medium">Rasmiy veb-sayt yoki yordam sahifasi</label>
+                <input
+                  type="url"
+                  id="supportUrl" aria-label="supportUrl" aria-invalid={Boolean(fieldErrors.supportUrl)} aria-describedby="supportUrl-error"
+                  value={supportUrl}
+                  onChange={e => setSupportUrl(e.target.value)}
+                  placeholder="https://business.uz/yordam"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500"
-                >
-                  {CATEGORIES.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+                />
+                <p className="mt-1 text-[11px] text-slate-500">Mijozlar buyurtma bo‘yicha yordam yoki rasmiy ma’lumot uchun shu havolani ochadi.</p>
+                {fieldError('supportUrl')}
               </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
-              <div>
-                <h4 className="font-semibold text-white">Xizmat qayerda yoki qanday bajariladi? *</h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Bu tanlov AI qidiruvida filial majburiyligini belgilaydi. Jismoniy xizmatlarda kamida bitta faol filial kerak; masofaviy xizmatda filial talab qilinmaydi.
-                </p>
-              </div>
-              <select
-                value={fulfillmentMode}
-                onChange={e => setFulfillmentMode(e.target.value as ProviderFulfillmentMode)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500"
-              >
-                <option value={ProviderFulfillmentMode.ONSITE}>Mijoz filialga/joyga keladi (On-site)</option>
-                <option value={ProviderFulfillmentMode.DELIVERY}>Mijoz manziliga yetkazib beriladi (Delivery)</option>
-                <option value={ProviderFulfillmentMode.PICKUP}>Filialdan olib ketiladi (Pickup)</option>
-                <option value={ProviderFulfillmentMode.HYBRID}>Filial va masofaviy/yetkazib berish (Hybrid)</option>
-                <option value={ProviderFulfillmentMode.REMOTE}>To‘liq masofaviy yoki raqamli (Remote)</option>
-              </select>
-              {requiresActiveLocations((CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES') as ProviderType, fulfillmentMode) ? (
-                <div className="text-[11px] text-amber-200 bg-amber-950/30 border border-amber-500/30 rounded-xl p-3">
-                  <strong>Faol filial majburiy:</strong> LOCATIONS capability avtomatik qo‘shiladi. API <code>GET /locations</code> orqali kamida bitta <code>isActive: true</code> filial qaytarishi shart; aks holda sertifikatlash o‘tmaydi va provider AI qidiruvida ko‘rinmaydi.
-                </div>
-              ) : (
-                <div className="text-[11px] text-emerald-200 bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-3">
-                  Masofaviy xizmat tanlandi: filial majburiy emas.
-                </div>
-              )}
             </div>
 
             <div>
-              <label className="block text-slate-300 mb-1 font-medium">Xizmat haqida qisqacha tavsif (Description)</label>
+              <label className="block text-slate-300 mb-1 font-medium">Biznes haqida qisqacha izoh <span className="text-slate-500">(ixtiyoriy)</span></label>
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 rows={2}
-                placeholder="AI agentlar xizmatingiz qamrovi va imkoniyatlarini tushunishi uchun qisqa izoh (masalan: Toshkent shahrida 45 daqiqada taom yetkazib berish)"
+                placeholder="Masalan: onlayn katalog va buyurtma qabul qiluvchi biznes. Aniq xizmatlar API katalogidan olinadi."
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
               <h4 className="font-semibold text-white flex items-center gap-2">
-                <Phone className="w-4 h-4 text-indigo-400" /> Mijozlarni qo‘llab-quvvatlash kontaktlari <span className="text-rose-400">*</span>
+                <Phone className="w-4 h-4 text-indigo-400" /> Mijozlar uchun yordam <span className="text-rose-400">*</span>
               </h4>
-              <p className="text-[11px] text-slate-400">Kamida bittasini kiriting: telefon, Telegram yoki support email.</p>
+              <p className="text-[11px] text-slate-400">Buyurtmadan keyin mijoz aynan shu kanallarni ko‘radi. Kamida bittasi kerak; qolganlarini xohlaganingizcha qo‘shing.</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1">Telefon raqam</label>
@@ -1488,7 +1597,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                   {fieldError('supportTelegram')}
                 </div>
                 <div>
-                  <label className="block text-slate-400 mb-1">Support Email</label>
+                  <label className="block text-slate-400 mb-1">Yordam emaili</label>
                   <input
                     type="email"
                     id="supportEmail" aria-label="supportEmail" aria-invalid={Boolean(fieldErrors.supportEmail)} aria-describedby="supportEmail-error"
@@ -1500,13 +1609,30 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                   {fieldError('supportEmail')}
                 </div>
               </div>
+              <div>
+                <label className="block text-slate-400 mb-1">Mijozga ko‘rinadigan qisqa izoh <span className="text-slate-500">(ixtiyoriy)</span></label>
+                <textarea
+                  id="supportNote" aria-label="supportNote" aria-invalid={Boolean(fieldErrors.supportNote)} aria-describedby="supportNote-error"
+                  value={supportNote}
+                  onChange={e => setSupportNote(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                  placeholder="Masalan: Buyurtma raqamingizni yuboring, jamoamiz yordam beradi."
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
+                />
+                <div className="mt-1 flex justify-between text-[10px] text-slate-500"><span>Bu izoh buyurtma kartasida chiqadi.</span><span>{supportNote.length}/500</span></div>
+                {fieldError('supportNote')}
+              </div>
+              <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-3 text-[11px] text-slate-300">
+                <span className="font-semibold text-white">Mijoz ko‘rinishi:</span> “Buyurtmangiz bo‘yicha yordam kerakmi?” — telefon, Telegram, email va rasmiy sayt tugmalari faqat kiritilgan qiymatlar bilan chiqadi.
+              </div>
             </div>
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-slate-800">
             <button
               type="button"
-              onClick={() => setCurrentStep(2)}
+              onClick={() => onNavigateTab('overview')}
               className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Ortga
@@ -1523,44 +1649,27 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       )}
 
       {/* --------------------------------------------------------------------- */}
-      {/* STEP 4: Integration Details (Slug, API URL & Auth)                    */}
+      {/* STEP 2: Online API connection                                         */}
       {/* --------------------------------------------------------------------- */}
-      {currentStep === 4 && (
+      {currentStep === 2 && (
         <form noValidate onSubmit={handleRegisterProvider} className="space-y-6 animate-fadeIn">
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-white">4. API Integratsiya va Identifikator</h3>
+            <h3 className="text-lg font-bold text-white">2. API’ni ulang va tekshiring</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Zayuno protokoli orqali so‘rovlarni qabul qilish uchun API endpoint va autentifikatsiya usulini sozlang.
+              Zayuno faqat public HTTPS API bilan ulanadi. Manzilni kiriting, keyin tizim serveringiz haqiqatan javob berayotganini tekshiradi.
             </p>
           </div>
 
           <div className="space-y-5 text-xs">
-            {/* Slug & Base URL Fields */}
+            {/* Auto identity & Base URL */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-slate-300 mb-1 font-medium items-center">
-                  <span>Provider Slug (Noyob ID) *</span>
-                  <InfoTooltip
-                    text="AI agentlar va API so‘rovlarida biznesingizni topish uchun ishlatiladigan lotincha qisqa nom (masalan: my-coffee-shop)."
-                    docId="getting-started"
-                    onOpenDoc={openDocModal}
-                  />
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    id="slug" aria-label="slug" aria-invalid={Boolean(fieldErrors.slug)} aria-describedby="slug-error"
-                    value={slug}
-                    onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    placeholder="my-company-slug"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-indigo-500"
-                  />
-                  {fieldError('slug')}
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3">
+                <div className="flex items-center gap-2 text-slate-300 font-medium">
+                  <Building2 className="h-4 w-4 text-indigo-400" /> Zayuno biznes ID
                 </div>
-                <span className="text-[11px] text-slate-500 mt-1 block">
-                  AI so‘rovlarida identifikator: <span className="font-mono text-indigo-400">{slug || 'provider-slug'}</span>
-                </span>
+                <code className="mt-2 block text-sm text-indigo-300 font-mono">{slug || 'business-id-yaratilmoqda'}</code>
+                <p className="mt-1 text-[11px] text-slate-500">Biznes nomidan avtomatik yaratiladi. Keyin sozlamalarda o‘zgartirish mumkin.</p>
+                {fieldError('slug')}
               </div>
 
               <div>
@@ -1579,7 +1688,10 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                     value={baseUrl}
                     onChange={e => {
                       setBaseUrl(e.target.value);
-                      if (urlCheckResult.status !== 'idle') setUrlCheckResult({ status: 'idle', message: '' });
+                      if (urlCheckResult.status !== 'idle') {
+                        setUrlCheckResult({ status: 'idle', message: '' });
+                        setShowHealthReport(false);
+                      }
                     }}
                     placeholder="https://api.sizningbiznesingiz.uz/zayuno"
                     className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-indigo-500"
@@ -1624,31 +1736,89 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
             {/* URL Health Check Alert */}
             {urlCheckResult.status !== 'idle' && (
               <div
-                className={`p-3 rounded-xl text-xs flex items-start gap-2.5 animate-fadeIn ${
+                className={`rounded-2xl border overflow-hidden text-xs animate-fadeIn ${
                   urlCheckResult.status === 'success'
-                    ? 'bg-emerald-950/50 border border-emerald-500/40 text-emerald-300'
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-100'
                     : urlCheckResult.status === 'https_required' || urlCheckResult.status === 'warning'
-                    ? 'bg-amber-950/50 border border-amber-500/40 text-amber-300'
-                    : 'bg-rose-950/50 border border-rose-500/40 text-rose-300'
+                    ? 'bg-amber-950/35 border-amber-500/40 text-amber-100'
+                    : 'bg-rose-950/35 border-rose-500/40 text-rose-100'
                 }`}
               >
-                {urlCheckResult.status === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                )}
-                <div className="flex-1 leading-relaxed">{urlCheckResult.message}</div>
+                <div className="p-4 flex items-start gap-3">
+                  {urlCheckResult.status === 'success' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  )}
+                  <div className="min-w-0 flex-1 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-sm text-white">{urlCheckResult.guidance?.title || 'Ulanish holati'}</p>
+                        <p className="mt-0.5 text-slate-300 leading-relaxed">{urlCheckResult.message}</p>
+                      </div>
+                      {urlCheckResult.code && <span className="rounded-full border border-white/10 bg-slate-950/45 px-2 py-1 font-mono text-[10px] text-slate-300">{urlCheckResult.code}</span>}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="rounded-xl bg-slate-950/45 border border-white/5 px-2.5 py-2"><span className="block text-[10px] uppercase tracking-wider text-slate-500">Tekshirilgan manzil</span><code className="mt-1 block break-all text-[11px] text-sky-200">{urlCheckResult.checkedUrl || '—'}</code></div>
+                      <div className="rounded-xl bg-slate-950/45 border border-white/5 px-2.5 py-2"><span className="block text-[10px] uppercase tracking-wider text-slate-500">HTTP javob</span><strong className="mt-1 block text-sm text-white">{urlCheckResult.statusCode ?? '—'}</strong></div>
+                      <div className="rounded-xl bg-slate-950/45 border border-white/5 px-2.5 py-2"><span className="block text-[10px] uppercase tracking-wider text-slate-500">Javob vaqti</span><strong className="mt-1 block text-sm text-white">{urlCheckResult.latencyMs !== undefined ? `${urlCheckResult.latencyMs} ms` : '—'}</strong></div>
+                    </div>
+
+                    {urlCheckResult.guidance && (
+                      <div className="rounded-xl bg-slate-950/35 border border-white/5 p-3 space-y-2">
+                        <p><span className="font-semibold text-white">Nima bo‘ldi: </span>{urlCheckResult.guidance.cause}</p>
+                        <p><span className="font-semibold text-white">Kutilgan holat: </span>{urlCheckResult.guidance.expected}</p>
+                        <ol className="space-y-1 list-decimal list-inside text-slate-200">
+                          {urlCheckResult.guidance.steps.map(step => <li key={step}>{step}</li>)}
+                        </ol>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-0.5">
+                      {urlCheckResult.status !== 'success' && urlCheckResult.guidance && (
+                        <button type="button" onClick={handleCopyHealthFixBrief} className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold shadow-md shadow-indigo-600/25 transition flex items-center gap-1.5">
+                          {copiedHealthFix ? <Check className="w-3.5 h-3.5 text-emerald-200" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedHealthFix ? 'Fix brief nusxalandi!' : 'AI uchun fix brief nusxalash'}
+                        </button>
+                      )}
+                      <button type="button" onClick={() => setShowHealthReport(true)} className="px-3 py-2 rounded-xl border border-slate-600 bg-slate-900/75 hover:bg-slate-800 text-slate-200 text-[11px] font-semibold transition">
+                        Batafsil diagnostika
+                      </button>
+                      {urlCheckResult.status !== 'success' && (
+                        <button type="button" onClick={handleTestBaseUrl} disabled={testingUrl} className="px-3 py-2 rounded-xl border border-slate-600 bg-slate-900/75 hover:bg-slate-800 disabled:opacity-50 text-slate-200 text-[11px] font-semibold transition flex items-center gap-1.5">
+                          <RefreshCw className={`w-3.5 h-3.5 ${testingUrl ? 'animate-spin' : ''}`} /> Qayta tekshirish
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Integration Brief Helper for Users without an API */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-2xl border border-slate-800 bg-slate-950/60 p-3 text-[11px]">
+              <div className="rounded-xl bg-slate-900/80 p-2.5">
+                <span className="text-slate-500 block">1. Public manzil</span>
+                <span className={baseUrl.trim() ? 'mt-1 block font-semibold text-emerald-300' : 'mt-1 block font-semibold text-slate-400'}>{baseUrl.trim() ? 'Kiritildi' : 'Kutilmoqda'}</span>
+              </div>
+              <div className="rounded-xl bg-slate-900/80 p-2.5">
+                <span className="text-slate-500 block">2. Server health</span>
+                <span className={urlCheckResult.status === 'success' ? 'mt-1 block font-semibold text-emerald-300' : urlCheckResult.status === 'idle' ? 'mt-1 block font-semibold text-slate-400' : 'mt-1 block font-semibold text-amber-300'}>{urlCheckResult.status === 'success' ? 'Tasdiqlandi' : urlCheckResult.status === 'idle' ? 'Tekshirilmagan' : 'E’tibor kerak'}</span>
+              </div>
+              <div className="rounded-xl bg-slate-900/80 p-2.5">
+                <span className="text-slate-500 block">3. To‘liq contract</span>
+                <span className={certReport?.isProductionReady ? 'mt-1 block font-semibold text-emerald-300' : 'mt-1 block font-semibold text-slate-400'}>{certReport?.isProductionReady ? 'Mos' : 'Keyingi qadamda'}</span>
+              </div>
+            </div>
+
+            {/* Developer and AI handoff */}
             <div className="p-3.5 rounded-2xl bg-indigo-950/25 border border-indigo-500/30 flex items-center justify-between flex-wrap gap-3">
               <div className="space-y-0.5">
                 <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                  <Bot className="w-4 h-4 text-amber-300" /> Hali API’ingiz yo‘qmi?
+                  <Bot className="w-4 h-4 text-amber-300" /> Dasturchi yoki AI agent uchun bitta aniq brief
                 </span>
                 <p className="text-[11px] text-slate-300">
-                  Dasturchingizga yoki AI vositalariga (Cursor, ChatGPT) tayyor texnik topshiriq yuboring.
+                  Brief rasmiy docs, OpenAPI, endpointlar, xavfsizlik va tugallangan ish mezonini bitta nusxada beradi.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1661,7 +1831,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                 </button>
                 <button
                   type="button"
-                  onClick={() => openDocModal('base-url')}
+                  onClick={() => openDocModal('getting-started')}
                   className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition flex items-center gap-1.5"
                 >
                   <ExternalLink className="w-3.5 h-3.5 text-emerald-400" /> Express · FastAPI · Go
@@ -1685,7 +1855,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                 </label>
                 <button
                   type="button"
-                  onClick={() => openDocModal('base-url')}
+                  onClick={() => openDocModal('getting-started')}
                   className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
                 >
                   Qo‘llanma va kontraktlar →
@@ -1694,8 +1864,12 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {/* Variant A: Faqat topish va ko'rish */}
-                <div
+                <section
+                  role="radio"
+                  aria-checked={capabilityProfile === 'readonly'}
+                  tabIndex={0}
                   onClick={() => setCapabilityProfile('readonly')}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setCapabilityProfile('readonly'); } }}
                   className={`p-4 rounded-2xl border cursor-pointer transition-all space-y-2.5 ${
                     capabilityProfile === 'readonly'
                       ? 'bg-indigo-950/50 border-indigo-500 shadow-lg shadow-indigo-950/50 ring-1 ring-indigo-500/50'
@@ -1724,17 +1898,21 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                     <span className="text-[10px] font-mono text-sky-300">Endpointlar: /health, /catalog, /search</span>
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); openDocModal('base-url'); }}
+                      onClick={(e) => { e.stopPropagation(); openDocModal('catalog'); }}
                       className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
                     >
                       Batafsil ko‘rish →
                     </button>
                   </div>
-                </div>
+                </section>
 
                 {/* Variant B: Topish va buyurtma berish */}
-                <div
+                <section
+                  role="radio"
+                  aria-checked={capabilityProfile === 'transactional'}
+                  tabIndex={0}
                   onClick={() => setCapabilityProfile('transactional')}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setCapabilityProfile('transactional'); } }}
                   className={`p-4 rounded-2xl border cursor-pointer transition-all space-y-2.5 ${
                     capabilityProfile === 'transactional'
                       ? 'bg-indigo-950/50 border-indigo-500 shadow-lg shadow-indigo-950/50 ring-1 ring-indigo-500/50'
@@ -1763,13 +1941,13 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                     <span className="text-[10px] font-mono text-amber-300">Provider endpointlari: /provider-info, /health, /catalog, /quote, /actions</span>
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); openDocModal('base-url'); }}
+                      onClick={(e) => { e.stopPropagation(); openDocModal('actions'); }}
                       className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
                     >
                       Batafsil ko‘rish →
                     </button>
                   </div>
-                </div>
+                </section>
               </div>
 
               {/* Dynamic Endpoint Checklist */}
@@ -1786,6 +1964,10 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px]">
                   <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
+                    <span className="font-mono text-slate-200">GET /provider-info</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
                     <span className="font-mono text-slate-200">GET /health</span>
                     <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy</span>
                   </div>
@@ -1793,13 +1975,6 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                     <span className="font-mono text-slate-200">GET /catalog</span>
                     <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold text-[10px]">Majburiy</span>
                   </div>
-                  {requiresActiveLocations((CATEGORIES.find(item => item.id === category)?.providerType || 'SERVICES') as ProviderType, fulfillmentMode) && (
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-amber-950/30 border border-amber-500/30">
-                      <span className="font-mono text-amber-100">GET /locations · ≥1 active</span>
-                      <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 font-semibold text-[10px]">Discovery uchun majburiy</span>
-                    </div>
-                  )}
-
                   {capabilityProfile === 'transactional' ? (
                     <>
                       <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
@@ -1823,10 +1998,6 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
                     <>
                       <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
                         <span className="font-mono text-slate-200">GET /search</span>
-                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-semibold text-[10px]">Ixtiyoriy</span>
-                      </div>
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80">
-                        <span className="font-mono text-slate-200">GET /locations</span>
                         <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-semibold text-[10px]">Ixtiyoriy</span>
                       </div>
                     </>
@@ -2191,7 +2362,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
           <div className="flex items-center justify-between pt-4 border-t border-slate-800">
             <button
               type="button"
-              onClick={() => setCurrentStep(3)}
+              onClick={() => setCurrentStep(1)}
               className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Ortga
@@ -2217,10 +2388,10 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       {/* --------------------------------------------------------------------- */}
       {/* STEP 5: In-Wizard Interactive Certification Runner                    */}
       {/* --------------------------------------------------------------------- */}
-      {currentStep === 5 && (
+      {currentStep === 3 && (
         <div className="space-y-6 animate-fadeIn">
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-white">5. Sinov va Avtomatlashtirilgan Sertifikatlash</h3>
+            <h3 className="text-lg font-bold text-white">3. Sinov va Avtomatlashtirilgan Sertifikatlash</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
               Zayuno compliance runner barcha talab etiladigan endpointlarni avtomatik tarzda tekshiradi.
             </p>
@@ -2498,7 +2669,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
           <div className="flex items-center justify-between pt-4 border-t border-slate-800">
             <button
               type="button"
-              onClick={() => setCurrentStep(4)}
+              onClick={() => setCurrentStep(2)}
               className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Ortga (API sozlamalari)
@@ -2507,11 +2678,11 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
               type="button"
               onClick={() => {
                 if (!createdCredentials) {
-                  setError('Iltimos, avval 4-qadamda API sozlamalarini saqlang.');
-                  setCurrentStep(4);
+                  setError('Iltimos, avval 2-qadamda API sozlamalarini saqlang.');
+                  setCurrentStep(2);
                   return;
                 }
-                setCurrentStep(6);
+                setCurrentStep(4);
               }}
               className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2"
             >
@@ -2524,7 +2695,7 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
       {/* --------------------------------------------------------------------- */}
       {/* STEP 6: Review, Handoff & Dashboard Navigation                        */}
       {/* --------------------------------------------------------------------- */}
-      {currentStep === 6 && (
+      {currentStep === 4 && (
         <div className="space-y-6 animate-fadeIn">
           {!createdCredentials ? (
             <div className="p-8 rounded-3xl bg-amber-950/20 border border-amber-500/30 text-center space-y-4 max-w-lg mx-auto animate-fadeIn">
@@ -2534,15 +2705,15 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
               <div className="space-y-1">
                 <h3 className="text-base font-bold text-white">Arizangiz hali topshirilmagan</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Ko‘rib chiqish bosqichiga o‘tish uchun avval 4-qadamda Provider Slug va API Base URL sozlamalarini saqlang.
+                  Ko‘rib chiqish bosqichiga o‘tish uchun avval 2-qadamda Provider Slug va API Base URL sozlamalarini saqlang.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setCurrentStep(4)}
+                onClick={() => setCurrentStep(2)}
                 className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2 mx-auto"
               >
-                4-qadamga o‘tish (API sozlamalari) <ArrowRight className="w-4 h-4" />
+                2-qadamga o‘tish (API sozlamalari) <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           ) : (
@@ -2650,17 +2821,62 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
         </div>
       )}
 
+      {showHealthReport && urlCheckResult.status !== 'idle' && createPortal(
+        <div
+          className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-slate-950/85 p-3 backdrop-blur-md animate-fadeIn sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="health-report-title"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setShowHealthReport(false);
+          }}
+        >
+          <div className="my-auto flex w-full max-w-3xl max-h-[88vh] flex-col overflow-hidden rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl animate-scaleUp">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-slate-950/90 px-5 py-4 backdrop-blur">
+              <div>
+                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-indigo-300">Live connection report</p>
+                <h3 id="health-report-title" className="mt-1 text-base font-bold text-white">{urlCheckResult.guidance?.title || 'API diagnostikasi'}</h3>
+              </div>
+              <button type="button" onClick={() => setShowHealthReport(false)} className="rounded-xl bg-slate-800 p-2 text-slate-400 hover:bg-slate-700 hover:text-white transition" aria-label="Diagnostikani yopish"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="min-h-0 overflow-y-auto space-y-4 p-5 text-xs text-slate-300">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"><span className="text-[10px] uppercase tracking-wider text-slate-500">Natija kodi</span><strong className="mt-1 block font-mono text-sm text-white">{urlCheckResult.code || '—'}</strong></div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"><span className="text-[10px] uppercase tracking-wider text-slate-500">HTTP</span><strong className="mt-1 block font-mono text-sm text-white">{urlCheckResult.statusCode ?? '—'}</strong></div>
+                <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"><span className="text-[10px] uppercase tracking-wider text-slate-500">Latency</span><strong className="mt-1 block font-mono text-sm text-white">{urlCheckResult.latencyMs !== undefined ? `${urlCheckResult.latencyMs} ms` : '—'}</strong></div>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"><span className="text-[10px] uppercase tracking-wider text-slate-500">Zayuno tekshirgan manzil</span><code className="mt-1.5 block break-all text-sky-200">{urlCheckResult.checkedUrl || '—'}</code></div>
+              <div className="rounded-xl border border-amber-500/25 bg-amber-950/15 p-4 space-y-2"><h4 className="font-semibold text-amber-100">Sabab va tuzatish</h4><p>{urlCheckResult.guidance?.cause || urlCheckResult.message}</p><ol className="space-y-1 list-decimal list-inside text-slate-200">{urlCheckResult.guidance?.steps.map(step => <li key={step}>{step}</li>)}</ol></div>
+              <div className="rounded-xl border border-indigo-500/25 bg-indigo-950/20 p-4"><h4 className="font-semibold text-indigo-100">Contract kutayotgan javob</h4><p className="mt-1.5 text-slate-300">{urlCheckResult.guidance?.expected}</p><pre className="mt-3 overflow-x-auto rounded-lg border border-slate-700 bg-slate-950 p-3 font-mono text-[11px] leading-relaxed text-sky-200">HTTP 200\nContent-Type: application/json\n{HEALTH_RESPONSE_EXAMPLE}</pre></div>
+              <div className="flex flex-wrap justify-end gap-2 pt-1">
+                <button type="button" onClick={() => { setShowHealthReport(false); openDocModal('base-url'); }} className="rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition">Health qo‘llanmasi</button>
+                {urlCheckResult.status !== 'success' && <button type="button" onClick={handleCopyHealthFixBrief} className="rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-500 transition">{copiedHealthFix ? 'Brief nusxalandi!' : 'AI fix brief nusxalash'}</button>}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
       {/* --------------------------------------------------------------------- */}
       {/* IN-WIZARD DOCS DRAWER / MODAL (Never lose form context)               */}
       {/* --------------------------------------------------------------------- */}
-      {activeDocsDrawer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-scaleUp">
+      {activeDocsDrawer && createPortal(
+        <div
+          className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-slate-950/80 p-3 backdrop-blur-md animate-fadeIn sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="docs-drawer-title"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setActiveDocsDrawer(null);
+          }}
+        >
+          <div className="my-auto flex w-full max-w-4xl max-h-[88vh] flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl animate-scaleUp">
             {/* Drawer Header */}
             <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/70">
               <div className="flex items-center gap-2.5">
                 <Globe className="w-5 h-5 text-indigo-400" />
-                <h3 className="font-bold text-white text-sm sm:text-base">Zayuno Documentation & Kontraktlar</h3>
+                <h3 id="docs-drawer-title" className="font-bold text-white text-sm sm:text-base">Zayuno Documentation & Kontraktlar</h3>
               </div>
               <div className="flex items-center gap-2">
                 {onOpenDoc && (
@@ -2692,11 +2908,15 @@ ${locationRequired ? '- Bu xizmat jismoniy manzilda/yetkazib berish orqali bajar
               <DocsViewer
                 selectedDoc={activeDocsDrawer}
                 onSelectDoc={(id) => setActiveDocsDrawer(id)}
-                onOpenAiKit={onOpenAiKit}
+                onOpenAiKit={() => {
+                  setActiveDocsDrawer(null);
+                  onOpenAiKit();
+                }}
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

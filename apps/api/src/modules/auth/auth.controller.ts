@@ -50,14 +50,17 @@ export class AuthController {
     this.setAccessCookie(response, result.accessToken);
     this.setRefreshCookie(response, result.refreshToken);
     const portal = process.env.PROVIDER_PORTAL_URL || process.env.PROVIDER_PORTAL_BASE_URL || 'http://localhost:3001';
-    const destination = /^\/\?tab=(apps|onboarding|overview)$/.test(result.returnTo) ? result.returnTo : '/?tab=apps';
+    const destination = this.authService.normalizeProviderReturnTo(result.returnTo);
     return response.redirect(`${portal}${destination}`);
   }
 
   @Post('register-owner')
   @ApiOperation({ summary: 'Self-service registration for Provider Owners' })
-  async registerOwner(@Body() body: { email: string; password: string; name: string }) {
-    return this.authService.registerProviderOwner(body);
+  async registerOwner(@Body() body: { email: string; password: string; name: string }, @Res({ passthrough: true }) response: Response) {
+    const result = await this.authService.registerProviderOwner(body);
+    this.setAccessCookie(response, result.accessToken);
+    this.setRefreshCookie(response, result.refreshToken);
+    return result;
   }
 
   @Post('verify-email')

@@ -4,8 +4,7 @@ import {
   determineProviderCapabilityProfile,
   getMandatoryCapabilitiesForProfile,
   getProviderProtocolEndpoints,
-  PROVIDER_CONTRACT_VERSION,
-  requiresActiveLocations
+  PROVIDER_CONTRACT_VERSION
 } from '@zayuno/contracts';
 import { redactForLogs, scrubSensitiveString } from '../../../packages/shared/src/redaction';
 
@@ -114,6 +113,8 @@ export interface GeneratePromptOptions {
   provider?: any;
   certReport?: any;
   isAiTarget?: 'chatgpt' | 'claude' | 'cursor' | 'codex';
+  /** A single brief for any coding agent. The agent inspects the existing project itself. */
+  universal?: boolean;
 }
 
 /**
@@ -214,7 +215,7 @@ function getFrameworkTask(framework: AiFramework, goal: AiIntegrationGoal): stri
  * Generates the full structured Markdown AI integration prompt.
  */
 export function generateAiPrompt(options: GeneratePromptOptions): string {
-  const { goal, framework, provider, certReport } = options;
+  const { goal, framework, provider, certReport, universal = false } = options;
   const goalObj = GOAL_OPTIONS.find(g => g.id === goal) || GOAL_OPTIONS[0];
   const fwObj = FRAMEWORK_OPTIONS.find(f => f.id === framework) || FRAMEWORK_OPTIONS[0];
 
@@ -233,7 +234,7 @@ export function generateAiPrompt(options: GeneratePromptOptions): string {
   ];
 
   const profile = determineProviderCapabilityProfile(declaredCaps);
-  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps, { type: providerType, fulfillmentMode: sanitizedProvider.fulfillmentMode || sanitizedProvider.metadata?.fulfillmentMode });
+  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps);
   const isReadOnly = profile === ProviderCapabilityProfile.DISCOVERY_READONLY;
 
   // Redacted certification issues if any
@@ -268,11 +269,36 @@ ${failed.map((f: any, idx: number) => `
    - Docs: https://partners.zayuno.uz/docs/contract-reference/#${endpoint.docsAnchor}`)
     .join('\n');
 
-  const rawPrompt = `# Zayuno Provider Integration Task
+  const goalSection = universal
+    ? `## 1. Your task
+Make this Zayuno provider integration work end-to-end in the **existing codebase**.
 
-## 1. Goal
+### Work project-first
+1. Inspect the repository, runtime, existing API routes, data model, tests and deployment conventions before editing.
+2. Detect the actual language, framework and package manager yourself. Reuse the project’s patterns; do not scaffold a parallel app or ask the user to choose a stack.
+3. Implement only the missing or broken Zayuno adapter pieces. Preserve unrelated product behavior and existing public APIs unless the contract requires a compatible change.
+4. Run the relevant tests/build, fix the failures you introduce, then report changed files, exact test results and the next concrete step.
+`
+    : `## 1. Goal
 **${goalObj.labelEn}** (${goalObj.labelUz})
 > ${goalObj.descriptionEn}
+`;
+
+  const implementationSection = universal
+    ? `## 6. Adaptive implementation rules
+- Detect the repository’s existing HTTP framework and follow its routing, validation, error, logging and configuration conventions.
+- Do not hardcode a framework-specific skeleton. Work in the language and framework already present in the project.
+- Preserve raw request bytes when verifying HMAC-SHA256 signatures; validate structured JSON before use.
+- Keep money calculations precise, persist idempotency keys atomically, and omit optional null fields from canonical JSON responses.
+- Add or update only meaningful tests for changed Zayuno behavior.
+`
+    : `## 6. Framework-Specific Task (${fwObj.name})
+${getFrameworkTask(framework, goal)}
+`;
+
+  const rawPrompt = `# Zayuno Provider Integration Task
+
+${goalSection}
 
 ---
 
@@ -281,7 +307,7 @@ ${failed.map((f: any, idx: number) => `
 Read https://partners.zayuno.uz/llms.txt first, then https://partners.zayuno.uz/docs/ai-agents.md.
 Exact schemas: https://partners.zayuno.uz/openapi.json. All guides: https://partners.zayuno.uz/llms-full.txt.
 Source precedence: canonical schemas and endpoint definitions, then generated reference, then explanatory guides.
-Current product focus is food ordering; general capability support is not proof of live providers in every category.
+Zayuno currently onboards public online API integrations. Do not invent physical branches, maps, delivery radii, pickup flows or offline operations unless a later contract explicitly adds them.
 
 Zayuno is an AI Agent Business Network that enables conversational AI agents (ChatGPT, Claude, Cursor, Codex) to discover and interact with real-world business services through normalized capability contracts.
 
@@ -300,7 +326,6 @@ The universal lifecycle follows four strict stages:
 - **Capability Profile:** \`${profile}\` (${isReadOnly ? 'Read-only / Discovery only' : 'Full Transactional'})
 - **Declared Capabilities:** \`${declaredCaps.join(', ')}\`
 - **Mandatory for this Profile:** \`${mandatoryCaps.join(', ')}\`
-- **Physical Locations:** ${requiresActiveLocations(providerType, sanitizedProvider.fulfillmentMode || sanitizedProvider.metadata?.fulfillmentMode) ? 'Required (physical fulfillment)' : 'Not automatically required (remote fulfillment)'}
 
 ---
 
@@ -323,19 +348,18 @@ Compatibility note: new integrations emit canonical \`id/lines\` quote fields an
 
 ---
 
-## 6. Framework-Specific Task (${fwObj.name})
-${getFrameworkTask(framework, goal)}
+${implementationSection}
 
 ---
 
 ## 7. Verification Steps
-1. **Local Test:** Start local server on port \`4001\` and verify \`GET /health\` and \`GET /catalog\`.
+1. **Local Test:** Verify \`GET /health\` and \`GET /catalog\` against your local implementation.
 2. **Simulator Test:** The portal Sandbox uses a sample provider to explain the lifecycle. Its success does NOT verify your provider backend.
 3. **Automated Certification:** Configure your own HTTPS provider base URL and run API verification in a controlled test environment. Transactional certification may create test actions. Certification, review and ACTIVE publication are separate steps.
 ${issueSection}
 ---
 
-## 9. Constraints
+## 8. Constraints
 - Do NOT bypass or weaken authentication, idempotency, or HMAC signature checks.
 - Do NOT generate fake providers or fake certification success flags.
 - Follow the universal capability contract schemas strictly.
@@ -344,6 +368,21 @@ ${issueSection}
 `;
 
   return scrubSensitiveString(rawPrompt, 100000);
+}
+
+/**
+ * Produces the one brief shown in the portal. It is intentionally independent
+ * of an AI vendor or framework selector: a capable agent must inspect the
+ * existing project and choose the correct implementation path itself.
+ */
+export function generateUniversalAiPrompt(provider?: any, certReport?: any): string {
+  return generateAiPrompt({
+    goal: 'create-new',
+    framework: 'raw-http',
+    provider,
+    certReport,
+    universal: true
+  });
 }
 
 /**
@@ -362,7 +401,7 @@ export function generateContractJson(provider?: any): string {
   ];
 
   const profile = determineProviderCapabilityProfile(declaredCaps);
-  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps, { type: clean.type || 'SERVICES', fulfillmentMode: clean.fulfillmentMode || clean.metadata?.fulfillmentMode });
+  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps);
 
   const endpoints = Object.fromEntries(
     getProviderProtocolEndpoints(profile)

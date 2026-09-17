@@ -5,15 +5,15 @@ import { prisma } from '../packages/database/src/client.ts';
 import { UserRole } from '../packages/database/dist/index.js';
 
 async function main() {
-  console.log('🧪 Testing Provider Owner Auth & Email Verification Flow...');
+  console.log('🧪 Testing Provider Owner Auth Flow...');
   process.env.ENABLE_DEV_TOKEN_HELPER = 'true';
+  process.env.JWT_SECRET ||= 'test-provider-auth-secret-that-is-long-enough-for-jwt';
 
   const emailVerificationService = new EmailVerificationService();
-  const mockJwtService: any = {
-    sign: (payload: any) => `mock_jwt_token_${payload.sub}`
-  };
+  const mockJwtService: any = { signAsync: async (payload: any) => `mock_jwt_token_${payload.sub}_${payload.type}` };
+  const mockRedis: any = { set: async () => undefined, del: async () => undefined };
 
-  const authService = new AuthService(mockJwtService, emailVerificationService);
+  const authService = new AuthService(mockJwtService, emailVerificationService, mockRedis);
 
   // 1. Password Strength Validation
   console.log('  Testing password validation...');
@@ -59,14 +59,16 @@ async function main() {
     'Resending within 60s must trigger cooldown rate-limit'
   );
 
-  // 4. Registration, Activation & Login Flow with Mock DB
-  console.log('  Testing full signup -> verify -> login flow...');
+  // 4. Registration issues a session immediately; email verification is not part
+  // of the provider signup path anymore.
+  console.log('  Testing direct signup -> session -> login flow...');
   let mockUser: any = null;
   const flowEmail = `owner_flow_${Date.now()}@business.uz`;
 
   const originalFindUnique = prisma.user.findUnique;
   const originalCreate = prisma.user.create;
   const originalUpdate = prisma.user.update;
+  const originalSessionCreate = prisma.consumerSession.create;
 
   try {
     (prisma.user as any).findUnique = async ({ where }: any) => {
@@ -79,6 +81,8 @@ async function main() {
     (prisma.user as any).create = async ({ data }: any) => {
       mockUser = {
         id: 'usr_mock_123',
+        providerId: null,
+        provider: null,
         ...data,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -93,35 +97,20 @@ async function main() {
       }
       return null;
     };
+    (prisma.consumerSession as any).create = async ({ data }: any) => data;
 
-    // A. Register unverified owner
+    // A. Register provider owner and receive an active session immediately.
     const regResult = await authService.registerProviderOwner({
       email: flowEmail,
       name: 'Business Owner',
       password: 'StrongPassword123!'
     });
     assert.ok(regResult.success);
-    assert.equal(mockUser.isActive, false, 'New registrant must be inactive until email verification');
+    assert.equal(mockUser.isActive, true, 'New registrant must be active immediately');
+    assert.ok(regResult.accessToken, 'Registration must return an access token');
+    assert.equal(regResult.user.email, flowEmail);
 
-    // B. Attempt login before verification -> MUST FAIL
-    await assert.rejects(
-      () => authService.login(flowEmail, 'StrongPassword123!'),
-      /Noto‘g‘ri login yoki parol/i,
-      'Login must be refused before email verification'
-    );
-
-    // C. Verify Email using issued token
-    const token = emailVerificationService.getLastDevToken(flowEmail);
-    assert.ok(token);
-
-    const verifySuccess = await authService.verifyEmail(token);
-    assert.ok(verifySuccess.success);
-    assert.ok(verifySuccess.accessToken, 'verifyEmail must return accessToken for auto-login');
-    assert.ok(verifySuccess.user, 'verifyEmail must return user object');
-    assert.equal(verifySuccess.user.email, flowEmail);
-    assert.equal(mockUser.isActive, true, 'User must be activated after verification');
-
-    // D. Attempt login after verification -> MUST SUCCEED
+    // B. A later email/password login must still work.
     const loginResult = await authService.login(flowEmail, 'StrongPassword123!');
     assert.ok(loginResult.accessToken);
     assert.equal(loginResult.user.email, flowEmail);
@@ -130,6 +119,7 @@ async function main() {
     prisma.user.findUnique = originalFindUnique;
     prisma.user.create = originalCreate;
     prisma.user.update = originalUpdate;
+    prisma.consumerSession.create = originalSessionCreate;
   }
 
   console.log('✅ Provider Owner Auth & Email Verification Tests Passed!');

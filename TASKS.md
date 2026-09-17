@@ -1,3 +1,59 @@
+# Joriy ish — API ulash diagnostikasi va AI fix-brief UX (2026-09-17)
+
+- [x] `/health` tekshiruvini aniq status, sabab, kutilgan javob va keyingi qadam bilan ko‘rsatish.
+- [x] Xato holati uchun AI/dasturchiga yuboriladigan maxfiylikka xavfsiz diagnostika briefi, nusxalash va qayta tekshirish tugmalarini qo‘shish.
+- [x] API rejimi kartalari hamda qo‘llanma/batafsil tugmalarini semantik va aniq endpoint hujjatlariga bog‘lash.
+- [x] Provider portal build va onboarding regressiya testlarini bajarish.
+
+**Holat / handoff:** Bajarildi. API ulash endi `tekshir → aniq sabab → fix brief → qayta tekshir` oqimida ishlaydi. `/health` tekshiruvi URL, natija kodi, HTTP kodi, javob vaqti, sabab, kutilgan JSON va amaliy tuzatish qadamlari bilan ko‘rinadi. Batafsil diagnostika oynasi hamda faqat texnik, maxfiy ma’lumotsiz AI fix brief nusxalash tugmasi qo‘shildi. Read-only va buyurtmali rejim kartalari klaviaturadan ham tanlanadi; batafsil havolalari tegishli katalog va action contract hujjatlariga olib boradi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-onboarding-catalog-resilience.ts`, `pnpm exec tsx tests/test-ai-integration-kit-and-profiles.ts`, `git diff --check`. Vite faqat oldindan mavjud PostCSS module-type warningini chiqardi. Deploy/push bajarilmadi.
+
+# Joriy ish — Onboarding header ikonini aniqroq qilish (2026-09-17)
+
+- [x] `Biznesni ulash` sarlavhasidagi chiqishga o‘xshash strelkani integratsiya belgisi bilan almashtirish.
+- [x] Provider portal build va diff tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. `WorkspaceShell.tsx`dagi onboarding ikonasi `ArrowRight`dan `PlugZap`ga almashtirildi. U provayder integratsiyasini bildiradi va tashqi havola/chiqish ma’nosini bermaydi. `pnpm --filter @zayuno/provider-portal build` hamda `git diff --check` PASS; build faqat oldindan mavjud katta-chunk va PostCSS module-type warningini berdi.
+
+# Joriy ish — Online Provider onboarding, mijoz supporti va admin review (2026-09-17)
+
+- [x] Provider onboardingdan jismoniy fulfillment/filial majburiyatlarini olib, faqat public online API oqimiga o‘tkazish.
+- [x] Mijozga ko‘rinadigan structured support kontaktlari, rasmiy sayt va qisqa yordam izohini contract, backend hamda portalga ulash.
+- [x] API ulash sahifasini real health holati, yashirin avtomatik slug va umumiy AI/developer brief bilan kuchaytirish.
+- [x] Admin provider arizasida mijoz supporti va rasmiy saytni ko‘rish/yaratishni tushunarli qilish.
+- [x] Provider portal, API va admin buildlari hamda tegishli onboarding/contract testlarini bajarish.
+
+**Holat / handoff:** Bajarildi. Yangi self-service provider oqimi faqat public online API uchun: biznes turi/kategoriya/filial/manzil/pickup/delivery savollari yo‘q; backend yangi arizalarga `SERVICES` + `online_services` + `REMOTE` qiymatlarini beradi. Portal 4 bosqichni ko‘rsatadi: Biznes va mijoz yordami → Online API → Contract tekshiruvi → Review va faollashuv. Slug biznes nomidan avtomatik yaratiladi va lotin bo‘lmagan nomda ham tahrirlash paytida o‘zgarmaydi. Mijoz yordami phone, Telegram, email, rasmiy HTTPS sayt va 500 belgigacha qisqa izohdan iborat; u contractda tekshiriladi, providerga saqlanadi, admin review kartasida ko‘rinadi va buyurtma muvaffaqiyatli yaratilgan javobga qo‘shiladi. AI/developer brief bitta nusxada rasmiy docs, OpenAPI va endpointlarni beradi. Tekshiruvlar PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm --filter @zayuno/admin build`, `pnpm --filter @zayuno/api build`, `pnpm exec tsx tests/test-onboarding-catalog-resilience.ts`, `pnpm exec tsx tests/test-ai-integration-kit-and-profiles.ts`, `git diff --check`. Vite faqat oldindan mavjud katta-chunk va `postcss.config.js` module-type warningini berdi. Deploy/push bajarilmadi.
+
+# Joriy ish — Provider onboardingni 4 real bosqichga qisqartirish (2026-09-17)
+
+- [x] `Hisob` va `Tasdiqlash`ni onboarding progressidan olib tashlash.
+- [x] Eski draft/deep-link qadamlarini yangi 4 qadamli oqimga xavfsiz moslashtirish.
+- [x] Bosqich nomlari, ortga/keyingi actionlar va copylarni yangi oqimga moslashtirish.
+- [x] Provider portal build hamda `git diff --check`ni bajarish.
+
+**Holat / handoff:** `OnboardingWizard.tsx` endi faqat 4 qadamni ko‘rsatadi: Biznes → Integratsiya → Sertifikat → Ko‘rib chiqish. Login va email tasdiqlash auth oqimida alohida qoladi. Eski draftlar hamda `flow=provider-v2` bo‘lmagan old URL’lardagi 3–6 qadamlar yangi 1–4 qadamga moslanadi; yangi deep-link va draftlar `flow=provider-v2`/`flowVersion: 2` bilan saqlanadi. Provider portal build PASS, `git diff --check` PASS. Vite oldindan mavjud katta-chunk va `postcss.config.js` module-type warningini berdi.
+
+# Joriy ish — Provider Portal to‘liq UI/UX redesign (2026-09-17)
+
+- [x] 1. Navigatsiya va umumiy atamalarni yangilash (`Mening biznesim` -> `Biznesim`, `Integratsiyani tekshirish` -> `Tekshiruv`, dead-end empty statelarni 4 bosqichli trail bilan almashtirish).
+- [x] 2. `Biznesim` (Apps) sahifasini WorkspaceOverview darajasidagi B2B dizayniga o‘tkazish (boshqaruv markazi, progress cardlar, KPI, buyurtmalar jadvali va integratsiya sozlamalari).
+- [x] 3. `Sinov muhiti` (Sandbox) sahifasini to‘liq o‘zbeklashtirish va enterprise darajaga ko‘tarish (5 bosqichli stepper: Provider topish -> Narx olish -> Buyurtma -> To‘lov -> Yakunlandi, live JSON inspection).
+- [x] 4. `Tekshiruv` (Certification) sahifasini yangilash (qulflangan holatda aniq checklist, faol holatda 13 ta tekshiruv moduli, status pillslar va test triggerlari).
+- [x] 5. `So‘rovlar jurnali` (Inspector) sahifasini yangilash (event filter pillslar: discovery, quote, action.create, webhook, error; rich trace va so‘rov/javob ko‘rish paneli).
+- [x] 6. `Hujjatlar` (DocsViewer) sahifasini yangilash (tepada 4 ta asosiy endpoint banneri: GET /health, GET /catalog, POST /quote, POST /actions; toza typography va kod bloklari).
+- [x] 7. Build tekshiruvi (`pnpm --filter @zayuno/provider-portal build`), browserda tekshirish va `git diff --check`.
+- [x] 8. O‘zgarishlarni tekshirib, commit qilish va `origin/main` branchiga push qilish.
+
+**Holat / handoff:** Zayuno Provider Workspace sahifalari to‘liq `WorkspaceOverview` darajasidagi enterprise B2B dark SaaS dizayniga o‘tkazildi va barcha o‘zgarishlar `origin/main` ga push qilindi:
+1. **Navigatsiya va Atamalar:** Sidebar va document title'da `Mening biznesim` → `Biznesim`, `Integratsiyani tekshirish` → `Tekshiruv` deb yangilandi. Dead-end empty statelar o‘rniga yangi `ProviderEmptyState.tsx` komponenti yaratilib, 4 bosqichli onboarding yo‘li (`1. Biznes profili → 2. API integratsiyasi → 3. Integratsiya testi → 4. Jonli buyurtmalar`) va `Biznesni ulash →` CTA joylashtirildi.
+2. **Biznesim (Apps):** Boshqaruv markazi, status va salomatlik pillslari, 5 ta zamonaviy KPI kartochkasi, API sozlamalari va buyurtmalar auditi yangilandi.
+3. **Sinov muhiti (Sandbox):** Inglizcha prototip o‘rniga `SandboxSimulator.tsx` yaratildi. To‘liq o‘zbeklashtirildi (`Buyurtma oqimini sinab ko‘ring`), 5 bosqichli vizual stepper (`1. Provider topish → 2. Narx olish → 3. Buyurtma → 4. To‘lov → 5. Yakunlandi`), hamda o‘ng tomonda jonli so‘rov/javob ko‘rsatuvchi syntax-highlighted JSON inspektori joriy qilindi.
+4. **Tekshiruv (Certification):** `CertificationView.tsx` yaratildi. Qulflangan holatda 6 ta capability yo‘nalishi bo‘yicha aniq tayyorgarlik kartalari, jonli tekshiruvda esa 13 ta capability testi, status pillslar (`PASS`, `BLOCKED`, `FAIL`, `MAJBURIY`, `IXTIYORIY`) va xatoliklarni kengaytirib ko‘rish paneli qo‘shildi.
+5. **So‘rovlar jurnali (Inspector):** `RequestInspector.tsx` yaratildi. Yuqorida tezkor filtr pillslari (`Barchasi`, `discovery`, `quote`, `action.create`, `webhook`, `error`), latency indikatorlari, trace ID nusxalash va boy so‘rov/javob/webhook ko‘rish modali integratsiya qilindi.
+6. **Hujjatlar (DocsViewer):** Yuqorida 4 ta asosiy protokol endpointining ko‘rkam vizual kartasi joylashtirildi (`GET /health`, `GET /catalog`, `POST /quote`, `POST /actions`).
+7. **Tekshiruvlar:** `@zayuno/provider-portal` build PASS; `@zayuno/api` build PASS; `@zayuno/admin` build PASS; `@zayuno/contracts` build PASS; barcha testlar PASS; `git diff --check` PASS (0 xato).
+8. **Git & Deploy:** Barcha o‘zgarishlar commit qilinib, `origin/main` ga push qilindi.
+
 # Joriy ish — Provider portal Google OAuth va sessiya implementatsiya prompti (2026-09-13)
 
 - [x] Joriy provider auth, himoyalangan route va sidebar holatini prompt uchun qayd etish.
@@ -92,7 +148,15 @@ Keyinchalik yangi providerlar faollashganda shu javob avtomatik kengayadi. **Age
 
 Shu yo‘l bilan Zayuno umumiy yordamchi sifatida taniladi, har bir xizmatdagi ishlash sifati esa hozirgi food oqimidek aniq bo‘ladi.
 
-# Joriy ish: Provider Portal 403 Forbidden va rol yangilanishini tuzatish (2026-09-16)
+# Joriy ish: Developer Panel va API'ni lokal rejimda ishga tushirish (2026-09-16)
+
+- [x] Mahalliy Docker konteynerlarini (`zayuno-postgres`, `zayuno-redis`, `zayuno-nats`) ishga tushirish.
+- [x] Backend API (`apps/api`, port 4000) ni ishga tushirish va sog‘lomligini tekshirish.
+- [x] Developer Panel (`apps/provider-portal`, port 3001) ni ishga tushirish va ulanishni tekshirish.
+
+**Holat / handoff:** Developer Panel (`http://localhost:3001`) va Backend API (`http://localhost:4000`) to‘liq ishga tushirildi. PostgreSQL va Redis konteynerlari faol. Barcha endpointlar HTTP 200 OK qaytmoqda.
+
+# Bajarilgan: Provider Portal 403 Forbidden va rol yangilanishini tuzatish (2026-09-16)
 
 - [x] `apps/api/src/modules/auth/auth.service.ts` da Google OAuth orqali kirgan mavjud `API_CONSUMER` foydalanuvchini `PROVIDER_OWNER` roliga ko‘tarish (admin rollarni saqlagan holda).
 - [x] `auth.service.ts`dagi `issueProviderSession` va `refreshProviderSession`da ham `API_CONSUMER` rolidagi hisobni avtomatik `PROVIDER_OWNER`ga yangilash.
@@ -2044,3 +2108,217 @@ Zayuno orqali AI agent tomonidan buyurtma berilganda, mijozning veb-saytdagi sav
 2. **Universal Shopla Adapter (`Zayuno`):** Zayuno Provider SDK asosida har qanday Shopla do'koni uchun universal proxy vazifasini bajaruvchi adapter.
 3. **Seller panelida ulanish (`brend-admin`):** Sotuvchi kabinetiga "Zayunoga ulanish" tugmasi va status indikatori.
 4. **Sinxronizatsiya va Webhook:** Narx va qoldiqlar uchun Shopla yagona haqiqat manbai (Source of Truth) bo'lib qoladi; buyurtma statusi o'zgarganda Zayunoga webhook orqali xabar boradi.
+
+---
+
+## Zayuno strategik hukmi va 12 oylik yo‘nalish
+
+Albatta, buni faqat marketing shiori emas, texnik va governance qoidasiga aylantirish kerak.
+
+---
+
+16. Mening Zayuno haqidagi hozirgi hukmim
+
+Men uni hozircha:
+
+“Yandex'ga raqib”
+
+deb baholamagan bo‘lardim.
+
+Bu noto‘g‘ri battlefield.
+
+Men uni:
+
+> “AI agentlar uchun mustaqil transaction infrastructure qurishga urinayotgan startup”
+
+
+
+deb ko‘raman.
+
+Va bu konsepsiya Yandex bilan to‘g‘ridan-to‘g‘ri urushishdan ko‘ra ancha aqlli battlefield.
+
+Ammo hozirgi eng katta muammo:
+
+> Network effect hali isbotlanmagan.
+
+
+
+MCP borligi moat emas.
+
+Sayt borligi moat emas.
+
+API borligi moat emas.
+
+Provider liquidity + agent adoption + transaction volume + reliability + trust = moat.
+
+---
+
+17. Men bo‘lsam keyingi 12 oyda nima qilardim?
+
+Men Yandex bilan raqobat qilmasdim.
+
+0 → 3 oy
+
+Bitta vertical.
+
+Masalan:
+
+> Restaurants.
+
+
+
+100–300 ta real provider.
+
+MCP integration.
+
+Quote.
+
+Availability.
+
+Order.
+
+Cancellation.
+
+Analytics.
+
+---
+
+3 → 6 oy
+
+Agent distribution.
+
+ChatGPT
+Claude
+custom agents
+Telegram AI agents
+
+va boshqalar.
+
+Maqsad:
+
+> “Bir marta integrate qilgan provider bir nechta agentdan customer oladi.”
+
+
+
+---
+
+6 → 12 oy
+
+Transaction network.
+
+Har provider uchun:
+
+capability → availability → quote → action → status
+
+standartini mukammallashtirish.
+
+Keyin boshqa vertical:
+
+hotel / booking / services.
+
+---
+
+18. Va eng muhim strategik qoida
+
+Yandex bilan kurashadigan kompaniya qurma.
+
+Yandex foydalanishga majbur bo‘ladigan infratuzilma qur.
+
+Bu ikkalasi orasida osmon bilan yercha farq bor.
+
+Ideal holat:
+
+Yandex keladi:
+
+> “Biz Zayuno network'iga ulanmoqchimiz.”
+
+
+
+ChatGPT keladi:
+
+> “Biz Zayuno network'iga ulanmoqchimiz.”
+
+
+
+Claude keladi:
+
+> “Biz Zayuno network'iga ulanmoqchimiz.”
+
+
+
+Provider keladi:
+
+> “Men bir marta Zayuno'ga ulanaman va hammasiga chiqaman.”
+
+
+
+Ana o‘shanda Zayuno Yandex'ning raqibi emas, uning infrastructure layer'laridan biriga aylanadi.
+
+Va ochig‘i, sening hozirgi mahsulotingda aynan shu yo‘lning urug‘i bor: provider-owned checkout, deterministic quote, approval guardrails, HMAC webhook, idempotency va MCP contract allaqachon shu yo‘nalishga mos tushgan.
+
+Lekin hozircha bu faqat urug‘. Daraxt emas.
+
+Agar xohlasang, keyingi qadamda men Zayuno vs Yandex vs Google vs OpenAI vs Claude vs Uzum bo‘yicha haqiqiy competitive war-game qilaman: har biri Zayuno'ni qanday o‘ldirishi mumkin, Zayuno har biriga qanday javob beradi, qaysi moatlarni 1 yil ichida qurish kerak va “Zayuno 2030” uchun 3 ta realistik biznes modeli + revenue modelni raqamlar bilan chiqarib beraman.
+# Joriy ish — Health diagnostika modali viewport joylashuvi (2026-09-17)
+
+- [x] Batafsil diagnostikani sahifa scrollidan mustaqil, viewport markazida ochish.
+- [x] Modalning ichki scrolli, yopish tugmasi va Escape orqali yopilishini tekshirish.
+- [x] Provider portal build va diff tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. Muammo `OnboardingWizard`ning kirish animatsiyasi `transform` qo‘llagani sababli yuzaga kelgan: ichidagi `fixed` modal viewport o‘rniga uzun wizard konteyneriga bog‘langan. Health diagnostika endi `document.body`ga React portal orqali render qilinadi, shuning uchun u sahifa scrollidan qat’i nazar viewport markazida turadi. Fon scrolli ochilganda bloklanadi; tashqarisini bosish, X va Escape oynani yopadi; reportning o‘zi ichida scroll bo‘ladi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-onboarding-catalog-resilience.ts`, `git diff --check`. Vite faqat oldindan mavjud PostCSS module-type va katta chunk warninglarini chiqardi.
+# Joriy ish — Hujjatlar modali viewport joylashuvi (2026-09-17)
+
+- [x] `Batafsil ko‘rish` hujjatlar modalini wizard scrollidan mustaqil ochish.
+- [x] Hujjatlar modalining ichki scrolli va yopish oqimini health diagnostika modali bilan bir xil qilish.
+- [x] Provider portal build va diff tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. `Batafsil ko‘rish` ochadigan hujjatlar drawer’i ham `document.body`ga React portal orqali render qilinadi. Health va hujjatlar modallari endi bir xil overlay qoidasiga ega: viewport markazi, fon scrolli bloklangan, report/hujjat ichida mustaqil scroll, tashqariga bosish, X yoki Escape bilan yopish. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-ai-integration-kit-and-profiles.ts`, `git diff --check`. Vite faqat oldindan mavjud PostCSS module-type va katta chunk warninglarini chiqardi.
+# Joriy ish — Docs ichidan AI Kitni ochish (2026-09-17)
+
+- [x] Hujjatlar modalidagi AI Kit tugmasi oldingi modalni yopib, AI Kit oynasini ko‘rinadigan qatlamda ochishini ta’minlash.
+- [x] Provider portal build va AI Kit regressiya testini bajarish.
+
+**Holat / handoff:** Bajarildi. Docs drawer ichidagi AI Kit action avval hujjatlar modalini yopadi, so‘ng App’dagi AI Kit modalini ochadi. Shuning uchun AI Kit endi `z-100` hujjatlar overlayi ortida qolmaydi va bosilgan zahoti ko‘rinadi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-ai-integration-kit-and-profiles.ts`, `git diff --check`. Vite faqat oldindan mavjud PostCSS module-type va katta chunk warninglarini chiqardi.
+# Joriy ish — AI Kitni bitta universal professional briefga qisqartirish (2026-09-17)
+
+- [x] Goal, framework va AI-turi tanlovlarini AI Kit interfeysidan olib tashlash.
+- [x] Mavjud provider holati va contractdan avtomatik kontekst oladigan universal prompt previewini yaratish.
+- [x] Bitta aniq nusxalash actionini qoldirib, prompt hamma zamonaviy AI/coding agent uchun ishlashini ta’minlash.
+- [x] Provider portal build, AI kit privacy/regressiya testi va diff tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. AI Kit endi faqat professional Markdown preview va `Promptni nusxalash` actionidan iborat. Goal, framework, ChatGPT/Claude/Cursor/Codex tanlovlari hamda download tugmalari olib tashlandi. Universal prompt provider/capability/certification kontekstini avtomatik qo‘shadi, AI agentga avval repozitoriy, runtime, framework va testlarni o‘zi tahlil qilishni hamda mavjud loyihada faqat kerakli Zayuno adapterini yozishni buyuradi. Prompt maxfiy credential va PII’ni tozalashda davom etadi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-ai-integration-kit-and-profiles.ts`, `git diff --check`. Vite faqat oldindan mavjud PostCSS module-type va katta chunk warninglarini chiqardi.
+# Joriy ish — Tooltip ichidagi qo‘llanma havolasini bosish (2026-09-17)
+
+- [x] Tooltip ochiqligini trigger va tooltip orasida pointer yo‘qolmasdan saqlash.
+- [x] `Batafsil qo‘llanma`ni hover va klaviaturada bosiladigan qilish.
+- [x] Provider portal build va diff tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. `InfoTooltip` mouse enter/leave holatini faqat info ikonka tugmasida emas, trigger va tooltipni o‘rab turgan konteynerda boshqaradi. Tooltipning pastki paddingi ikonka bilan panel orasidagi bo‘shliqni interaktiv ko‘prik qilib turadi, shuning uchun pointer `Batafsil qo‘llanma`ga o‘tayotganda panel yopilmaydi. Tooltip klaviaturada ham ikonchani bosib ochiladi va `aria-expanded` holatini beradi. PASS: `pnpm --filter @zayuno/provider-portal build`, `git diff --check`. Vite faqat oldindan mavjud PostCSS module-type va katta chunk warninglarini chiqardi.
+# Joriy ish — Docs drawer responsive overflow (2026-09-17)
+
+- [ ] Hujjatlar qidiruvi, agent resource havolasi va endpoint bloklarini modal eni ichida responsiv joylashtirish.
+- [ ] Uzun URL, kod va markdown bloklari gorizontal sahifa overflowi qilmasligini ta’minlash.
+- [x] Provider portal build va diff tekshiruvini bajarish.
+
+**Holat / handoff:** Ish boshlandi. Foydalanuvchi hujjatlar drawer’ida qidiruv va `/llms.txt` qatori gorizontal chiqib ketayotganini ko‘rsatdi. Docs layout to‘liq sahifa uchun yozilgan; modal ichida flex/grid elementlarining minimal eni shrink bo‘lishiga xalaqit beryapti.
+# Joriy ish — Docs drawer overflowini tuzatish (2026-09-17)
+
+- [x] Drawer ichidagi qidiruv, `/llms.txt` havolasi va endpoint kartalarini tor en uchun responsiv qilish.
+- [x] Uzun URL, kod va hujjat matni gorizontal sahifa overflowini chiqarmasligini ta’minlash.
+- [x] Provider portal build, AI integration-kit testi va diff tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. To‘liq hujjatlar sahifasi o‘z holicha qoldi; onboarding drawer ichida esa qidiruv alohida to‘liq qatorga o‘tadi, `/llms.txt` havolasi keyingi qatorda qoladi, navigatsiya yig‘iladigan menyuga aylanadi, endpoint kartalari ikki ustunda (telefonda bir ustunda) ko‘rinadi. Uzoq URL, kod va matn modal chegarasidan chiqmaydi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm exec tsx tests/test-ai-integration-kit-and-profiles.ts`, `git diff --check`. Build faqat avvaldan mavjud PostCSS module-type hamda katta chunk warninglarini berdi.
+# Joriy ish — Hujjatlar qidiruv inputi focus uslubi (2026-09-17)
+
+- [x] Hujjatlar qidiruv inputidagi ikkinchi focus borderini olib tashlash.
+- [ ] Provider portal build va diff tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. Faqat foydalanuvchi ko‘rsatgan qidiruv inputi tuzatildi. Tashqi qidiruv konteyneri focus holatini ko‘rsatadi; ichki input endi yana alohida ramka chizmaydi. PASS: `pnpm --filter @zayuno/provider-portal build`, `git diff --check`. Build faqat avvaldan mavjud PostCSS module-type hamda katta chunk warninglarini berdi.
+# Joriy ish — Provider auth gate va mustaqil kirish sahifasi (2026-09-17)
+
+- [x] Sessiyasiz foydalanuvchini onboarding va barcha provider boshqaruv sahifalaridan auth oqimiga yo‘naltirish.
+- [x] Workspace shellsiz, Google/Email kirish va ro‘yxatdan o‘tish uchun alohida minimal auth sahifasini yaratish.
+- [x] Email bilan yangi provider hisobini email tasdiqlashsiz darhol sessiyaga kiritish va Google oqimi bilan bir xil onboarding manziliga qaytarish.
+- [x] Provider portal va API buildlari hamda auth oqimi regressiya tekshiruvini bajarish.
+
+**Holat / handoff:** Bajarildi. `onboarding`, ilovalar, sandbox, sertifikatlash va so‘rovlar inspektori sessiyasiz ochilmaydi; to‘g‘ridan-to‘g‘ri onboarding manzili alohida ro‘yxatdan o‘tish sahifasiga qaytadi. Kirish/ro‘yxatdan o‘tish endi workspace shell, sidebar va marketing bloklarisiz; Google va email oqimlari foydalaniladigan manzilga qaytaradi. Email bilan yangi provider darhol sessiyaga kiradi, email tasdiqlashi talab qilinmaydi. Brauzerda anonim onboarding redirecti va kirish rejimiga o‘tish tekshirildi. PASS: `pnpm --filter @zayuno/provider-portal build`, `pnpm --filter @zayuno/api build`, `pnpm exec tsx tests/test-auth-and-verification.ts`, `pnpm exec tsx tests/test-onboarding-and-auth-flow.ts`, `git diff --check`. Build faqat avvaldan mavjud PostCSS module-type hamda katta chunk warninglarini berdi.

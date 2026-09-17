@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { createHash, randomUUID } from 'crypto';
@@ -67,9 +67,17 @@ export class AuthService {
     const redirectUri = this.getGoogleOAuthRedirectUri();
     if (!clientId || !redirectUri) throw new BadRequestException('Google OAuth hali sozlanmagan.');
     const state = randomUUID();
-    await this.redis.set(`provider:oauth:state:${state}`, JSON.stringify({ returnTo: /^\/\?tab=(apps|onboarding|overview)$/.test(returnTo) ? returnTo : '/?tab=apps' }), 600);
+    await this.redis.set(`provider:oauth:state:${state}`, JSON.stringify({ returnTo: this.normalizeProviderReturnTo(returnTo) }), 600);
     const params = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri, response_type: 'code', scope: 'openid email profile', access_type: 'offline', prompt: 'select_account', state });
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  normalizeProviderReturnTo(returnTo?: string): string {
+    if (!returnTo || !returnTo.startsWith('/?')) return '/?tab=apps';
+    const params = new URLSearchParams(returnTo.slice(2));
+    const tab = params.get('tab');
+    if (!tab || !['apps', 'sandbox', 'certification', 'inspector', 'onboarding', 'overview'].includes(tab)) return '/?tab=apps';
+    return `/?tab=${tab}`;
   }
 
   async googleCallback(code: string, state: string) {
@@ -128,39 +136,36 @@ export class AuthService {
       throw new BadRequestException('Parol kamida 12 belgidan iborat bo‘lishi kerak.');
     }
 
-    const existing = await prisma.user.findUnique({ where: { email: cleanEmail } });
-    if (existing) {
-      if (existing.isActive) {
-        // Enumeration-safe response
-        return {
-          success: true,
-          message: 'Agar ushbu email ro‘yxatdan o‘tgan bo‘lsa, tasdiqlash xati yuborildi.'
-        };
-      }
-      // If user exists but is not active / unverified, re-send verification
-      await this.emailVerificationService.generateAndSendVerificationToken(cleanEmail);
-      return {
-        success: true,
-        message: 'Tasdiqlash xati yuborildi. Iltimos, emailingizni tekshiring.'
-      };
+    const passwordHash = await bcrypt.hash(password, 12);
+    const existing = await prisma.user.findUnique({ where: { email: cleanEmail }, include: { provider: true } });
+    if (existing?.isActive) {
+      throw new ConflictException('Bu email bilan hisob mavjud. Kirishdan foydalaning.');
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
-    await prisma.user.create({
-      data: {
-        email: cleanEmail,
-        name: cleanName,
-        passwordHash,
-        role: UserRole.PROVIDER_OWNER,
-        isActive: false // Activated upon email verification
-      }
-    });
+    // Older, never-activated registrations have not had a usable provider session.
+    // Complete them with the submitted credentials so this flow no longer depends on email verification.
+    const user = existing
+      ? await prisma.user.update({
+          where: { id: existing.id },
+          data: { name: cleanName, passwordHash, isActive: true },
+          include: { provider: true },
+        })
+      : await prisma.user.create({
+          data: {
+            email: cleanEmail,
+            name: cleanName,
+            passwordHash,
+            role: UserRole.PROVIDER_OWNER,
+            isActive: true,
+          },
+          include: { provider: true },
+        });
 
-    await this.emailVerificationService.generateAndSendVerificationToken(cleanEmail);
-
+    const session = await this.issueProviderSession(user);
     return {
       success: true,
-      message: 'Hisob yaratildi. Iltimos, hisobingizni faollashtirish uchun emailingizga yuborilgan havolani tasdiqlang.'
+      message: 'Hisob yaratildi va tizimga kirildi.',
+      ...session,
     };
   }
 

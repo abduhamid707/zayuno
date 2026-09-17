@@ -5,7 +5,8 @@
 .docs-search-row { display:flex; gap:18px; align-items:center; margin-bottom:30px; }
 .docs-search { display:flex; align-items:center; gap:12px; padding:13px 16px; background:#111925; border:1px solid #333d50; border-radius:9px; color:#a99ecf; flex:1; }
 .docs-search:focus-within { border-color:#a193d6; box-shadow:0 0 0 3px #8170b815; }
-.docs-search input { background:none; color:#e9e6f5; outline:none; width:100%; min-width:0; font-size:12px; }
+.docs-search input { background:none; border:0; box-shadow:none; color:#e9e6f5; outline:none; width:100%; min-width:0; font-size:12px; }
+.docs-search input:focus-visible { outline:none; }
 .docs-search input::placeholder { color:#8b9bb0; }
 .docs-agent-link { display:flex; align-items:center; gap:8px; font:11px ui-monospace,monospace; color:#b6a7e4; }
 .docs-layout { display:grid; grid-template-columns:185px minmax(0,1fr) 145px; gap:32px; align-items:start; border-top:1px solid #293344; padding-top:28px; }

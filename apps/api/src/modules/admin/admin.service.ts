@@ -17,7 +17,9 @@ import { MetricsCollector } from '@zayuno/observability';
 import {
   isProviderDiscoveryReady,
   isProviderPublished,
+  normalizeSupportContact,
   redactForLogs,
+  sanitizePublicSupportContact,
   sanitizeHeaders,
 } from '@zayuno/shared';
 
@@ -206,6 +208,9 @@ export class AdminService {
     return providers.map((p) => {
       const meta = (p.metadata as any) || {};
       const discovery = isProviderDiscoveryReady(p);
+      const supportContact = sanitizePublicSupportContact(
+        normalizeSupportContact((p.config as any)?.supportContact || meta.supportContact),
+      );
       return {
         id: p.id,
         slug: p.slug,
@@ -217,6 +222,7 @@ export class AdminService {
         capabilities: p.capabilities,
         adapterType: p.adapterType,
         baseUrl: p.baseUrl,
+        supportContact,
         isCertified: Boolean(meta.isCertified),
         reviewStatus: meta.reviewStatus || 'DRAFT',
         metadata: meta,

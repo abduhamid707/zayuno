@@ -37,7 +37,6 @@ import {
   HelpCircle,
   AlertTriangle,
   AlertCircle,
-  Download,
   Building2,
   Phone,
   MessageCircle,
@@ -45,18 +44,14 @@ import {
   Activity,
   Eye,
   Sparkles,
-  Bot,
   FileText
 } from 'lucide-react';
 import { ProtectedGate } from './ProtectedGate';
-import {
-  generateAiPrompt,
-  generateContractJson,
-  GOAL_OPTIONS,
-  FRAMEWORK_OPTIONS,
-  AiIntegrationGoal,
-  AiFramework
-} from './ai-integration-kit';
+import { ProviderEmptyState } from './ProviderEmptyState';
+import { SandboxSimulator } from './SandboxSimulator';
+import { CertificationView } from './CertificationView';
+import { RequestInspector } from './RequestInspector';
+import { generateUniversalAiPrompt } from './ai-integration-kit';
 import {
   ProviderFulfillmentMode,
   ProviderType,
@@ -75,6 +70,7 @@ const API_BASE =
 const SHOW_LOCAL_SIMULATOR = (import.meta as any).env?.VITE_ENABLE_LOCAL_SIMULATOR === 'true' || true;
 
 const SANDBOX_PROVIDER_SLUG = 'sandbox-provider';
+const PROTECTED_PROVIDER_TABS = new Set<WorkspaceTab>(['apps', 'sandbox', 'certification', 'inspector', 'onboarding']);
 
 const PROVIDER_CAPABILITIES = [
   'METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE',
@@ -145,6 +141,10 @@ export default function App() {
     }
     return 'overview';
   });
+  const [authScreenMode, setAuthScreenMode] = useState<'login' | 'signup'>(() => {
+    if (typeof window === 'undefined') return 'login';
+    return new URLSearchParams(window.location.search).get('mode') === 'signup' ? 'signup' : 'login';
+  });
 
   const [initialOnboardingStep, setInitialOnboardingStep] = useState<number>(() => {
     if (typeof window === 'undefined') return 1;
@@ -181,23 +181,43 @@ export default function App() {
       const tab = params.has('doc') ? 'docs' : allowed.includes(rawTab as WorkspaceTab) ? rawTab as WorkspaceTab : rawTab === 'login' ? 'auth' : 'overview';
       routeKey.current = tab + ':' + doc;
       setSelectedDoc(doc);
+      setAuthScreenMode(params.get('mode') === 'signup' ? 'signup' : 'login');
       setActiveTab(tab);
     };
     window.addEventListener('popstate', onBack);
     return () => window.removeEventListener('popstate', onBack);
   }, []);
 
-  // Protected provider routes should enter the real auth screen directly.
-  // Keep the requested internal route so a successful sign-in can return there.
-  useEffect(() => {
-    const protectedTabs = new Set<WorkspaceTab>(['apps', 'sandbox', 'certification', 'inspector']);
-    if (!authReady || token || !protectedTabs.has(activeTab)) return;
-    const returnTo = `/?tab=${activeTab}`;
-    const url = new URL(window.location.href);
-    url.searchParams.set('tab', 'auth');
-    url.searchParams.set('returnTo', returnTo);
-    window.history.replaceState({}, '', url.toString());
+  const openAuthFor = (target: WorkspaceTab, mode: 'login' | 'signup' = target === 'onboarding' ? 'signup' : 'login') => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.search = '';
+      url.searchParams.set('tab', 'auth');
+      url.searchParams.set('returnTo', `/?tab=${target}`);
+      url.searchParams.set('mode', mode);
+      window.history.replaceState({}, '', url.toString());
+    }
+    setAuthScreenMode(mode);
     setActiveTab('auth');
+  };
+
+  const navigateTo = (tab: WorkspaceTab) => {
+    if (tab === 'auth') {
+      openAuthFor('apps', 'login');
+      return;
+    }
+    if (authReady && !token && PROTECTED_PROVIDER_TABS.has(tab)) {
+      openAuthFor(tab);
+      return;
+    }
+    setActiveTab(tab);
+  };
+
+  // Protected provider routes enter the standalone auth screen. Keep a safe
+  // internal destination so the user returns to the requested workspace page.
+  useEffect(() => {
+    if (!authReady || token || !PROTECTED_PROVIDER_TABS.has(activeTab)) return;
+    openAuthFor(activeTab);
   }, [activeTab, authReady, token]);
 
   const [copiedText, setCopiedText] = useState<string | null>(null);
@@ -246,8 +266,6 @@ export default function App() {
 
   // AI Integration Kit Modal State
   const [aiKitOpen, setAiKitOpen] = useState(false);
-  const [aiGoal, setAiGoal] = useState<AiIntegrationGoal>('create-new');
-  const [aiFramework, setAiFramework] = useState<AiFramework>('nodejs-express');
   const [aiCopiedToast, setAiCopiedToast] = useState<string | null>(null);
   const [locale, setLocale] = useState<'uz' | 'en'>('uz');
   useEffect(() => {
@@ -282,19 +300,8 @@ export default function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
-    const tokenInUrl = url.searchParams.get('verifyToken') || url.searchParams.get('token');
     const emailInUrl = url.searchParams.get('email');
-
-    if (tokenInUrl) {
-      setVerifyTokenInput(tokenInUrl);
-      if (emailInUrl) setEmail(emailInUrl);
-      // If user is not on onboarding or auth tab, open auth modal
-      const tabParam = url.searchParams.get('tab');
-      if (tabParam !== 'onboarding' && tabParam !== 'auth') {
-        setAuthModalTab('verify');
-        setAuthModalOpen(true);
-      }
-    }
+    if (emailInUrl) setInitialEmailParam(emailInUrl);
   }, []);
 
   useEffect(() => {
@@ -316,8 +323,8 @@ export default function App() {
       window.history.replaceState({}, '', url);
     }
     routeKey.current = key;
-    document.title = (activeTab === 'docs' ? DOCS_MENU.find(doc => doc.id === selectedDoc)?.title || 'Hujjatlar' : activeTab === 'apps' ? 'Mening biznesim' : 'Provider workspace') + ' · Zayuno Partners';
-  }, [activeTab, selectedDoc]);
+    document.title = (activeTab === 'auth' ? (authScreenMode === 'signup' ? 'Provider hisobini yaratish' : 'Kirish') : activeTab === 'docs' ? DOCS_MENU.find(doc => doc.id === selectedDoc)?.title || 'Hujjatlar' : activeTab === 'apps' ? 'Biznesim' : 'Provider workspace') + ' · Zayuno Partners';
+  }, [activeTab, authScreenMode, selectedDoc]);
 
   const apiFetch = async (path: string, init: RequestInit = {}) => {
     const response = await fetch(`${API_BASE}${path}`, {
@@ -802,50 +809,16 @@ export default function App() {
   const certReport = certifyMutation.data;
 
   // AI Integration Kit Actions
-  const copyAiPrompt = async (target: 'chatgpt' | 'claude' | 'cursor' | 'codex') => {
-    const prompt = generateAiPrompt({
-      goal: aiGoal,
-      framework: aiFramework,
-      provider: provider,
-      certReport: certReport,
-      isAiTarget: target
-    });
+  const copyAiPrompt = async () => {
+    const prompt = generateUniversalAiPrompt(provider, certReport);
     try {
       await navigator.clipboard.writeText(prompt);
-      const targetName = target === 'chatgpt' || target === 'codex' ? 'ChatGPT / Codex' : 'Claude / Cursor';
-      setAiCopiedToast(`${targetName} uchun prompt nusxalandi!`);
+      setAiCopiedToast('Tayyor prompt nusxalandi! Endi uni AI agentga yuboring.');
       setTimeout(() => setAiCopiedToast(null), 3000);
     } catch {
-      setAiCopiedToast('Nusxalash amalga oshmadi. Markdown faylini yuklab oling.');
+      setAiCopiedToast('Nusxalash amalga oshmadi. Preview ichidagi matnni belgilang va nusxalang.');
       setTimeout(() => setAiCopiedToast(null), 3000);
     }
-  };
-
-  const downloadMarkdown = () => {
-    const prompt = generateAiPrompt({
-      goal: aiGoal,
-      framework: aiFramework,
-      provider: provider,
-      certReport: certReport
-    });
-    const blob = new Blob([prompt], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `zayuno-${provider?.slug || 'provider'}-integration.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadContractJson = () => {
-    const jsonStr = generateContractJson(provider);
-    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `zayuno-${provider?.slug || 'provider'}-contract.json`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const [docsSearchRequest, setDocsSearchRequest] = useState(0);
@@ -853,7 +826,7 @@ export default function App() {
 
   return (
     <>
-      <WorkspaceShell activeTab={activeTab} onNavigate={setActiveTab} onSearch={openDocsSearch}
+      {activeTab !== 'auth' && <WorkspaceShell activeTab={activeTab} onNavigate={navigateTo} onSearch={openDocsSearch}
         onAiKit={() => setAiKitOpen(true)} signedIn={!!token} account={userProfile?.name || userProfile?.email}
         onLogout={handleLogout}>
         <Suspense fallback={<div className="workspace-loading" role="status"><RefreshCw className="animate-spin" size={20} /> Yuklanmoqda…</div>}>
@@ -864,12 +837,12 @@ export default function App() {
           <WorkspaceOverview signedIn={!!token} provider={providerData}
             loading={!!token && providerLoading} failed={!!token && providerFailed}
             onRetry={() => refetchProvider()}
-            onNavigate={(tab, step) => { if (step) setInitialOnboardingStep(step); if (tab === 'apps' && providerData?.status !== 'ACTIVE') setDashboardSection('integration'); setActiveTab(tab); }}
+            onNavigate={(tab, step) => { if (step) setInitialOnboardingStep(step); if (tab === 'apps' && providerData?.status !== 'ACTIVE') setDashboardSection('integration'); navigateTo(tab); }}
             onDoc={id => { setSelectedDoc(id); setActiveTab('docs'); }}
             onAiKit={() => setAiKitOpen(true)} />
         )}
         {activeTab === 'onboarding' && (
-          <OnboardingWizard
+          !authReady && !token ? <div className="workspace-loading" role="status"><RefreshCw className="animate-spin" size={20} /> Sessiya tekshirilmoqda…</div> : <OnboardingWizard
             apiBase={API_BASE}
             token={token}
             onAuthSuccess={(newToken, user) => {
@@ -900,38 +873,6 @@ export default function App() {
         )}
 
         {/* ========================================================================= */}
-        {/* AUTH / LOGIN VIEW                                                         */}
-        {/* ========================================================================= */}
-        {activeTab === 'auth' && (
-          <AuthView
-            apiBase={API_BASE}
-            onLoginSuccess={(newToken, user) => {
-              setToken(newToken);
-              setUserProfile(user);
-              if (typeof window !== 'undefined') {
-                const url = new URL(window.location.href);
-                const requestedReturn = url.searchParams.get('returnTo') || '';
-                const returnMatch = requestedReturn.match(/^\/\?tab=(apps|sandbox|certification|inspector)$/);
-                const nextTab = (returnMatch?.[1] || 'apps') as WorkspaceTab;
-                url.searchParams.delete('verifyToken');
-                url.searchParams.delete('token');
-                url.searchParams.delete('returnTo');
-                window.history.replaceState({}, '', url.toString());
-                refetchProvider();
-                setActiveTab(nextTab);
-              } else {
-                refetchProvider();
-                setActiveTab('apps');
-              }
-            }}
-            onStartOnboarding={() => setActiveTab('onboarding')}
-            onOpenDocs={() => setActiveTab('docs')}
-            initialEmail={initialEmailParam}
-            initialMode={initialVerifyTokenParam ? 'verify' : 'login'}
-          />
-        )}
-
-        {/* ========================================================================= */}
         {/* TAB 2: INTERACTIVE DOCUMENTATION (PUBLIC)                                  */}
         {/* ========================================================================= */}
         {activeTab === 'docs' && (
@@ -952,8 +893,8 @@ export default function App() {
               <ProtectedGate
                 sectionTitle="Provider Dashboard & API Boshqaruvi"
                 sectionDescription="Provider arizangiz, API credentiallari, webhooklar va tushgan buyurtmalarni monitoring qilish uchun tizimga kiring."
-                onLoginClick={() => setActiveTab('auth')}
-                onSignupClick={() => setActiveTab('onboarding')}
+                onLoginClick={() => openAuthFor('apps', 'login')}
+                onSignupClick={() => openAuthFor('onboarding', 'signup')}
                 onDocsClick={() => setActiveTab('docs')}
               />
             ) : providerLoading ? (
@@ -961,24 +902,13 @@ export default function App() {
             ) : providerFailed ? (
               <div className="workspace-notice" role="alert">Provider profilini yuklab bo‘lmadi.<button onClick={() => refetchProvider()}>Qayta urinish</button></div>
             ) : !provider ? (
-              <div className="p-8 rounded-3xl bg-slate-950 border border-slate-800 text-center space-y-4 max-w-lg mx-auto animate-fadeIn">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
-                  <Building2 className="w-6 h-6" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-base font-bold text-white">Sizda hali ro‘yxatdan o‘tgan provider yo‘q</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Zayuno tarmog‘iga xizmat yoki biznesingizni ulash uchun bir necha daqiqalik onboarding wizardini yakunlang.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('onboarding')}
-                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2 mx-auto"
-                >
-                  Onboardingni boshlash / davom ettirish <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
+              <ProviderEmptyState
+                title="Avval biznes profilingizni yarating"
+                description="Zayuno tarmog‘i orqali AI mijozlardan buyurtma qabul qilish uchun biznesingizni 4 bosqichda ulang."
+                onStartOnboarding={() => navigateTo('onboarding')}
+                onOpenDocs={() => setActiveTab('docs')}
+                onOpenAiKit={() => setAiKitOpen(true)}
+              />
             ) : (
               /* EXISTING PROVIDER DASHBOARD */
               <div className="space-y-6">
@@ -1626,136 +1556,24 @@ export default function App() {
         {/* TAB 4: INTERACTIVE SANDBOX SIMULATOR                                      */}
         {/* ========================================================================= */}
         {activeTab === 'sandbox' && (
-          <div className="space-y-6 animate-fadeIn">
-            <div>
-              <h2 className="text-xl font-bold text-white">Interactive Sandbox Action Simulator</h2>
-              <p className="text-xs text-slate-400">Step through the complete end-to-end lifecycle without touching production systems.</p>
-            </div>
-
-            {/* Stepper Header */}
-            <div className="grid grid-cols-5 gap-2 text-xs font-mono">
-              {[
-                { s: 1, label: '1. Discovery' },
-                { s: 2, label: '2. Quote' },
-                { s: 3, label: '3. Create Action' },
-                { s: 4, label: '4. Pay Handoff' },
-                { s: 5, label: '5. Completed' }
-              ].map(step => (
-                <div
-                  key={step.s}
-                  className={`p-2.5 rounded-xl border text-center transition-all ${
-                    sandboxStep === step.s
-                      ? 'bg-indigo-600 text-white border-indigo-500 shadow'
-                      : sandboxStep > step.s
-                      ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30'
-                      : 'bg-slate-900/40 text-slate-500 border-slate-800'
-                  }`}
-                >
-                  {step.label}
-                </div>
-              ))}
-            </div>
-
-            {sandboxError && (
-              <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300">
-                {sandboxError}
-              </div>
-            )}
-
-            {/* Simulator Box */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-6">
-              {sandboxStep === 1 && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-white">Step 1: AI Provider Discovery</h3>
-                  <p className="text-xs text-slate-400">The AI agent calls <code className="text-indigo-300 font-mono">find_providers(category: "general_services")</code> to discover eligible providers.</p>
-                  <button
-                    onClick={runSandboxDiscovery}
-                    disabled={sandboxLoading}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-2"
-                  >
-                    {sandboxLoading ? 'Discovering...' : 'Simulate Provider Discovery'}
-                  </button>
-                </div>
-              )}
-
-              {sandboxStep === 2 && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-white">Step 2: Request Verified Pricing Quote</h3>
-                  <p className="text-xs text-slate-400">The AI agent calculates an exact quote for 2 units of the Standard Package.</p>
-                  <button
-                    onClick={runSandboxQuote}
-                    disabled={sandboxLoading}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-2"
-                  >
-                    {sandboxLoading ? 'Calculating Quote...' : 'Simulate Request Quote'}
-                  </button>
-                </div>
-              )}
-
-              {sandboxStep === 3 && sandboxQuote && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-white">Step 3: User Confirms Quote & Creates Action</h3>
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs font-mono text-slate-300 space-y-1">
-                    <div>Quote ID: <span className="text-indigo-400">{sandboxQuote.quoteId || sandboxQuote.id}</span></div>
-                    <div>Total Price: <span className="text-emerald-400">{sandboxQuote.totalAmount || sandboxQuote.total} {sandboxQuote.currency}</span></div>
-                  </div>
-                  <button
-                    onClick={runSandboxCreateAction}
-                    disabled={sandboxLoading}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-2"
-                  >
-                    {sandboxLoading ? 'Creating Action...' : 'Simulate User Confirmation & Action Dispatch'}
-                  </button>
-                </div>
-              )}
-
-              {sandboxStep === 4 && sandboxAction && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-white">Step 4: Payment Handoff via NextAction</h3>
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs font-mono text-slate-300 space-y-1.5">
-                    <div>Action Reference: <span className="text-indigo-400">{sandboxAction.actionId || sandboxAction.publicId || sandboxAction.id}</span></div>
-                    <div>Status: <span className="text-amber-400">{sandboxAction.status}</span></div>
-                    <div>
-                      NextAction Checkout URL: <br />
-                      <a
-                        href={sandboxAction.nextAction?.url || sandboxAction.paymentUrl || 'https://sandbox.zayuno.uz/checkout'}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-sky-400 underline"
-                      >
-                        {sandboxAction.nextAction?.url || sandboxAction.paymentUrl}
-                      </a>
-                    </div>
-                  </div>
-                  <button
-                    onClick={runSandboxWebhook}
-                    disabled={sandboxLoading}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-2"
-                  >
-                    {sandboxLoading ? 'Processing Settlement...' : 'Simulate Customer Payment & Dispatch Webhook'}
-                  </button>
-                </div>
-              )}
-
-              {sandboxStep === 5 && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex items-center gap-3">
-                    <CheckCircle2 className="w-6 h-6 text-emerald-400 flex-shrink-0" />
-                    <div>
-                      <h4 className="text-sm font-semibold text-emerald-300">End-to-End Sandbox Simulation Completed!</h4>
-                      <p className="text-xs text-slate-300">Action state successfully progressed from Creation → Awaiting Payment → Webhook Settlement → Completed.</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => { setSandboxStep(1); setSandboxQuote(null); setSandboxAction(null); }}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-4 py-2 rounded-xl border border-slate-700"
-                  >
-                    Reset Simulation
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          <SandboxSimulator
+            step={sandboxStep}
+            loading={sandboxLoading}
+            error={sandboxError}
+            quote={sandboxQuote}
+            action={sandboxAction}
+            onRunDiscovery={runSandboxDiscovery}
+            onRunQuote={runSandboxQuote}
+            onRunCreateAction={runSandboxCreateAction}
+            onRunWebhook={runSandboxWebhook}
+            onReset={() => {
+              setSandboxStep(1);
+              setSandboxQuote(null);
+              setSandboxAction(null);
+              setSandboxError(null);
+            }}
+            providerSlug={provider?.slug}
+          />
         )}
 
         {/* ========================================================================= */}
@@ -1767,149 +1585,27 @@ export default function App() {
               <ProtectedGate
                 sectionTitle="Avtomatlashtirilgan Sertifikatlash"
                 sectionDescription="Provider API integratsiyangizni Zayuno universal protokoli va xavfsizlik talablariga mosligini tekshirish uchun tizimga kiring."
-                onLoginClick={() => setActiveTab('auth')}
-                onSignupClick={() => setActiveTab('onboarding')}
+                onLoginClick={() => openAuthFor('apps', 'login')}
+                onSignupClick={() => openAuthFor('onboarding', 'signup')}
                 onDocsClick={() => setActiveTab('docs')}
               />
             ) : !provider?.slug ? (
-              <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
-                  <Building2 className="w-7 h-7" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Avval provider app yarating</h3>
-                <p className="text-xs text-slate-400">Certification testlarini o‘tkazish uchun avval Apps bo‘limida provider arizangizni yarating.</p>
-                <button
-                  onClick={() => setActiveTab('apps')}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all inline-flex items-center gap-2"
-                >
-                  Yangi App yaratish <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <ProviderEmptyState
+                title="Tekshiruvdan oldin biznes profilingizni yarating"
+                description="Avtomatlashtirilgan capability certification testlarini o‘tkazish uchun avval biznes profilingizni yarating va API manzilingizni ulang."
+                onStartOnboarding={() => navigateTo('onboarding')}
+                onOpenDocs={() => { setSelectedDoc('certification'); setActiveTab('docs'); }}
+                onOpenAiKit={() => setAiKitOpen(true)}
+              />
             ) : (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-white">Automated Capability Certification</h2>
-                    <p className="text-xs text-slate-400">Verifies provider compliance against mandatory contracts, idempotency, payment handoffs, and webhook signatures.</p>
-                  </div>
-                  <button
-                    onClick={() => certifyMutation.mutate()}
-                    disabled={certifyMutation.isPending || !provider?.slug}
-                    className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2"
-                  >
-                    {certifyMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                    Run Full Certification
-                  </button>
-                </div>
-
-                {certReport ? (
-                  <div className="space-y-6">
-                    {/* Result Banner */}
-                    <div className={`p-6 rounded-2xl border flex items-center justify-between ${
-                      certReport.isCertified
-                        ? 'bg-emerald-950/40 border-emerald-500/40'
-                        : 'bg-rose-950/40 border-rose-500/40'
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        {certReport.isCertified ? (
-                          <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-                        ) : (
-                          <XCircle className="w-8 h-8 text-rose-400" />
-                        )}
-                        <div>
-                          <h3 className="text-base font-bold text-white">
-                            {certReport.isCertified ? 'Provider Integration Certified' : 'Certification Tests Failed'}
-                          </h3>
-                          <p className="text-xs text-slate-300">
-                            {certReport.passedCount} passed, {certReport.failedCount} failed, {certReport.skippedCount || 0} blocked. Production ready: {certReport.isProductionReady ? 'YES' : 'NO'}.
-                          </p>
-                        </div>
-                      </div>
-                      <span className={`text-xs font-mono font-bold px-3 py-1 rounded-full border ${
-                        certReport.isCertified
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                          : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                      }`}>
-                        {certReport.isCertified ? 'CERTIFIED' : 'FAILED'}
-                      </span>
-                    </div>
-
-                    {/* Test Results Table */}
-                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-mono text-[11px]">
-                          <tr>
-                            <th className="p-3.5">Capability & Test</th>
-                            <th className="p-3.5">Category</th>
-                            <th className="p-3.5">Duration</th>
-                            <th className="p-3.5 text-right">Result</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/60">
-                          {certReport.tests.map((t: any, idx: number) => (
-                            <tr key={idx} className="hover:bg-slate-800/40 transition">
-                              <td className="p-3.5">
-                                <div className="font-semibold text-white">{t.name}</div>
-                                <div className="text-[11px] text-slate-400 font-mono">{t.capability}</div>
-                                {t.error && (
-                                  <div className="mt-1 text-[11px] text-rose-300 bg-rose-950/30 border border-rose-500/20 p-1.5 rounded-lg">
-                                    {t.error}
-                                  </div>
-                                )}
-                                {t.issue && (
-                                  <div className="mt-1 text-[10px] text-slate-300 space-y-0.5">
-                                    <div><b>Root cause:</b> {t.issue.rootCause}</div>
-                                    {t.endpoint && <div><b>Endpoint:</b> <code>{t.endpoint}</code></div>}
-                                    {t.issue.path && <div><b>Path:</b> <code>{t.issue.path}</code></div>}
-                                    {t.issue.expected && <div><b>Expected:</b> {t.issue.expected}</div>}
-                                    {t.issue.received && <div><b>Received:</b> {t.issue.received}</div>}
-                                  </div>
-                                )}
-                                {t.blockedBy?.length > 0 && <div className="mt-1 text-[10px] text-amber-300">Blocked by: {t.blockedBy.join(', ')}</div>}
-                              </td>
-                              <td className="p-3.5">
-                                {t.isMandatory ? (
-                                  <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full text-[10px] font-mono">
-                                    MANDATORY
-                                  </span>
-                                ) : (
-                                  <span className="bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full text-[10px] font-mono">
-                                    OPTIONAL
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-3.5 font-mono text-slate-400">{t.durationMs}ms</td>
-                              <td className="p-3.5 text-right">
-                                {(t.status === 'PASS' || t.passed) ? (
-                                  <span className="text-emerald-400 font-semibold flex items-center justify-end gap-1">
-                                    <Check className="w-3.5 h-3.5" /> PASS
-                                  </span>
-                                ) : t.status === 'SKIPPED' ? (
-                                  <span className="text-amber-400 font-semibold flex items-center justify-end gap-1">
-                                    <AlertTriangle className="w-3.5 h-3.5" /> BLOCKED
-                                  </span>
-                                ) : (
-                                  <span className="text-rose-400 font-semibold flex items-center justify-end gap-1">
-                                    <XCircle className="w-3.5 h-3.5" /> FAIL
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-slate-900/40 border border-slate-800 border-dashed rounded-2xl p-12 text-center space-y-3">
-                    <ShieldCheck className="w-12 h-12 text-slate-600 mx-auto" />
-                    <h3 className="text-sm font-semibold text-slate-300">Ready to execute compliance tests</h3>
-                    <p className="text-xs text-slate-500 max-w-md mx-auto">
-                      Click the button above to run the automated test suite against <code className="text-indigo-400 font-mono">{provider?.slug || 'your provider'}</code>.
-                    </p>
-                  </div>
-                )}
-              </div>
+              <CertificationView
+                provider={provider}
+                certReport={certReport}
+                isPending={certifyMutation.isPending}
+                onRunCertify={() => certifyMutation.mutate()}
+                onOpenDocs={docId => { setSelectedDoc(docId); setActiveTab('docs'); }}
+                onOpenAiKit={() => setAiKitOpen(true)}
+              />
             )}
           </div>
         )}
@@ -1923,162 +1619,78 @@ export default function App() {
               <ProtectedGate
                 sectionTitle="Live Tranzaksiya Inspectori"
                 sectionDescription="AI agentlaridan kelayotgan real-time so‘rovlar, quote hisoblash va webhook tranzaksiyalari loglarini kuzatish uchun tizimga kiring."
-                onLoginClick={() => setActiveTab('auth')}
-                onSignupClick={() => setActiveTab('onboarding')}
+                onLoginClick={() => openAuthFor('apps', 'login')}
+                onSignupClick={() => openAuthFor('onboarding', 'signup')}
                 onDocsClick={() => setActiveTab('docs')}
               />
             ) : !provider?.slug ? (
-              <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-md mx-auto my-12">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
-                  <Building2 className="w-7 h-7" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Avval provider app yarating</h3>
-                <p className="text-xs text-slate-400">Live inspectorni ishlatish uchun avval Apps bo‘limida provider arizangizni yarating.</p>
-                <button
-                  onClick={() => setActiveTab('apps')}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all inline-flex items-center gap-2"
-                >
-                  Yangi App yaratish <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <ProviderEmptyState
+                title="So‘rovlar jurnali uchun biznes profilingizni yarating"
+                description="AI agentlar va mijozlardan kelayotgan real-time so‘rovlar hamda trace loglarini ko‘rish uchun avval biznes profilingizni yarating."
+                onStartOnboarding={() => navigateTo('onboarding')}
+                onOpenDocs={() => setActiveTab('docs')}
+                onOpenAiKit={() => setAiKitOpen(true)}
+              />
             ) : (
-              <div className="space-y-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                      <Activity className="w-5 h-5 text-indigo-400" /> Live Provider API & Payload Inspector
-                    </h2>
-                    <p className="text-xs text-slate-400">
-                      Real-time request/response audit logs, latencies, trace IDs, and sanitized payloads for {provider?.name || 'your provider'}.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => refetchLogs()}
-                    disabled={logsLoading}
-                    className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${logsLoading ? 'animate-spin' : ''}`} />
-                    Yangilash
-                  </button>
-                </div>
-
-                {/* Filter Bar */}
-                <div className="grid gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:grid-cols-3 md:grid-cols-4">
-                  <input
-                    type="text"
-                    placeholder="Trace ID bo‘yicha qidirish..."
-                    value={inspectorFilters.traceId}
-                    onChange={e => setInspectorFilters(cur => ({ ...cur, traceId: e.target.value }))}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                  />
-                  <input
-                    type="date"
-                    value={inspectorFilters.from}
-                    onChange={e => setInspectorFilters(cur => ({ ...cur, from: e.target.value }))}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-                  />
-                  <input
-                    type="date"
-                    value={inspectorFilters.to}
-                    onChange={e => setInspectorFilters(cur => ({ ...cur, to: e.target.value }))}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-                  />
-                  <button
-                    onClick={() => setInspectorFilters({ traceId: '', from: '', to: '' })}
-                    className="rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3 py-2 text-xs text-slate-300 transition"
-                  >
-                    Filtrni tozalash
-                  </button>
-                </div>
-
-                {/* Logs Table */}
-                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-mono text-[11px]">
-                      <tr>
-                        <th className="p-3.5">Method & Endpoint</th>
-                        <th className="p-3.5">Status</th>
-                        <th className="p-3.5">Latency</th>
-                        <th className="p-3.5">Trace ID</th>
-                        <th className="p-3.5">Vaqt</th>
-                        <th className="p-3.5 text-right">Amal</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-mono">
-                      {logsLoading ? (
-                        <tr>
-                          <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">
-                            Loglar yuklanmoqda...
-                          </td>
-                        </tr>
-                      ) : !providerLogsData?.logs || providerLogsData.logs.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="p-8 text-center text-slate-400 font-sans">
-                            Hozircha hech qanday integration yoki webhook chaqiruvlari qayd etilmagan.
-                          </td>
-                        </tr>
-                      ) : (
-                        providerLogsData.logs.map((log: any) => (
-                          <tr key={log.id} className="hover:bg-slate-800/40 transition">
-                            <td className="p-3.5">
-                              <div className="flex items-center gap-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  log.method === 'POST' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-sky-500/20 text-sky-300'
-                                }`}>
-                                  {log.method || 'EVENT'}
-                                </span>
-                                <span className="font-semibold text-slate-200">{log.endpoint || log.event}</span>
-                              </div>
-                              <span className="text-[10px] text-slate-500 font-sans block mt-0.5">{log.source}</span>
-                            </td>
-                            <td className="p-3.5">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                log.statusCode >= 200 && log.statusCode < 300
-                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                                  : log.statusCode >= 400 && log.statusCode < 500
-                                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                                  : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
-                              }`}>
-                                {log.statusCode || 'ERR'}
-                              </span>
-                            </td>
-                            <td className="p-3.5 text-slate-400">
-                              {log.durationMs != null ? `${log.durationMs}ms` : '—'}
-                            </td>
-                            <td className="p-3.5 text-indigo-300 text-[11px]">
-                              {log.traceId ? (
-                                <div className="flex items-center gap-1">
-                                  <span className="truncate max-w-[120px]">{log.traceId}</span>
-                                  <button
-                                    onClick={() => copyToClipboard(log.traceId, log.id)}
-                                    title="Nusxalash"
-                                    className="text-slate-500 hover:text-slate-300"
-                                  >
-                                    {copiedText === log.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                  </button>
-                                </div>
-                              ) : '—'}
-                            </td>
-                            <td className="p-3.5 text-right">
-                              <button
-                                onClick={() => setSelectedInspectorLog(log)}
-                                className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded-lg text-xs font-sans font-medium transition flex items-center gap-1 ml-auto"
-                              >
-                                <Eye className="w-3.5 h-3.5" /> Ko‘rish
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <RequestInspector
+                provider={provider}
+                logs={providerLogsData?.logs || []}
+                loading={logsLoading}
+                filters={inspectorFilters}
+                onFilterChange={setInspectorFilters}
+                onRefresh={refetchLogs}
+                selectedLog={selectedInspectorLog}
+                onSelectLog={setSelectedInspectorLog}
+              />
             )}
           </div>
         )}
         </Suspense>
-      </WorkspaceShell>
+      </WorkspaceShell>}
+
+      {activeTab === 'auth' && (
+        <Suspense fallback={<div className="min-h-dvh grid place-items-center bg-[#090d15] text-sm text-slate-400">Yuklanmoqda…</div>}>
+          <AuthView
+            apiBase={API_BASE}
+            initialEmail={initialEmailParam}
+            initialMode={authScreenMode}
+            onModeChange={(mode) => {
+              setAuthScreenMode(mode);
+              const url = new URL(window.location.href);
+              url.searchParams.set('mode', mode);
+              url.searchParams.set('returnTo', mode === 'signup' ? '/?tab=onboarding' : '/?tab=apps');
+              window.history.replaceState({}, '', url.toString());
+            }}
+            onAuthenticated={(newToken, user) => {
+              setToken(newToken);
+              setUserProfile(user);
+              const url = new URL(window.location.href);
+              const requestedReturn = url.searchParams.get('returnTo') || (authScreenMode === 'signup' ? '/?tab=onboarding' : '/?tab=apps');
+              const destination = new URL(requestedReturn, window.location.origin);
+              const nextTab = (['apps', 'sandbox', 'certification', 'inspector', 'onboarding', 'overview'].includes(destination.searchParams.get('tab') || '')
+                ? destination.searchParams.get('tab')
+                : 'apps') as WorkspaceTab;
+              window.history.replaceState({}, '', `${destination.pathname}${destination.search}`);
+              refetchProvider();
+              setActiveTab(nextTab);
+            }}
+            onOpenDocs={() => {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('returnTo');
+              url.searchParams.delete('mode');
+              window.history.replaceState({}, '', url.toString());
+              setActiveTab('docs');
+            }}
+            onOpenOverview={() => {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('returnTo');
+              url.searchParams.delete('mode');
+              window.history.replaceState({}, '', url.toString());
+              setActiveTab('overview');
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* Auth & Onboarding Modal */}
       {authModalOpen && (
@@ -2312,99 +1924,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Selected Inspector Log Modal */}
-      {selectedInspectorLog && (
-        <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="my-8 w-full max-w-3xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">Payload Inspector</span>
-                <h3 className="text-lg font-bold text-white font-mono flex items-center gap-2 mt-0.5">
-                  <span className="text-indigo-400">{selectedInspectorLog.method || 'POST'}</span> {selectedInspectorLog.endpoint || selectedInspectorLog.event}
-                </h3>
-                <p className="text-xs text-slate-400 mt-1 font-mono">
-                  Trace ID: {selectedInspectorLog.traceId || 'N/A'} · Status: {selectedInspectorLog.statusCode} · {selectedInspectorLog.durationMs}ms
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedInspectorLog(null)}
-                className="rounded-full bg-slate-800 p-1.5 text-xs text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            {selectedInspectorLog.errorMessage && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs font-sans">
-                <strong>Error:</strong> {selectedInspectorLog.errorMessage}
-              </div>
-            )}
-
-            <div className="space-y-4 text-xs font-mono">
-              {selectedInspectorLog.requestBody && (
-                <div>
-                  <div className="flex justify-between items-center text-slate-400 mb-1 font-sans">
-                    <span>Request Body (Sanitized & Redacted):</span>
-                    <button
-                      onClick={() => copyToClipboard(JSON.stringify(selectedInspectorLog.requestBody, null, 2), 'req-body')}
-                      className="text-[11px] text-indigo-400 hover:underline flex items-center gap-1"
-                    >
-                      {copiedText === 'req-body' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />} Nusxalash
-                    </button>
-                  </div>
-                  <pre className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-slate-300 max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
-                    {JSON.stringify(selectedInspectorLog.requestBody, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-              {selectedInspectorLog.responseBody && (
-                <div>
-                  <div className="flex justify-between items-center text-slate-400 mb-1 font-sans">
-                    <span>Response Body (Sanitized & Redacted):</span>
-                    <button
-                      onClick={() => copyToClipboard(JSON.stringify(selectedInspectorLog.responseBody, null, 2), 'res-body')}
-                      className="text-[11px] text-indigo-400 hover:underline flex items-center gap-1"
-                    >
-                      {copiedText === 'res-body' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />} Nusxalash
-                    </button>
-                  </div>
-                  <pre className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-emerald-300 max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
-                    {JSON.stringify(selectedInspectorLog.responseBody, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-              {selectedInspectorLog.payload && (
-                <div>
-                  <div className="flex justify-between items-center text-slate-400 mb-1 font-sans">
-                    <span>Webhook Event Payload (Sanitized & Redacted):</span>
-                    <button
-                      onClick={() => copyToClipboard(JSON.stringify(selectedInspectorLog.payload, null, 2), 'webhook-payload')}
-                      className="text-[11px] text-indigo-400 hover:underline flex items-center gap-1"
-                    >
-                      {copiedText === 'webhook-payload' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />} Nusxalash
-                    </button>
-                  </div>
-                  <pre className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-cyan-300 max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
-                    {JSON.stringify(selectedInspectorLog.payload, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setSelectedInspectorLog(null)}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-sans font-medium"
-              >
-                Yopish
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* AI Integration Kit Modal */}
       {aiKitOpen && (
         <div role="dialog" aria-modal="true" aria-labelledby="ai-kit-title" className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto bg-black/85 p-4 backdrop-blur-md animate-fadeIn">
@@ -2420,12 +1939,12 @@ export default function App() {
                   </span>
                 </div>
                 <h2 id="ai-kit-title" className="text-xl font-bold text-white">
-                  {locale === 'uz' ? 'AI bilan integratsiya qilish (Copy for AI)' : 'AI Integration Assistant'}
+                  {locale === 'uz' ? 'AI uchun tayyor prompt' : 'Ready prompt for your AI agent'}
                 </h2>
                 <p className="text-xs text-slate-400">
                   {locale === 'uz'
-                    ? 'ChatGPT, Claude, Cursor yoki Codex uchun tayyor kontekst, kontrakt va vazifa promptini oling.'
-                    : 'Generate complete prompt, contracts, and code templates for ChatGPT, Claude, Cursor, or Codex.'}
+                    ? 'Nusxalang va istalgan coding agentga yuboring. U loyihangizni va contractni o‘zi tahlil qiladi.'
+                    : 'Copy once and send it to any coding agent. It inspects your project and the contract itself.'}
                 </p>
               </div>
               <button
@@ -2437,134 +1956,37 @@ export default function App() {
               </button>
             </div>
 
-            {/* Zero Secrets Guarantee Alert */}
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3.5 flex items-center justify-between text-xs text-emerald-300">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>
-                  <strong>Agentga tayyor kontekst:</strong> Credential maydonlari chiqarib tashlanadi. Yuborishdan oldin previewni ko‘rib chiqing; haqiqiy kalitlarni o‘zingiz qo‘shmang.
-                </span>
-              </div>
-              <span className="text-[10px] font-mono bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">
-                BRIEF
-              </span>
-            </div>
-
-            {/* Step 1: Goal Selector */}
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-white">
-                1. Integratsiya maqsadi (Goal):
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                {GOAL_OPTIONS.map(g => (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => setAiGoal(g.id)}
-                    className={`p-3 rounded-xl border text-left text-xs transition-all flex flex-col justify-between gap-1.5 ${
-                      aiGoal === g.id
-                        ? 'border-indigo-500 bg-indigo-950/40 text-white shadow-lg shadow-indigo-500/10'
-                        : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                    }`}
-                  >
-                    <div className="font-semibold text-slate-200 flex items-center justify-between">
-                      <span>{locale === 'uz' ? g.labelUz : g.labelEn}</span>
-                      {aiGoal === g.id && <Check className="w-3.5 h-3.5 text-indigo-400" />}
-                    </div>
-                    <p className="text-[11px] text-slate-500 line-clamp-2">
-                      {locale === 'uz' ? g.descriptionUz : g.descriptionEn}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Step 2: Framework Selector */}
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-white">
-                2. Texnologik stek / Framework:
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {FRAMEWORK_OPTIONS.map(fw => (
-                  <button
-                    key={fw.id}
-                    type="button"
-                    onClick={() => setAiFramework(fw.id)}
-                    className={`px-3 py-2 rounded-xl border text-xs font-medium transition-all flex items-center gap-2 ${
-                      aiFramework === fw.id
-                        ? 'border-sky-500 bg-sky-950/40 text-white shadow-md shadow-sky-500/10'
-                        : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                    }`}
-                  >
-                    <span>{fw.name}</span>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                      aiFramework === fw.id ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-900 text-slate-500'
-                    }`}>
-                      {fw.tag}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Step 3: Generated Prompt Preview */}
+            {/* Universal prompt preview */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-white flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-indigo-400" /> AI uchun tayyor prompt (Markdown Preview):
+                  <FileText className="w-3.5 h-3.5 text-indigo-400" /> AI uchun tayyor prompt (Markdown Preview)
                 </label>
                 <span className="text-[11px] font-mono text-slate-500">
-                  Provider: {provider?.slug || 'demo-provider'}
+                  Secretlarsiz · {provider?.slug || 'demo-provider'}
                 </span>
               </div>
               <div className="relative rounded-xl border border-slate-800 bg-slate-950 overflow-hidden">
-                <pre className="p-4 text-[11px] font-mono text-indigo-200 max-h-64 overflow-y-auto whitespace-pre-wrap select-all">
-                  {generateAiPrompt({
-                    goal: aiGoal,
-                    framework: aiFramework,
-                    provider: provider,
-                    certReport: certReport
-                  })}
+                <pre className="p-4 text-[11px] font-mono text-indigo-200 max-h-[52vh] overflow-y-auto whitespace-pre-wrap select-all">
+                  {generateUniversalAiPrompt(provider, certReport)}
                 </pre>
               </div>
             </div>
 
-            {/* Step 4: Action Buttons Footer */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => copyAiPrompt('chatgpt')}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2"
-                >
-                  <Bot className="w-4 h-4 text-emerald-300" /> ChatGPT / Codex uchun nusxalash
-                </button>
-                <button
-                  type="button"
-                  onClick={() => copyAiPrompt('claude')}
-                  className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-purple-600/30 flex items-center gap-2"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-300" /> Claude / Cursor uchun nusxalash
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={downloadMarkdown}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-700 transition-all flex items-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" /> Markdown (.md)
-                </button>
-                <button
-                  type="button"
-                  onClick={downloadContractJson}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium px-3.5 py-2.5 rounded-xl border border-slate-700 transition-all flex items-center gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" /> Contract (.json)
-                </button>
-              </div>
+            <div className="flex flex-col gap-3 border-t border-slate-800 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[11px] leading-relaxed text-slate-400">
+                Istalgan AI coding agentga yuboring. U avval loyiha stackini tahlil qiladi, so‘ng Zayuno contractiga mos o‘zgarishni qiladi.
+              </p>
+              <button
+                type="button"
+                onClick={copyAiPrompt}
+                className="shrink-0 rounded-xl bg-indigo-600 px-5 py-3 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 transition-all hover:bg-indigo-500 flex items-center justify-center gap-2"
+              >
+                {aiCopiedToast ? <Check className="w-4 h-4 text-emerald-200" /> : <Copy className="w-4 h-4" />}
+                {aiCopiedToast ? 'Prompt nusxalandi!' : 'Promptni nusxalash'}
+              </button>
             </div>
+            {aiCopiedToast && <p role="status" className="text-center text-xs font-medium text-emerald-300">{aiCopiedToast}</p>}
           </div>
         </div>
       )}

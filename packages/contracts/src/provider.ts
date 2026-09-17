@@ -175,7 +175,10 @@ export const StructuredSupportContactSchema = z.object({
   telegram: optionalNullable(z.string()),
   email: optionalNullable(z.string()),
   workingHours: optionalNullable(z.string()),
+  /** A public business website or dedicated customer-support page. */
   supportUrl: optionalNullable(z.string()),
+  /** Short, customer-facing guidance shown with a completed action. */
+  supportNote: optionalNullable(z.string().trim().max(500)),
   locale: optionalNullable(z.string())
 });
 export type StructuredSupportContact = z.infer<typeof StructuredSupportContactSchema>;
@@ -189,8 +192,8 @@ export type SupportContact = z.infer<typeof SupportContactSchema>;
 export const RequiredSupportContactSchema = z.union([
   z.string().trim().min(1, 'At least one customer support contact is required'),
   StructuredSupportContactSchema.refine(
-    contact => Boolean(contact.phone?.trim() || contact.telegram?.trim() || contact.email?.trim()),
-    { message: 'At least one customer support contact (phone, Telegram, or email) is required' }
+    contact => Boolean(contact.phone?.trim() || contact.telegram?.trim() || contact.email?.trim() || contact.supportUrl?.trim()),
+    { message: 'At least one customer support contact (phone, Telegram, email, or official support URL) is required' }
   )
 ]);
 
@@ -203,7 +206,7 @@ export const ProviderInfoSchema = z.object({
   status: z.nativeEnum(ProviderStatus),
   type: z.nativeEnum(ProviderType),
   fulfillmentMode: optionalNullable(z.nativeEnum(ProviderFulfillmentMode)),
-  category: z.string().default('general'),
+  category: z.string().default('online_services'),
   geography: optionalNullable(z.array(z.string()), ['UZ']),
   adapterType: z.string().default('sandbox'),
   authMethod: z.nativeEnum(AuthMethod).default(AuthMethod.API_KEY),
@@ -292,7 +295,7 @@ export const RegisterProviderInputSchema = z.object({
   description: z.string().optional(),
   type: z.nativeEnum(ProviderType).default(ProviderType.SERVICES),
   fulfillmentMode: z.nativeEnum(ProviderFulfillmentMode).optional(),
-  category: z.string().default('general'),
+  category: z.string().default('online_services'),
   geography: z.array(z.string()).default(['UZ']),
   baseUrl: z.string().url().optional(),
   apiSecret: z.string().optional(),
@@ -306,6 +309,12 @@ export const RegisterProviderInputSchema = z.object({
     if (contact.phone?.trim() && !/^\+?[\d\s()-]{7,22}$/.test(contact.phone.trim())) invalid('phone', 'Invalid support phone');
     if (contact.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email.trim())) invalid('email', 'Invalid support email');
     if (contact.telegram?.trim() && !/^(?:@|https:\/\/t\.me\/)?[a-zA-Z][a-zA-Z0-9_]{4,31}$/.test(contact.telegram.trim())) invalid('telegram', 'Invalid Telegram username');
+    if (contact.supportUrl?.trim()) {
+      try {
+        const url = new URL(contact.supportUrl.trim());
+        if (url.protocol !== 'https:' || url.username || url.password) invalid('supportUrl', 'Support URL must be a public HTTPS URL');
+      } catch { invalid('supportUrl', 'Invalid support URL'); }
+    }
   })
 });
 export type RegisterProviderInput = z.infer<typeof RegisterProviderInputSchema>;

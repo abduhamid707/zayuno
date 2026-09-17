@@ -2,7 +2,7 @@ import { StructuredSupportContact } from '@zayuno/contracts';
 
 /**
  * Normalizes any legacy string or structured support contact into a standard
- * StructuredSupportContact format. Strips internal notes and unapproved fields.
+ * StructuredSupportContact format. Keeps only customer-facing fields.
  */
 export function normalizeSupportContact(raw: unknown): StructuredSupportContact | undefined {
   if (!raw) return undefined;
@@ -35,6 +35,9 @@ export function normalizeSupportContact(raw: unknown): StructuredSupportContact 
     }
     if (typeof obj.supportUrl === 'string' && obj.supportUrl.trim()) {
       contact.supportUrl = obj.supportUrl.trim();
+    }
+    if (typeof obj.supportNote === 'string' && obj.supportNote.trim()) {
+      contact.supportNote = obj.supportNote.trim().slice(0, 500);
     }
     if (typeof obj.locale === 'string' && obj.locale.trim()) {
       contact.locale = obj.locale.trim();
@@ -110,6 +113,7 @@ export function sanitizePublicSupportContact(
   if (contact.email) safe.email = contact.email;
   if (contact.workingHours) safe.workingHours = contact.workingHours;
   if (contact.supportUrl) safe.supportUrl = contact.supportUrl;
+  if (contact.supportNote) safe.supportNote = contact.supportNote;
   if (contact.locale) safe.locale = contact.locale;
   return Object.keys(safe).length > 0 ? safe : undefined;
 }
