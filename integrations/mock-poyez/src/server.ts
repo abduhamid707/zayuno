@@ -3,6 +3,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import cors, { type CorsOptions } from 'cors';
 import {
   ActionStatus,
+  AvailabilityStatus,
   PaymentMethodType,
   PaymentStatus,
   ProviderCapability,
@@ -486,15 +487,32 @@ export function createPoyezSandboxApp(): Express {
       const input = req.body as CheckAvailabilityInput;
       if (!Array.isArray(input.items) || input.items.length === 0) return res.status(400).json({ message: 'At least one item is required.' });
       const parameters = parseObject(input.parameters);
-      const result: AvailabilityResult = { isAvailable: true, unavailableItems: [], availableItems: [], checkedAt: new Date().toISOString(), validUntil: new Date(Date.now() + 30_000).toISOString(), parameters: { sandbox: true } };
+      const result: AvailabilityResult = {
+        availabilityStatus: AvailabilityStatus.AVAILABLE,
+        isAvailable: true,
+        unavailableItems: [],
+        availableItems: [],
+        checkedAt: new Date().toISOString(),
+        validUntil: new Date(Date.now() + 30_000).toISOString(),
+        parameters: { sandbox: true }
+      };
       for (const item of input.items) {
         const resolved = resolveTripOffering(item.offeringId);
-        if (!resolved) { result.isAvailable = false; result.unavailableItems.push({ offeringId: item.offeringId, reason: 'Trip not found.' }); continue; }
+        if (!resolved) {
+          result.availabilityStatus = AvailabilityStatus.UNAVAILABLE;
+          result.isAvailable = false;
+          result.unavailableItems.push({ offeringId: item.offeringId, reason: 'Trip not found.' });
+          continue;
+        }
         try {
           const car = chooseCar(resolved.trip, resolved.date, item.variantId, parameters.preferences || {});
           const recommended = pickSeats(resolved.trip, resolved.date, car, item.quantity, parameters);
           result.availableItems?.push({ offeringId: item.offeringId, variantId: car.id, requestedQuantity: item.quantity, remainingCapacity: availableSeats(resolved.trip, resolved.date, car).length, unitPrice: car.price, currency: 'UZS', metadata: { carNumber: car.number, carClass: car.class, recommendedSeats: recommended.map(number => ({ number, level: seatLevel(number, car.class) })) } });
-        } catch (error) { result.isAvailable = false; result.unavailableItems.push({ offeringId: item.offeringId, reason: error instanceof Error ? error.message : String(error) }); }
+        } catch (error) {
+          result.availabilityStatus = AvailabilityStatus.UNAVAILABLE;
+          result.isAvailable = false;
+          result.unavailableItems.push({ offeringId: item.offeringId, reason: error instanceof Error ? error.message : String(error) });
+        }
       }
       return res.json(result);
     } catch (error) { return res.status(400).json({ message: error instanceof Error ? error.message : String(error) }); }

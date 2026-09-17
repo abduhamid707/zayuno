@@ -2570,3 +2570,19 @@ Pasted strategiyadagi `AI Tycoon + Tap-to-Eat` g‘oyasi marketing tajribasi sif
   - `pnpm exec tsx tests/test-provider-environment-and-category.ts`: PASS.
   - `git diff --check`: PASS (0 xatolik).
 - **Deploy va Git holati:** Barcha universal contract hardening, xavfsiz legacy migration runner, DTO, testlar hamda iTicket mock o‘zgarishlari to‘liq tekshirildi, commit qilindi va `origin/main` ga push qilindi.
+
+**Foydalanuvchi tasdig‘i (2026-09-18):** Foydalanuvchi boshqa agent ishni to‘liq yakunlagani va `124b13a` commit `origin/main`ga push qilinganini tasdiqladi. Bu ish qayta boshlanmaydi.
+
+# Joriy ish — GitHub Actions CI/CD Docker build xatolarini tuzatish (2026-09-18)
+
+- [x] `integrations/sandbox-provider` dagi `ProviderInfo` ga `environment` va `category` maydonlarini qo‘shish (Build & Push api uchun).
+- [x] `integrations/mock-poyez` dagi `AvailabilityResult` ga `availabilityStatus` maydonini qo‘shish (Build & Push mock-poyez uchun).
+- [x] Butun workspace bo‘yicha to‘liq recursive build (`pnpm -r run build`) va `pnpm --filter @zayuno/api... run build`ni tekshirish.
+- [x] `git diff --check`ni tekshirish, commit qilish va `origin/main` ga push qilish.
+
+**Holat / handoff:** Bajarildi. GitHub Actions workflow run #184 da chiqqan TypeScript xatoliklari tuzatildi:
+1. `Build & Push api`: `Dockerfile.api`dagi `pnpm --filter @zayuno/api... run build` buyrug‘i bog‘liqlik sifatida `integrations/sandbox-provider`ni qurar edi. Unda `ProviderInfo` qaytaruvchi `getProviderInfo` metodiga `environment` va `category` maydonlari qo‘shildi.
+2. `Build & Push mock-poyez`: `integrations/mock-poyez/src/server.ts`dagi `/availability` endpointida `AvailabilityResult` tipiga majburiy `availabilityStatus` (`AVAILABLE` va `UNAVAILABLE`) qo‘shildi.
+3. `pnpm -r run build` va `pnpm --filter @zayuno/api... run build` orqali monorepodagi barcha workspace paketlar 0 xato bilan build bo‘lishi tasdiqlandi.
+4. `git diff --check` PASS (0 xato).
+5. O‘zgarishlar commit qilinib, `origin/main` ga push qilindi.
