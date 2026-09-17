@@ -8,6 +8,7 @@ import {
   ProviderCapability
 } from '@zayuno/contracts';
 import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
+import { assertDeclaredDynamicParameters } from '../../common/dynamic-parameter-validation';
 
 @Injectable()
 export class QuotesService {
@@ -41,6 +42,10 @@ export class QuotesService {
     if (!adapter.requestQuote) {
       throw new BadRequestException(`Provider "${cleanSlug}" does not implement requestQuote.`);
     }
+    await assertDeclaredDynamicParameters(adapter, cleanSlug, input.parameters, {
+      locationId: input.locationId,
+      offeringIds: input.items.map(item => item.offeringId)
+    });
 
     const quote = await adapter.requestQuote(input);
 

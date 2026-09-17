@@ -110,6 +110,29 @@ export const NormalizedActionSchema = z.object({
 });
 export type NormalizedAction = z.infer<typeof NormalizedActionSchema>;
 
+/**
+ * Stable allowlist for agent and customer-facing action responses. The
+ * normalized action remains the internal/provider protocol object: it contains
+ * persistence IDs, idempotency material, raw provider context and timeline
+ * payloads that must not cross a public MCP boundary.
+ */
+export const PublicActionSchema = z.object({
+  actionId: z.string().describe('Stable Zayuno public action reference, e.g. ZY-ACT-12345'),
+  providerSlug: z.string(),
+  providerName: optionalNullable(z.string()),
+  status: z.nativeEnum(ActionStatus),
+  paymentStatus: z.nativeEnum(PaymentStatus),
+  total: z.number().nonnegative(),
+  currency: CurrencySchema.default('UZS'),
+  fulfillmentType: z.string().default('STANDARD'),
+  nextAction: optionalNullable(NextActionSchema).describe('Provider-owned customer handoff when one is required'),
+  checkoutUrl: optionalNullable(z.string().url()).describe('Convenience alias for nextAction.url'),
+  supportContact: optionalNullable(StructuredSupportContactSchema),
+  createdAt: IsoDateTimeSchema,
+  updatedAt: IsoDateTimeSchema
+});
+export type PublicAction = z.infer<typeof PublicActionSchema>;
+
 export const GetActionInputSchema = z.object({
   providerSlug: optionalNullable(z.string()),
   actionId: z.string().min(1).describe('Public ID (e.g. "ZY-ACT-12345") or UUID')
@@ -140,7 +163,8 @@ export type CancelActionInput = z.infer<typeof CancelActionInputSchema>;
 
 export const CancelActionResultSchema = z.object({
   success: z.boolean(),
-  actionId: z.string(),
+  actionId: z.string().describe('Stable Zayuno public action reference'),
+  externalActionId: optionalNullable(z.string()).describe('Provider action identifier, when the caller is authorized to use it'),
   previousStatus: z.nativeEnum(ActionStatus),
   newStatus: z.nativeEnum(ActionStatus),
   message: z.string(),

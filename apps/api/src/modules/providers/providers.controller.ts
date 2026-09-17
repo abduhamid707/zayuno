@@ -27,9 +27,12 @@ export class ProvidersController {
   @Get()
   @UseGuards(ApiKeyGuard)
   @ApiSecurity('api-key')
-  @ApiOperation({ summary: 'List all active registered capability providers' })
-  async listProviders(@Query('status') status?: ProviderStatus) {
-    return this.providersService.listProviders(status);
+  @ApiOperation({ summary: 'List active providers in the live environment by default; pass environment=SANDBOX or STAGING explicitly when authorized' })
+  async listProviders(
+    @Query('status') status?: ProviderStatus,
+    @Query('environment') environment?: string
+  ) {
+    return this.providersService.listPublicProviders(status, environment);
   }
 
   @Get('welcome')
@@ -43,20 +46,22 @@ export class ProvidersController {
   @Get('find')
   @UseGuards(ApiKeyGuard)
   @ApiSecurity('api-key')
-  @ApiOperation({ summary: 'Discover and filter capability providers (by category, capability, geography, query)' })
+  @ApiOperation({ summary: 'Discover and filter providers by category, capability, geography, query, and explicit environment (LIVE by default)' })
   async findProviders(
     @Query('category') category?: string,
     @Query('capability') capability?: ProviderCapability,
     @Query('geography') geography?: string,
     @Query('query') query?: string,
+    @Query('environment') environment?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string
   ) {
-    return this.providersService.findProviders({
+    return this.providersService.findPublicProviders({
       category,
       capability,
       geography,
       query,
+      environment,
       limit: limit ? parseInt(limit, 10) : 20,
       offset: offset ? parseInt(offset, 10) : 0
     });
@@ -67,7 +72,7 @@ export class ProvidersController {
   @ApiSecurity('api-key')
   @ApiOperation({ summary: 'Discover capability providers via POST payload' })
   async findProvidersPost(@Body() body: FindProvidersInput) {
-    return this.providersService.findProviders(body);
+    return this.providersService.findPublicProviders(body);
   }
 
   @Post('register')
@@ -162,9 +167,9 @@ export class ProvidersController {
   @Get(':slug')
   @UseGuards(ApiKeyGuard)
   @ApiSecurity('api-key')
-  @ApiOperation({ summary: 'Get details and metadata for a specific provider' })
-  async getProvider(@Param('slug') slug: string) {
-    return this.providersService.getProviderBySlug(slug);
+  @ApiOperation({ summary: 'Get public details for a specific provider' })
+  async getProvider(@Param('slug') slug: string, @Query('environment') environment?: string) {
+    return this.providersService.getPublicProviderBySlug(slug, environment);
   }
 
   @Get(':slug/credentials')
@@ -202,17 +207,17 @@ export class ProvidersController {
   @Get(':slug/capabilities')
   @UseGuards(ApiKeyGuard)
   @ApiSecurity('api-key')
-  @ApiOperation({ summary: 'Get list of supported capabilities for a provider' })
-  async getCapabilities(@Param('slug') slug: string) {
-    return this.providersService.getCapabilities(slug);
+  @ApiOperation({ summary: 'Get supported capabilities for a LIVE provider by default; request SANDBOX or STAGING explicitly' })
+  async getCapabilities(@Param('slug') slug: string, @Query('environment') environment?: string) {
+    return this.providersService.getCapabilities(slug, environment);
   }
 
   @Get(':slug/health')
   @UseGuards(ApiKeyGuard)
   @ApiSecurity('api-key')
-  @ApiOperation({ summary: 'Run a live health check against a provider integration' })
-  async checkHealth(@Param('slug') slug: string) {
-    return this.providersService.checkHealth(slug);
+  @ApiOperation({ summary: 'Run a health check for a LIVE provider by default; request SANDBOX or STAGING explicitly' })
+  async checkHealth(@Param('slug') slug: string, @Query('environment') environment?: string) {
+    return this.providersService.checkHealth(slug, environment);
   }
 
   @Get(':slug/locations')
@@ -223,13 +228,14 @@ export class ProvidersController {
     @Param('slug') slug: string,
     @Query('activeOnly') activeOnly?: string,
     @Query('lat') lat?: string,
-    @Query('lng') lng?: string
+    @Query('lng') lng?: string,
+    @Query('environment') environment?: string
   ) {
     return this.providersService.getLocations(slug, {
       providerSlug: slug,
       activeOnly: activeOnly !== 'false',
       coordinates: lat && lng ? { latitude: parseFloat(lat), longitude: parseFloat(lng) } : undefined
-    });
+    }, environment);
   }
 
   @Post(':slug/certify')

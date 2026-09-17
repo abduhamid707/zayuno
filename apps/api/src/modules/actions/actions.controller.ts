@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiSecurity } from '@nestjs/swagger';
 import { ActionsService } from './actions.service';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { CreateActionInput, ActionStatus } from '@zayuno/contracts';
+import { projectPublicAction, projectPublicActions } from './public-action-response';
 
 @ApiTags('Actions & Fulfillment')
 @Controller('api/v1/actions')
@@ -19,28 +20,30 @@ export class ActionsController {
     @Query('status') status?: ActionStatus,
     @Query('limit') limit?: string
   ) {
-    return this.actionsService.listActions({
+    const actions = await this.actionsService.listActions({
       providerSlug,
       status: status as any,
       limit: limit ? parseInt(limit, 10) : 50,
       access: request.user
     });
+    return projectPublicActions(actions);
   }
 
   @Post()
   @ApiOperation({ summary: 'Execute an explicitly confirmed action with idempotency' })
   async createAction(@Body() body: CreateActionInput, @Req() request: any) {
     const headerKey = request.headers['idempotency-key'] as string | undefined;
-    return this.actionsService.createAction({
+    const action = await this.actionsService.createAction({
       ...body,
       idempotencyKey: body.idempotencyKey || headerKey
     }, request.user?.id);
+    return projectPublicAction(action);
   }
 
   @Get(':actionId')
   @ApiOperation({ summary: 'Get live status and timeline of an action' })
   async getAction(@Param('actionId') actionId: string, @Req() request: any) {
-    return this.actionsService.getAction({ actionId }, request.user);
+    return projectPublicAction(await this.actionsService.getAction({ actionId }, request.user));
   }
 
   @Post(':actionId/cancel')

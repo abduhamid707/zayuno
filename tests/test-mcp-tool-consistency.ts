@@ -48,6 +48,20 @@ async function main() {
     const client = new Proxy({}, {
       get: (_target, property) => (...methodArgs: unknown[]) => {
         calls.push({ method: String(property), args: methodArgs });
+        if (property === 'createAction' || property === 'getAction') {
+          return Promise.resolve({
+            id: 'internal-action-id', publicId: 'ZY-TEST-1', providerSlug: 'mock-evos',
+            status: 'AWAITING_PAYMENT', paymentStatus: 'PENDING', total: 1000,
+            currency: 'UZS', fulfillmentType: 'STANDARD',
+            createdAt: '2026-09-18T10:00:00.000Z', updatedAt: '2026-09-18T10:00:00.000Z'
+          });
+        }
+        if (property === 'cancelAction') {
+          return Promise.resolve({
+            success: true, actionId: 'ZY-TEST-1', previousStatus: 'AWAITING_PAYMENT',
+            newStatus: 'CANCELLED', message: 'Cancelled', refundInitiated: false
+          });
+        }
         return Promise.resolve({ ok: true });
       }
     });

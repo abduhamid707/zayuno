@@ -347,6 +347,21 @@ async function main() {
     ssn: '000-12-3456',
     cvv: '999'
   };
+  const dirtyProviderInternals = {
+    id: 'f9e4a8f2-4d86-4fc7-8ac6-9f9865c6e004',
+    baseUrl: 'https://provider-internal.example/api',
+    adapterType: 'remote-http',
+    authMethod: 'API_KEY',
+    ownerUserId: 'usr_internal_owner',
+    healthMonitoring: { lastFailureAt: '2026-09-18T00:00:00.000Z' },
+    lastCertificationReport: { endpoint: '/internal/certification' },
+    webhookEndpoint: 'https://api.zayuno.uz/api/v1/webhooks/coffee-time',
+    metadata: {
+      ownerUserId: 'usr_internal_owner',
+      integrationUpdatedBy: 'usr_internal_operator',
+      healthMonitoring: { lastFailureAt: '2026-09-18T00:00:00.000Z' }
+    }
+  };
 
   let mockErrorMode = false;
 
@@ -368,7 +383,7 @@ async function main() {
     if (url.includes('/welcome')) {
       res.end(JSON.stringify({ customerMessage: 'Assalomu alaykum! Zayuno bilan sevimli restoraningizdan ovqat buyurtma qilish oson.\n\nHamkor restoranlar menyusidan sizga mos taomni topib beraman.', availableServiceCount: 1, dynamicServiceMessage: 'Hamkor restoranlar menyusidan sizga mos taomni topib beraman.', ...dirtySecretsInjection }));
     } else if (url.includes('/providers/search') || url.includes('/providers/find') || url.includes('/find')) {
-      res.end(JSON.stringify({ providers: [{ slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', status: 'ACTIVE', isCertified: true, isPublished: true, ...dirtySecretsInjection }], total: 1, ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ providers: [{ slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', status: 'ACTIVE', isCertified: true, isPublished: true, ...dirtyProviderInternals, ...dirtySecretsInjection }], total: 1, ...dirtySecretsInjection }));
     } else if (url.includes('/capabilities')) {
       res.end(JSON.stringify({ capabilities: ['METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'ACTION_CANCEL', 'PAYMENT_OPTIONS', 'WEBHOOK'], ...dirtySecretsInjection }));
     } else if (url.includes('/locations')) {
@@ -384,17 +399,17 @@ async function main() {
     } else if (url.includes('/quotes')) {
       res.end(JSON.stringify({ id: 'ct_quote_test_123', providerSlug: 'coffee-time', lines: [{ offeringId: 'ct_cappuccino', offeringTitle: 'Cappuccino', quantity: 1, unitPrice: 18000, lineTotal: 18000, ...dirtySecretsInjection }], subtotal: 18000, totalFees: 10000, totalDiscount: 0, total: 28000, currency: 'UZS', expiresAt: new Date(Date.now() + 900000).toISOString(), ...dirtySecretsInjection }));
     } else if (url.includes('/actions/') && req.method === 'POST' && url.includes('/cancel')) {
-      res.end(JSON.stringify({ id: 'ct_act_test_123', publicId: 'CT-SB-84920', status: 'CANCELLED', cancellationReason: 'Customer requested', ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ success: true, actionId: 'CT-SB-84920', externalActionId: 'coffee-provider-action-123', previousStatus: 'AWAITING_PAYMENT', newStatus: 'CANCELLED', message: 'Customer requested cancellation', refundInitiated: false, ...dirtySecretsInjection }));
     } else if (url.includes('/actions/') && url.includes('/payment-options')) {
       res.end(JSON.stringify({ paymentOptions: [{ id: 'ct_test_checkout', name: 'Coffee Time test checkout', checkoutUrl: 'https://coffee-time-sandbox.shopla.uz/pay/CT_test_123', ...dirtySecretsInjection }], ...dirtySecretsInjection }));
     } else if (url.includes('/actions/') && req.method === 'GET') {
-      res.end(JSON.stringify({ id: 'ct_act_test_123', publicId: 'CT-SB-84920', status: 'CONFIRMED', fulfillmentStatus: 'IN_PREPARATION', customerMessage: 'Buyurtmangiz tayyorlanmoqda.', paymentUrl: 'https://coffee-time-sandbox.shopla.uz/pay/CT_test_123', ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ id: 'ct_act_test_123', publicId: 'CT-SB-84920', providerSlug: 'coffee-time', providerName: 'Coffee Time Sandbox Demo', status: 'CONFIRMED', paymentStatus: 'PENDING', total: 28000, currency: 'UZS', fulfillmentType: 'DELIVERY', fulfillmentStatus: 'IN_PREPARATION', customerMessage: 'Buyurtmangiz tayyorlanmoqda.', paymentUrl: 'https://coffee-time-sandbox.shopla.uz/pay/CT_test_123', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...dirtySecretsInjection }));
     } else if (url.includes('/actions') && req.method === 'POST') {
-      res.end(JSON.stringify({ id: 'ct_act_test_123', publicId: 'CT-SB-84920', providerSlug: 'coffee-time', status: 'AWAITING_PAYMENT', total: 28000, currency: 'UZS', paymentUrl: 'https://coffee-time-sandbox.shopla.uz/pay/CT_test_123', ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ id: 'ct_act_test_123', publicId: 'CT-SB-84920', providerSlug: 'coffee-time', providerName: 'Coffee Time Sandbox Demo', status: 'AWAITING_PAYMENT', paymentStatus: 'PENDING', total: 28000, currency: 'UZS', fulfillmentType: 'DELIVERY', paymentUrl: 'https://coffee-time-sandbox.shopla.uz/pay/CT_test_123', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...dirtySecretsInjection }));
     } else if (url.includes('/providers/coffee-time')) {
-      res.end(JSON.stringify({ slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', status: 'ACTIVE', isCertified: true, isPublished: true, capabilities: ['METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'ACTION_CANCEL', 'PAYMENT_OPTIONS', 'WEBHOOK'], ...dirtySecretsInjection }));
+      res.end(JSON.stringify({ slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', status: 'ACTIVE', isCertified: true, isPublished: true, capabilities: ['METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE', 'ACTION_CREATE', 'ACTION_STATUS', 'ACTION_CANCEL', 'PAYMENT_OPTIONS', 'WEBHOOK'], ...dirtyProviderInternals, ...dirtySecretsInjection }));
     } else if (url.includes('/providers')) {
-      res.end(JSON.stringify([{ slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', isCertified: true, isPublished: true, ...dirtySecretsInjection }]));
+      res.end(JSON.stringify([{ slug: 'coffee-time', name: 'Coffee Time Sandbox Demo', type: 'DELIVERY', isCertified: true, isPublished: true, ...dirtyProviderInternals, ...dirtySecretsInjection }]));
     } else {
       res.end(JSON.stringify({ status: 'ok', ...dirtySecretsInjection }));
     }
@@ -471,6 +486,19 @@ async function main() {
 
       // Verify recursive zero secret and zero PII leakage over real HTTP response
       assertNoSecretLeakage(parsedPayload, tool.name);
+      if (['find_providers', 'list_providers', 'get_provider'].includes(tool.name)) {
+        const serialized = JSON.stringify(parsedPayload);
+        for (const key of ['"id"', '"baseUrl"', '"adapterType"', '"authMethod"', '"ownerUserId"', '"healthMonitoring"', '"lastCertificationReport"', '"webhookEndpoint"', '"metadata"']) {
+          assert.ok(!serialized.includes(key), `Tool ${tool.name} leaked internal provider field ${key}`);
+        }
+      }
+      if (['create_action', 'get_action'].includes(tool.name)) {
+        const serialized = JSON.stringify(parsedPayload);
+        for (const key of ['"id"', '"publicId"', '"externalActionId"', '"quoteId"', '"idempotencyKey"', '"parameters"', '"metadata"', '"timeline"', '"customer"', '"destination"']) {
+          assert.ok(!serialized.includes(key), `Tool ${tool.name} leaked internal action field ${key}`);
+        }
+        assert.ok(parsedPayload.actionId, `Tool ${tool.name} must expose stable actionId`);
+      }
     }
     console.log(`    ✓ All ${ZAYUNO_MCP_TOOLS.length} tools executed over HTTP POST /mcp with verified zero secret/PII leakage.`);
 
@@ -561,6 +589,21 @@ async function main() {
   // 11. Real Coffee Time Mock Server E2E Flow & Safety Guardrails
   // ---------------------------------------------------------------------------
   console.log('  [11/11] Executing Real Coffee Time Wire-Level E2E Flow & Safety Guardrails...');
+  const previousCoffeeTimeWebhookSecret = process.env.ZAYUNO_WEBHOOK_SECRET;
+  const previousCoffeeTimeApiUrl = process.env.ZAYUNO_API_URL;
+  let coffeeTimeWebhookDeliveries = 0;
+  const coffeeTimeWebhookServer = http.createServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/api/v1/webhooks/coffee-time') {
+      coffeeTimeWebhookDeliveries += 1;
+    }
+    res.writeHead(204);
+    res.end();
+  });
+  const coffeeTimeWebhookPort: number = await new Promise(resolve => {
+    coffeeTimeWebhookServer.listen(0, '127.0.0.1', () => resolve((coffeeTimeWebhookServer.address() as any).port));
+  });
+  process.env.ZAYUNO_WEBHOOK_SECRET = 'coffee-time-contract-test-webhook-secret';
+  process.env.ZAYUNO_API_URL = `http://127.0.0.1:${coffeeTimeWebhookPort}`;
   const { createCoffeeTimeSandboxApp } = await import('../integrations/mock-coffee-time/src/server.ts');
   const ctApp = createCoffeeTimeSandboxApp();
   const ctServer: Server = await new Promise(resolve => {
@@ -823,9 +866,9 @@ async function main() {
       destination: { raw: 'Toshkent, Chilonzor tumani' },
       items: [{ offeringId: 'ct_cappuccino', quantity: 1 }]
     });
-    assert.ok(createdAction.id || createdAction.publicId);
-    assert.ok(createdAction.customerMessage.includes('Bu Coffee Time sandbox demo xizmati'));
-    const actionRefId = createdAction.publicId || createdAction.id;
+    assert.ok(createdAction.actionId);
+    assert.ok(createdAction.customerMessage.includes('Haqiqiy providerga yuborilmaydi'));
+    const actionRefId = createdAction.actionId;
 
     // 10. Safety Guardrail: duplicate create_action with same idempotencyKey -> Idempotent
     const duplicateAction = await callCtMcp('create_action', {
@@ -837,12 +880,11 @@ async function main() {
       destination: { raw: 'Toshkent, Chilonzor tumani' },
       items: [{ offeringId: 'ct_cappuccino', quantity: 1 }]
     });
-    assert.equal(duplicateAction.publicId || duplicateAction.id, actionRefId, 'Duplicate action must be idempotent');
+    assert.equal(duplicateAction.actionId, actionRefId, 'Duplicate action must be idempotent');
 
     // 11. Payment Options
     const payOpts = await callCtMcp('get_payment_options', { actionId: actionRefId });
-    assert.ok(payOpts.customerMessage.includes('To‘lov sahifasi tayyor'));
-    assert.ok(payOpts.customerMessage.includes('Bu Coffee Time sandbox demo xizmati'));
+    assert.ok(payOpts.customerMessage.includes('Haqiqiy to‘lov amalga oshirilmaydi'));
 
     // 12. Get Action Status
     const statusRes = await callCtMcp('get_action', { actionId: actionRefId });
@@ -851,12 +893,18 @@ async function main() {
     // 13. Cancel Action
     const cancelRes = await callCtMcp('cancel_action', { actionId: actionRefId, reason: 'Customer requested cancel' });
     assert.ok(cancelRes.customerMessage.includes('bekor qilingan'));
+    assert.equal(coffeeTimeWebhookDeliveries, 1, 'Cancellation must deliver one bounded webhook to the configured receiver.');
 
     console.log('    ✓ All 13 Coffee Time wire-level actions, quotes, disclaimers, and guardrail tests passed.');
   } finally {
     await new Promise(resolve => ctMcpServer.close(resolve));
     await new Promise(resolve => ctApiServer.close(resolve));
     await new Promise(resolve => ctServer.close(resolve));
+    await new Promise(resolve => coffeeTimeWebhookServer.close(resolve));
+    if (previousCoffeeTimeWebhookSecret === undefined) delete process.env.ZAYUNO_WEBHOOK_SECRET;
+    else process.env.ZAYUNO_WEBHOOK_SECRET = previousCoffeeTimeWebhookSecret;
+    if (previousCoffeeTimeApiUrl === undefined) delete process.env.ZAYUNO_API_URL;
+    else process.env.ZAYUNO_API_URL = previousCoffeeTimeApiUrl;
   }
 
   console.log('\n================================================================');

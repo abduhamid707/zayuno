@@ -136,6 +136,12 @@ Zayuno uses Prisma for database management:
    - Never run destructive migrations (dropping active columns or tables) in an automated release.
 4. **Seed Isolation**: Production deployments never run database seeders automatically.
 
+### Legacy database bootstrap
+
+`pnpm --filter @zayuno/database migrate:deploy` normally runs `prisma migrate deploy` unchanged. It also handles one historical case safely: a database with no `_prisma_migrations` ledger but the exact original Zayuno core schema (`Provider`, `Branch`, `Order*`, and the original enum, constraint, and index signatures).
+
+For that verified shape only, the runner marks `20260816000000_init` as applied and then runs the remaining migrations normally. Any extra, missing, or changed table, column, enum, constraint, or index stops the command before it records a migration. Do not run `prisma migrate resolve` manually on an unknown database; inspect and establish its migration history first.
+
 ---
 
 ## 7. Health Checks & Smoke Testing
@@ -192,4 +198,3 @@ If GitHub Actions is unreachable or offline recovery is necessary, the legacy fa
 ```
 
 This builds scoped packages locally, archives source code, uploads via SCP, builds containers on the server, reloads Nginx, and validates health checks.
-

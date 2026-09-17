@@ -12,6 +12,7 @@ import {
   SearchCatalogInput,
   CheckAvailabilityInput,
   AvailabilityResult,
+  AvailabilityStatus,
   RequestQuoteInput,
   NormalizedQuote,
   CreateActionInput,
@@ -106,14 +107,11 @@ export abstract class BaseProviderAdapter implements ProviderAdapter {
   async checkAvailability(input: CheckAvailabilityInput): Promise<AvailabilityResult> {
     this.assertCapability(ProviderCapability.CATALOG);
     return {
-      isAvailable: true,
+      availabilityStatus: AvailabilityStatus.NOT_SUPPORTED,
+      isAvailable: null,
       unavailableItems: [],
-      availableItems: input.items.map(item => ({
-        offeringId: item.offeringId,
-        variantId: item.variantId,
-        requestedQuantity: item.quantity,
-        metadata: {}
-      })),
+      availableItems: [],
+      checkedAt: new Date().toISOString(),
       parameters: input.parameters || {}
     };
   }

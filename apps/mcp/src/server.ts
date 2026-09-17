@@ -6,7 +6,7 @@ import cors from 'cors';
 import { randomUUID } from 'crypto';
 import { ZayunoApiClient } from './client.js';
 import { registerZayunoTools, ZAYUNO_MCP_TOOLS } from './tools.js';
-import { getWelcomeMessage, formatCustomerError, getOpenAiAppsChallengeToken, stripSensitiveSecrets } from '@zayuno/shared';
+import { buildAgentErrorEnvelope, getWelcomeMessage, getOpenAiAppsChallengeToken, stripSensitiveSecrets } from '@zayuno/shared';
 
 const MCP_INSTRUCTIONS = 'Use ordinary, concise chat replies in the customer language. For a provider catalog call get_catalog with its verified slug and show a short numbered list of offerings and prices. No widgets, iframes, quick-reply buttons, image galleries or claims that an interactive catalog opened. Keep catalog and cart selections in the conversation; ask only for missing choices. Fetch get_offering when variants or required modifiers need clarification. Calculate request_quote after all provider-declared quote requirements are known. Ask for contact, destination, time, or other details only when the selected provider or its quote declares them. When the customer confirms the quote, call create_action and include only the declared contact/address fields (customer.name defaults to "Mijoz" when a phone is required). Never claim that a security check blocked an action. CONFIRMED does not imply PAID.';
 
@@ -303,21 +303,19 @@ export function runHttpSseServer(port = 4002): Express {
           isNotification: false
         };
       } catch (err: any) {
-        const friendlyMessage = formatCustomerError(err);
+        const presentation = buildAgentErrorEnvelope(err);
+        const errorPayload = { ...presentation, message: presentation.customerMessage };
         return {
           response: {
             jsonrpc: '2.0',
             id,
             result: {
               isError: true,
+              structuredContent: errorPayload,
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify({
-                    isError: true,
-                    customerMessage: friendlyMessage,
-                    message: friendlyMessage
-                  }, null, 2)
+                  text: JSON.stringify(errorPayload, null, 2)
                 }
               ]
             }

@@ -211,6 +211,27 @@ async function main() {
     console.log('    ✅ Anonymous Customer 1 retry succeeded with secret key credential.');
 
     // =========================================================================
+    // 6b. Same idempotency key with a changed payload must never replay the
+    // original action.
+    // =========================================================================
+    console.log('  6b. Reusing an idempotency key with different payload...');
+    let collisionError: any;
+    try {
+      await actionsService.createAction({
+        ...anon1Input,
+        customer: { name: 'Changed Customer', phone: '+998909999999' },
+        items: [{ offeringId: 'ct_cappuccino', quantity: 4, selectedOptions: [] }]
+      }, undefined);
+    } catch (err) {
+      collisionError = err;
+    }
+    assert.equal(collisionError?.statusCode, 409);
+    assert.equal(collisionError?.code, 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD');
+    assert.equal(collisionError?.details?.retryable, false);
+    assert.equal(storedActions.length, 2, 'A collided idempotency key must not create or replay an action');
+    console.log('    ✅ Changed payload rejected with deterministic idempotency conflict.');
+
+    // =========================================================================
     // 7. Same Quote + Same Phone, but WITHOUT valid idempotency key -> Blocked
     // =========================================================================
     console.log('  7. Anonymous request with same quote and same phone, but missing secret key...');

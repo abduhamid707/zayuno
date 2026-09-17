@@ -8,6 +8,7 @@ export * from './publishing';
 export * from './health-monitor';
 export * from './redaction';
 export * from './customer-presenter';
+export * from './public-action';
+export * from './public-payment-option';
 export * from './constants';
 export * from './trusted-internal-targets';
-

@@ -23,6 +23,8 @@ total = subtotal + totalFees - totalDiscount
 
 Use the contract's line price semantics. In particular, do not count an option price once in the line and again in fees.
 
+For every selected modifier, `selectedOptions[].quantity` means units **per base item**, so its line contribution is `priceDelta × selectedOptions[].quantity × line.quantity`. Include this amount exactly once in `optionsTotal` and `lineTotal`.
+
 ## Expiry and confirmation
 
 Provider controls expiresAt. Do not copy an old example date or assume all providers use the same validity duration.

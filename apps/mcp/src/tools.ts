@@ -15,15 +15,17 @@ import {
   formatUzbekCurrency,
   formatCustomerOffering,
   formatCustomerPaymentOptions,
-  formatCustomerError,
+  buildAgentErrorEnvelope,
   getWelcomeMessage,
   getDynamicServiceMessage,
-  stripSensitiveSecrets
+  stripSensitiveSecrets,
+  toPublicAction,
+  toPublicPaymentOptions
 } from '@zayuno/shared';
 
 // Discovery should return enough to select a provider, never its embedded catalog/config.
 function providerSummary(provider: any) {
-  const keys = ['id', 'slug', 'name', 'description', 'status', 'type', 'category', 'geography', 'capabilities', 'fulfillmentMode'];
+  const keys = ['slug', 'name', 'description', 'logoUrl', 'status', 'type', 'environment', 'category', 'subcategory', 'geography', 'capabilities', 'fulfillmentMode', 'supportContact'];
   return Object.fromEntries(keys.filter(key => provider[key] !== undefined).map(key => [key, provider[key]]));
 }
 
@@ -160,7 +162,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 1. find_providers (Multi-criteria discovery)
   {
     name: 'find_providers',
-    description: 'Discover and filter capability providers across categories (e.g. food_delivery, logistics, bookings, retail), specific required capabilities (e.g. ACTION_CREATE, QUOTE), geographic coverage, or keyword queries.',
+    description: 'Discover live capability providers by canonical category (e.g. FOOD_AND_DRINK, LOGISTICS, TICKETING), required capability, geographic coverage, or keyword. Legacy category aliases such as food_delivery are accepted. Pass environment explicitly to discover SANDBOX or STAGING providers.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -171,7 +173,12 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       properties: {
         category: {
           type: 'string',
-          description: 'Filter by provider category or industry (restaurants use food_dining; food_delivery is accepted as an alias; e.g. "food_delivery", "logistics", "general_services").'
+          description: 'Canonical provider category such as FOOD_AND_DRINK, LOGISTICS, or TICKETING. Legacy aliases such as food_delivery are normalized by the API.'
+        },
+        environment: {
+          type: 'string',
+          enum: ['LIVE', 'SANDBOX', 'STAGING'],
+          description: 'Deployment environment. Defaults to LIVE; request SANDBOX or STAGING explicitly.'
         },
         capability: {
           type: 'string',
@@ -201,16 +208,17 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           items: {
             type: 'object',
             properties: {
-              id: { type: 'string' },
               slug: { type: 'string' },
               name: { type: 'string' },
               description: { type: 'string' },
               status: { type: 'string' },
               type: { type: 'string' },
+              environment: { type: 'string' },
               category: { type: 'string' },
+              subcategory: { type: ['string', 'null'] },
               capabilities: { type: 'array', items: { type: 'string' } }
             },
-            required: ['id', 'slug', 'name', 'status']
+            required: ['slug', 'name', 'status']
           }
         },
         total: { type: 'number' }
@@ -218,7 +226,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['customerMessage', 'providers']
     },
     handler: async (args, client) => {
-      const result = await client.findProviders({ ...args, category: args.category === 'food_delivery' ? 'food_dining' : args.category });
+      const result = await client.findProviders(args);
       const list = Array.isArray(result) ? result : result?.providers || [];
       const customerMessage = formatCustomerProviders(list);
       return {
@@ -231,7 +239,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 2. list_providers (Backward compatibility)
   {
     name: 'list_providers',
-    description: 'List all registered and active capability providers (e.g. services, logistics, commerce). Returns provider slugs, names, types, and supported capability flags.',
+    description: 'List active capability providers in the LIVE environment by default. Request SANDBOX or STAGING explicitly when test integrations are needed.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -243,7 +251,12 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         status: {
           type: 'string',
           enum: ['ACTIVE', 'SANDBOX'],
-          description: 'Filter providers by operational status (default: ACTIVE and SANDBOX).'
+          description: 'Optional operational status filter. Environment is selected separately.'
+        },
+        environment: {
+          type: 'string',
+          enum: ['LIVE', 'SANDBOX', 'STAGING'],
+          description: 'Deployment environment. Defaults to LIVE.'
         }
       }
     },
@@ -257,13 +270,14 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           items: {
             type: 'object',
             properties: {
-              id: { type: 'string' },
               slug: { type: 'string' },
               name: { type: 'string' },
               status: { type: 'string' },
-              type: { type: 'string' }
+              type: { type: 'string' },
+              environment: { type: 'string' },
+              category: { type: 'string' }
             },
-            required: ['id', 'slug', 'name', 'status']
+            required: ['slug', 'name', 'status']
           }
         },
         total: { type: 'number' }
@@ -271,7 +285,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['customerMessage', 'providers']
     },
     handler: async (args, client) => {
-      const result = await client.listProviders(args.status);
+      const result = await client.listProviders(args.status, args.environment);
       const list = Array.isArray(result) ? result : result?.providers || [];
       const customerMessage = formatCustomerProviders(list);
       return {
@@ -284,7 +298,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 3. get_provider
   {
     name: 'get_provider',
-    description: 'Get comprehensive metadata, supported capabilities, operational status, and details for a specific capability provider by slug.',
+    description: 'Get public provider details, capabilities, operational status, and deployment environment by slug. LIVE is the default environment; request SANDBOX or STAGING explicitly.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -296,6 +310,11 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         providerSlug: {
           type: 'string',
           description: 'Unique slug of the target capability provider (e.g. "sandbox-provider").'
+        },
+        environment: {
+          type: 'string',
+          enum: ['LIVE', 'SANDBOX', 'STAGING'],
+          description: 'Deployment environment. Defaults to LIVE.'
         }
       },
       required: ['providerSlug']
@@ -304,23 +323,28 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       type: 'object',
       properties: {
         customerMessage: { type: 'string', description: 'Pre-formatted provider profile for customer' },
-        id: { type: 'string' },
         slug: { type: 'string' },
         name: { type: 'string' },
         description: { type: 'string' },
+        logoUrl: { type: 'string' },
         status: { type: 'string' },
         type: { type: 'string' },
+        environment: { type: 'string' },
+        category: { type: 'string' },
+        subcategory: { type: ['string', 'null'] },
+        geography: { type: 'array', items: { type: 'string' } },
+        fulfillmentMode: { type: 'string' },
         capabilities: { type: 'array', items: { type: 'string' } },
-        supportContact: { type: 'object' }
+        supportContact: { type: ['object', 'string', 'null'] }
       },
-      required: ['customerMessage', 'id', 'slug', 'name']
+      required: ['customerMessage', 'slug', 'name']
     },
     handler: async (args, client) => {
-      const provider = await client.getProvider(args.providerSlug);
+      const provider = await client.getProvider(args.providerSlug, args.environment);
       const customerMessage = formatCustomerProvider(provider);
       return {
         customerMessage,
-        ...provider
+        ...providerSummary(provider)
       };
     }
   },
@@ -328,7 +352,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 4. get_provider_capabilities
   {
     name: 'get_provider_capabilities',
-    description: 'Retrieve the explicit capability matrix for a provider (e.g. CATALOG, QUOTE, ACTION_CREATE, LOCATIONS, PAYMENT_OPTIONS). Use this to determine which tools can be invoked against the provider.',
+    description: 'Retrieve the explicit capability matrix for a provider (e.g. CATALOG, QUOTE, ACTION_CREATE, LOCATIONS, PAYMENT_OPTIONS). LIVE is the default environment; request SANDBOX or STAGING explicitly. Use this to determine which tools can be invoked against the provider.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -340,6 +364,11 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         providerSlug: {
           type: 'string',
           description: 'Unique slug of the capability provider.'
+        },
+        environment: {
+          type: 'string',
+          enum: ['LIVE', 'SANDBOX', 'STAGING'],
+          description: 'Deployment environment. Defaults to LIVE.'
         }
       },
       required: ['providerSlug']
@@ -354,7 +383,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['customerMessage', 'capabilities']
     },
     handler: async (args, client) => {
-      const result = await client.getProviderCapabilities(args.providerSlug);
+      const result = await client.getProviderCapabilities(args.providerSlug, args.environment);
       const caps = Array.isArray(result) ? result : result?.capabilities || [];
       const customerMessage = formatCustomerCapabilities(caps, args.providerSlug);
       return {
@@ -367,7 +396,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 5. get_locations
   {
     name: 'get_locations',
-    description: 'Retrieve physical operational locations, fulfillment centers, or branches for a specific provider, including addresses, operating hours, and service radii.',
+    description: 'Retrieve physical operational locations, fulfillment centers, or branches for a specific provider, including addresses, operating hours, and service radii. LIVE is the default environment; request SANDBOX or STAGING explicitly.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -383,6 +412,11 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         activeOnly: {
           type: 'boolean',
           description: 'Filter only currently active locations (default: true).'
+        },
+        environment: {
+          type: 'string',
+          enum: ['LIVE', 'SANDBOX', 'STAGING'],
+          description: 'Deployment environment. Defaults to LIVE.'
         }
       },
       required: ['providerSlug']
@@ -408,7 +442,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['customerMessage', 'locations']
     },
     handler: async (args, client) => {
-      const locations = await client.getLocations(args.providerSlug, args.activeOnly);
+      const locations = await client.getLocations(args.providerSlug, args.activeOnly, args.environment);
       const list = Array.isArray(locations) ? locations : locations?.locations || [];
       const customerMessage = formatCustomerLocations(list);
       return {
@@ -476,7 +510,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 7. search_catalog
   {
     name: 'search_catalog',
-    description: 'Search static or real-time provider offerings. For dynamic domains such as tickets, appointments, hotels, and transport, pass structured parameters (dates, origin/destination, passengers, capacity, or preferences).',
+    description: 'Search static or real-time provider offerings. If a provider declares CATALOG but not SEARCH, Zayuno automatically filters its catalog locally. For dynamic domains such as tickets, appointments, hotels, and transport, pass structured parameters (dates, origin/destination, passengers, capacity, or preferences).',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -589,7 +623,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 9. check_availability
   {
     name: 'check_availability',
-    description: 'Read-only real-time inventory check before requesting a quote. Use for seats, appointment slots, rooms, tickets, limited stock, or any capacity that can change. This does not reserve or hold inventory.',
+    description: 'Read-only real-time inventory check before requesting a quote. Use for seats, appointment slots, rooms, tickets, limited stock, or any capacity that can change. A NOT_SUPPORTED or UNKNOWN result does not confirm inventory; request a quote for final verification. This does not reserve or hold inventory.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -636,20 +670,31 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       type: 'object',
       properties: {
         customerMessage: { type: 'string', description: 'Pre-formatted availability status for customer' },
-        available: { type: 'boolean' },
+        availabilityStatus: { type: 'string', enum: ['AVAILABLE', 'UNAVAILABLE', 'UNKNOWN', 'NOT_SUPPORTED', 'STALE', 'ERROR'] },
+        available: { type: ['boolean', 'null'] },
+        isAvailable: { type: ['boolean', 'null'] },
         reason: { type: 'string' },
         items: { type: 'array', items: { type: 'object' } }
       },
-      required: ['customerMessage', 'available']
+      required: ['customerMessage', 'availabilityStatus', 'available']
     },
     handler: async (args, client) => {
       const result = await client.checkAvailability(args);
-      const customerMessage = formatCustomerAvailability(result);
-      const available = typeof result?.available === 'boolean' ? result.available : typeof result?.isAvailable === 'boolean' ? result.isAvailable : true;
+      const availabilityStatus = result?.availabilityStatus || (
+        result?.isAvailable === true ? 'AVAILABLE' : result?.isAvailable === false ? 'UNAVAILABLE' : 'UNKNOWN'
+      );
+      const isAvailable = availabilityStatus === 'AVAILABLE'
+        ? true
+        : availabilityStatus === 'UNAVAILABLE'
+          ? false
+          : null;
+      const customerMessage = formatCustomerAvailability({ ...result, availabilityStatus, isAvailable });
       return {
+        ...result,
         customerMessage,
-        available,
-        ...result
+        availabilityStatus,
+        isAvailable,
+        available: isAvailable
       };
     }
   },
@@ -866,14 +911,14 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       type: 'object',
       properties: {
         customerMessage: { type: 'string', description: 'Pre-formatted confirmation and payment link for customer' },
-        id: { type: 'string', description: 'Internal action identifier' },
-        actionId: { type: 'string', description: 'Action reference identifier' },
-        publicId: { type: 'string', description: 'Public order identifier (e.g. ZY-ORD-123)' },
+        actionId: { type: 'string', description: 'Stable Zayuno action reference' },
         providerSlug: { type: 'string' },
+        providerName: { type: ['string', 'null'] },
         status: { type: 'string' },
         paymentStatus: { type: 'string' },
         total: { type: 'number' },
         currency: { type: 'string' },
+        fulfillmentType: { type: 'string' },
         checkoutUrl: { type: 'string', description: 'Secure external payment URL' },
         nextAction: {
           type: 'object',
@@ -882,9 +927,12 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
             url: { type: 'string' },
             description: { type: 'string' }
           }
-        }
+        },
+        supportContact: { type: ['object', 'null'] },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' }
       },
-      required: ['customerMessage', 'id', 'publicId', 'status']
+      required: ['customerMessage', 'actionId', 'providerSlug', 'status', 'paymentStatus', 'total', 'currency', 'fulfillmentType', 'createdAt', 'updatedAt']
     },
     handler: async (args, client) => {
       const idempotencyKey = args.idempotencyKey || getOrCreateActionIdempotencyKey(args.quoteId);
@@ -919,8 +967,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       const customerMessage = formatCustomerActionConfirmation(action);
       return {
         customerMessage,
-        actionId: action.publicId || action.id,
-        ...action
+        ...toPublicAction(action)
       };
     }
   },
@@ -948,29 +995,31 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       type: 'object',
       properties: {
         customerMessage: { type: 'string', description: 'Pre-formatted action status in natural Uzbek' },
-        id: { type: 'string' },
-        actionId: { type: 'string' },
-        publicId: { type: 'string' },
+        actionId: { type: 'string', description: 'Stable Zayuno action reference' },
         providerSlug: { type: 'string' },
+        providerName: { type: ['string', 'null'] },
         status: { type: 'string' },
         paymentStatus: { type: 'string' },
         total: { type: 'number' },
         currency: { type: 'string' },
+        fulfillmentType: { type: 'string' },
         checkoutUrl: { type: 'string' },
-        timeline: { type: 'array', items: { type: 'object' } }
+        nextAction: { type: 'object' },
+        supportContact: { type: ['object', 'null'] },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' }
       },
-      required: ['customerMessage', 'id', 'publicId', 'status']
+      required: ['customerMessage', 'actionId', 'providerSlug', 'status', 'paymentStatus', 'total', 'currency', 'fulfillmentType', 'createdAt', 'updatedAt']
     },
     handler: async (args, client) => {
       const action = await client.getAction(args.actionId);
-      const provider = action?.providerSlug && typeof client.getProvider === 'function'
-        ? await client.getProvider(action.providerSlug).catch(() => undefined)
-        : undefined;
-      const customerMessage = formatCustomerActionStatus(action, provider);
+      // The action response carries the public provider/action state needed by
+      // the presenter. Avoid a second provider lookup so one MCP tool call
+      // maps to one API dispatch and cannot accidentally broaden visibility.
+      const customerMessage = formatCustomerActionStatus(action);
       return {
         customerMessage,
-        actionId: action.publicId || action.id,
-        ...action
+        ...toPublicAction(action)
       };
     }
   },
@@ -1007,21 +1056,28 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       type: 'object',
       properties: {
         customerMessage: { type: 'string', description: 'Pre-formatted cancellation result' },
-        id: { type: 'string' },
-        actionId: { type: 'string' },
-        publicId: { type: 'string' },
-        status: { type: 'string' },
-        cancellationReason: { type: 'string' }
+        success: { type: 'boolean' },
+        actionId: { type: 'string', description: 'Stable Zayuno action reference' },
+        externalActionId: { type: ['string', 'null'], description: 'Optional provider reference' },
+        previousStatus: { type: 'string' },
+        newStatus: { type: 'string' },
+        message: { type: 'string' },
+        refundInitiated: { type: 'boolean' }
       },
-      required: ['customerMessage', 'id', 'status']
+      required: ['customerMessage', 'success', 'actionId', 'previousStatus', 'newStatus', 'message', 'refundInitiated']
     },
     handler: async (args, client) => {
       const result = await client.cancelAction(args.actionId, args.reason, args.reasonCode);
       const customerMessage = formatCustomerActionCancellation(result);
       return {
         customerMessage,
-        actionId: result.publicId || result.id,
-        ...result
+        success: Boolean(result.success),
+        actionId: result.actionId || args.actionId,
+        ...(result.externalActionId ? { externalActionId: result.externalActionId } : {}),
+        previousStatus: result.previousStatus,
+        newStatus: result.newStatus,
+        message: result.message || 'Action cancelled.',
+        refundInitiated: Boolean(result.refundInitiated)
       };
     }
   },
@@ -1054,12 +1110,17 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           items: {
             type: 'object',
             properties: {
-              method: { type: 'string' },
+              id: { type: 'string' },
               name: { type: 'string' },
+              type: { type: 'string' },
+              isOnline: { type: 'boolean' },
               checkoutUrl: { type: 'string' },
-              isAvailable: { type: 'boolean' }
+              qrCodeUrl: { type: 'string' },
+              instructions: { type: 'string' },
+              supportedCurrencies: { type: 'array', items: { type: 'string' } },
+              isSandbox: { type: 'boolean' }
             },
-            required: ['method', 'name']
+            required: ['id', 'name', 'type', 'isOnline', 'isSandbox']
           }
         }
       },
@@ -1067,12 +1128,16 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     },
     handler: async (args, client) => {
       const options = await client.getPaymentOptions(args.actionId);
-      const customerMessage = formatCustomerPaymentOptions(
-        Array.isArray(options) ? options : options?.paymentOptions,
-      );
+      const rawPaymentOptions = Array.isArray(options)
+        ? options
+        : Array.isArray(options?.paymentOptions)
+          ? options.paymentOptions
+          : [];
+      const paymentOptions = toPublicPaymentOptions(rawPaymentOptions);
+      const customerMessage = formatCustomerPaymentOptions(paymentOptions);
       return {
         customerMessage,
-        ...(Array.isArray(options) ? { paymentOptions: options } : options)
+        paymentOptions
       };
     }
   }
@@ -1137,17 +1202,15 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
             ]
           };
         } catch (err: any) {
-          const friendlyMessage = formatCustomerError(err);
+          const presentation = buildAgentErrorEnvelope(err);
+          const errorPayload = { ...presentation, message: presentation.customerMessage };
           return {
             isError: true,
+            structuredContent: errorPayload,
             content: [
               {
                 type: 'text',
-                text: JSON.stringify({
-                  isError: true,
-                  customerMessage: friendlyMessage,
-                  message: friendlyMessage
-                }, null, 2)
+                text: JSON.stringify(errorPayload, null, 2)
               }
             ]
           };

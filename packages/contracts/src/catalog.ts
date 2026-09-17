@@ -178,9 +178,24 @@ export type SearchCatalogInput = z.infer<typeof SearchCatalogInputSchema>;
 export const SelectedOptionSchema = z.object({
   groupId: z.string(),
   optionId: z.string(),
-  quantity: z.number().int().positive().default(1)
+  quantity: z.number().int().positive().default(1).describe(
+    'How many units of this option apply to EACH requested base item. ' +
+    'For an item quantity of N, the option charge is priceDelta × selected option quantity × N.'
+  )
 });
 export type SelectedOption = z.infer<typeof SelectedOptionSchema>;
+
+/**
+ * Canonical pricing rule for SelectedOption.quantity.
+ *
+ * A selected option belongs to one item line, but its quantity is per base
+ * item, never a total for the whole line. This prevents an adapter from
+ * interpreting quantity=1 on two coffees as one syrup instead of one syrup
+ * on each coffee. Providers whose upstream API uses line-level modifiers must
+ * convert that representation inside their adapter before returning a quote.
+ */
+export const SELECTED_OPTION_QUANTITY_SEMANTICS =
+  'PER_ITEM: option charge = priceDelta × selectedOption.quantity × item.quantity' as const;
 
 export const CheckAvailabilityInputSchema = z.object({
   providerSlug: z.string().min(1),
@@ -195,8 +210,18 @@ export const CheckAvailabilityInputSchema = z.object({
 });
 export type CheckAvailabilityInput = z.infer<typeof CheckAvailabilityInputSchema>;
 
+export enum AvailabilityStatus {
+  AVAILABLE = 'AVAILABLE',
+  UNAVAILABLE = 'UNAVAILABLE',
+  UNKNOWN = 'UNKNOWN',
+  NOT_SUPPORTED = 'NOT_SUPPORTED',
+  STALE = 'STALE',
+  ERROR = 'ERROR'
+}
+
 export const AvailabilityResultSchema = z.object({
-  isAvailable: z.boolean(),
+  availabilityStatus: z.nativeEnum(AvailabilityStatus).optional(),
+  isAvailable: z.boolean().nullable().optional(),
   unavailableItems: z.array(z.object({
     offeringId: z.string(),
     reason: z.string()
@@ -213,5 +238,47 @@ export const AvailabilityResultSchema = z.object({
   checkedAt: optionalNullable(IsoDateTimeSchema),
   validUntil: optionalNullable(IsoDateTimeSchema),
   parameters: optionalNullable(z.record(z.any()), {})
+}).superRefine((value, context) => {
+  if (value.availabilityStatus === AvailabilityStatus.AVAILABLE && value.isAvailable === false) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['isAvailable'],
+      message: 'isAvailable must be true when availabilityStatus is AVAILABLE'
+    });
+  }
+  if (value.availabilityStatus === AvailabilityStatus.UNAVAILABLE && value.isAvailable === true) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['isAvailable'],
+      message: 'isAvailable must be false when availabilityStatus is UNAVAILABLE'
+    });
+  }
+  if (
+    value.availabilityStatus &&
+    ![AvailabilityStatus.AVAILABLE, AvailabilityStatus.UNAVAILABLE].includes(value.availabilityStatus) &&
+    value.isAvailable !== undefined &&
+    value.isAvailable !== null
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['isAvailable'],
+      message: 'isAvailable must be null when availability is not definitive'
+    });
+  }
+}).transform((value) => {
+  const availabilityStatus = value.availabilityStatus ?? (
+    value.isAvailable === true
+      ? AvailabilityStatus.AVAILABLE
+      : value.isAvailable === false
+        ? AvailabilityStatus.UNAVAILABLE
+        : AvailabilityStatus.UNKNOWN
+  );
+  const isAvailable = availabilityStatus === AvailabilityStatus.AVAILABLE
+    ? true
+    : availabilityStatus === AvailabilityStatus.UNAVAILABLE
+      ? false
+      : null;
+
+  return { ...value, availabilityStatus, isAvailable };
 });
 export type AvailabilityResult = z.infer<typeof AvailabilityResultSchema>;

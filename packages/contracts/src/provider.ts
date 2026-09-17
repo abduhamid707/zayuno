@@ -41,6 +41,132 @@ export enum ProviderType {
 }
 
 /**
+ * Deployment environment is independent from a provider's operational state.
+ * An ACTIVE sandbox is healthy and usable for tests, but it must never be
+ * mistaken for a live provider that can fulfil a real customer request.
+ */
+export enum ProviderEnvironment {
+  LIVE = 'LIVE',
+  SANDBOX = 'SANDBOX',
+  STAGING = 'STAGING'
+}
+
+/**
+ * Provider-level commercial verticals. Product/catalog categories and
+ * fulfilment mode intentionally remain separate dimensions.
+ */
+export enum ProviderCategory {
+  FOOD_AND_DRINK = 'FOOD_AND_DRINK',
+  RETAIL = 'RETAIL',
+  TRANSPORT = 'TRANSPORT',
+  TICKETING = 'TICKETING',
+  TRAVEL = 'TRAVEL',
+  ACCOMMODATION = 'ACCOMMODATION',
+  RECRUITMENT = 'RECRUITMENT',
+  LOGISTICS = 'LOGISTICS',
+  HEALTHCARE = 'HEALTHCARE',
+  HOME_SERVICES = 'HOME_SERVICES',
+  PROFESSIONAL_SERVICES = 'PROFESSIONAL_SERVICES',
+  DIGITAL_SERVICES = 'DIGITAL_SERVICES',
+  OTHER = 'OTHER'
+}
+
+const PROVIDER_CATEGORY_ALIASES: Record<string, ProviderCategory> = {
+  food: ProviderCategory.FOOD_AND_DRINK,
+  food_and_drink: ProviderCategory.FOOD_AND_DRINK,
+  food_delivery: ProviderCategory.FOOD_AND_DRINK,
+  food_dining: ProviderCategory.FOOD_AND_DRINK,
+  restaurant: ProviderCategory.FOOD_AND_DRINK,
+  restaurants: ProviderCategory.FOOD_AND_DRINK,
+  fast_food: ProviderCategory.FOOD_AND_DRINK,
+  cafe: ProviderCategory.FOOD_AND_DRINK,
+  coffee: ProviderCategory.FOOD_AND_DRINK,
+  coffee_shop: ProviderCategory.FOOD_AND_DRINK,
+  pizza: ProviderCategory.FOOD_AND_DRINK,
+  sushi: ProviderCategory.FOOD_AND_DRINK,
+  retail: ProviderCategory.RETAIL,
+  commerce: ProviderCategory.RETAIL,
+  ecommerce: ProviderCategory.RETAIL,
+  marketplace: ProviderCategory.RETAIL,
+  shop: ProviderCategory.RETAIL,
+  transport: ProviderCategory.TRANSPORT,
+  mobility: ProviderCategory.TRANSPORT,
+  taxi: ProviderCategory.TRANSPORT,
+  ride_hailing: ProviderCategory.TRANSPORT,
+  ticket: ProviderCategory.TICKETING,
+  tickets: ProviderCategory.TICKETING,
+  ticketing: ProviderCategory.TICKETING,
+  events: ProviderCategory.TICKETING,
+  travel: ProviderCategory.TRAVEL,
+  tourism: ProviderCategory.TRAVEL,
+  flights: ProviderCategory.TRAVEL,
+  accommodation: ProviderCategory.ACCOMMODATION,
+  hotel: ProviderCategory.ACCOMMODATION,
+  hotels: ProviderCategory.ACCOMMODATION,
+  lodging: ProviderCategory.ACCOMMODATION,
+  recruitment: ProviderCategory.RECRUITMENT,
+  jobs: ProviderCategory.RECRUITMENT,
+  job_board: ProviderCategory.RECRUITMENT,
+  hiring: ProviderCategory.RECRUITMENT,
+  employment: ProviderCategory.RECRUITMENT,
+  logistics: ProviderCategory.LOGISTICS,
+  delivery: ProviderCategory.LOGISTICS,
+  parcel: ProviderCategory.LOGISTICS,
+  courier: ProviderCategory.LOGISTICS,
+  shipping: ProviderCategory.LOGISTICS,
+  healthcare: ProviderCategory.HEALTHCARE,
+  health: ProviderCategory.HEALTHCARE,
+  medical: ProviderCategory.HEALTHCARE,
+  pharmacy: ProviderCategory.HEALTHCARE,
+  home_services: ProviderCategory.HOME_SERVICES,
+  home_service: ProviderCategory.HOME_SERVICES,
+  professional_services: ProviderCategory.PROFESSIONAL_SERVICES,
+  general_services: ProviderCategory.PROFESSIONAL_SERVICES,
+  services: ProviderCategory.PROFESSIONAL_SERVICES,
+  digital_services: ProviderCategory.DIGITAL_SERVICES,
+  online_services: ProviderCategory.DIGITAL_SERVICES,
+  digital: ProviderCategory.DIGITAL_SERVICES,
+  general: ProviderCategory.OTHER,
+  other: ProviderCategory.OTHER,
+  misc: ProviderCategory.OTHER
+};
+
+function normalizeTaxonomyKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+/** Accepts legacy spellings at the boundary and returns only the canonical enum. */
+export function normalizeProviderCategory(value: unknown): ProviderCategory | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  const key = normalizeTaxonomyKey(value);
+  const direct = Object.values(ProviderCategory).find((category) => category.toLowerCase() === key);
+  return direct || PROVIDER_CATEGORY_ALIASES[key];
+}
+
+/** Maps historic `PRODUCTION` metadata to the canonical `LIVE` environment. */
+export function normalizeProviderEnvironment(value: unknown): ProviderEnvironment | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  const key = normalizeTaxonomyKey(value);
+  if (key === 'live' || key === 'production' || key === 'prod') return ProviderEnvironment.LIVE;
+  if (key === 'sandbox' || key === 'test') return ProviderEnvironment.SANDBOX;
+  if (key === 'staging' || key === 'preproduction' || key === 'preprod') return ProviderEnvironment.STAGING;
+  return undefined;
+}
+
+const CanonicalProviderCategorySchema = z.nativeEnum(ProviderCategory);
+const CanonicalProviderEnvironmentSchema = z.nativeEnum(ProviderEnvironment);
+
+export const ProviderCategorySchema = z.preprocess(
+  (value) => value === undefined || value === null ? value : normalizeProviderCategory(value) ?? value,
+  CanonicalProviderCategorySchema
+);
+
+export const ProviderEnvironmentSchema = z.preprocess(
+  (value) => value === undefined || value === null ? value : normalizeProviderEnvironment(value) ?? value,
+  CanonicalProviderEnvironmentSchema
+);
+
+/**
  * Describes where a provider fulfils the service. Provider type/category alone
  * is not enough: a booking can be an on-site restaurant table or a remote
  * consultation. This value is the canonical source for location readiness.
@@ -57,6 +183,14 @@ export function defaultFulfillmentModeForProviderType(type?: ProviderType): Prov
   if (type === ProviderType.DELIVERY) return ProviderFulfillmentMode.DELIVERY;
   if (type === ProviderType.RETAIL || type === ProviderType.BOOKINGS) return ProviderFulfillmentMode.ONSITE;
   return ProviderFulfillmentMode.REMOTE;
+}
+
+export function defaultProviderCategoryForType(type?: ProviderType): ProviderCategory {
+  if (type === ProviderType.RETAIL || type === ProviderType.COMMERCE) return ProviderCategory.RETAIL;
+  if (type === ProviderType.TICKETING) return ProviderCategory.TICKETING;
+  if (type === ProviderType.DIGITAL) return ProviderCategory.DIGITAL_SERVICES;
+  if (type === ProviderType.SERVICES) return ProviderCategory.PROFESSIONAL_SERVICES;
+  return ProviderCategory.OTHER;
 }
 
 export function requiresActiveLocations(
@@ -205,8 +339,10 @@ export const ProviderInfoSchema = z.object({
   logoUrl: optionalNullable(z.string()),
   status: z.nativeEnum(ProviderStatus),
   type: z.nativeEnum(ProviderType),
+  environment: ProviderEnvironmentSchema.default(ProviderEnvironment.LIVE),
   fulfillmentMode: optionalNullable(z.nativeEnum(ProviderFulfillmentMode)),
-  category: z.string().default('online_services'),
+  category: ProviderCategorySchema.default(ProviderCategory.OTHER),
+  subcategory: optionalNullable(z.string().trim().min(1).max(100)),
   geography: optionalNullable(z.array(z.string()), ['UZ']),
   adapterType: z.string().default('sandbox'),
   authMethod: z.nativeEnum(AuthMethod).default(AuthMethod.API_KEY),
@@ -218,6 +354,28 @@ export const ProviderInfoSchema = z.object({
   metadata: optionalNullable(z.record(z.any()), {})
 });
 export type ProviderInfo = z.infer<typeof ProviderInfoSchema>;
+
+/**
+ * Stable allowlist for agent and customer-facing provider discovery. Provider
+ * connection details, ownership, operational history and raw metadata remain
+ * in the internal ProviderInfo contract.
+ */
+export const PublicProviderInfoSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+  description: optionalNullable(z.string()),
+  logoUrl: optionalNullable(z.string()),
+  status: z.nativeEnum(ProviderStatus),
+  type: z.nativeEnum(ProviderType),
+  environment: ProviderEnvironmentSchema.default(ProviderEnvironment.LIVE),
+  fulfillmentMode: optionalNullable(z.nativeEnum(ProviderFulfillmentMode)),
+  category: ProviderCategorySchema.default(ProviderCategory.OTHER),
+  subcategory: optionalNullable(z.string().trim().min(1).max(100)),
+  geography: optionalNullable(z.array(z.string()), ['UZ']),
+  capabilities: z.array(z.nativeEnum(ProviderCapability)),
+  supportContact: optionalNullable(z.union([z.string(), StructuredSupportContactSchema]))
+});
+export type PublicProviderInfo = z.infer<typeof PublicProviderInfoSchema>;
 
 export const HealthCheckResultSchema = z.object({
   status: z.enum(['HEALTHY', 'DEGRADED', 'DOWN']),
@@ -254,7 +412,8 @@ export type ProviderHealthMonitoringData = z.infer<typeof ProviderHealthMonitori
 /* -------------------------------------------------------------------------- */
 
 export const FindProvidersInputSchema = z.object({
-  category: z.string().optional().describe('Filter by provider category (e.g. food_delivery, logistics, bookings)'),
+  category: z.string().trim().min(1).max(100).optional().describe('Canonical provider category (e.g. FOOD_AND_DRINK, LOGISTICS). Legacy aliases such as food_delivery are normalized at the boundary.'),
+  environment: z.string().trim().min(1).max(32).optional().describe('Deployment environment. Public discovery defaults to LIVE; SANDBOX and STAGING are explicit non-production environments.'),
   capability: z.nativeEnum(ProviderCapability).optional().describe('Filter by required capability flag'),
   geography: z.string().optional().describe('Filter by geographic coverage (e.g. UZ, Tashkent, Samarkand)'),
   query: z.string().optional().describe('Search keyword matching provider name or description'),
@@ -294,8 +453,14 @@ export const RegisterProviderInputSchema = z.object({
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/),
   description: z.string().optional(),
   type: z.nativeEnum(ProviderType).default(ProviderType.SERVICES),
+  environment: z.string().trim().min(1).max(32).optional()
+    .refine((value) => value === undefined || normalizeProviderEnvironment(value) !== undefined, 'Environment must be LIVE, SANDBOX, or STAGING')
+    .default(ProviderEnvironment.LIVE),
   fulfillmentMode: z.nativeEnum(ProviderFulfillmentMode).optional(),
-  category: z.string().default('online_services'),
+  category: z.string().trim().min(1).max(100)
+    .refine((value) => normalizeProviderCategory(value) !== undefined, 'Category must use a canonical category or supported legacy alias')
+    .default(ProviderCategory.OTHER),
+  subcategory: z.string().trim().min(1).max(100).optional(),
   geography: z.array(z.string()).default(['UZ']),
   baseUrl: z.string().url().optional(),
   apiSecret: z.string().optional(),

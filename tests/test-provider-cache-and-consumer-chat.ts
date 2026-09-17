@@ -78,6 +78,14 @@ async function main() {
     2,
     "final availability checks must never be cached",
   );
+  const unsupportedCatalog = new CatalogService(
+    { assertAndGetCapability: async () => ({}) } as any,
+    { assertProviderPublished: async () => undefined } as any,
+    redis as any,
+  );
+  const unsupportedAvailability = await unsupportedCatalog.checkAvailability(availabilityInput);
+  assert.equal(unsupportedAvailability.availabilityStatus, "NOT_SUPPORTED");
+  assert.equal(unsupportedAvailability.isAvailable, null);
   assert.ok(
     (await catalog.invalidateProviderCache("hh-uz")) >= 2,
     "provider webhook invalidation must clear cached data",
@@ -290,9 +298,10 @@ async function main() {
       }),
       getCatalog: async () => ({ offerings: [] }),
       checkAvailability: async (input: any) => ({
-        isAvailable: true,
+        availabilityStatus: "NOT_SUPPORTED",
+        isAvailable: null,
         unavailableItems: [],
-        availableItems: input.items,
+        availableItems: [],
       }),
     } as any,
     {

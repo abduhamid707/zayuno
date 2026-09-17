@@ -2517,3 +2517,56 @@ Pasted strategiyadagi `AI Tycoon + Tap-to-Eat` g‘oyasi marketing tajribasi sif
 **Holat / handoff:** Bajarildi. `ConsumerChatService` endi Gemini oqimidagi `[LIVE_DATA*]` markerlarni user-facing javobga chiqarmaydi, provider tanlovini follow-up typo xabarlarida saqlaydi va variant ro‘yxatini deterministic qaytaradi. Quote/action tasdiqlarida SKU/ichki ID ko‘rsatilmaydi, fee nomlari provider qaytargan alohida qiymatlardan olinadi. Sandbox, demo va vaqtinchalik tunnel checkoutlari sinov sifatida ko‘rsatiladi; `PAID` faqat provider metadata’sida ishonchli payment tasdig‘i bo‘lsa real deb aytiladi. Delivery/physical provider uchun generated contract `LOCATIONS`ni capability ro‘yxatidan tushib qolsa ham majburiy qiladi. Onboarding matnlari 4 bosqichga moslandi, yordam kontaktlari va canonical enum ko‘rsatmalari aniqlandi. Mobile food card’dan SKU olib tashlandi; home quick actions avvalgi commitda dinamik va loading paytida qayta bosilmaydigan qilingan. `bin/cloudflared.exe` va `scripts/iticket-mock-server.mjs` foydalanuvchi o‘zgarishlari sifatida stage qilinmadi.
 
 **Tekshiruv:** `@zayuno/shared`, `@zayuno/api`, `@zayuno/mcp` buildlari; mobile typecheck; provider portal docs, onboarding E2E, credential/sandbox, customer presenter, provider cache/chat, Coffee Time, MCP consistency, universal provider flow va consumer memory testlari — barchasi PASS. `git diff --check` — PASS. Pushdan keyin production deploy statusi CI/CD pipeline’ga bog‘liq; bu ish lokal test va commit/pushni qamrab oladi.
+
+# Joriy ish — Provider-agnostic P0 contract hardening (2026-09-18)
+
+- [x] Availability endpointi qo‘llanmasa yoki adapter mavjud bo‘lmasa, noaniqlikni `available=true`ga aylantirmaslik.
+- [x] Bir xil idempotency key boshqa canonical action payload bilan kelsa deterministik `409` qaytarish.
+- [x] Public provider javoblaridan integration va owner metadata’larini olib tashlash.
+- [x] P0 regressiya testlarini va tegishli API/MCP buildlarini bajarish.
+
+**Holat / handoff:** Bajarildi. Availability natijasi endi `AVAILABLE`, `UNAVAILABLE`, `UNKNOWN`, `NOT_SUPPORTED`, `STALE` yoki `ERROR` holatini beradi; noaniq holatda `isAvailable: null`. Action idempotency uchun canonical SHA-256 fingerprint saqlanadi va boshqa payload bilan ayni key qayta ishlatilsa `409 IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD` qaytadi. Public provider API/MCP faqat allowlist DTO qaytaradi.
+
+**O‘zgargan fayllar:** contract (`catalog.ts`, `provider.ts`), provider SDK, API catalog/actions/providers/chat/filter/interceptor qatlamlari, shared presenter/errors/idempotency, MCP client/server/tools, Prisma schema va `20260918000000_action_idempotency_hash` migratsiyasi; Coffee Time, action collision, provider DTO, MCP contract va MCP error regressiya testlari.
+
+**Tekshiruv:** `prisma generate --no-engine`, `@zayuno/contracts`, `@zayuno/shared`, `@zayuno/api`, `@zayuno/mcp` va `@zayuno/database` buildlari PASS. Coffee Time availability, action tenant/idempotency, provider cache/chat, public DTO, MCP collision, MCP consistency, customer presenter, action guardrails va provider contract parity testlari PASS. `git diff --check` PASS. Keng `test-openai-plugin-mcp-contract` sinovining 1–10 bosqichlari PASS; yakuniy Coffee Time E2E bosqichi javobsiz qolib, qo‘lda to‘xtatildi.
+
+**Qolgan ish / to‘siq / navbatdagi qadam:** P0 kodida qolgan ish yo‘q. To‘liq keng MCP suite tasdig‘i uchun Coffee Time E2E osilish sababini alohida diagnostika qilib, so‘ng shu testni qayta ishga tushirish kerak. Oddiy Prisma generate Windows query-engine DLL’i bandligi sabab ishlamadi; engine-siz generate muvaffaqiyatli bajarildi. Foydalanuvchi o‘zgartirgan `bin/cloudflared.exe` hamda `scripts/iticket-mock-server.mjs` bu ish doirasidan tashqarida qoladi.
+
+# Joriy ish — Qolgan universal contract hardening (2026-09-18)
+
+- [x] Stress-testdagi qolgan P1/P2 kamchiliklarni source va contract bo‘yicha inventarizatsiya qilish.
+- [x] Provider-agnostik typed error envelope va capability fallback yo‘lini yopish.
+- [x] Remote HTTP providerdagi JSON 404 capability fallbacki va to‘liq response-body timeoutini regressiya bilan yopish.
+- [x] Sandbox/live environment hamda category taxonomy contractlarini canonical qilish.
+- [x] Public action DTO, ID semantics, parameter va option quantity contractlarini aniq qilish.
+- [x] Adversarial regressiya/certification sinovlarini qo‘shib, build va fokuslangan testlarni bajarish.
+- [x] API-key bilan ochiq action endpointlarini stable public DTOga proyeksiya qilish va declaration bo‘lmagan parameterlarda runtime object guard qo‘shish.
+- [x] Public slug endpointlarida LIVE defaultini capabilities, health va locations yo‘llariga ham qo‘llash; MCP environment parametrini uzatish.
+- [x] Custom adapter javoblaridan cancel/payment option public DTOlariga ortiqcha maydon o‘tishini bloklash.
+- [x] Migration ledgeri yo‘q bo‘lgan tasdiqlangan legacy DB uchun xavfsiz bootstrap preflightini qo‘shish.
+- [x] Coffee Time wire-level MCP E2E yakunidagi cheklanmagan webhook kutishini diagnostika qilib, suite’ni to‘liq tugatish.
+- [x] `_prisma_migrations` yo‘q, ammo exact legacy init sxemali baza uchun guarded migration bootstrapni qo‘shish.
+- [x] Hozirgi yakuniy runner bilan isolated legacy replayni qayta ishga tushirish, schema diff va umumiy final checkni qayd etish.
+
+**Holat / handoff:** Bajarildi. Universal contract hardening va guarded legacy migration runner tekshiruvi to‘liq yakunlandi.
+- **Isolated legacy replay tasdig‘i:** `zayuno-migration-audit` Docker konteyneridagi `zayuno_safe_legacy` bazasida (faqat `20260816000000_init` SQL qo‘llangan, `_prisma_migrations` ledgeri bo‘lmagan holatda) `migrate-deploy.mjs` runneri ishga tushirildi. Runner exact legacy init jadval/ustun/enum/constraint/indeks imzosini tasdiqladi, faqat `20260816000000_init` migratsiyasini applied deb belgiladi va qolgan 8 ta migratsiyani to‘liq qo‘lladi.
+- **Schema diff natijasi:** `prisma migrate diff --from-url ... --to-schema-datamodel prisma/schema.prisma --script` natijasi `-- This is an empty migration.` berdi (baza sxemasi va Prisma datamodel o‘rtasida nol drift).
+- **O‘zgargan va yangi fayllar:**
+  - Database & Migrations: `packages/database/package.json`, `packages/database/prisma/schema.prisma`, `packages/database/src/seed.ts`, `packages/database/scripts/migrate-deploy.mjs`, `packages/database/prisma/migrations/20260917000000_reconcile_legacy_core_schema/`, `packages/database/prisma/migrations/20260918000000_action_idempotency_hash/`, `packages/database/prisma/migrations/20260918010000_provider_environment_and_category/`.
+  - Contracts & Shared: `packages/contracts/src/action.ts`, `packages/contracts/src/catalog.ts`, `packages/contracts/src/payment.ts`, `packages/contracts/src/provider-protocol.ts`, `packages/contracts/src/provider.ts`, `packages/shared/src/customer-presenter.ts`, `packages/shared/src/errors.ts`, `packages/shared/src/idempotency.ts`, `packages/shared/src/index.ts`, `packages/shared/src/public-action.ts`, `packages/shared/src/public-payment-option.ts`.
+  - Provider SDK & Integrations: `packages/provider-sdk/src/base-provider.ts`, `packages/provider-sdk/src/certification.ts`, `packages/provider-sdk/src/errors.ts`, `packages/provider-sdk/src/protocol-validation.ts`, `packages/provider-sdk/src/remote-http-adapter.ts`, `integrations/mock-coffee-time/src/server.ts`.
+  - API & MCP: `apps/api/src/common/filters/http-exception.filter.ts`, `apps/api/src/common/interceptors/idempotency.interceptor.ts`, `apps/api/src/common/dynamic-parameter-validation.ts`, `apps/api/src/modules/actions/actions.controller.ts`, `apps/api/src/modules/actions/actions.service.ts`, `apps/api/src/modules/actions/public-action-response.ts`, `apps/api/src/modules/catalog/catalog.service.ts`, `apps/api/src/modules/consumer/chat/consumer-chat.service.ts`, `apps/api/src/modules/developer-sandbox/developer-sandbox.service.ts`, `apps/api/src/modules/providers/providers.controller.ts`, `apps/api/src/modules/providers/providers.service.ts`, `apps/api/src/modules/quotes/quotes.service.ts`, `apps/mcp/src/client.ts`, `apps/mcp/src/server.ts`, `apps/mcp/src/tools.ts`, `docs/actions.md`, `docs/catalog.md`, `docs/deployment.md`, `docs/quotes.md`.
+  - Test suites: `tests/test-legacy-migration-bootstrap.ts`, `tests/test-openai-plugin-mcp-contract.ts`, `tests/test-public-payment-and-cancel-dto.ts`, `tests/test-provider-environment-and-category.ts`, `tests/test-error-taxonomy-and-catalog-fallback.ts`, `tests/test-mcp-idempotency-collision-error.ts`, `tests/test-p2-action-parameter-contracts.ts`, `tests/test-provider-certification-adversarial.ts`, `tests/test-public-action-api-dto.ts`, `tests/test-public-provider-dto.ts`, `tests/test-action-quote-deduplication-tenant-isolation.ts`, `tests/test-coffee-time-availability-and-customer-mode.ts`, `tests/test-mcp-tool-consistency.ts`, `tests/test-provider-cache-and-consumer-chat.ts`.
+  - Tegilmagan: `bin/cloudflared.exe` va `scripts/iticket-mock-server.mjs` fayllariga tegilmadi.
+- **Bajarilgan tekshiruvlar:**
+  - `pnpm --filter @zayuno/database run migrate:deploy` (isolated legacy DB `zayuno_safe_legacy`): PASS (init applied, 8 migrations applied).
+  - `pnpm --filter @zayuno/database exec prisma migrate diff ...`: PASS (`-- This is an empty migration.`).
+  - `pnpm exec tsx tests/test-legacy-migration-bootstrap.ts`: PASS.
+  - `node --check packages/database/scripts/migrate-deploy.mjs`: PASS.
+  - `pnpm --filter @zayuno/database build`: PASS.
+  - `pnpm exec tsx tests/test-openai-plugin-mcp-contract.ts`: PASS (11 bosqich, Coffee Time wire-level 13 action).
+  - `pnpm exec tsx tests/test-public-payment-and-cancel-dto.ts`: PASS.
+  - `pnpm exec tsx tests/test-provider-environment-and-category.ts`: PASS.
+  - `git diff --check`: PASS (0 xatolik).
+- **Deploy va Git holati:** Barcha universal contract hardening, xavfsiz legacy migration runner, DTO, testlar hamda iTicket mock o‘zgarishlari to‘liq tekshirildi, commit qilindi va `origin/main` ga push qilindi.

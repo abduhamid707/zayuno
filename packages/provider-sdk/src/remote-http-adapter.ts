@@ -13,6 +13,7 @@ import {
   SearchCatalogInput,
   CheckAvailabilityInput,
   AvailabilityResult,
+  AvailabilityStatus,
   RequestQuoteInput,
   NormalizedQuote,
   CreateActionInput,
@@ -50,6 +51,8 @@ import { z } from 'zod';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import crypto from 'node:crypto';
+import { normalizeZayunoErrorCode } from '@zayuno/shared';
+import { ProviderError } from './errors';
 
 /**
  * Universal Remote HTTP Provider Adapter.
@@ -117,13 +120,83 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
     }
   }
 
+  private requestTimeoutMs(): number {
+    const configured = Number(this.config.timeoutMs ?? this.config.config?.timeoutMs ?? this.config.metadata?.timeoutMs ?? 15_000);
+    if (!Number.isFinite(configured)) return 15_000;
+    return Math.min(Math.max(Math.floor(configured), 1_000), 60_000);
+  }
+
+  private remoteFailure(
+    endpoint: string,
+    upstreamStatusCode: number,
+    body?: unknown
+  ): ProviderError {
+    const parsed = body && typeof body === 'object' ? body as Record<string, any> : undefined;
+    const providerCode = parsed?.errorCode || parsed?.code || parsed?.error;
+    const providerMessage = typeof parsed?.message === 'string' ? parsed.message : undefined;
+    let code = normalizeZayunoErrorCode(providerCode, upstreamStatusCode, providerMessage);
+    const endpointPath = endpoint.split('?', 1)[0] || endpoint;
+    const hasGenericProviderCode = !providerCode || [
+      'RESOURCE_NOT_FOUND',
+      'INTERNAL_ERROR',
+      'UNAUTHORIZED',
+      'FORBIDDEN'
+    ].includes(code);
+
+    // Remote APIs commonly include generic `Not Found` or `Unauthorized` JSON
+    // labels. Preserve explicit canonical business codes, but let the endpoint
+    // context classify generic transport failures at the Core boundary.
+    if (hasGenericProviderCode && upstreamStatusCode === 404 && (endpointPath === '/availability' || endpointPath === '/search')) {
+      code = 'CAPABILITY_NOT_SUPPORTED';
+    } else if (hasGenericProviderCode && upstreamStatusCode === 404 && endpointPath.startsWith('/offerings/')) {
+      code = 'OFFERING_NOT_FOUND';
+    } else if (hasGenericProviderCode && (upstreamStatusCode === 401 || upstreamStatusCode === 403)) {
+      code = 'PROVIDER_AUTHENTICATION_ERROR';
+    }
+
+    const retryable = code === 'RATE_LIMITED' || code === 'PROVIDER_TIMEOUT' || code === 'PROVIDER_UNAVAILABLE';
+    const statusCode = code === 'PROVIDER_AUTHENTICATION_ERROR'
+      ? 502
+      : upstreamStatusCode === 408
+        ? 504
+        : upstreamStatusCode >= 500
+          ? 502
+          : upstreamStatusCode;
+    return new ProviderError(
+      'Provider request could not be completed.',
+      statusCode,
+      code,
+      {
+        providerSlug: this.providerSlug,
+        endpoint,
+        upstreamStatusCode,
+        retryable
+      }
+    );
+  }
+
   private async callRemote<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
     if (!this.targetUrl) {
-      throw new Error(`Provider "${this.providerSlug}" has no baseUrl configured.`);
+      throw new ProviderError(
+        'Provider integration is not configured.',
+        502,
+        'PROVIDER_UNAVAILABLE',
+        { providerSlug: this.providerSlug, endpoint, retryable: false }
+      );
     }
 
     const url = `${this.targetUrl}${endpoint}`;
-    await this.assertResolvedAddressIsPublic();
+    try {
+      await this.assertResolvedAddressIsPublic();
+    } catch (error) {
+      if (error instanceof ProviderError) throw error;
+      throw new ProviderError(
+        'Provider target could not be reached.',
+        502,
+        'PROVIDER_UNAVAILABLE',
+        { providerSlug: this.providerSlug, endpoint, retryable: true }
+      );
+    }
 
     const authMethod = this.config.authMethod || this.config.config?.authMethod || 'API_KEY';
     const secret = this.config.secret || '';
@@ -151,15 +224,42 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
       }
     }
 
-    const res = await fetch(url, {
-      ...options,
-      headers,
-      // A public HTTPS endpoint must not be able to redirect this server to a
-      // private address after the initial URL validation.
-      redirect: 'error'
-    });
+    const timeout = new AbortController();
+    const timeoutId = setTimeout(() => timeout.abort(), this.requestTimeoutMs());
+    let res: Response;
+    let rawText: string;
+    try {
+      res = await fetch(url, {
+        ...options,
+        headers,
+        signal: timeout.signal,
+        // A public HTTPS endpoint must not be able to redirect this server to a
+        // private address after the initial URL validation.
+        redirect: 'error'
+      });
+      // Fetch resolves once response headers arrive. Keep the same deadline
+      // while consuming the body so a provider cannot hold this request open
+      // indefinitely by streaming or stalling after headers.
+      rawText = await res.text();
+    } catch (error) {
+      if (timeout.signal.aborted) {
+        throw new ProviderError(
+          'Provider request timed out.',
+          504,
+          'PROVIDER_TIMEOUT',
+          { providerSlug: this.providerSlug, endpoint, retryable: true }
+        );
+      }
+      throw new ProviderError(
+        'Provider target could not be reached.',
+        502,
+        'PROVIDER_UNAVAILABLE',
+        { providerSlug: this.providerSlug, endpoint, retryable: true }
+      );
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
-    const rawText = await res.text();
     let parsedBody: any;
     try {
       parsedBody = JSON.parse(rawText);
@@ -168,10 +268,7 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
     }
 
     if (!res.ok) {
-      const message = typeof parsedBody === 'object' && parsedBody !== null
-        ? parsedBody.message || JSON.stringify(parsedBody)
-        : String(parsedBody || `HTTP ${res.status}`);
-      throw new Error(`Remote Provider HTTP [${res.status}]: ${message}`);
+      throw this.remoteFailure(endpoint, res.status, parsedBody);
     }
 
     return parsedBody as T;
@@ -262,19 +359,18 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
       }
       return validateProviderResponse('/availability', 'contract-availability', AvailabilityResultSchema, value);
     } catch (error) {
-      // `/availability` predates some otherwise valid Provider Contract v1
-      // implementations. Preserve their old optimistic behavior only for an
-      // explicit 404; authentication, timeout, and provider errors still fail.
-      if (error instanceof Error && error.message.includes('Remote Provider HTTP [404]')) {
+      // A missing endpoint is a lack of evidence, never evidence of stock.
+      // Keep older providers usable by making quote the verification point.
+      if (
+        error instanceof ProviderError &&
+        error.code === 'CAPABILITY_NOT_SUPPORTED' &&
+        error.details?.upstreamStatusCode === 404
+      ) {
         return {
-          isAvailable: true,
+          availabilityStatus: AvailabilityStatus.NOT_SUPPORTED,
+          isAvailable: null,
           unavailableItems: [],
-          availableItems: input.items.map(item => ({
-            offeringId: item.offeringId,
-            variantId: item.variantId,
-            requestedQuantity: item.quantity,
-            metadata: { availabilityEndpointImplemented: false }
-          })),
+          availableItems: [],
           checkedAt: new Date().toISOString(),
           parameters: { availabilityEndpointImplemented: false }
         };

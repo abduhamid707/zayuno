@@ -21,6 +21,8 @@ Do not rename canonical fields to a merchant's internal field names. Keep that t
 
 Variants have their own IDs, labels, prices and availability. Option groups define selectable modifiers; minSelections and maxSelections constrain the choices. priceDelta is used in verified quote calculation, not merely in the product card.
 
+`selectedOptions[].quantity` is **per requested base item**. For example, two Large Cappuccinos with one vanilla syrup each use `item.quantity: 2` and `selectedOptions[].quantity: 1`; the syrup contribution is `priceDelta × 1 × 2`. Provider adapters must normalize upstream line-level modifier quantities to this canonical per-item meaning.
+
 Keep IDs stable across catalog refreshes. Changed or unavailable choices must be checked again by POST /quote.
 
 ## Catalog versus quote

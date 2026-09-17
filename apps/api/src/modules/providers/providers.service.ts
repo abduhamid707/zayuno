@@ -27,9 +27,12 @@ import {
 } from '@zayuno/shared';
 import {
   ProviderInfo,
+  PublicProviderInfo,
   ProviderAdapter,
   ProviderStatus,
   ProviderType,
+  ProviderEnvironment,
+  ProviderCategory,
   ProviderFulfillmentMode,
   ProviderCapability,
   AuthMethod,
@@ -48,6 +51,9 @@ import {
   getMandatoryCapabilitiesForProfile,
   determineProviderCapabilityProfile,
   defaultFulfillmentModeForProviderType,
+  defaultProviderCategoryForType,
+  normalizeProviderCategory,
+  normalizeProviderEnvironment,
   requiresActiveLocations,
   WelcomeInfo
 } from '@zayuno/contracts';
@@ -102,7 +108,7 @@ export class ProvidersService {
 
     try {
       const providers = await prisma.provider.findMany({
-        where: { status: DbProviderStatus.ACTIVE },
+        where: { status: DbProviderStatus.ACTIVE, environment: ProviderEnvironment.LIVE as any },
         include: { locations: true }
       });
 
@@ -134,9 +140,13 @@ export class ProvidersService {
     }
   }
 
-  async listProviders(status?: ProviderStatus): Promise<ProviderInfo[]> {
+  async listProviders(status?: ProviderStatus, environment?: string): Promise<ProviderInfo[]> {
+    const targetEnvironment = this.resolveProviderEnvironment(environment);
     const providers = await prisma.provider.findMany({
-      where: status ? { status } : { status: ProviderStatus.ACTIVE },
+      where: {
+        ...(status ? { status } : { status: ProviderStatus.ACTIVE }),
+        environment: targetEnvironment as any
+      },
       include: { locations: true },
       orderBy: { name: 'asc' }
     });
@@ -144,8 +154,17 @@ export class ProvidersService {
     return providers.filter(p => this.isDiscoveryReady(p)).map(p => this.mapToProviderInfo(p));
   }
 
+  async listPublicProviders(status?: ProviderStatus, environment?: string): Promise<PublicProviderInfo[]> {
+    return (await this.listProviders(status, environment)).map((provider) => this.mapToPublicProviderInfo(provider));
+  }
+
   async findProviders(filter: FindProvidersInput): Promise<FindProvidersResult> {
-    const where: any = { status: ProviderStatus.ACTIVE };
+    const targetEnvironment = this.resolveProviderEnvironment(filter.environment);
+    const targetCategory = this.resolveProviderCategory(filter.category);
+    const where: any = {
+      status: ProviderStatus.ACTIVE,
+      environment: targetEnvironment as any
+    };
 
     if (filter.query) {
       where.OR = [
@@ -166,8 +185,8 @@ export class ProvidersService {
 
     let results = providers.filter(p => this.isDiscoveryReady(p)).map(p => this.mapToProviderInfo(p));
 
-    if (filter.category && filter.category !== 'all') {
-      results = results.filter(p => p.category?.toLowerCase() === filter.category?.toLowerCase() || p.type?.toLowerCase() === filter.category?.toLowerCase());
+    if (targetCategory) {
+      results = results.filter((provider) => provider.category === targetCategory);
     }
 
     if (filter.geography) {
@@ -200,6 +219,14 @@ export class ProvidersService {
     return { total, providers: results.slice(offset, offset + (filter.limit || 20)) };
   }
 
+  async findPublicProviders(filter: FindProvidersInput): Promise<{ total: number; providers: PublicProviderInfo[] }> {
+    const result = await this.findProviders(filter);
+    return {
+      total: result.total,
+      providers: result.providers.map((provider) => this.mapToPublicProviderInfo(provider))
+    };
+  }
+
   async getProviderBySlug(slug: string): Promise<ProviderInfo> {
     const cleanSlug = slug.toLowerCase().trim();
     const provider = await prisma.provider.findUnique({
@@ -215,8 +242,26 @@ export class ProvidersService {
     return this.mapToProviderInfo(provider);
   }
 
-  async assertProviderPublished(slug: string): Promise<void> {
-    await this.getProviderBySlug(slug);
+  async getPublicProviderBySlug(slug: string, environment?: string): Promise<PublicProviderInfo> {
+    return this.mapToPublicProviderInfo(await this.getPublicProviderInfo(slug, environment));
+  }
+
+  private async getPublicProviderInfo(slug: string, environment?: string): Promise<ProviderInfo> {
+    const provider = await this.getProviderBySlug(slug);
+    if (provider.environment !== this.resolveProviderEnvironment(environment)) {
+      throw new NotFoundError('Provider', slug.toLowerCase().trim());
+    }
+    return provider;
+  }
+
+  async assertProviderPublished(slug: string, environment?: string): Promise<void> {
+    const provider = await this.getProviderBySlug(slug);
+    // Internal catalog/quote/action paths retain their existing sandbox support.
+    // Callers that need an environment boundary pass it explicitly; public
+    // discovery routes always resolve an omitted environment to LIVE above.
+    if (environment !== undefined && provider.environment !== this.resolveProviderEnvironment(environment)) {
+      throw new NotFoundError('Provider', slug.toLowerCase().trim());
+    }
   }
 
   async getProviderForActor(actor?: { providerId?: string; role?: UserRole }): Promise<ProviderInfo> {
@@ -429,13 +474,13 @@ export class ProvidersService {
     return parsed;
   }
 
-  async getCapabilities(providerSlug: string): Promise<ProviderCapability[]> {
-    const info = await this.getProviderBySlug(providerSlug);
+  async getCapabilities(providerSlug: string, environment?: string): Promise<ProviderCapability[]> {
+    const info = await this.getPublicProviderInfo(providerSlug, environment);
     return info.capabilities;
   }
 
-  async checkHealth(providerSlug: string): Promise<HealthCheckResult> {
-    await this.assertProviderPublished(providerSlug);
+  async checkHealth(providerSlug: string, environment?: string): Promise<HealthCheckResult> {
+    await this.getPublicProviderInfo(providerSlug, environment);
     const adapter = await this.registry.getAdapter(providerSlug);
     if (adapter.checkHealth) {
       return adapter.checkHealth();
@@ -448,8 +493,8 @@ export class ProvidersService {
     };
   }
 
-  async getLocations(providerSlug: string, input?: GetLocationsInput): Promise<Location[]> {
-    await this.assertProviderPublished(providerSlug);
+  async getLocations(providerSlug: string, input?: GetLocationsInput, environment?: string): Promise<Location[]> {
+    await this.getPublicProviderInfo(providerSlug, environment);
     const adapter = await this.registry.assertAndGetCapability(providerSlug, ProviderCapability.LOCATIONS);
     if (adapter.getLocations) {
       return adapter.getLocations(input);
@@ -541,6 +586,9 @@ export class ProvidersService {
       throw new BadRequestException('Provider API credential is required. Generate or enter a key before continuing.');
     }
     const normalizedSupport = normalizeSupportContact(input.supportContact);
+    const environment = normalizeProviderEnvironment(input.environment) || ProviderEnvironment.LIVE;
+    const category = normalizeProviderCategory(input.category) || defaultProviderCategoryForType(input.type);
+    const subcategory = input.subcategory?.trim() || undefined;
     // Self-service v1 connects a public online API. Branches, maps and physical
     // fulfilment are intentionally not a registration requirement; existing
     // providers keep their stored fulfilment metadata unchanged.
@@ -553,6 +601,9 @@ export class ProvidersService {
         name: input.name,
         logoUrl: input.logoUrl,
         type: (input.type as any) || ProviderType.SERVICES,
+        environment: environment as any,
+        category: category as any,
+        subcategory,
         adapterType: input.baseUrl ? 'remote-http' : 'sandbox',
         capabilities: input.capabilities,
         baseUrl: input.baseUrl,
@@ -564,7 +615,9 @@ export class ProvidersService {
         },
         metadata: {
           ...((existingOwnerDraft.metadata as Record<string, any>) || {}),
-          category: input.category || 'online_services',
+          category,
+          subcategory,
+          environment,
           geography: input.geography || ['UZ'],
           description: input.description,
           supportContact: normalizedSupport,
@@ -616,6 +669,9 @@ export class ProvidersService {
         logoUrl: input.logoUrl,
         type: (input.type as any) || ProviderType.SERVICES,
         status: ProviderStatus.DRAFT,
+        environment: environment as any,
+        category: category as any,
+        subcategory,
         adapterType: input.baseUrl ? 'remote-http' : 'sandbox',
         capabilities: input.capabilities,
         baseUrl: input.baseUrl,
@@ -628,7 +684,9 @@ export class ProvidersService {
           supportContact: normalizedSupport
         },
         metadata: {
-          category: input.category || 'online_services',
+          category,
+          subcategory,
+          environment,
           geography: input.geography || ['UZ'],
           description: input.description,
           supportContact: normalizedSupport,
@@ -811,9 +869,20 @@ export class ProvidersService {
     const capabilities = defaultCaps.filter((capability) =>
       !input.capabilities || input.capabilities.includes(capability),
     ) as any;
+    const environment = normalizeProviderEnvironment(input.metadata?.environment)
+      || normalizeProviderEnvironment((existing as any)?.environment || existingMetadata.environment)
+      || ProviderEnvironment.LIVE;
+    const category = normalizeProviderCategory(input.metadata?.category)
+      || normalizeProviderCategory((existing as any)?.category || existingMetadata.category)
+      || ProviderCategory.RETAIL;
+    const subcategory = typeof input.metadata?.subcategory === 'string'
+      ? input.metadata.subcategory.trim().slice(0, 100) || undefined
+      : (existing as any)?.subcategory || (typeof existingMetadata.subcategory === 'string' ? existingMetadata.subcategory : undefined);
     const safeMetadata = {
       description: typeof input.metadata?.description === 'string' ? input.metadata.description.slice(0, 2000) : undefined,
-      category: typeof input.metadata?.category === 'string' ? input.metadata.category.slice(0, 100) : undefined,
+      environment,
+      category,
+      subcategory,
     };
 
     if (existing) {
@@ -824,6 +893,9 @@ export class ProvidersService {
           baseUrl: input.baseUrl || existing.baseUrl,
           logoUrl: input.logoUrl !== undefined ? input.logoUrl : existing.logoUrl,
           status: dbStatus,
+          environment: environment as any,
+          category: category as any,
+          subcategory,
           adapterType: 'remote-http',
           encryptedSecret,
           capabilities,
@@ -853,6 +925,9 @@ export class ProvidersService {
           logoUrl: input.logoUrl || null,
           status: dbStatus,
           type: DbProviderType.COMMERCE,
+          environment: environment as any,
+          category: category as any,
+          subcategory,
           adapterType: 'remote-http',
           capabilities,
           baseUrl: input.baseUrl,
@@ -915,6 +990,9 @@ export class ProvidersService {
     }
 
     const normalizedSupport = normalizeSupportContact(input.supportContact);
+    const environment = normalizeProviderEnvironment(input.environment) || ProviderEnvironment.LIVE;
+    const category = normalizeProviderCategory(input.category) || defaultProviderCategoryForType(input.type);
+    const subcategory = input.subcategory?.trim() || undefined;
     const sandboxKey = generateApiKey(false);
     const webhookSecret = `zy_whsec_${randomBytes(32).toString('base64url')}`;
     const encryptedSecret = encryptSecret(webhookSecret, this.getEncryptionKey());
@@ -922,10 +1000,11 @@ export class ProvidersService {
     const result = await prisma.$transaction(async tx => {
       const provider = await tx.provider.create({ data: {
         slug, name: input.name.trim(), type: (input.type as any) || ProviderType.SERVICES,
+        environment: environment as any, category: category as any, subcategory,
         status: ProviderStatus.DRAFT, adapterType: input.baseUrl ? 'remote-http' : 'sandbox',
         capabilities: input.capabilities, baseUrl: input.baseUrl, encryptedSecret, webhookSecret,
         config: { authMethod: input.authMethod, authConfig: input.authConfig || {}, webhookUrl: input.webhookUrl, supportContact: normalizedSupport },
-        metadata: { category: input.category || 'online_services', geography: input.geography || ['UZ'], description: input.description, supportContact: normalizedSupport, fulfillmentMode: ProviderFulfillmentMode.REMOTE, isCertified: false, isPublished: false, reviewStatus: 'DRAFT', registeredAt: new Date().toISOString() }
+        metadata: { category, subcategory, environment, geography: input.geography || ['UZ'], description: input.description, supportContact: normalizedSupport, fulfillmentMode: ProviderFulfillmentMode.REMOTE, isCertified: false, isPublished: false, reviewStatus: 'DRAFT', registeredAt: new Date().toISOString() }
       }});
       const owner = await tx.user.create({ data: { id: randomUUID(), email: input.ownerEmail.trim().toLowerCase(), name: input.ownerName.trim(), passwordHash, role: UserRole.PROVIDER_OWNER, providerId: provider.id, isActive: true } });
       await tx.apiKey.create({ data: { name: `Provider sandbox key (${slug})`, keyHash: sandboxKey.keyHash, keyPrefix: sandboxKey.keyPrefix, role: UserRole.PROVIDER_DEVELOPER, userId: owner.id, providerId: provider.id, isActive: true } });
@@ -1355,23 +1434,44 @@ export class ProvidersService {
     webhookSecret: string;
     config?: any;
     metadata?: any;
+    environment?: ProviderEnvironment | string;
+    category?: ProviderCategory | string;
+    subcategory?: string;
   }) {
     const encryptedSecret = encryptSecret(data.secret, this.getEncryptionKey());
+    const type = data.type || ProviderType.SERVICES;
+    const environment = normalizeProviderEnvironment(data.environment || data.metadata?.environment)
+      || ProviderEnvironment.SANDBOX;
+    const category = normalizeProviderCategory(data.category || data.metadata?.category)
+      || defaultProviderCategoryForType(type);
+    const subcategory = typeof data.subcategory === 'string'
+      ? data.subcategory.trim().slice(0, 100) || undefined
+      : typeof data.metadata?.subcategory === 'string'
+        ? data.metadata.subcategory.trim().slice(0, 100) || undefined
+        : undefined;
 
     const provider = await prisma.provider.create({
       data: {
         slug: data.slug.toLowerCase().trim(),
         name: data.name,
         logoUrl: data.logoUrl,
-        type: data.type || ProviderType.SERVICES,
+        type,
         status: data.status || ProviderStatus.SANDBOX,
+        environment: environment as any,
+        category: category as any,
+        subcategory,
         adapterType: data.adapterType || 'sandbox',
         capabilities: data.capabilities,
         baseUrl: data.baseUrl,
         encryptedSecret,
         webhookSecret: data.webhookSecret,
         config: data.config || {},
-        metadata: data.metadata || {}
+        metadata: {
+          ...(data.metadata || {}),
+          environment,
+          category,
+          subcategory
+        }
       }
     });
 
@@ -1390,12 +1490,28 @@ export class ProvidersService {
     capabilities: ProviderCapability[];
     config: any;
     metadata: any;
+    environment: ProviderEnvironment | string;
+    category: ProviderCategory | string;
+    subcategory: string;
   }>) {
     const cleanSlug = slug.toLowerCase().trim();
     const updateData: any = { ...data };
     if (data.secret) {
       updateData.encryptedSecret = encryptSecret(data.secret, this.getEncryptionKey());
       delete updateData.secret;
+    }
+    if (data.environment !== undefined) {
+      const environment = normalizeProviderEnvironment(data.environment);
+      if (!environment) throw new BadRequestException('environment must be LIVE, SANDBOX, or STAGING.');
+      updateData.environment = environment as any;
+    }
+    if (data.category !== undefined) {
+      const category = normalizeProviderCategory(data.category);
+      if (!category) throw new BadRequestException('category must use a canonical provider category or a supported legacy alias.');
+      updateData.category = category as any;
+    }
+    if (data.subcategory !== undefined) {
+      updateData.subcategory = data.subcategory?.trim().slice(0, 100) || null;
     }
 
     const updated = await prisma.provider.update({
@@ -1459,6 +1575,24 @@ export class ProvidersService {
     return true;
   }
 
+  private resolveProviderEnvironment(value?: string): ProviderEnvironment {
+    if (!value) return ProviderEnvironment.LIVE;
+    const environment = normalizeProviderEnvironment(value);
+    if (!environment) {
+      throw new BadRequestException('environment must be LIVE, SANDBOX, or STAGING.');
+    }
+    return environment;
+  }
+
+  private resolveProviderCategory(value?: string): ProviderCategory | undefined {
+    if (!value || value.trim().toLowerCase() === 'all') return undefined;
+    const category = normalizeProviderCategory(value);
+    if (!category) {
+      throw new BadRequestException('category must use a canonical provider category or a supported legacy alias.');
+    }
+    return category;
+  }
+
   private mapToProviderInfo(p: any): ProviderInfo {
     const meta = (p.metadata as any) || {};
     // Review history may contain operations-only notes. Public/provider-facing
@@ -1467,6 +1601,11 @@ export class ProvidersService {
     const isPublished = isProviderPublished(p);
     const rawSupport = p.config?.supportContact || meta.supportContact;
     const supportContact = sanitizePublicSupportContact(normalizeSupportContact(rawSupport));
+    const environment = normalizeProviderEnvironment(p.environment || meta.environment) || ProviderEnvironment.LIVE;
+    const category = normalizeProviderCategory(p.category || meta.category) || defaultProviderCategoryForType(p.type as ProviderType);
+    const subcategory = typeof (p.subcategory || meta.subcategory) === 'string'
+      ? String(p.subcategory || meta.subcategory).trim() || undefined
+      : undefined;
 
     return {
       id: p.id,
@@ -1476,8 +1615,10 @@ export class ProvidersService {
       logoUrl: p.logoUrl || undefined,
       status: p.status as any,
       type: p.type as any,
+      environment,
       fulfillmentMode: (meta.fulfillmentMode || defaultFulfillmentModeForProviderType(p.type as any)) as ProviderFulfillmentMode,
-      category: meta.category || 'general',
+      category,
+      subcategory,
       geography: meta.geography || ['UZ'],
       adapterType: p.adapterType,
       authMethod: p.config?.authMethod || 'API_KEY',
@@ -1489,6 +1630,24 @@ export class ProvidersService {
       // Prevent stale registration metadata from contradicting the canonical
       // publication state on the provider record.
       metadata: { ...safeMeta, isPublished }
+    };
+  }
+
+  private mapToPublicProviderInfo(provider: ProviderInfo): PublicProviderInfo {
+    return {
+      slug: provider.slug,
+      name: provider.name,
+      description: provider.description || undefined,
+      logoUrl: provider.logoUrl || undefined,
+      status: provider.status,
+      type: provider.type,
+      environment: provider.environment,
+      fulfillmentMode: provider.fulfillmentMode || undefined,
+      category: provider.category,
+      subcategory: provider.subcategory || undefined,
+      geography: provider.geography,
+      capabilities: provider.capabilities,
+      supportContact: provider.supportContact || undefined
     };
   }
 

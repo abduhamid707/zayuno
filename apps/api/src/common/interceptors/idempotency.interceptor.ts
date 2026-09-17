@@ -2,13 +2,17 @@ import {
   Injectable,
   NestInterceptor,
   ExecutionContext,
-  CallHandler,
-  ConflictException
+  CallHandler
 } from '@nestjs/common';
 import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { RedisService } from '../services/redis.service';
-import { buildIdempotencyRedisKey } from '@zayuno/shared';
+import {
+  buildIdempotencyRedisKey,
+  createIdempotencyPayloadHash,
+  IdempotencyError,
+  IdempotencyPayloadConflictError
+} from '@zayuno/shared';
 
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {
@@ -32,13 +36,20 @@ export class IdempotencyInterceptor implements NestInterceptor {
     }
 
     const redisKey = buildIdempotencyRedisKey(req.path, idempotencyKey);
+    const payloadHash = createIdempotencyPayloadHash({
+      body: req.body || {},
+      query: req.query || {}
+    });
     const cachedRecordStr = await this.redisService.get(redisKey);
 
     if (cachedRecordStr) {
       try {
         const cached = JSON.parse(cachedRecordStr);
+        if (cached.payloadHash !== payloadHash) {
+          throw new IdempotencyPayloadConflictError();
+        }
         if (cached.status === 'PENDING') {
-          throw new ConflictException('A request with this idempotency key is currently processing. Please retry in a few seconds.');
+          throw new IdempotencyError();
         }
 
         if (cached.status === 'RESOLVED') {
@@ -47,7 +58,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
           return of(cached.response);
         }
       } catch (err: any) {
-        if (err instanceof ConflictException) throw err;
+        if (err instanceof IdempotencyError || err instanceof IdempotencyPayloadConflictError) throw err;
       }
     }
 
@@ -56,6 +67,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
       redisKey,
       JSON.stringify({
         status: 'PENDING',
+        payloadHash,
         createdAt: Date.now()
       }),
       30
@@ -68,6 +80,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
             redisKey,
             JSON.stringify({
               status: 'RESOLVED',
+              payloadHash,
               statusCode: res.statusCode || 200,
               response: responseBody,
               createdAt: Date.now()

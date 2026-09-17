@@ -8,7 +8,12 @@ import {
   HttpException,
   HttpStatus
 } from '@nestjs/common';
-import { RequestQuoteInput, CreateActionInput } from '@zayuno/contracts';
+import {
+  RequestQuoteInput,
+  CreateActionInput,
+  ProviderEnvironment,
+  ProviderCategory
+} from '@zayuno/contracts';
 import { QuotesService } from '../quotes/quotes.service';
 import { ActionsService } from '../actions/actions.service';
 import { RedisService } from '../../common/services/redis.service';
@@ -62,6 +67,9 @@ export class DeveloperSandboxService {
             name: 'Zayuno Sandbox Demonstration Provider',
             status: 'ACTIVE',
             type: 'SERVICES',
+            environment: ProviderEnvironment.SANDBOX as any,
+            category: ProviderCategory.PROFESSIONAL_SERVICES as any,
+            subcategory: 'developer_simulator',
             adapterType: 'sandbox',
             capabilities: [
               'METADATA',
@@ -80,7 +88,9 @@ export class DeveloperSandboxService {
             webhookSecret: 'dev_sandbox_webhook_secret',
             config: {},
             metadata: {
-              category: 'general_services',
+              environment: ProviderEnvironment.SANDBOX,
+              category: ProviderCategory.PROFESSIONAL_SERVICES,
+              subcategory: 'developer_simulator',
               description: 'Demonstration provider for developer simulator.'
             }
           }
@@ -98,7 +108,9 @@ export class DeveloperSandboxService {
           slug: 'sandbox-provider',
           name: 'Zayuno Sandbox Demonstration Provider',
           description: 'Universal sandbox provider simulating discovery, quote, action, and payment handoff.',
-          category: 'general_services',
+          environment: ProviderEnvironment.SANDBOX,
+          category: ProviderCategory.PROFESSIONAL_SERVICES,
+          subcategory: 'developer_simulator',
           capabilities: [
             'METADATA',
             'HEALTH',

@@ -3219,7 +3219,10 @@ USER=${JSON.stringify(prompt)}`;
         items,
         parameters: state.parameters,
       });
-      if (!availability.isAvailable || availability.unavailableItems?.length) {
+      const isDefinitivelyUnavailable =
+        availability.availabilityStatus === "UNAVAILABLE" ||
+        availability.isAvailable === false;
+      if (isDefinitivelyUnavailable || availability.unavailableItems?.length) {
         await this.redisService.del(this.orderStateKey(userId, conversationId));
         return "Tanlangan mahsulot hozir mavjud emas. Boshqa variantni tanlab ko‘raylik.";
       }

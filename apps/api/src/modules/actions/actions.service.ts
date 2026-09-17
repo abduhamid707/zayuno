@@ -7,11 +7,14 @@ import {
   generatePublicActionId,
   NotFoundError,
   IdempotencyError,
+  IdempotencyPayloadConflictError,
+  createIdempotencyPayloadHash,
   Logger,
   isProviderPublished,
   isSandboxCheckoutUrl,
   normalizeSupportContact,
-  sanitizePublicSupportContact
+  sanitizePublicSupportContact,
+  toPublicPaymentOptions
 } from '@zayuno/shared';
 import { ZayunoEventTopic } from '@zayuno/event-schemas';
 import {
@@ -21,6 +24,7 @@ import {
   CancelActionInput,
   CancelActionInputSchema,
   CancelActionResult,
+  CancelActionResultSchema,
   ActionStatus,
   PaymentStatus,
   ProviderCapability
@@ -28,6 +32,7 @@ import {
 import { QuoteExpiredError, ActionCancellationError } from '@zayuno/provider-sdk';
 import { RedisService } from '../../common/services/redis.service';
 import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
+import { assertDeclaredDynamicParameters } from '../../common/dynamic-parameter-validation';
 
 type AccessScope = {
   id?: string;
@@ -68,6 +73,17 @@ export class ActionsService {
         `Sensitive identity or payment field "${forbiddenKey}" is not allowed in action parameters. Use the provider-owned secure handoff.`
       );
     }
+    const idempotencyPayloadHash = createIdempotencyPayloadHash({
+      providerSlug: cleanSlug,
+      quoteId: input.quoteId,
+      locationId: input.locationId || null,
+      items: input.items || [],
+      customer: input.customer || null,
+      destination: input.destination || null,
+      fulfillmentType: input.fulfillmentType || null,
+      paymentMethod: input.paymentMethod || null,
+      parameters: input.parameters || {}
+    });
 
     // A client-supplied idempotency key is only meaningful inside that
     // client's account. Without this namespace, another API consumer who
@@ -84,7 +100,10 @@ export class ActionsService {
           timeline: { orderBy: { createdAt: 'asc' } }
         }
       });
-      if (concurrentAction) return this.mapDbActionToNormalized(concurrentAction);
+      if (concurrentAction) {
+        this.assertIdempotencyPayloadMatches(concurrentAction, idempotencyPayloadHash);
+        return this.mapDbActionToNormalized(concurrentAction);
+      }
       throw new IdempotencyError();
     }
 
@@ -100,6 +119,7 @@ export class ActionsService {
       });
 
       if (existingAction) {
+        this.assertIdempotencyPayloadMatches(existingAction, idempotencyPayloadHash);
         this.logger.info(`Idempotent hit: returning existing action ${existingAction.publicId} for key ${input.idempotencyKey}`);
         return this.mapDbActionToNormalized(existingAction);
       }
@@ -116,6 +136,7 @@ export class ActionsService {
         if (existingQuoteAction) {
           if (userId) {
             if (existingQuoteAction.userId === userId) {
+              this.assertIdempotencyPayloadMatches(existingQuoteAction, idempotencyPayloadHash);
               this.logger.info(`Quote action hit: returning existing action ${existingQuoteAction.publicId} for user ${userId} on quote ${input.quoteId}`);
               return this.mapDbActionToNormalized(existingQuoteAction);
             } else {
@@ -136,6 +157,7 @@ export class ActionsService {
             const hasValidCredential = Boolean(input.idempotencyKey && existingQuoteAction.idempotencyKey === scopedIdempotencyKey);
 
             if (hasValidCredential) {
+              this.assertIdempotencyPayloadMatches(existingQuoteAction, idempotencyPayloadHash);
               this.logger.info(
                 `Quote action hit: returning existing action ${existingQuoteAction.publicId} for verified anonymous idempotencyKey on quote ${input.quoteId}`
               );
@@ -181,6 +203,10 @@ export class ActionsService {
       if (!adapter.createAction) {
         throw new BadRequestException(`Provider "${cleanSlug}" does not implement createAction.`);
       }
+      await assertDeclaredDynamicParameters(adapter, cleanSlug, input.parameters, {
+        locationId: input.locationId,
+        offeringIds: input.items.map(item => item.offeringId)
+      });
 
       // 4. Call Provider Adapter
       const providerAction = await adapter.createAction({
@@ -249,6 +275,7 @@ export class ActionsService {
           paymentStatus: (providerAction.paymentStatus || PaymentStatus.PENDING) as DbPaymentStatus,
           paymentUrl: providerPaymentUrl,
           idempotencyKey: scopedIdempotencyKey,
+          idempotencyHash: idempotencyPayloadHash,
           parameters: (input.parameters as any) || {},
           metadata: input.locationId ? { providerLocationId: input.locationId } : {}
         },
@@ -358,6 +385,7 @@ export class ActionsService {
       return {
         success: true,
         actionId: action.publicId,
+        externalActionId: action.externalActionId || undefined,
         previousStatus: ActionStatus.CANCELLED,
         newStatus: ActionStatus.CANCELLED,
         message: 'Action is already cancelled.',
@@ -411,7 +439,18 @@ export class ActionsService {
       reason: input.reason
     });
 
-    return cancelResult;
+    // Provider cancel endpoints may return their own external/public ID. The
+    // Zayuno action reference must remain stable across initial and repeated
+    // cancellation responses, so keep the provider ID in its own field.
+    return CancelActionResultSchema.parse({
+      success: cancelResult.success,
+      actionId: action.publicId,
+      externalActionId: action.externalActionId || cancelResult.externalActionId || undefined,
+      previousStatus: cancelResult.previousStatus,
+      newStatus: cancelResult.newStatus,
+      message: cancelResult.message,
+      refundInitiated: cancelResult.refundInitiated
+    });
   }
 
   async getPaymentOptions(actionId: string, access?: AccessScope) {
@@ -423,10 +462,11 @@ export class ActionsService {
     this.assertActionAccess(action, access);
     const adapter = await this.registry.assertAndGetCapability(action.provider.slug, ProviderCapability.PAYMENT_OPTIONS);
     if (adapter.getPaymentOptions) {
-      return adapter.getPaymentOptions({
+      const options = await adapter.getPaymentOptions({
         providerSlug: action.provider.slug,
         actionId: action.externalActionId || action.id
       });
+      return toPublicPaymentOptions(options);
     }
 
     return [];
@@ -485,6 +525,11 @@ export class ActionsService {
     if (isProviderUser && access.providerId === action.providerId) return;
     if (!isProviderUser && access.id && access.id === action.userId) return;
     throw new ForbiddenException('You do not have access to this action.');
+  }
+
+  private assertIdempotencyPayloadMatches(action: { idempotencyHash?: string | null }, expectedHash: string): void {
+    if (action.idempotencyHash && action.idempotencyHash === expectedHash) return;
+    throw new IdempotencyPayloadConflictError();
   }
 
   private mapDbActionToNormalized(dbAction: any): NormalizedAction {

@@ -6,7 +6,20 @@ import {
   HttpStatus
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { ZayunoError, Logger } from '@zayuno/shared';
+import {
+  ZayunoError,
+  Logger,
+  getAgentErrorPresentation,
+  normalizeZayunoErrorCode
+} from '@zayuno/shared';
+
+function isStructuredZayunoError(value: unknown): value is ZayunoError {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.statusCode === 'number'
+    && typeof candidate.code === 'string'
+    && typeof candidate.message === 'string';
+}
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -20,20 +33,26 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal Server Error';
-    let code = 'INTERNAL_ERROR';
+    let rawCode: unknown = 'INTERNAL_ERROR';
     let details: any = undefined;
+    let retryable: boolean | undefined;
 
-    if (exception instanceof ZayunoError) {
+    if (exception instanceof ZayunoError || isStructuredZayunoError(exception)) {
       status = exception.statusCode;
       message = exception.message;
-      code = exception.code;
+      rawCode = exception.code;
       details = exception.details;
+      retryable = typeof exception.retryable === 'boolean'
+        ? exception.retryable
+        : typeof details?.retryable === 'boolean'
+          ? details.retryable
+          : undefined;
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
       if (typeof res === 'object' && res !== null) {
         message = (res as any).message || exception.message;
-        code = (res as any).error || 'HTTP_ERROR';
+        rawCode = (res as any).errorCode || (res as any).code || (res as any).error || 'HTTP_ERROR';
         details = res;
       } else {
         message = exception.message;
@@ -41,6 +60,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     } else if (exception instanceof Error) {
       message = exception.message;
     }
+
+    const code = normalizeZayunoErrorCode(rawCode, status, Array.isArray(message) ? message.join('; ') : message);
+    const presentation = getAgentErrorPresentation({
+      errorCode: code,
+      statusCode: status,
+      details,
+      retryable
+    });
+    retryable = retryable ?? presentation.retryable;
 
     this.logger.error(`[${request.method}] ${request.url} failed with status ${status}: ${message}`, exception, {
       traceId,
@@ -53,8 +81,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
       success: false,
       statusCode: status,
       code,
-      message,
-      details,
+      errorCode: code,
+      // The transport boundary returns the canonical presentation only. Raw
+      // provider messages and exception details remain in server logs because
+      // they can contain credentials, endpoints, or vendor-specific internals.
+      message: presentation.customerMessage,
+      customerMessage: presentation.customerMessage,
+      agentMessage: presentation.agentMessage,
+      recommendedAction: presentation.recommendedAction,
+      retryable,
       traceId,
       timestamp: new Date().toISOString()
     });

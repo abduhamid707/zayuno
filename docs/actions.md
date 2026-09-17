@@ -40,4 +40,6 @@ On an uncertain timeout, query the existing action or retry the same key. Do not
 
 When ACTION_CANCEL is supported, use the canonical cancellation route and payload. A stable reasonCode and safe human-readable reason help explain the result.
 
+Cancellation responses always use Zayuno's public reference in `actionId`. If a provider has its own identifier, it is returned separately as `externalActionId`; never substitute it into `actionId`.
+
 Provider sends signed status events to Zayuno's webhook endpoint. Polling GET /actions/:id must reflect the same order identity and authoritative state. Cancellation, payment and fulfillment should remain consistent.

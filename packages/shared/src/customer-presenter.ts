@@ -1,4 +1,5 @@
 import { isProviderPublished, isProviderDiscoveryReady } from './publishing.js';
+import { getAgentErrorPresentation } from './errors.js';
 
 export interface CustomerQuoteFormatOptions {
   origin?: string;
@@ -114,6 +115,8 @@ export function isDemoOrSandboxAction(action: any, providerInfo?: any): boolean 
   return (
     isDemoOrSandboxProvider(providerInfo) ||
     isDemoOrSandboxProvider(action) ||
+    action?.isSandbox === true ||
+    action?.environment === 'SANDBOX' ||
     actionMetadata.sandbox === true ||
     actionMetadata.isDemo === true ||
     actionMetadata.environment === 'SANDBOX' ||
@@ -430,6 +433,15 @@ export function formatCustomerActionCancellation(result: any, providerInfo?: any
  */
 export function formatCustomerAvailability(result: any, providerInfo?: any): string {
   if (!result) return 'Mavjudlik tekshirildi.';
+  const availabilityStatus = result.availabilityStatus || (
+    result.isAvailable === true ? 'AVAILABLE' : result.isAvailable === false ? 'UNAVAILABLE' : 'UNKNOWN'
+  );
+  if (availabilityStatus === 'NOT_SUPPORTED') {
+    return 'Jonli mavjudlikni oldindan tekshirish imkoni yo‘q. Yakuniy mavjudlik narx hisoblanganda tasdiqlanadi.';
+  }
+  if (availabilityStatus === 'UNKNOWN' || availabilityStatus === 'STALE' || availabilityStatus === 'ERROR') {
+    return 'Jonli mavjudlikni hozir ishonchli tekshirib bo‘lmadi. Yakuniy mavjudlik narx hisoblanganda tasdiqlanadi.';
+  }
   if (result.isAvailable) {
     if (Array.isArray(result.availableItems) && result.availableItems.length > 0) {
       const isTicket = isTicketPresentation(result, providerInfo);
@@ -543,7 +555,10 @@ export function formatCustomerPaymentOptions(options: any[], action?: any, provi
  * Formats a friendly customer-facing error message, strictly without technical jargon.
  */
 export function formatCustomerError(error?: unknown): string {
-  return 'Hozir buyurtmani yakunlay olmadim. Qayta urinib ko‘raymi?';
+  // Keep customer language free of raw provider/API errors while allowing the
+  // platform error taxonomy to choose an accurate recovery message.
+  // `require` is deliberately avoided so this remains a normal shared export.
+  return getAgentErrorPresentation(error).customerMessage;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProviderError } from './errors';
 
 export interface ProviderContractIssue {
   code: string;
@@ -11,7 +12,7 @@ export interface ProviderContractIssue {
   fixExample?: string;
 }
 
-export class ProviderContractValidationError extends Error {
+export class ProviderContractValidationError extends ProviderError {
   readonly issue: ProviderContractIssue;
   readonly issues: ProviderContractIssue[];
 
@@ -29,7 +30,7 @@ export class ProviderContractValidationError extends Error {
     const summary = list.length > 1
       ? `${primary.endpoint} javobida ${list.length} ta schema xatosi aniqlandi: ${list.map(i => `${i.path} (${i.expected})`).join('; ')}`
       : primary.message;
-    super(summary);
+    super(summary, 502, 'PROVIDER_RESPONSE_INVALID', { retryable: false });
     this.name = 'ProviderContractValidationError';
     this.issue = primary;
     this.issues = list;

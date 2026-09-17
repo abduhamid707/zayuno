@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import {
   ActionStatus, PaymentMethodType, PaymentStatus, ProviderCapability, ProviderStatus, ProviderType,
   type CreateActionInput, type NormalizedAction, type NormalizedQuote, type QuoteLine, type RequestQuoteInput,
-  type CheckAvailabilityInput, type AvailabilityResult
+  type CheckAvailabilityInput, type AvailabilityResult, AvailabilityStatus
 } from '@zayuno/contracts';
 import { COFFEE_CATEGORIES, COFFEE_LOCATIONS, COFFEE_OFFERINGS } from './data';
 
@@ -82,7 +82,13 @@ export function createCoffeeTimeSandboxApp(): Express {
       const payload = { eventId: makeId('ct_evt'), eventType, providerSlug: SLUG, externalActionId: action.externalActionId, newStatus: action.status, newPaymentStatus: action.paymentStatus, timestamp: new Date().toISOString(), payload: { sandboxState: action.sandboxState } };
       const raw = JSON.stringify(payload);
       const signature = crypto.createHmac('sha256', webhookSecret).update(raw).digest('hex');
-      await fetch(`${zayunoApi}/api/v1/webhooks/${SLUG}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-provider-signature': signature }, body: raw });
+      await fetch(`${zayunoApi}/api/v1/webhooks/${SLUG}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-provider-signature': signature },
+        body: raw,
+        signal: AbortSignal.timeout(5_000),
+        redirect: 'error'
+      });
     } catch (err: any) {
       // Non-blocking in local test runs
     }
@@ -103,6 +109,7 @@ export function createCoffeeTimeSandboxApp(): Express {
         return res.status(400).json({ message: 'At least one item is required.' });
       }
       const result: AvailabilityResult = {
+        availabilityStatus: AvailabilityStatus.AVAILABLE,
         isAvailable: true,
         unavailableItems: [],
         availableItems: [],
@@ -113,6 +120,7 @@ export function createCoffeeTimeSandboxApp(): Express {
       for (const item of input.items) {
         const offering = COFFEE_OFFERINGS.find(value => value.id === item.offeringId || value.offeringCode === item.offeringId);
         if (!offering || !offering.isAvailable) {
+          result.availabilityStatus = AvailabilityStatus.UNAVAILABLE;
           result.isAvailable = false;
           result.unavailableItems.push({ offeringId: item.offeringId, reason: 'Offering is not available.' });
           continue;
@@ -120,6 +128,7 @@ export function createCoffeeTimeSandboxApp(): Express {
         if (item.variantId) {
           const variant = offering.variants?.find(v => v.id === item.variantId);
           if (!variant || variant.isAvailable === false) {
+            result.availabilityStatus = AvailabilityStatus.UNAVAILABLE;
             result.isAvailable = false;
             result.unavailableItems.push({ offeringId: item.offeringId, reason: `Variant "${item.variantId}" is not available.` });
             continue;
@@ -129,6 +138,7 @@ export function createCoffeeTimeSandboxApp(): Express {
           const group = offering.optionGroups?.find(g => g.id === selected.groupId);
           const option = group?.options.find(o => o.id === selected.optionId);
           if (!group || !option || option.isAvailable === false) {
+            result.availabilityStatus = AvailabilityStatus.UNAVAILABLE;
             result.isAvailable = false;
             result.unavailableItems.push({ offeringId: item.offeringId, reason: `Option "${selected.optionId}" is not available.` });
             continue;

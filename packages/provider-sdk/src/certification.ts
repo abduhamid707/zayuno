@@ -12,7 +12,7 @@ import {
   getMandatoryCapabilitiesForProfile,
   requiresActiveLocations,
   ActionStatus,
-  PaymentMethodType,
+  CreateActionInput,
   Offering,
   SelectedOption,
   PROVIDER_PROTOCOL_ENDPOINTS
@@ -21,6 +21,17 @@ import { ProviderContractValidationError } from './protocol-validation';
 
 export type CertificationTestStatus = 'PASS' | 'FAIL' | 'SKIPPED';
 export type CertificationTestStage = 'CONTRACT_READINESS' | 'LIFECYCLE_E2E';
+export type CertificationMode = 'STANDARD' | 'ADVERSARIAL';
+
+/**
+ * STANDARD retains the existing compatibility-oriented certification flow.
+ * ADVERSARIAL adds safe negative probes only for capabilities implemented by
+ * the adapter. It is intentionally opt-in because a transactional provider
+ * must prepare a certification-safe test environment before it is probed.
+ */
+export interface CertificationRunOptions {
+  mode?: CertificationMode;
+}
 
 export interface CertificationIssue {
   code: string;
@@ -53,6 +64,7 @@ export interface CertificationTestResult {
 
 export interface CertificationReport {
   providerSlug: string;
+  mode: CertificationMode;
   totalTests: number;
   passedCount: number;
   failedCount: number;
@@ -78,9 +90,11 @@ export interface CertificationReport {
  */
 export class ProviderCertificationRunner {
   private adapter: ProviderAdapter;
+  private readonly defaultOptions: CertificationRunOptions;
 
-  constructor(adapter: ProviderAdapter) {
+  constructor(adapter: ProviderAdapter, options: CertificationRunOptions = {}) {
     this.adapter = adapter;
+    this.defaultOptions = options;
   }
 
   private endpointFor(testId?: string, capability?: ProviderCapability) {
@@ -236,7 +250,72 @@ export class ProviderCertificationRunner {
     }
   }
 
-  async runAllTests(): Promise<CertificationReport> {
+  private addSkippedTest(
+    results: CertificationTestResult[],
+    testId: string,
+    name: string,
+    capability: ProviderCapability,
+    reason: string
+  ): void {
+    const endpoint = this.endpointFor(testId, capability);
+    results.push({
+      testId,
+      name,
+      stage: 'LIFECYCLE_E2E',
+      capability,
+      isMandatory: false,
+      passed: false,
+      status: 'SKIPPED',
+      durationMs: 0,
+      endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
+      docsUrl: endpoint ? `https://partners.zayuno.uz/docs/contract-reference/#${endpoint.docsAnchor}` : undefined,
+      error: reason,
+      issue: {
+        code: 'ADVERSARIAL_PROBE_NOT_APPLICABLE',
+        endpoint: endpoint ? `${endpoint.method} ${endpoint.path}` : undefined,
+        docsUrl: endpoint ? `https://partners.zayuno.uz/docs/contract-reference/#${endpoint.docsAnchor}` : undefined,
+        rootCause: reason
+      }
+    });
+  }
+
+  private errorCodeFor(error: unknown): string | undefined {
+    if (!error || typeof error !== 'object') return undefined;
+    const candidate = error as {
+      code?: unknown;
+      errorCode?: unknown;
+      name?: unknown;
+      details?: { code?: unknown; errorCode?: unknown };
+    };
+    const value = candidate.errorCode || candidate.code || candidate.details?.errorCode || candidate.details?.code;
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim().toUpperCase().replace(/[\s-]+/g, '_');
+    }
+    // Adapters that validate the canonical request locally surface ZodError
+    // before any network call. That is a valid rejection of malformed input.
+    if (candidate.name === 'ZodError') return 'VALIDATION_ERROR';
+    return undefined;
+  }
+
+  private async expectRejectedWithCode(
+    attempt: () => Promise<unknown>,
+    expectedCodes: string[],
+    label: string
+  ): Promise<void> {
+    try {
+      await attempt();
+    } catch (error: any) {
+      const code = this.errorCodeFor(error);
+      if (code && expectedCodes.includes(code)) return;
+      const received = code || error?.message || String(error);
+      throw new Error(`${label} must be rejected with ${expectedCodes.join(' or ')}; received ${received}.`);
+    }
+    throw new Error(`${label} was accepted. The provider must reject malformed selections before pricing.`);
+  }
+
+  async runAllTests(runOptions: CertificationRunOptions = {}): Promise<CertificationReport> {
+    const mode = runOptions.mode ?? this.defaultOptions.mode ?? 'STANDARD';
+    const adversarialMode = mode === 'ADVERSARIAL';
     const results: CertificationTestResult[] = [];
     const declaredCaps = this.adapter.getCapabilities();
     const profile = determineProviderCapabilityProfile(declaredCaps);
@@ -489,31 +568,197 @@ export class ProviderCertificationRunner {
       }, ['catalog'], 'LIFECYCLE_E2E');
     }
 
-    // 7. Action Create & Payment Handoff (MANDATORY)
-    let createdActionId: string | undefined;
-    const testIdempKey = crypto.randomUUID();
+    // V2 adversarial probes are opt-in and quote-only: they cannot create a
+    // provider action. Each probe is tied to QUOTE and runs only after a valid
+    // quote proves the selected catalog fixture is usable.
+    if (adversarialMode && this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote) {
+      await this.runTest(
+        results,
+        'adversarial-invalid-selection',
+        'Adversarial Invalid Selection Rejection',
+        ProviderCapability.QUOTE,
+        true,
+        async () => {
+          const offering = selectedTestOffering;
+          const offeringId = offering?.id || offering?.offeringCode;
+          if (!offering || !offeringId) {
+            throw new Error('Catalog has no offering available for the invalid-selection probe.');
+          }
 
-    if (this.adapter.hasCapability(ProviderCapability.ACTION_CREATE) && this.adapter.createAction) {
-      await this.runTest(results, 'action-create', 'Action Creation & Payment Handoff', ProviderCapability.ACTION_CREATE, true, async () => {
-        const testOfferingId = selectedTestOffering!.id || selectedTestOffering!.offeringCode;
-        const action = await this.adapter.createAction!({
-          idempotencyKey: testIdempKey,
-          providerSlug: this.adapter.providerSlug,
-          quoteId: testQuoteId!,
-          locationId: testLocationId,
-          customer: {
-            name: 'Certification Validator',
-            phone: '+998901234567'
-          },
-          destination: certificationDestination,
-          items: [{
-            offeringId: testOfferingId,
+          const invalidSuffix = `__zayuno_cert_invalid_${crypto.randomUUID()}`;
+          const invalidItem: {
+            offeringId: string;
+            variantId?: string;
+            quantity: number;
+            selectedOptions: SelectedOption[];
+          } = {
+            offeringId,
             variantId: selectedTestVariantId,
             quantity: 1,
             selectedOptions: selectedTestOptions
-          }],
-          userConfirmed: true
-        });
+          };
+
+          const availableVariant = offering.variants?.find(variant => variant.isAvailable !== false);
+          const optionGroup = offering.optionGroups?.find(group =>
+            group.options.some(option => option.isAvailable !== false)
+          );
+
+          if (availableVariant) {
+            invalidItem.variantId = `${availableVariant.id}${invalidSuffix}`;
+          } else if (optionGroup) {
+            invalidItem.selectedOptions = [
+              ...selectedTestOptions.filter(option => option.groupId !== optionGroup.id),
+              { groupId: optionGroup.id, optionId: `invalid-option${invalidSuffix}`, quantity: 1 }
+            ];
+          } else {
+            invalidItem.offeringId = `${offeringId}${invalidSuffix}`;
+          }
+
+          await this.expectRejectedWithCode(
+            () => this.adapter.requestQuote!({
+              providerSlug: this.adapter.providerSlug,
+              locationId: testLocationId,
+              items: [invalidItem],
+              destination: certificationDestination
+            }),
+            ['OFFERING_NOT_FOUND', 'INVALID_VARIANT', 'INVALID_OPTION', 'VALIDATION_ERROR', 'RESOURCE_NOT_FOUND'],
+            'Invalid catalog selection'
+          );
+        },
+        ['quote'],
+        'LIFECYCLE_E2E'
+      );
+
+      await this.runTest(
+        results,
+        'adversarial-zero-quantity',
+        'Adversarial Zero Quantity Rejection',
+        ProviderCapability.QUOTE,
+        true,
+        async () => {
+          const offeringId = selectedTestOffering?.id || selectedTestOffering?.offeringCode;
+          if (!offeringId) throw new Error('Catalog has no offering available for the zero-quantity probe.');
+
+          await this.expectRejectedWithCode(
+            () => this.adapter.requestQuote!({
+              providerSlug: this.adapter.providerSlug,
+              locationId: testLocationId,
+              items: [{
+                offeringId,
+                variantId: selectedTestVariantId,
+                quantity: 0,
+                selectedOptions: selectedTestOptions
+              }],
+              destination: certificationDestination
+            }),
+            ['INVALID_QUANTITY', 'VALIDATION_ERROR'],
+            'Zero item quantity'
+          );
+        },
+        ['quote'],
+        'LIFECYCLE_E2E'
+      );
+
+      const pricedOption = selectedTestOffering?.optionGroups
+        .flatMap(group => group.options
+          .filter(option => option.isAvailable !== false && Number.isFinite(Number(option.priceDelta)) && Number(option.priceDelta) !== 0)
+          .map(option => ({ group, option })))
+        .find(Boolean);
+
+      if (!pricedOption) {
+        this.addSkippedTest(
+          results,
+          'adversarial-option-quantity-math',
+          'Adversarial Option Quantity Math',
+          ProviderCapability.QUOTE,
+          'Catalogda narxi nol bo‘lmagan selectable option yo‘q; option-quantity matematikasi bu provider uchun qo‘llanmaydi.'
+        );
+      } else {
+        await this.runTest(
+          results,
+          'adversarial-option-quantity-math',
+          'Adversarial Option Quantity Math',
+          ProviderCapability.QUOTE,
+          true,
+          async () => {
+            const offeringId = selectedTestOffering?.id || selectedTestOffering?.offeringCode;
+            if (!offeringId) throw new Error('Catalog has no offering available for the option-quantity probe.');
+
+            const itemQuantity = 2;
+            const optionQuantity = 2;
+            const expectedOptionsTotal = Number(pricedOption.option.priceDelta) * optionQuantity * itemQuantity;
+            const selectedOptions = [
+              ...selectedTestOptions.filter(option => option.groupId !== pricedOption.group.id),
+              { groupId: pricedOption.group.id, optionId: pricedOption.option.id, quantity: optionQuantity }
+            ];
+
+            const quote = await this.adapter.requestQuote!({
+              providerSlug: this.adapter.providerSlug,
+              locationId: testLocationId,
+              items: [{
+                offeringId,
+                variantId: selectedTestVariantId,
+                quantity: itemQuantity,
+                selectedOptions
+              }],
+              destination: certificationDestination
+            });
+
+            const line = quote.lines.find(candidate => candidate.offeringId === offeringId);
+            if (!line) throw new Error('Option-quantity quote is missing the requested offering line.');
+
+            const reportedOptionsTotal = Number(line.optionsTotal);
+            if (!Number.isFinite(reportedOptionsTotal) || Math.abs(reportedOptionsTotal - expectedOptionsTotal) > 0.01) {
+              throw new Error(
+                `Option quantity math error: expected optionsTotal ${expectedOptionsTotal} ` +
+                `(priceDelta ${pricedOption.option.priceDelta} × option quantity ${optionQuantity} × item quantity ${itemQuantity}) ` +
+                `but received ${line.optionsTotal}.`
+              );
+            }
+
+            const expectedLineTotal = Number(line.unitPrice) * itemQuantity + reportedOptionsTotal;
+            if (!Number.isFinite(Number(line.lineTotal)) || Math.abs(Number(line.lineTotal) - expectedLineTotal) > 0.01) {
+              throw new Error(
+                `Option quantity line math error: expected lineTotal ${expectedLineTotal} ` +
+                `(unitPrice ${line.unitPrice} × item quantity ${itemQuantity} + optionsTotal ${reportedOptionsTotal}) ` +
+                `but received ${line.lineTotal}.`
+              );
+            }
+          },
+          ['quote'],
+          'LIFECYCLE_E2E'
+        );
+      }
+    }
+
+    // 7. Action Create & Payment Handoff (MANDATORY)
+    let createdActionId: string | undefined;
+    const testIdempKey = crypto.randomUUID();
+    const createCertificationActionInput = (customerName = 'Certification Validator'): CreateActionInput => {
+      const offeringId = selectedTestOffering!.id || selectedTestOffering!.offeringCode;
+      return {
+        idempotencyKey: testIdempKey,
+        providerSlug: this.adapter.providerSlug,
+        quoteId: testQuoteId!,
+        locationId: testLocationId,
+        customer: {
+          name: customerName,
+          phone: '+998901234567'
+        },
+        destination: certificationDestination,
+        items: [{
+          offeringId,
+          variantId: selectedTestVariantId,
+          quantity: 1,
+          selectedOptions: selectedTestOptions
+        }],
+        userConfirmed: true
+      };
+    };
+
+    if (this.adapter.hasCapability(ProviderCapability.ACTION_CREATE) && this.adapter.createAction) {
+      await this.runTest(results, 'action-create', 'Action Creation & Payment Handoff', ProviderCapability.ACTION_CREATE, true, async () => {
+        const action = await this.adapter.createAction!(createCertificationActionInput());
 
         if (!action.id && !action.externalActionId) {
           throw new Error('Action creation must return a valid ID or externalActionId.');
@@ -535,25 +780,7 @@ export class ProviderCertificationRunner {
 
       // 7b. Idempotency Validation (MANDATORY)
       await this.runTest(results, 'action-idempotency', 'Action Idempotency Protection', ProviderCapability.ACTION_CREATE, true, async () => {
-        const testOfferingId = selectedTestOffering!.id || selectedTestOffering!.offeringCode;
-        const dupAction = await this.adapter.createAction!({
-          idempotencyKey: testIdempKey,
-          providerSlug: this.adapter.providerSlug,
-          quoteId: testQuoteId!,
-          locationId: testLocationId,
-          customer: {
-            name: 'Certification Validator',
-            phone: '+998901234567'
-          },
-          destination: certificationDestination,
-          items: [{
-            offeringId: testOfferingId,
-            variantId: selectedTestVariantId,
-            quantity: 1,
-            selectedOptions: selectedTestOptions
-          }],
-          userConfirmed: true
-        });
+        const dupAction = await this.adapter.createAction!(createCertificationActionInput());
 
         const originalId = createdActionId;
         const dupId = dupAction.id || dupAction.externalActionId;
@@ -561,6 +788,42 @@ export class ProviderCertificationRunner {
           throw new Error(`Idempotency failure: duplicate creation generated new ID (${dupId}) instead of returning original (${originalId}).`);
         }
       }, ['action-create'], 'LIFECYCLE_E2E');
+
+      if (adversarialMode) {
+        await this.runTest(
+          results,
+          'adversarial-idempotency-payload-collision',
+          'Adversarial Idempotency Payload Collision',
+          ProviderCapability.ACTION_CREATE,
+          true,
+          async () => {
+            let collisionError: unknown;
+            try {
+              // The quote, item and destination remain unchanged. Changing a
+              // customer field proves the key is bound to the full request,
+              // rather than merely to a quote or provider slug.
+              await this.adapter.createAction!(createCertificationActionInput('Certification Collision Probe'));
+            } catch (error) {
+              collisionError = error;
+            }
+
+            if (!collisionError) {
+              throw new Error('Idempotency payload collision was accepted and may create a different action.');
+            }
+
+            const code = this.errorCodeFor(collisionError);
+            if (code !== 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD') {
+              const received = code || (collisionError as any)?.message || String(collisionError);
+              throw new Error(
+                'Changed payload with the same idempotency key must return ' +
+                `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD; received ${received}.`
+              );
+            }
+          },
+          ['action-idempotency'],
+          'LIFECYCLE_E2E'
+        );
+      }
     }
 
     // 8. Action Status Capability (MANDATORY)
@@ -662,6 +925,7 @@ export class ProviderCertificationRunner {
 
     return {
       providerSlug: this.adapter.providerSlug,
+      mode,
       totalTests: results.length,
       passedCount,
       failedCount,

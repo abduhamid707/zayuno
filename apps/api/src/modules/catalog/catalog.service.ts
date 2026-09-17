@@ -3,8 +3,17 @@ import { createHash } from 'crypto';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
 import { ProvidersService } from '../providers/providers.service';
 import { RedisService } from '../../common/services/redis.service';
-import { Catalog, Offering, AvailabilityResult, CheckAvailabilityInput, ProviderCapability } from '@zayuno/contracts';
+import {
+  Catalog,
+  Offering,
+  AvailabilityResult,
+  AvailabilityResultSchema,
+  AvailabilityStatus,
+  CheckAvailabilityInput,
+  ProviderCapability
+} from '@zayuno/contracts';
 import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
+import { assertDeclaredDynamicParameters } from '../../common/dynamic-parameter-validation';
 
 type CacheEnvelope<T> = {
   version: 1;
@@ -65,6 +74,7 @@ export class CatalogService {
       if (!adapter.getCatalog) {
         throw new BadRequestException(`Provider "${cleanSlug}" does not implement getCatalog.`);
       }
+      await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, { locationId });
       const rawCatalog = await adapter.getCatalog({
         providerSlug: cleanSlug,
         locationId,
@@ -101,6 +111,10 @@ export class CatalogService {
       if (!adapter.getOffering) {
         throw new BadRequestException(`Provider "${cleanSlug}" does not implement getOffering.`);
       }
+      await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, {
+        locationId,
+        offeringIds: [offeringId]
+      });
       const rawOffering = await adapter.getOffering({
         providerSlug: cleanSlug,
         offeringId,
@@ -133,21 +147,102 @@ export class CatalogService {
     });
 
     return this.readThroughCache(cacheKey, SEARCH_CACHE_POLICY, async () => {
-      const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.SEARCH);
-      if (!adapter.searchOfferings) {
-        throw new BadRequestException(`Provider "${cleanSlug}" does not implement searchOfferings.`);
+      try {
+        const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.SEARCH);
+        if (adapter.searchOfferings) {
+          await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, { locationId });
+          const rawOfferings = await adapter.searchOfferings({
+            providerSlug: cleanSlug,
+            query: normalizedQuery,
+            categorySlug,
+            locationId,
+            limit,
+            parameters
+          });
+          const metaOfferings = await this.getProviderMetadataOfferings(cleanSlug);
+          return this.overlayMediaFromMetadata(rawOfferings, metaOfferings);
+        }
+        // A declaration without an implementation is treated as unavailable
+        // SEARCH capability. The catalog fallback below remains capability-led.
+      } catch (error) {
+        if (!this.isCapabilityNotSupported(error)) throw error;
       }
-      const rawOfferings = await adapter.searchOfferings({
-        providerSlug: cleanSlug,
-        query: normalizedQuery,
+
+      return this.searchCatalogFallback(
+        cleanSlug,
+        normalizedQuery,
         categorySlug,
         locationId,
         limit,
         parameters
-      });
-      const metaOfferings = await this.getProviderMetadataOfferings(cleanSlug);
-      return this.overlayMediaFromMetadata(rawOfferings, metaOfferings);
+      );
     });
+  }
+
+  /** SEARCH is optional; CATALOG is the universal discovery boundary. */
+  private async searchCatalogFallback(
+    providerSlug: string,
+    query: string,
+    categorySlug?: string,
+    locationId?: string,
+    limit = 20,
+    parameters?: Record<string, any>
+  ): Promise<Offering[]> {
+    // getCatalog performs the CATALOG capability and dynamic-parameter checks.
+    // Do not use this fallback for a SEARCH provider outage: only an absent
+    // SEARCH capability reaches here, so failure is never disguised as no data.
+    const catalog = await this.getCatalog(providerSlug, locationId, categorySlug, parameters);
+    const normalizedCategory = this.normalizeSearchText(categorySlug || '');
+    const boundedLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.floor(limit), 1), 100) : 20;
+
+    return catalog.offerings
+      .map((offering, index) => ({ offering, index, score: this.catalogSearchScore(offering, query) }))
+      .filter(({ offering, score }) => {
+        if (score < 0) return false;
+        return !normalizedCategory || this.normalizeSearchText(offering.categorySlug || '') === normalizedCategory;
+      })
+      .sort((left, right) => {
+        if (right.score !== left.score) return right.score - left.score;
+        const titleOrder = String(left.offering.title || '').localeCompare(String(right.offering.title || ''));
+        if (titleOrder !== 0) return titleOrder;
+        if (left.offering.id !== right.offering.id) return left.offering.id.localeCompare(right.offering.id);
+        return left.index - right.index;
+      })
+      .slice(0, boundedLimit)
+      .map(({ offering }) => offering);
+  }
+
+  private isCapabilityNotSupported(error: unknown): boolean {
+    return Boolean(error && typeof error === 'object' && (error as { code?: unknown }).code === 'CAPABILITY_NOT_SUPPORTED');
+  }
+
+  private catalogSearchScore(offering: Offering, query: string): number {
+    const normalizedQuery = this.normalizeSearchText(query);
+    if (!normalizedQuery) return 0;
+    const title = this.normalizeSearchText(offering.title || '');
+    const haystack = this.normalizeSearchText([
+      offering.title,
+      offering.description,
+      offering.categorySlug,
+      offering.categoryTitle,
+      ...(offering.tags || [])
+    ].filter(Boolean).join(' '));
+    if (!haystack) return -1;
+    if (haystack.includes(normalizedQuery)) return title.includes(normalizedQuery) ? 200 : 160;
+    const terms = normalizedQuery.split(/\s+/).filter((term) => term.length > 1);
+    const matched = terms.filter((term) => haystack.includes(term));
+    if (matched.length === 0) return -1;
+    return matched.length * 20 + matched.filter((term) => title.includes(term)).length * 10;
+  }
+
+  private normalizeSearchText(value: string): string {
+    return value
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[’‘ʻ`]/g, "'")
+      .toLocaleLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim();
   }
 
   private async getProviderMetadataOfferings(cleanSlug: string): Promise<any[]> {
@@ -217,18 +312,19 @@ export class CatalogService {
     const cleanSlug = input.providerSlug.toLowerCase().trim();
     await this.providersService.assertProviderPublished(cleanSlug);
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
+    await assertDeclaredDynamicParameters(adapter, cleanSlug, input.parameters, {
+      locationId: input.locationId,
+      offeringIds: input.items.map(item => item.offeringId)
+    });
     if (adapter.checkAvailability) {
-      return adapter.checkAvailability(input);
+      return AvailabilityResultSchema.parse(await adapter.checkAvailability(input));
     }
     return {
-      isAvailable: true,
+      availabilityStatus: AvailabilityStatus.NOT_SUPPORTED,
+      isAvailable: null,
       unavailableItems: [],
-      availableItems: input.items.map((item) => ({
-        offeringId: item.offeringId,
-        variantId: item.variantId,
-        requestedQuantity: item.quantity,
-        metadata: {}
-      })),
+      availableItems: [],
+      checkedAt: new Date().toISOString(),
       parameters: input.parameters || {}
     };
   }

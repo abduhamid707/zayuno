@@ -1,5 +1,20 @@
 import { WelcomeInfo } from '@zayuno/contracts';
 
+export class ZayunoApiError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    public readonly code: string,
+    message: string,
+    public readonly retryable?: boolean,
+    public readonly customerMessage?: string,
+    public readonly agentMessage?: string,
+    public readonly recommendedAction?: string
+  ) {
+    super(`Zayuno API [${statusCode}]: ${message}`);
+    this.name = 'ZayunoApiError';
+  }
+}
+
 export class ZayunoApiClient {
   private baseUrl: string;
   private apiKey: string;
@@ -32,7 +47,30 @@ export class ZayunoApiClient {
       const message = typeof parsedBody === 'object' && parsedBody !== null
         ? parsedBody.message || JSON.stringify(parsedBody)
         : String(parsedBody || `HTTP ${res.status}`);
-      throw new Error(`Zayuno API [${res.status}]: ${message}`);
+      const code = typeof parsedBody === 'object' && parsedBody !== null
+        ? parsedBody.errorCode || parsedBody.code || parsedBody.error || 'HTTP_ERROR'
+        : 'HTTP_ERROR';
+      const retryable = typeof parsedBody === 'object' && parsedBody !== null && typeof parsedBody.retryable === 'boolean'
+        ? parsedBody.retryable
+        : undefined;
+      const customerMessage = typeof parsedBody === 'object' && parsedBody !== null && typeof parsedBody.customerMessage === 'string'
+        ? parsedBody.customerMessage
+        : undefined;
+      const agentMessage = typeof parsedBody === 'object' && parsedBody !== null && typeof parsedBody.agentMessage === 'string'
+        ? parsedBody.agentMessage
+        : undefined;
+      const recommendedAction = typeof parsedBody === 'object' && parsedBody !== null && typeof parsedBody.recommendedAction === 'string'
+        ? parsedBody.recommendedAction
+        : undefined;
+      throw new ZayunoApiError(
+        res.status,
+        code,
+        message,
+        retryable,
+        customerMessage,
+        agentMessage,
+        recommendedAction
+      );
     }
 
     return parsedBody as T;
@@ -43,14 +81,18 @@ export class ZayunoApiClient {
     return this.request<WelcomeInfo>('/api/v1/providers/welcome');
   }
 
-  async listProviders(status?: string) {
-    const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  async listProviders(status?: string, environment?: string) {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (environment) params.append('environment', environment);
+    const query = params.toString() ? `?${params.toString()}` : '';
     return this.request(`/api/v1/providers${query}`);
   }
 
-  async findProviders(filter: { category?: string; capability?: string; geography?: string; query?: string; limit?: number; offset?: number }) {
+  async findProviders(filter: { category?: string; environment?: string; capability?: string; geography?: string; query?: string; limit?: number; offset?: number }) {
     const params = new URLSearchParams();
     if (filter.category) params.append('category', filter.category);
+    if (filter.environment) params.append('environment', filter.environment);
     if (filter.capability) params.append('capability', filter.capability);
     if (filter.geography) params.append('geography', filter.geography);
     if (filter.query) params.append('query', filter.query);
@@ -60,16 +102,21 @@ export class ZayunoApiClient {
     return this.request(`/api/v1/providers/find${query}`);
   }
 
-  async getProvider(slug: string) {
-    return this.request(`/api/v1/providers/${slug}`);
+  async getProvider(slug: string, environment?: string) {
+    const query = environment ? `?environment=${encodeURIComponent(environment)}` : '';
+    return this.request(`/api/v1/providers/${slug}${query}`);
   }
 
-  async getProviderCapabilities(slug: string) {
-    return this.request(`/api/v1/providers/${slug}/capabilities`);
+  async getProviderCapabilities(slug: string, environment?: string) {
+    const query = environment ? `?environment=${encodeURIComponent(environment)}` : '';
+    return this.request(`/api/v1/providers/${slug}/capabilities${query}`);
   }
 
-  async getLocations(slug: string, activeOnly?: boolean) {
-    const query = activeOnly !== undefined ? `?activeOnly=${activeOnly}` : '';
+  async getLocations(slug: string, activeOnly?: boolean, environment?: string) {
+    const params = new URLSearchParams();
+    if (activeOnly !== undefined) params.append('activeOnly', String(activeOnly));
+    if (environment) params.append('environment', environment);
+    const query = params.toString() ? `?${params.toString()}` : '';
     return this.request(`/api/v1/providers/${slug}/locations${query}`);
   }
 

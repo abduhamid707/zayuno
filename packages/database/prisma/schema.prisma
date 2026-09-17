@@ -15,6 +15,28 @@ enum ProviderStatus {
   DISABLED
 }
 
+enum ProviderEnvironment {
+  LIVE
+  SANDBOX
+  STAGING
+}
+
+enum ProviderCategory {
+  FOOD_AND_DRINK
+  RETAIL
+  TRANSPORT
+  TICKETING
+  TRAVEL
+  ACCOMMODATION
+  RECRUITMENT
+  LOGISTICS
+  HEALTHCARE
+  HOME_SERVICES
+  PROFESSIONAL_SERVICES
+  DIGITAL_SERVICES
+  OTHER
+}
+
 enum ProviderType {
   RETAIL
   DELIVERY
@@ -78,6 +100,9 @@ model Provider {
   logoUrl         String?
   status          ProviderStatus       @default(SANDBOX)
   type            ProviderType         @default(SERVICES)
+  environment     ProviderEnvironment  @default(LIVE)
+  category        ProviderCategory     @default(OTHER)
+  subcategory     String?
   adapterType     String               @default("sandbox") // Identifier used by AdapterRegistryService
   capabilities    ProviderCapability[]
   baseUrl         String?
@@ -95,6 +120,8 @@ model Provider {
   webhookLogs     WebhookLog[]
   integrationLogs IntegrationLog[]
   users           User[]
+
+  @@index([environment, status, category])
 }
 
 model Location {
@@ -355,6 +382,7 @@ model Action {
   paymentUrl       String?       // Provider-supplied external checkout URL
 
   idempotencyKey   String?       @unique
+  idempotencyHash  String?
   parameters       Json          @default("{}")
   metadata         Json          @default("{}")
   createdAt        DateTime      @default(now())

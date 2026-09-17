@@ -16,6 +16,7 @@ import {
   formatCustomerPaymentOptions,
   formatCustomerError
 } from '../packages/shared/src/customer-presenter';
+import { AvailabilityStatus } from '../packages/contracts/src/catalog';
 
 process.env.PROVIDER_API_KEY = 'coffee-test-key-123';
 process.env.PROVIDER_PUBLIC_BASE_URL = 'https://coffee-time-sandbox.shopla.uz';
@@ -76,13 +77,26 @@ async function main() {
       timeoutMs: 5000
     });
 
-    // When checkAvailability hits a 404 remote endpoint, it should safely fallback without crashing
+    // A missing availability endpoint must remain explicit uncertainty.
     const fallbackAvail = await errorAdapter.checkAvailability({
       providerSlug: 'coffee-time',
       items: [{ offeringId: 'ct_cappuccino', quantity: 1 }]
     });
-    assert.equal(fallbackAvail.isAvailable, true);
+    assert.equal(fallbackAvail.availabilityStatus, AvailabilityStatus.NOT_SUPPORTED);
+    assert.equal(fallbackAvail.isAvailable, null);
     assert.equal(fallbackAvail.parameters?.availabilityEndpointImplemented, false);
+    assert.match(formatCustomerAvailability(fallbackAvail), /oldindan tekshirish imkoni yo‘q/i);
+
+    const availabilityTool = ZAYUNO_MCP_TOOLS.find(tool => tool.name === 'check_availability')!;
+    const unsupportedMcpResult = await availabilityTool.handler(
+      { providerSlug: 'coffee-time', items: [{ offeringId: 'ct_cappuccino', quantity: 1 }] },
+      {
+        checkAvailability: async () => fallbackAvail
+      } as any
+    );
+    assert.equal(unsupportedMcpResult.availabilityStatus, AvailabilityStatus.NOT_SUPPORTED);
+    assert.equal(unsupportedMcpResult.available, null);
+    assert.match(unsupportedMcpResult.customerMessage, /oldindan tekshirish imkoni yo‘q/i);
 
     console.log('    ✅ Coffee Time availability endpoint and stream single-read verified.');
 
@@ -162,7 +176,7 @@ async function main() {
 
     const retryResult = await createActionTool.handler(actionInput, retryClient);
     assert.equal(retryIdempotencyKey, createdIdempotencyKey, 'Retrying with same quoteId must reuse the exact same idempotencyKey');
-    assert.equal(retryResult.publicId, actionResult.publicId, 'Retry must return the same action');
+    assert.equal(retryResult.actionId, actionResult.actionId, 'Retry must return the same action');
 
     console.log('    ✅ Action creation without client idempotencyKey and retry deduplication verified.');
 
@@ -205,9 +219,9 @@ async function main() {
       getOffering: async () => ({ title: 'Cappuccino', basePrice: 24000 }),
       checkAvailability: async () => ({ isAvailable: true }),
       requestQuote: async () => ({ id: 'q_1', subtotal: 24000, total: 24000, currency: 'UZS', lines: [{ title: 'Cappuccino', quantity: 1, lineTotal: 24000 }] }),
-      createAction: async () => ({ id: 'act_1', publicId: 'ZY-TEST-1', paymentUrl: 'https://zayuno.uz/pay/1', status: 'AWAITING_PAYMENT', metadata: { sandbox: true } }),
-      getAction: async () => ({ id: 'act_1', publicId: 'ZY-TEST-1', status: 'CONFIRMED', paymentStatus: 'PAID' }),
-      cancelAction: async () => ({ success: true, actionId: 'ZY-TEST-1', previousStatus: 'AWAITING_PAYMENT', newStatus: 'CANCELLED' }),
+      createAction: async () => ({ id: 'act_1', publicId: 'ZY-TEST-1', providerSlug: 'coffee-time', providerName: 'Coffee Time', paymentUrl: 'https://zayuno.uz/pay/1', status: 'AWAITING_PAYMENT', paymentStatus: 'PENDING', total: 24000, currency: 'UZS', fulfillmentType: 'DELIVERY', metadata: { sandbox: true }, createdAt: '2026-09-18T10:00:00.000Z', updatedAt: '2026-09-18T10:00:00.000Z' }),
+      getAction: async () => ({ id: 'act_1', publicId: 'ZY-TEST-1', providerSlug: 'coffee-time', providerName: 'Coffee Time', status: 'CONFIRMED', paymentStatus: 'PAID', total: 24000, currency: 'UZS', fulfillmentType: 'DELIVERY', createdAt: '2026-09-18T10:00:00.000Z', updatedAt: '2026-09-18T10:00:00.000Z' }),
+      cancelAction: async () => ({ success: true, actionId: 'ZY-TEST-1', previousStatus: 'AWAITING_PAYMENT', newStatus: 'CANCELLED', message: 'Cancelled', refundInitiated: false }),
       getPaymentOptions: async () => [{ checkoutUrl: 'https://zayuno.uz/pay/1' }]
     } as any;
 
