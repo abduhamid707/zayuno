@@ -193,8 +193,8 @@ async function main() {
       parameters: { trainNumber: '006F' }
     };
     const confirmCopy = formatCustomerActionConfirmation(ticketAction, { type: 'TICKETING' });
-    assert.match(confirmCopy, /^Chipta band qilindi\. Endi to‘lovni yakunlang:/);
-    assert.match(confirmCopy, /\[To‘lov sahifasini ochish\]\(https:\/\/poyez-sandbox\.shopla\.uz\/pay\/ps_789\)/);
+    assert.match(confirmCopy, /^Sinov chipta so‘rovi yaratildi\./);
+    assert.match(confirmCopy, /\[Sinov sahifasini ochish\]\(https:\/\/poyez-sandbox\.shopla\.uz\/pay\/ps_789\)/);
   }
 
   // 9. unpaid customer copy
@@ -208,8 +208,8 @@ async function main() {
       parameters: { trainNumber: '006F' }
     };
     const unpaidCopy = formatCustomerActionStatus(unpaidTicket, { type: 'TICKETING' });
-    assert.match(unpaidCopy, /^Chipta band qilingan, lekin to‘lov hali qilinmagan\./);
-    assert.match(unpaidCopy, /\[To‘lovni yakunlash\]\(https:\/\/poyez-sandbox\.shopla\.uz\/pay\/ps_unpaid\)/);
+    assert.match(unpaidCopy, /^Bu sinov chipta so‘rovi\. Haqiqiy to‘lov olinmaydi\./);
+    assert.match(unpaidCopy, /\[Sinov sahifasini ochish\]\(https:\/\/poyez-sandbox\.shopla\.uz\/pay\/ps_unpaid\)/);
   }
 
   // 10. paid customer copy
@@ -221,7 +221,7 @@ async function main() {
       paymentStatus: 'PAID',
       parameters: { trainNumber: '006F' }
     };
-    const paidCopy = formatCustomerActionStatus(paidTicket, { type: 'TICKETING' });
+    const paidCopy = formatCustomerActionStatus(paidTicket, { type: 'TICKETING', metadata: { paymentStatusVerified: true } });
     assert.equal(paidCopy, 'Zo‘r, to‘lov qabul qilindi. Chiptangiz tasdiqlandi.');
 
     const paidFood = {
@@ -230,7 +230,7 @@ async function main() {
       status: 'CONFIRMED',
       paymentStatus: 'PAID'
     };
-    const paidFoodCopy = formatCustomerActionStatus(paidFood);
+    const paidFoodCopy = formatCustomerActionStatus(paidFood, { metadata: { paymentStatusVerified: true } });
     assert.equal(paidFoodCopy, 'To‘lov qabul qilindi. Buyurtmangiz tasdiqlandi.');
   }
 
@@ -244,8 +244,8 @@ async function main() {
       paymentUrl: 'https://checkout.example.test/pay/confirmed-unpaid'
     };
     const confirmedButUnpaidCopy = formatCustomerActionStatus(confirmedButUnpaid);
-    assert.match(confirmedButUnpaidCopy, /^Buyurtmangiz qabul qilingan, lekin to‘lov hali qilinmagan\./);
-    assert.match(confirmedButUnpaidCopy, /\[To‘lovni yakunlash\]\(https:\/\/checkout\.example\.test\/pay\/confirmed-unpaid\)/);
+    assert.match(confirmedButUnpaidCopy, /^Bu sinov buyurtmasi\. Haqiqiy to‘lov olinmaydi\./);
+    assert.match(confirmedButUnpaidCopy, /\[Sinov sahifasini ochish\]\(https:\/\/checkout\.example\.test\/pay\/confirmed-unpaid\)/);
 
     const cancelledTicket = {
       id: 'act_ticket_canc',
@@ -274,8 +274,8 @@ async function main() {
       parameters: { trainNumber: '006F' }
     };
     const demoConfirm = formatCustomerActionConfirmation(demoAction, demoProvider);
-    assert.match(demoConfirm, /Bu demo buyurtma, haqiqiy to‘lov olinmaydi\./);
-    assert.match(demoConfirm, /\[To‘lov sahifasini ochish\]/);
+    assert.match(demoConfirm, /Sinov chipta so‘rovi yaratildi\./);
+    assert.match(demoConfirm, /\[Sinov sahifasini ochish\]/);
 
     const realProvider = {
       slug: 'railway-uz',

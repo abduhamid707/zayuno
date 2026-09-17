@@ -14,6 +14,7 @@ import { createHash, randomUUID } from "crypto";
 import { ConsumerMemoryService } from "../memory/consumer-memory.service";
 import { UnmetDemandService } from "../../analytics/unmet-demand.service";
 import { CONSUMER_GEMINI_MODEL, FoodConstraints, normalizeFoodConstraints, readFoodBudget, lowestAvailableFoodPrice } from "./food-request";
+import { hasVerifiedPaymentStatus, isDemoOrSandboxAction } from "@zayuno/shared";
 
 type ConversationMessage = {
   role: "user" | "assistant";
@@ -180,6 +181,7 @@ type PendingConsumerOrder = {
     total: number;
     currency: string;
     expiresAt: string;
+    fees?: Array<{ name: string; amount: number }>;
   };
   idempotencyKey: string;
   language?: ChatLanguage;
@@ -454,13 +456,14 @@ STRICT RULES:
               const delta = chunk.text();
               if (!delta) continue;
               content += delta;
-              onDelta(delta);
             }
             const response = await result.response;
             content = content.trim();
             if (!content) throw new Error("empty Gemini stream");
             this.assertCompleteGeminiResponse(response);
-            return content;
+            const safeContent = this.sanitizeCustomerResponse(content);
+            onDelta(safeContent);
+            return safeContent;
           } catch (error: any) {
             if (content) error.noGeminiRetry = true;
             throw error;
@@ -639,7 +642,7 @@ STRICT RULES:
           history,
           plan: this.emptyPlan("general"),
           liveContext: [],
-          directAnswer: `Tayyor — **${demand.queryIntent || "so‘ragan xizmatingiz"}** Zayunoga qo‘shilganda sizga xabar berish uchun belgilandi.`,
+          directAnswer: `Tayyor — **${demand.queryIntent || "so‘ragan xizmatingiz"}** uchun “Qo‘shilganda xabar ber” bildirishnomasi yoqildi. Xizmat Zayunoga qo‘shilganda sizga xabar beramiz.`,
         };
       }
     }
@@ -663,6 +666,26 @@ STRICT RULES:
     const previousPlan = await this.readFoodRequest(input.userId, input.conversationId);
     const plan = await this.planWithAi(prompt, history, providers, personalizationContext, previousPlan);
     if (!plan) throw new ServiceUnavailableException("Request planning unavailable");
+
+    // Persist a directly named provider even when the router classifies the
+    // message as a plain provider listing. This keeps the next typo or short
+    // follow-up (for example "MaxWay" → "Butger") inside the selected
+    // provider instead of allowing a ranked catalog to jump to another brand.
+    const directlyMentionedProviders = this.findMentionedProviderSlugs(prompt, providers, history);
+    if (directlyMentionedProviders.length === 1) {
+      plan.providerSlugs = directlyMentionedProviders;
+      plan.providerScope = "explicit";
+    } else if (
+      previousPlan?.providerScope === "explicit" &&
+      previousPlan.providerSlugs.length === 1 &&
+      !this.isProviderScopeReset(prompt)
+    ) {
+      plan.providerSlugs = previousPlan.providerSlugs;
+      plan.providerScope = "explicit";
+    }
+    if (plan.providerScope === "explicit" && plan.providerSlugs.length === 1) {
+      await this.saveFoodRequest(input.userId, plan, input.conversationId);
+    }
 
     if (plan.intent === "general") {
       if (this.unmetDemandService) {
@@ -2265,6 +2288,24 @@ LIVE_CATALOG=${JSON.stringify(facts)}`, { timeout: timeoutMs }));
       state.stage === "collecting_requirements"
         ? this.nextOrderRequirement(state)
         : undefined;
+
+    // Variant questions are deterministic UI actions. Asking Gemini to infer
+    // "barcha/boshqa variantlar" made this flow slow and occasionally fell
+    // through to the generic service error. Keep the pending order alive and
+    // answer directly from the provider-declared choices.
+    const variantChoice = this.findPendingVariantChoice(prompt, state);
+    if (variantChoice && (!requirement || requirement.kind === "variant" || state.stage === "proposed")) {
+      variantChoice.item.selectedVariantId = variantChoice.variant.id;
+      state.stage = "collecting_requirements";
+      state.proposalText = undefined;
+      await this.savePendingOrder(userId, state, conversationId);
+      return this.advanceOrderCollection(userId, state, conversationId);
+    }
+    if (this.isPendingVariantListRequest(prompt, state) && (!requirement || requirement.kind === "variant" || state.stage === "proposed")) {
+      const variantList = this.formatPendingVariants(state);
+      if (variantList) return variantList;
+    }
+
     const turn = await this.interpretPendingTurn(prompt, state, requirement);
     if (!turn) {
       return "Kechirasiz, javobingizni aniq tushunmadim. Iltimos, yana bir bor yozing yoki kerakli variantni tanlang.";
@@ -2424,6 +2465,13 @@ LIVE_CATALOG=${JSON.stringify(facts)}`, { timeout: timeoutMs }));
     } catch {
       // PAYMENT_OPTIONS is optional when ACTION_CREATE already owns handoff.
     }
+    const providerInfo = typeof this.providersService.getProviderBySlug === "function"
+      ? await this.providersService.getProviderBySlug(state.providerSlug).catch(() => undefined)
+      : undefined;
+    const sandboxAction = isDemoOrSandboxAction(
+      { ...action, paymentUrl, nextAction: action.nextAction || (paymentUrl ? { url: paymentUrl } : undefined) },
+      providerInfo,
+    );
     const reference = this.cleanMarkdownText(action.publicId || action.id);
     await this.redisService.set(
       this.activeActionStateKey(userId, conversationId),
@@ -2459,6 +2507,20 @@ LIVE_CATALOG=${JSON.stringify(facts)}`, { timeout: timeoutMs }));
       state.language,
       action.supportContact,
     );
+
+    if (sandboxAction) {
+      const subject = this.isTicketProvider(providerInfo || state)
+        ? "Sinov chipta so‘rovi"
+        : "Sinov buyurtmasi";
+      const links = paymentLinks.length > 0
+        ? paymentLinks.join("\n")
+        : paymentUrl
+          ? `[Sinov sahifasini ochish](${paymentUrl})`
+          : "";
+      if (state.language === "ru") return `Создан тестовый запрос (${subject.toLowerCase()}). Реальный провайдер и платёж не используются.${links ? `\n\n${links}` : ""}${supportHint}`;
+      if (state.language === "en") return `A test request was created (${subject.toLowerCase()}). No real provider order or payment was made.${links ? `\n\n${links}` : ""}${supportHint}`;
+      return `${subject} yaratildi. Haqiqiy provider buyurtmasi yuborilmadi va to‘lov amalga oshmadi.${links ? `\n\n${links}` : ""}${supportHint}`;
+    }
 
     if (paymentLinks.length > 0) {
       if (state.language === "ru") return `Заказ успешно отправлен в **${this.cleanMarkdownText(state.providerName)}**. Номер: **${reference}**\n\nСпособы оплаты:\n${paymentLinks.join("\n")}${supportHint}`;
@@ -2602,6 +2664,59 @@ USER=${JSON.stringify(prompt)}`;
     if (confirmations.includes(normalized)) return "confirm";
     if (cancellations.includes(normalized)) return "cancel";
     return null;
+  }
+
+  private findPendingVariantChoice(
+    prompt: string,
+    state: PendingConsumerOrder,
+  ): { item: PendingOrderItem; variant: any } | undefined {
+    const normalized = this.normalizeLookupText(prompt);
+    if (!normalized || this.isPendingVariantListRequest(prompt, state)) return undefined;
+    const numeric = Number.parseInt(normalized, 10);
+    for (const item of state.items) {
+      const variants = item.variants.filter((variant) => variant?.isAvailable !== false);
+      if (variants.length <= 1) continue;
+      if (String(numeric) === normalized && variants[numeric - 1]) {
+        return { item, variant: variants[numeric - 1] };
+      }
+      const match = variants.find((variant) => {
+        const label = this.normalizeLookupText(variant?.name ?? variant?.id ?? "");
+        return label && (normalized === label || normalized.includes(label));
+      });
+      if (match) return { item, variant: match };
+    }
+    return undefined;
+  }
+
+  private isPendingVariantListRequest(prompt: string, state: PendingConsumerOrder): boolean {
+    const hasVariants = state.items.some(
+      (item) => item.variants.filter((variant) => variant?.isAvailable !== false).length > 1,
+    );
+    if (!hasVariants) return false;
+    const normalized = this.normalizeLookupText(prompt);
+    // Customers commonly type this word as "varaynt"/"varayn". Treat those
+    // spellings (and the natural "tanlov" synonym) as a variant request so a
+    // list question never falls through to the generic AI error path.
+    const variantWord = /var(?:iant|aynt|ayn|iyant)|tanlov|tur(lar)?|sektor|ring|qator|joy/i.test(normalized);
+    const listWord = /hamma|barcha|boshqa|yana|ro['‘`]?yxat|chiqar|ko['‘`]?rsat|bormi|mavjud/i.test(normalized);
+    return variantWord && listWord;
+  }
+
+  private formatPendingVariants(state: PendingConsumerOrder): string | undefined {
+    const item = state.items.find(
+      (candidate) => candidate.variants.filter((variant) => variant?.isAvailable !== false).length > 1,
+    );
+    if (!item) return undefined;
+    const variants = item.variants.filter((variant) => variant?.isAvailable !== false);
+    const rows = variants.map((variant, index) => {
+      const name = this.cleanMarkdownText(variant?.name ?? variant?.id ?? `Variant ${index + 1}`);
+      const price = Number(variant?.basePrice ?? variant?.price);
+      return `${index + 1}. ${name}${Number.isFinite(price) && price > 0 ? ` — ${price.toLocaleString("en-US")} UZS` : ""}`;
+    });
+    const language = state.language;
+    if (language === "ru") return `Доступные варианты для **${this.cleanMarkdownText(item.offeringTitle)}**:\n\n${rows.join("\n")}\n\nНапишите номер или название варианта.`;
+    if (language === "en") return `Available variants for **${this.cleanMarkdownText(item.offeringTitle)}**:\n\n${rows.join("\n")}\n\nReply with a number or the variant name.`;
+    return `**${this.cleanMarkdownText(item.offeringTitle)}** uchun mavjud variantlar:\n\n${rows.join("\n")}\n\nRaqamini yoki nomini yozing.`;
   }
 
   private extractPendingContactDetails(
@@ -3140,6 +3255,14 @@ USER=${JSON.stringify(prompt)}`;
     state.quote = {
       id: quote.id,
       lines: quote.lines,
+      fees: Array.isArray(quote.fees)
+        ? quote.fees
+            .map((fee: any) => ({
+              name: this.cleanMarkdownText(fee?.name || "Xizmat haqi"),
+              amount: Number(fee?.amount || 0),
+            }))
+            .filter((fee: any) => fee.amount > 0)
+        : [],
       subtotal: quote.subtotal,
       totalFees: quote.totalFees,
       totalDiscount: quote.totalDiscount,
@@ -3256,7 +3379,10 @@ USER=${JSON.stringify(prompt)}`;
         providerVerified: false,
       };
     }
-    return this.formatLiveActionStatus(result.action, result.providerVerified);
+    const provider = typeof this.providersService.getProviderBySlug === "function"
+      ? await this.providersService.getProviderBySlug(result.action.providerSlug || active.providerSlug).catch(() => undefined)
+      : undefined;
+    return this.formatLiveActionStatus(result.action, result.providerVerified, provider);
   }
 
   private formatOfficialSupport(providerName: string, support: any): string {
@@ -3332,12 +3458,18 @@ USER=${JSON.stringify(prompt)}`;
   private formatLiveActionStatus(
     action: any,
     providerVerified: boolean,
+    providerInfo?: any,
   ): string {
     const reference = this.cleanMarkdownText(action.publicId || action.id);
-    if (!providerVerified) {
-      return `**${reference}** holatini hozir provider orqali tekshirib bo‘lmadi. Oxirgi saqlangan holat: **${this.actionStatusLabel(action.status, action.paymentStatus)}**.`;
+    const payment = String(action.paymentStatus || "").toUpperCase();
+    const paymentTrusted = providerVerified && hasVerifiedPaymentStatus(action, providerInfo);
+    if (payment === "PAID" && (!paymentTrusted || isDemoOrSandboxAction(action, providerInfo))) {
+      return `**${reference}** holatida to‘lov qayd etilgandek ko‘rindi, lekin Zayuno uni ishonchli tasdiqlamadi. Sinov yoki provider statusini haqiqiy to‘lov deb qabul qilmang.`;
     }
-    return `**${reference}** provider holati: **${this.actionStatusLabel(action.status, action.paymentStatus)}**.`;
+    if (!providerVerified) {
+      return `**${reference}** holatini hozir provider orqali tekshirib bo‘lmadi. Oxirgi saqlangan holat: **${this.actionStatusLabel(action.status, action.paymentStatus, paymentTrusted)}**.`;
+    }
+    return `**${reference}** provider holati: **${this.actionStatusLabel(action.status, action.paymentStatus, paymentTrusted)}**.`;
   }
 
   private async interpretActiveActionTurn(
@@ -3382,10 +3514,10 @@ USER=${JSON.stringify(prompt)}`;
     return "other";
   }
 
-  private actionStatusLabel(status: unknown, paymentStatus: unknown): string {
+  private actionStatusLabel(status: unknown, paymentStatus: unknown, paymentTrusted = true): string {
     const payment = String(paymentStatus || "").toUpperCase();
     const action = String(status || "").toUpperCase();
-    if (payment === "PAID") return "to‘lov tasdiqlangan";
+    if (payment === "PAID") return paymentTrusted ? "to‘lov tasdiqlangan" : "to‘lov tasdig‘i kutilmoqda";
     if (payment === "FAILED") return "to‘lov amalga oshmagan";
     if (payment === "REFUNDED") return "to‘lov qaytarilgan";
     if (action === "COMPLETED") return "yakunlangan";
@@ -3450,21 +3582,20 @@ USER=${JSON.stringify(prompt)}`;
           : "",
         ...options,
       ].filter(Boolean);
-      const sku = this.cleanMarkdownText(
-        variant?.sku || line.sku || orderItem?.sku || "",
-      );
-      return `- ${title}${selections.length ? ` (${selections.join(", ")})` : ""}${sku ? ` · SKU: **${sku}**` : ""} × ${line.quantity}: **${Number(line.lineTotal).toLocaleString("en-US")} ${currency}**`;
+      return `- ${title}${selections.length ? ` (${selections.join(", ")})` : ""} × ${line.quantity}: **${Number(line.lineTotal).toLocaleString("en-US")} ${currency}**`;
     });
     if (quote.totalFees > 0) {
-      const feeLabel =
-        state.language === "ru"
-          ? state.fulfillmentType === "DELIVERY" ? "Доставка и сервисный сбор" : "Сервисный сбор"
-          : state.language === "en"
-            ? state.fulfillmentType === "DELIVERY" ? "Delivery and service fee" : "Service fee"
-            : state.fulfillmentType === "DELIVERY" ? "Yetkazib berish va xizmat haqi" : "Xizmat haqi";
-      rows.push(
-        `- ${feeLabel}: **${quote.totalFees.toLocaleString("en-US")} ${currency}**`,
-      );
+      const fees = Array.isArray(quote.fees) && quote.fees.length > 0
+        ? quote.fees
+        : [{
+            name: state.fulfillmentType === "DELIVERY"
+              ? state.language === "ru" ? "Доставка" : state.language === "en" ? "Delivery" : "Yetkazib berish haqi"
+              : state.language === "ru" ? "Сервисный сбор" : state.language === "en" ? "Service fee" : "Xizmat haqi",
+            amount: quote.totalFees,
+          }];
+      for (const fee of fees) {
+        rows.push(`- ${this.cleanMarkdownText(fee.name)}: **${Number(fee.amount).toLocaleString("en-US")} ${currency}**`);
+      }
     }
     if (quote.totalDiscount > 0) {
       const discountLabel = state.language === "ru" ? "Скидка" : state.language === "en" ? "Discount" : "Chegirma";
@@ -4680,11 +4811,19 @@ USER=${JSON.stringify(prompt)}`;
       const content = result.response.text().trim();
       if (!content) throw new Error("empty Gemini response");
       this.assertCompleteGeminiResponse(result.response);
-      return content;
+      return this.sanitizeCustomerResponse(content);
     } catch (error) {
       this.logger.error("Gemini response generation failed", error);
       throw new ServiceUnavailableException("Customer response unavailable");
     }
+  }
+
+  private sanitizeCustomerResponse(content: string): string {
+    const cleaned = String(content || "")
+      .replace(/\[\/?LIVE_DATA(?:_[A-Z0-9_]+)?\]/gi, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    return cleaned || "Hozircha tasdiqlangan ma’lumot topilmadi. Boshqa mahsulot yoki xizmat nomini yozing.";
   }
 
   private chatRequestKey(input: ChatRequest): string {

@@ -837,6 +837,7 @@ Provider Contract: v${PROVIDER_CONTRACT_VERSION}
 Biznes nomi: ${businessName.trim() || 'Mening Biznesim'}
 Provider Slug: ${slug.trim() || 'my-provider-slug'}
 Provider type (CANONICAL API ENUM): SERVICES
+Canonical enum eslatmasi: LOGISTICS canonical enum emas; transport yoki yetkazib berish provideri uchun contractdagi DELIVERY turidan foydalaning. O‘zingizcha type nomi uydirmang.
 Tanlangan imkoniyat: ${isTrans ? 'Topish, aniq narx olish va buyurtma yaratish (TRANSACTIONAL)' : 'Faqat topish va ko‘rsatish (DISCOVERY)'}
 Autentifikatsiya formati: ${authMethod} (${authMethod === 'API_KEY' ? 'X-API-KEY header: x-provider-api-key' : authMethod === 'BEARER_TOKEN' ? 'Authorization: Bearer token' : 'HMAC-SHA256 imzosi: x-zayuno-signature'})
 
@@ -1181,7 +1182,7 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
   };
 
   // --------------------------------------------------------------------------
-  // STEP 6: Submit for Review
+  // STEP 4: Submit for Review
   // --------------------------------------------------------------------------
   const handleSubmitReview = async () => {
     if (!integrationSaved || !certReport?.isProductionReady) { setError('Avval sozlamalarni saqlang va sertifikatlashni yakunlang.'); return; }
@@ -1605,7 +1606,7 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
               <h4 className="font-semibold text-white flex items-center gap-2">
                 <Phone className="w-4 h-4 text-indigo-400" /> Mijozlar uchun yordam <span className="text-rose-400">*</span>
               </h4>
-              <p className="text-[11px] text-slate-400">Buyurtmadan keyin mijoz aynan shu kanallarni ko‘radi. Kamida bittasi kerak; qolganlarini xohlaganingizcha qo‘shing.</p>
+              <p className="text-[11px] text-slate-400">Buyurtmadan keyin mijoz aynan shu kanallarni ko‘radi. Kamida bittasini kiriting: telefon, Telegram yoki support email. Qolganlarini xohlaganingizcha qo‘shing.</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-400 mb-1">Telefon raqam</label>
@@ -2077,9 +2078,9 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
-                    <span className="font-semibold text-emerald-400 block">2. Siz → Zayuno API (6-bosqichda beriladi)</span>
+                    <span className="font-semibold text-emerald-400 block">2. Siz → Zayuno API (4-bosqichda beriladi)</span>
                     <p className="text-slate-300 leading-relaxed">
-                      Sizning tizimingiz Zayuno platformasiga murojaat qilishi uchun 6-bosqichda alohida <code className="text-emerald-300 font-mono">zy_test_...</code> kaliti taqdim etiladi.
+                      Sizning tizimingiz Zayuno platformasiga murojaat qilishi uchun 4-bosqichda alohida <code className="text-emerald-300 font-mono">zy_test_...</code> kaliti taqdim etiladi.
                     </p>
                   </div>
                 </div>
@@ -2385,7 +2386,7 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
                         </button>
                       </div>
                       <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Yangi arizada bu secretni o‘ylab topish yoki kiritish shart emas. Zayuno uni avtomatik generatsiya qiladi va 6-bosqichda (Xulosa va Handoff) sizga faqat bir marta xavfsiz taqdim etadi.
+                        Yangi arizada bu secretni o‘ylab topish yoki kiritish shart emas. Zayuno uni avtomatik generatsiya qiladi va 4-bosqichda (Xulosa va Handoff) sizga faqat bir marta xavfsiz taqdim etadi.
                       </p>
                     </div>
                   </div>
@@ -2728,7 +2729,7 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
       )}
 
       {/* --------------------------------------------------------------------- */}
-      {/* STEP 6: Review, Handoff & Dashboard Navigation                        */}
+      {/* STEP 4: Review, Handoff & Dashboard Navigation                        */}
       {/* --------------------------------------------------------------------- */}
       {currentStep === 4 && (
         <div className="space-y-6 animate-fadeIn">

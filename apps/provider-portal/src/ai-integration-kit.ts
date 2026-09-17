@@ -234,7 +234,14 @@ export function generateAiPrompt(options: GeneratePromptOptions): string {
   ];
 
   const profile = determineProviderCapabilityProfile(declaredCaps);
-  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps);
+  // Fulfillment mode is part of the provider contract.  A physical or
+  // delivery provider therefore needs LOCATIONS even when the owner forgot to
+  // tick it in the capability list; the generated contract must reflect that
+  // requirement so certification and the AI brief agree.
+  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps, {
+    type: providerType,
+    fulfillmentMode: sanitizedProvider.fulfillmentMode
+  });
   const isReadOnly = profile === ProviderCapabilityProfile.DISCOVERY_READONLY;
 
   // Redacted certification issues if any
@@ -401,7 +408,13 @@ export function generateContractJson(provider?: any): string {
   ];
 
   const profile = determineProviderCapabilityProfile(declaredCaps);
-  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps);
+  // Fulfillment mode is part of the provider contract. A physical or
+  // delivery provider therefore needs LOCATIONS even when it was omitted
+  // from the declared capability list.
+  const mandatoryCaps = getMandatoryCapabilitiesForProfile(declaredCaps, {
+    type: clean.type,
+    fulfillmentMode: clean.fulfillmentMode
+  });
 
   const endpoints = Object.fromEntries(
     getProviderProtocolEndpoints(profile)

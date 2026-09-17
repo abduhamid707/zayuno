@@ -947,7 +947,7 @@ export default function App() {
             ) : !provider ? (
               <ProviderEmptyState
                 title="Avval biznes profilingizni yarating"
-                description="Zayuno tarmog‘i orqali AI mijozlardan buyurtma qabul qilish uchun biznesingizni 4 bosqichda ulang."
+                description="Sizda hali ro‘yxatdan o‘tgan provider yo‘q. Zayuno tarmog‘i orqali AI mijozlardan buyurtma qabul qilish uchun biznesingizni 4 bosqichda ulang."
                 onStartOnboarding={() => navigateTo('onboarding')}
                 onOpenDocs={() => setActiveTab('docs')}
                 onOpenAiKit={() => setAiKitOpen(true)}

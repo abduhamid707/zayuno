@@ -170,6 +170,76 @@ async function main() {
   const answer = chatInternals.buildGroundedCatalogAnswer(plan, context);
   assert.match(answer, /\[Ariza topshirish]\(https:\/\/hh\.uz\/vacancy\/123\)/);
 
+  // A provider-only menu request must pin the selected provider for the next
+  // typo or short follow-up. Otherwise "MaxWay" followed by "Butger" can be
+  // re-ranked into another food provider's catalog.
+  const scopeStore = new Map<string, string>();
+  const scopeRedis = {
+    get: async (key: string) => scopeStore.get(key) || null,
+    set: async (key: string, value: string) => void scopeStore.set(key, value),
+    del: async (key: string) => void scopeStore.delete(key),
+  };
+  const scopeChat = new ConsumerChatService(
+    {
+      listProviders: async () => [
+        { slug: "maxway", name: "MaxWay", type: "DELIVERY", capabilities: ["CATALOG"] },
+        { slug: "evos", name: "EVOS", type: "DELIVERY", capabilities: ["CATALOG"] },
+      ],
+    } as any,
+    {
+      getCatalog: async () => ({ offerings: [{ id: "maxway-burger", title: "MaxWay Burger", basePrice: 25_000 }] }),
+      searchOfferings: async () => [],
+    } as any,
+    {} as any,
+    {} as any,
+    scopeRedis as any,
+  );
+  const scopeInternals = scopeChat as any;
+  let previousScopePlan: any;
+  let routedProviderSlugs: string[] = [];
+  scopeInternals.planWithAi = async (prompt: string, _history: any[], _providers: any[], _personalization: string, previousPlan: any) => {
+    previousScopePlan = previousPlan;
+    if (prompt === "MaxWay menyusini ko‘rsat") {
+      return {
+        intent: "provider_listing",
+        needsCatalog: false,
+        providerScope: "selected",
+        providerSlugs: [],
+        query: "MaxWay",
+        limit: 6,
+        page: 0,
+        quantity: 1,
+        itemRequests: [],
+        allowCatalogFallback: false,
+        excludedOfferingIds: [],
+        directAnswer: "MaxWay menyusi.",
+      };
+    }
+    return {
+      intent: "catalog_browse",
+      needsCatalog: true,
+      providerScope: "selected",
+      providerSlugs: [],
+      query: "butger",
+      limit: 6,
+      page: 0,
+      quantity: 1,
+      itemRequests: [],
+      allowCatalogFallback: true,
+      excludedOfferingIds: [],
+    };
+  };
+  scopeInternals.recommendFood = async (_input: any, _history: any[], plan: any, liveContext: any[]) => {
+    routedProviderSlugs = plan.providerSlugs;
+    return { prompt: "Butger", history: [], plan, liveContext, directAnswer: "MaxWay katalogi." };
+  };
+  await scopeChat.processMessage({ prompt: "MaxWay menyusini ko‘rsat", messages: [], userId: "scope-user" });
+  const savedScopePlan = JSON.parse(scopeStore.get("consumer:food-request:scope-user:undefined")!).plan;
+  assert.deepEqual(savedScopePlan.providerSlugs, ["maxway"]);
+  await scopeChat.processMessage({ prompt: "Butger", messages: [], userId: "scope-user" });
+  assert.deepEqual(previousScopePlan.providerSlugs, ["maxway"]);
+  assert.deepEqual(routedProviderSlugs, ["maxway"]);
+
   // Free-text intent, multi-category discovery and budget recommendations now
   // use the single-model flow tested in test-food-conversation-intent.ts.
   // The former generic-catalog and fourth-off-topic-message silence assertions
@@ -497,7 +567,7 @@ async function main() {
   assert.equal(actionCalls, 1, "explicit confirmation must create one action");
   assert.match(
     paymentAnswer,
-    /\[To‘lov qilish\]\(https:\/\/pay\.maxifood\.example\/checkout\/1\)/,
+    /\[Sinov sahifasini ochish\]\(https:\/\/pay\.maxifood\.example\/checkout\/1\)/,
   );
   assert.equal(
     orderStore.has("consumer:chat:pending-order:order-user"),
@@ -515,7 +585,7 @@ async function main() {
     messages: [],
     userId: "order-user",
   });
-  assert.match(paidStatus.content, /to‘lov tasdiqlangan/i);
+  assert.match(paidStatus.content, /ishonchli tasdiqlamadi/i);
   const supportAnswer = await orderChat.processMessage({
     prompt: "supportga bog‘lansam bo‘ladimi",
     messages: [],

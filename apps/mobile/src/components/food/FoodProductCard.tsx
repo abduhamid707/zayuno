@@ -108,9 +108,6 @@ export const FoodProductCard = memo(function FoodProductCard({
           {offering.variantLabel ? (
             <Text numberOfLines={1} style={styles.variant}>{offering.variantLabel}</Text>
           ) : null}
-          {offering.sku ? (
-            <Text numberOfLines={1} style={styles.sku}>SKU: {offering.sku}</Text>
-          ) : null}
           {!showImage && offering.description ? <Text numberOfLines={2} style={styles.description}>{offering.description}</Text> : null}
           <Text style={styles.price}>
             {offering.isAvailable === false ? "Hozir mavjud emas" : priceLabel}
@@ -126,7 +123,6 @@ const styles = StyleSheet.create({
   textBadge: { color: "#8C93AF", fontSize: 11 },
   description: { color: "#9BA3B9", fontSize: 12, lineHeight: 17 },
   variant: { color: "#C9C3F8", fontSize: 11, lineHeight: 15 },
-  sku: { color: "#747D99", fontSize: 10, lineHeight: 14, fontVariant: ["tabular-nums"] },
   card: {
     flex: 1,
     borderRadius: 17,

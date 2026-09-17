@@ -9,6 +9,7 @@ import {
   IdempotencyError,
   Logger,
   isProviderPublished,
+  isSandboxCheckoutUrl,
   normalizeSupportContact,
   sanitizePublicSupportContact
 } from '@zayuno/shared';
@@ -488,6 +489,19 @@ export class ActionsService {
 
   private mapDbActionToNormalized(dbAction: any): NormalizedAction {
     const metadata = (dbAction.metadata as any) || {};
+    const providerMetadata = (dbAction.provider?.metadata as any) || {};
+    const providerIsSandbox = Boolean(
+      dbAction.provider?.status === 'SANDBOX' ||
+      dbAction.provider?.adapterType === 'sandbox' ||
+      providerMetadata.sandbox === true ||
+      providerMetadata.isDemo === true ||
+      isSandboxCheckoutUrl(dbAction.provider?.baseUrl),
+    );
+    const normalizedMetadata = {
+      ...metadata,
+      ...(providerIsSandbox ? { sandbox: true } : {}),
+      ...(providerMetadata.paymentStatusVerified === true ? { paymentStatusVerified: true } : {}),
+    };
     const rawSupport = dbAction.provider?.config?.supportContact || (dbAction.provider?.metadata as any)?.supportContact;
     const supportContact = sanitizePublicSupportContact(normalizeSupportContact(rawSupport));
 
@@ -527,7 +541,7 @@ export class ActionsService {
       idempotencyKey: dbAction.idempotencyKey || undefined,
       supportContact,
       parameters: (dbAction.parameters as any) || {},
-      metadata,
+      metadata: normalizedMetadata,
       timeline: (dbAction.timeline || []).map((e: any) => ({
         id: e.id,
         status: this.mapDbStatusToContract(e.status),

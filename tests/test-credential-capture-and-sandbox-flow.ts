@@ -199,12 +199,12 @@ async function main() {
   console.log('    ✓ Cross-tenant credential access safely blocked by assertProviderManager.');
 
   // --------------------------------------------------------------------------
-  // Test 10: Complete Navigation Flow: 4 -> 5 -> 6 -> Review -> Dashboard
+  // Test 10: Complete Navigation Flow: 2 -> 3 -> 4 -> Review -> Dashboard
   // --------------------------------------------------------------------------
-  console.log('  [10/10] Verifying Wizard Step Progression (4 -> 5 -> 6 -> Review -> Dashboard)...');
+  console.log('  [10/10] Verifying Wizard Step Progression (2 -> 3 -> 4 -> Review -> Dashboard)...');
   assert.ok(
-    wizardContent.includes('setCurrentStep(5)') &&
-    wizardContent.includes('setCurrentStep(6)') &&
+    wizardContent.includes('setCurrentStep(3)') &&
+    wizardContent.includes('setCurrentStep(4)') &&
     wizardContent.includes('handleSubmitReview'),
     'Wizard must progress step-by-step through Certification and Review before transitioning to Dashboard'
   );

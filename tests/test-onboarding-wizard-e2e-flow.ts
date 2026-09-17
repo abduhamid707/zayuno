@@ -8,31 +8,31 @@ async function main() {
   console.log('🚀 Starting Test Suite: Onboarding Wizard E2E Flow & Sandbox Security...');
 
   // --------------------------------------------------------------------------
-  // Test 1: Step 4 "Davom etish" -> Draft Saved -> Moves to Step 5 (Not Dashboard)
+  // Test 1: Step 2 "Davom etish" -> Draft Saved -> Moves to Step 3 (Not Dashboard)
   // --------------------------------------------------------------------------
-  console.log('  [1/8] Verifying Step 4 "Davom etish" button & in-wizard Step 5 navigation...');
+  console.log('  [1/8] Verifying Step 2 "Davom etish" button & in-wizard Step 3 navigation...');
   const wizardContent = fs.readFileSync(path.resolve('apps/provider-portal/src/OnboardingWizard.tsx'), 'utf-8');
   const appContent = fs.readFileSync(path.resolve('apps/provider-portal/src/App.tsx'), 'utf-8');
 
-  // Must have primary button "Davom etish" on Step 4
+  // Must have primary button "Davom etish" on Step 2
   assert.ok(
     wizardContent.includes("{loading ? 'Saqlanmoqda…' : 'Davom etish'}"),
     'Step 4 primary button must be "Davom etish"'
   );
-  // Must advance to Step 5 on provider registration success
+  // Must advance to Step 3 on provider registration success
   assert.ok(
-    wizardContent.includes('setCurrentStep(5)'),
-    'Step 4 submit must advance to Step 5'
+    wizardContent.includes('setCurrentStep(3)'),
+    'Step 2 submit must advance to Step 3'
   );
   // In App.tsx, apps tab must show friendly gate rather than prematurely hijacking onboarding
   assert.ok(
     appContent.includes('Sizda hali ro‘yxatdan o‘tgan provider yo‘q'),
     'App.tsx apps tab must show friendly gate rather than prematurely hijacking onboarding'
   );
-  console.log('    ✓ Step 4 cleanly transitions to Step 5 without unexpected dashboard jumps.');
+  console.log('    ✓ Step 2 cleanly transitions to Step 3 without unexpected dashboard jumps.');
 
   // --------------------------------------------------------------------------
-  // Test 2: Deep Link & Browser URL State Sync (?tab=onboarding&step=5&provider=slug)
+  // Test 2: Deep Link & Browser URL State Sync (?tab=onboarding&step=3&provider=slug)
   // --------------------------------------------------------------------------
   console.log('  [2/8] Verifying Deep Link Restoration & URL Sync...');
   assert.ok(
@@ -63,9 +63,9 @@ async function main() {
   console.log('    ✓ Resuming or retrying onboarding updates the draft provider idempotently.');
 
   // --------------------------------------------------------------------------
-  // Test 4: In-Wizard Interactive Certification Runner (Step 5)
+  // Test 4: In-Wizard Interactive Certification Runner (Step 3)
   // --------------------------------------------------------------------------
-  console.log('  [4/8] Verifying In-Wizard Certification Runner on Step 5...');
+  console.log('  [4/8] Verifying In-Wizard Certification Runner on Step 3...');
   assert.ok(
     wizardContent.includes('handleRunCertification') &&
     wizardContent.includes('api/v1/providers/${encodeURIComponent(targetSlug)}/certify'),
@@ -74,30 +74,30 @@ async function main() {
   assert.ok(
     wizardContent.includes('certReport.isProductionReady') &&
     wizardContent.includes('Davom etish (Xulosa va Ko‘rib chiqish)'),
-    'Step 5 must allow advancing to Step 6 only when certification and AI discovery readiness both pass'
+    'Step 3 must allow advancing to Step 4 only when certification and AI discovery readiness both pass'
   );
   assert.ok(
     appContent.includes('providerRequiresLocations') &&
     appContent.includes("mandatory.push('LOCATIONS')") &&
-    appContent.includes("provider.status === 'ACTIVE' || isLocationMandatory"),
-    'Existing physical providers must submit LOCATIONS from Dashboard settings and cannot accidentally uncheck it'
+    appContent.includes('capabilities: [...new Set([...integrationForm.capabilities, ...mandatory])]'),
+    'Physical providers must retain the mandatory LOCATIONS capability in Dashboard settings'
   );
   console.log('    ✓ In-wizard certification runner correctly implemented with pass/fail gates.');
 
   // --------------------------------------------------------------------------
-  // Test 5: Step 6 Review & Submit -> Navigates to Dashboard
+  // Test 5: Step 4 Review & Submit -> Navigates to Dashboard
   // --------------------------------------------------------------------------
-  console.log('  [5/8] Verifying Step 6 Review Submit...');
+  console.log('  [5/8] Verifying Step 4 Review Submit...');
   assert.ok(
     wizardContent.includes('handleSubmitReview') &&
     wizardContent.includes('api/v1/providers/${encodeURIComponent(targetSlug)}/submit-review'),
-    'Step 6 must submit provider for review'
+    'Step 4 must submit provider for review'
   );
   assert.ok(
     wizardContent.includes("Review’ga yuborish va Dashboardga o‘tish"),
-    'Step 6 must have button "Review’ga yuborish va Dashboardga o‘tish"'
+    'Step 4 must have button "Review’ga yuborish va Dashboardga o‘tish"'
   );
-  console.log('    ✓ Step 6 review submission successfully completes onboarding flow.');
+  console.log('    ✓ Step 4 review submission successfully completes onboarding flow.');
 
   // --------------------------------------------------------------------------
   // Test 6: Sandbox URL Warning & Server-Side Test Credential Resolution

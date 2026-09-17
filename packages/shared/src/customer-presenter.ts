@@ -18,6 +18,8 @@ function isTicketPresentation(value: any, providerInfo?: any): boolean {
     providerInfo?.category,
     providerInfo?.name,
     providerInfo?.slug,
+    value?.providerSlug,
+    value?.providerName,
     providerInfo?.metadata?.category,
   ]
     .filter(Boolean)
@@ -74,6 +76,61 @@ export function isDemoOrSandboxProvider(provider: any): boolean {
     config.sandbox === true ||
     config.isDemo === true
   );
+}
+
+
+/**
+ * A checkout link can prove that a response is a test handoff even when a
+ * provider record was accidentally published as production. Reserved test
+ * domains and temporary tunnel hosts must never be presented as real payment.
+ */
+export function isSandboxCheckoutUrl(value: unknown): boolean {
+  try {
+    const host = new URL(String(value || '')).hostname.toLowerCase().replace(/\.$/, '');
+    return (
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host === 'example' ||
+      host.endsWith('.example') ||
+      host.endsWith('.test') ||
+      host.includes('sandbox') ||
+      host.endsWith('.trycloudflare.com') ||
+      host.endsWith('.ngrok-free.app') ||
+      host.endsWith('.lhr.life')
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function isDemoOrSandboxAction(action: any, providerInfo?: any): boolean {
+  const actionMetadata = (action?.metadata as Record<string, any>) || {};
+  const checkoutUrls = [
+    action?.nextAction?.url,
+    action?.paymentUrl,
+    action?.checkoutUrl,
+    providerInfo?.baseUrl,
+  ];
+  return (
+    isDemoOrSandboxProvider(providerInfo) ||
+    isDemoOrSandboxProvider(action) ||
+    actionMetadata.sandbox === true ||
+    actionMetadata.isDemo === true ||
+    actionMetadata.environment === 'SANDBOX' ||
+    checkoutUrls.some(isSandboxCheckoutUrl)
+  );
+}
+
+/**
+ * A provider saying PAID is not enough. The payment integration must be
+ * explicitly approved for status reporting; this prevents a mock /actions
+ * endpoint from turning a customer message into a false payment receipt.
+ */
+export function hasVerifiedPaymentStatus(action: any, providerInfo?: any): boolean {
+  if (isDemoOrSandboxAction(action, providerInfo)) return false;
+  const actionMetadata = (action?.metadata as Record<string, any>) || {};
+  const providerMetadata = (providerInfo?.metadata as Record<string, any>) || {};
+  return actionMetadata.paymentStatusVerified === true || providerMetadata.paymentStatusVerified === true;
 }
 
 /**
@@ -287,30 +344,26 @@ export function formatCustomerActionConfirmation(action: any, providerInfo?: any
   if (!action) return 'Buyurtmangiz yaratildi. To‘lov kutilmoqda.';
 
   const isTicket = isTicketPresentation(action, providerInfo);
+  const checkoutUrl = action.nextAction?.url || action.paymentUrl;
+  const isDemo = isDemoOrSandboxAction(action, providerInfo);
 
-  const isCoffeeTime =
-    providerInfo?.slug === 'coffee-time' ||
-    action?.providerSlug === 'coffee-time' ||
-    action?.providerName?.toLowerCase().includes('coffee') ||
-    action?.paymentUrl?.includes('coffee-time');
-
-  const isDemo = isCoffeeTime || isDemoOrSandboxProvider(providerInfo) || isDemoOrSandboxProvider(action);
-  const checkoutUrl = action.nextAction?.url || action.paymentUrl || 'https://zayuno.uz/pay';
-
-  let demoDisclaimer = '';
-  if (isCoffeeTime) {
-    demoDisclaimer = 'Bu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.\n\n';
-  } else if (isTicket && isDemo) {
-    demoDisclaimer = 'Bu demo buyurtma, haqiqiy to‘lov olinmaydi.\n';
-  } else if (isDemo) {
-    demoDisclaimer = 'Bu sandbox buyurtmasi, haqiqiy to‘lov qilinmaydi.\n';
+  if (isDemo) {
+    const subject = isTicket ? 'Sinov chipta so‘rovi' : 'Sinov buyurtmasi';
+    const link = checkoutUrl ? `\n\n[Sinov sahifasini ochish](${checkoutUrl})` : '';
+    return `${subject} yaratildi. Haqiqiy providerga yuborilmaydi va bu sahifada haqiqiy to‘lov amalga oshmaydi.${link}`;
   }
+
+  const paymentUrl = checkoutUrl || 'https://zayuno.uz/pay';
 
   if (isTicket) {
-    return `Chipta band qilindi. Endi to‘lovni yakunlang:\n\n${demoDisclaimer}[To‘lov sahifasini ochish](${checkoutUrl})`;
+    return `Chipta band qilindi. Endi to‘lovni yakunlang:
+
+[To‘lov sahifasini ochish](${paymentUrl})`;
   }
 
-  return `Buyurtmangiz yaratildi. To‘lov kutilmoqda.\n\n${demoDisclaimer}[To‘lov sahifasini ochish](${checkoutUrl})`;
+  return `Buyurtmangiz yaratildi. To‘lov kutilmoqda.
+
+[To‘lov sahifasini ochish](${paymentUrl})`;
 }
 
 /**
@@ -320,45 +373,44 @@ export function formatCustomerActionStatus(action: any, providerInfo?: any): str
   if (!action) return 'Buyurtma ma’lumoti topilmadi.';
 
   const isTicket = isTicketPresentation(action, providerInfo);
-
+  const isDemo = isDemoOrSandboxAction(action, providerInfo);
   const status = String(action.status || '').toUpperCase();
   const paymentStatus = String(action.paymentStatus || '').toUpperCase();
   const sandboxState = String(action.sandboxState || '').toUpperCase();
 
-  // 1. Cancelled
   if (status === 'CANCELLED' || sandboxState === 'CANCELLED') {
-    if (isTicket) {
-      return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga yangi chipta topib beraman.';
-    }
+    if (isTicket) return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga yangi chipta topib beraman.';
     return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga boshqa taklif topib beraman.';
   }
 
-  // 2. Paid
-  // `CONFIRMED` describes the provider/order lifecycle, not payment settlement.
-  // A provider can confirm or accept an order while its payment is still
-  // pending, so never turn an action status into a payment claim.
   if (paymentStatus === 'PAID') {
-    if (isTicket) {
-      return 'Zo‘r, to‘lov qabul qilindi. Chiptangiz tasdiqlandi.';
+    if (isDemo) {
+      return `Bu ${isTicket ? 'sinov chipta so‘rovi' : 'sinov buyurtmasi'}. Provider qaytargan to‘lov holati haqiqiy to‘lov tasdig‘i emas.`;
     }
-    return 'To‘lov qabul qilindi. Buyurtmangiz tasdiqlandi.';
+    if (!hasVerifiedPaymentStatus(action, providerInfo)) {
+      return 'Provider to‘lov holatini qaytardi, lekin Zayuno hali uni ishonchli tasdiqlamagan. To‘lovni qayta tekshiring.';
+    }
+    return isTicket
+      ? 'Zo‘r, to‘lov qabul qilindi. Chiptangiz tasdiqlandi.'
+      : 'To‘lov qabul qilindi. Buyurtmangiz tasdiqlandi.';
   }
 
-  // 3. Unpaid / Awaiting Payment
   if (status === 'AWAITING_PAYMENT' || paymentStatus === 'PENDING' || sandboxState === 'AWAITING_PAYMENT' || sandboxState === 'AWAITING_PASSENGER_DETAILS') {
-    const checkoutUrl = action.nextAction?.url || action.paymentUrl || 'https://zayuno.uz/pay';
-    if (isTicket) {
-      return `Chipta band qilingan, lekin to‘lov hali qilinmagan.\n\n[To‘lovni yakunlash](${checkoutUrl})`;
+    const checkoutUrl = action.nextAction?.url || action.paymentUrl;
+    if (isDemo) {
+      const link = checkoutUrl ? `\n\n[Sinov sahifasini ochish](${checkoutUrl})` : '';
+      return `Bu ${isTicket ? 'sinov chipta so‘rovi' : 'sinov buyurtmasi'}. Haqiqiy to‘lov olinmaydi.${link}`;
     }
-    return `Buyurtmangiz qabul qilingan, lekin to‘lov hali qilinmagan.\n\n[To‘lovni yakunlash](${checkoutUrl})`;
+    const paymentUrl = checkoutUrl || 'https://zayuno.uz/pay';
+    if (isTicket) return `Chipta band qilingan, lekin to‘lov hali qilinmagan.
+
+[To‘lovni yakunlash](${paymentUrl})`;
+    return `Buyurtmangiz qabul qilingan, lekin to‘lov hali qilinmagan.
+
+[To‘lovni yakunlash](${paymentUrl})`;
   }
 
-  // 4. Failed
-  if (status === 'FAILED') {
-    return 'Buyurtmani yakunlab bo‘lmadi.';
-  }
-
-  // 5. In Progress / Other
+  if (status === 'FAILED') return 'Buyurtmani yakunlab bo‘lmadi.';
   return formatCustomerStatus(status, paymentStatus);
 }
 
@@ -474,14 +526,17 @@ export function formatCustomerOffering(offering: any): string {
 /**
  * Formats payment options for customer.
  */
-export function formatCustomerPaymentOptions(options: any[], action?: any): string {
+export function formatCustomerPaymentOptions(options: any[], action?: any, providerInfo?: any): string {
   const url = action?.paymentUrl || action?.nextAction?.url || options?.[0]?.checkoutUrl;
-  const isDemo = isDemoOrSandboxProvider(action) || (Array.isArray(options) && options.some(o => o.metadata?.sandbox === true || isDemoOrSandboxProvider(o)));
-  const demoDisclaimer = isDemo ? 'Bu Coffee Time sandbox demo xizmati. Haqiqiy buyurtma yoki to‘lov amalga oshirilmaydi.\n\n' : '';
+  const isDemo = isDemoOrSandboxAction(action, providerInfo) || (Array.isArray(options) && options.some(option => isDemoOrSandboxAction(option, providerInfo) || isSandboxCheckoutUrl(option?.checkoutUrl)));
   if (url) {
-    return `To‘lov sahifasi tayyor:\n\n${demoDisclaimer}[To‘lov sahifasini ochish](${url})`;
+    return isDemo
+      ? `Bu sinov checkout sahifasi. Haqiqiy to‘lov amalga oshirilmaydi.\n\n[Sinov sahifasini ochish](${url})`
+      : `To‘lov sahifasi tayyor:\n\n[To‘lov sahifasini ochish](${url})`;
   }
-  return `To‘lov usullari checkout sahifasida taqdim etiladi.\n\n${demoDisclaimer}`;
+  return isDemo
+    ? 'Bu sinov buyurtmasi. Haqiqiy to‘lov usuli yo‘q.'
+    : 'To‘lov usullari checkout sahifasida taqdim etiladi.';
 }
 
 /**

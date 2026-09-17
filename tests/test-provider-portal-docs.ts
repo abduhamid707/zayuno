@@ -64,10 +64,14 @@ assert.equal(resolveDocLink('https://example.com/?doc=auth'), undefined);
 assert.equal(resolveDocLink('http://['), undefined);
 
 assert.equal(getIntegrationState(false).tab, 'onboarding');
-assert.equal(getIntegrationState(true).step, 3);
+// A signed-in owner without a provider starts at the first business-profile
+// step in the current four-step onboarding flow.
+assert.equal(getIntegrationState(true).step, 1);
 assert.equal(getIntegrationState(true, { slug:'test' }).steps[1].complete, false);
-assert.equal(getIntegrationState(true, { slug:'test', baseUrl:'https://example.com' }).tab, 'certification');
-assert.equal(getIntegrationState(true, { slug:'test', baseUrl:'https://example.com', metadata:{ isCertified:true } }).steps[2].complete, false);
+// The current four-step wizard keeps certification inside onboarding so the
+// owner retains context while moving from API setup to the test runner.
+assert.equal(getIntegrationState(true, { slug:'test', baseUrl:'https://example.com' }).tab, 'onboarding');
+assert.equal(getIntegrationState(true, { slug:'test', baseUrl:'https://example.com', metadata:{ isCertified:true } }).steps[2].complete, true);
 assert.equal(getIntegrationState(true, { slug:'test', status:'SUSPENDED' }).status, 'SUSPENDED');
 assert.equal(getIntegrationState(true, { slug:'test', baseUrl:'https://example.com', status:'ACTIVE', metadata:{ isCertified:true } }).steps.every(step => step.complete), true);
 

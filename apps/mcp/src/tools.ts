@@ -765,10 +765,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         ...args,
         ...(destination ? { destination } : {})
       });
-      const provider = typeof client.getProvider === 'function'
-        ? await client.getProvider(args.providerSlug).catch(() => undefined)
-        : undefined;
-      const customerMessage = formatCustomerQuote(quote, provider);
+      const customerMessage = formatCustomerQuote(quote);
       return {
         customerMessage,
         ...quote
@@ -915,10 +912,11 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         ...(destination ? { destination } : {}),
         idempotencyKey
       });
-      const provider = typeof client.getProvider === 'function'
-        ? await client.getProvider(args.providerSlug).catch(() => undefined)
-        : undefined;
-      const customerMessage = formatCustomerActionConfirmation(action, provider);
+      // Keep create_action a single API dispatch. The action payload already
+      // carries providerSlug, payment URL and sandbox metadata needed by the
+      // shared presenter, so a second provider lookup only adds latency and
+      // breaks MCP's one-tool/one-request contract.
+      const customerMessage = formatCustomerActionConfirmation(action);
       return {
         customerMessage,
         actionId: action.publicId || action.id,
@@ -1069,7 +1067,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     },
     handler: async (args, client) => {
       const options = await client.getPaymentOptions(args.actionId);
-      const customerMessage = formatCustomerPaymentOptions(Array.isArray(options) ? options : options?.paymentOptions);
+      const customerMessage = formatCustomerPaymentOptions(
+        Array.isArray(options) ? options : options?.paymentOptions,
+      );
       return {
         customerMessage,
         ...(Array.isArray(options) ? { paymentOptions: options } : options)

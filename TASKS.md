@@ -2412,3 +2412,108 @@ Agar xohlasang, keyingi qadamda men Zayuno vs Yandex vs Google vs OpenAI vs Clau
 **Chegara:** `scripts/iticket-mock-server.mjs` foydalanuvchining test provideri; bu ishda o‘zgartirilmaydi. Uning sun’iy fee’i provider tomonda olib tashlangan.
 
 **Holat / handoff:** Bajarildi. `ConsumerChatService` endi faqat `CATALOG` capability’li faol providerlar bilan ishlaydi, aniq tanlangan providerni keyingi typo/follow-up xabarida saqlaydi va faqat provider e’lon qilgan fulfillment/contact talablarini so‘raydi. iTicket kabi REMOTE/e-ticket providerda yetkazib berish manzili hamda telefon avtomatik so‘ralmaydi; fee faqat provider quote’ida bo‘lsa chiqadi. MCP `create_action` endi contactni global majburiyat qilmaydi; quote/provider talab qilsa yuboradi. Mobile home tezkor tugmalari `/api/v1/consumer/chat/quick-actions` orqali jonli providerlardan darhol olinadi, generik fallback bor va so‘rov yuborilayotganda qayta bosilmaydi. O‘zgargan fayllar: consumer chat API/service, providers service, MCP server/tools, shared customer presenter, mobile home/catalog/i18n va regression testlar. PASS: `pnpm --filter @zayuno/api build`, `pnpm --filter mobile typecheck`, `pnpm --filter @zayuno/shared build`, `pnpm --filter @zayuno/mcp build`, `pnpm exec tsx tests/test-consumer-universal-provider-flow.ts`, `tests/test-customer-experience-and-presenter.ts`, `tests/test-action-guardrails.ts`, `tests/test-coffee-time-availability-and-customer-mode.ts`, `tests/test-openai-plugin-mcp-contract.ts`, `git diff --check`. iTicket mock va `bin/cloudflared.exe` foydalanuvchi o‘zgarishlari sifatida ajratilgan; commitga kiritilmaydi.
+
+# Reja — Z Coin / Zayuno Rewards: real actionga asoslangan loyalty va Telegram Mini App (2026-09-18)
+
+## Mahsulot qarori
+
+Z Coin foydalanuvchi uchun **Zayuno Rewards ballari** bo‘ladi: kripto-aktiv, airdrop, investitsiya yoki naqd pul emas. Ball faqat tasdiqlangan, provider tomonda haqiqatan yakunlangan actiondan keyin beriladi. U provider tomonidan oldindan tasdiqlangan vaucher, chegirma yoki xizmat foydasiga almashtiriladi.
+
+Pasted strategiyadagi `AI Tycoon + Tap-to-Eat` g‘oyasi marketing tajribasi sifatida keyingi bosqichda qoladi. Tap, daily streak, passive income yoki lucky wheel hech qachon o‘zi mustaqil pul qiymati yaratmaydi. Haqiqiy provider nomi, sovrin yoki chegirma providerning yozma ruxsatisiz ko‘rsatilmaydi.
+
+## Chegara va xavfsizlik qoidalari
+
+- [ ] Z Coinni kripto/token/airdrop sifatida sotmaslik, pulga qaytarmaslik va “daromad” va’dasini bermaslik.
+- [ ] Har bir reward uchun mablag‘ manbasi, provider subsidiyasi, muddati, maksimumi, refund/cancel qoidasi va foydalanuvchi shartlarini tasdiqlash.
+- [ ] Provider yoki uning brendi nomidan quest, voucher, “filial bilan shartnoma”, chipta sovrini va reklama chiqishidan oldin provider ruxsatini qayd qilish.
+- [ ] Test/mock providerlar uchun reward hamda redemptionni faqat `SANDBOX/DEMO` belgisi bilan ishlatish; real pul yoki real voucher yaratmaslik.
+- [ ] Bir action uchun rewardni action `COMPLETED` va to‘lov talab qilinsa `PAID` holatidan oldin bermaslik; cancellation, refund va chargebackda ledger bilan teskari yozuv yaratish.
+- [ ] Referral, device, Telegram account, IP va redemption limitlarini fraud modeli hamda maxfiylik qoidalarisiz productionga chiqarmaslik.
+
+## 0-bosqich — iqtisod va provider validatsiyasi
+
+- [ ] 3–5 ta real provider bilan reward manbasi modelini tanlash: provider-funded voucher, Zayuno-funded acquisition budget yoki cashback ulushi.
+- [ ] Har provider uchun “1 ballning foydasi”, maksimal chegirma, kunlik/oylik limit, expiry, minimal buyurtma va refund siyosatini yozma tasdiqlash.
+- [ ] Birinchi pilot vertikalni tanlash: faqat bitta real provider yoki bir turdagi provider; restaurant, ticket va boshqa vertikallarni bitta launchga aralashtirmaslik.
+- [ ] Funnel baseline’ini o‘lchash: katalog ochilishi → quote → confirmation → paid/completed action → 7/30 kunlik qaytish.
+- [ ] Pilotning success mezonlarini oldindan belgilash: reward ishlatilishi, incremental conversion, qaytish, fraud rate, provider xarajati va support yuklamasi.
+
+**Gate:** iqtisod va provider kelishuvi yozma tasdiqlanmaguncha Z Coin UI, tap yoki voucher redemption productionga chiqarilmaydi.
+
+## 1-bosqich — Rewards Ledger: real actiondan ball berish
+
+- [ ] `RewardsModule` yaratish: action eventlarni idempotent consumer orqali qabul qilish va faqat final eligible holatda ball yozish.
+- [ ] Prisma sxemasi: `RewardAccount`, append-only `RewardLedgerEntry`, `RewardCampaign`, `RewardRule`, `RewardRedemption`, `RewardReservation`, `Referral`, `FraudReview` hamda provider reward budget/settlement yozuvlari.
+- [ ] Ledger qoidasi: balans summasi ledgerdan hisoblanadi; balansni mutatsiya qilish yo‘q. Har yozuvda sabab, source action, campaign, provider, expiry va idempotency key bo‘ladi.
+- [ ] Reward qoidasini provider + capability + action turi + action/payment holati + vaqt oynasi bo‘yicha sozlash.
+- [ ] `COMPLETED/PAID` reward, `CANCELLED/REFUNDED/FAILED` reversal va duplicate webhook uchun exactly-once natijani sinash.
+- [ ] API: reward balans, tarix, eligible reward, redemption preview va user-visible tushunarli sabablar; raw provider/action ID’larini mijozga chiqarmaslik.
+- [ ] Admin: campaign/rule boshqaruvi, paus qilish, manual review, fraud hold, provider budget va audit eksporti.
+- [ ] Mobile: faqat haqiqiy balance, “qayerdan tushdi”, “qayerda ishlatiladi” hamda expiry’ni ko‘rsatish; soxta coin animatsiyasi yo‘q.
+
+**Acceptance:** bitta real yakunlangan action faqat bir marta ball beradi; refund reversal bilan yakuniy balans to‘g‘ri; parallel webhooklarda duplicate ball chiqmaydi; audit har entryning sababini ko‘rsatadi.
+
+## 2-bosqich — Voucher va redemption oqimi
+
+- [ ] Provider beradigan campaign/vaucher kontraktini aniqlash: nominal, SKU/category, minimal summa, expiry, per-user limit, provider qoplash summasi va checkout qo‘llashi.
+- [ ] Redemption oqimi: preview → ballni vaqtinchalik reserve qilish → provider quote/actionga voucher qo‘shish → provider tasdiqlasa redeem → xato/expiry/cancel bo‘lsa reserve release.
+- [ ] Quote taqdimotida provider qaytargan alohida fee, voucher chegirmasi va yakuniy jami aniq ko‘rsatilishini ta’minlash; qiymatlarni hech qachon client tomonda hisoblamaslik.
+- [ ] Provider checkout voucher qabul qilmasa, redemptionni taklif qilmaslik va mijozga aniq sabab berish.
+- [ ] Provider settlement reportini yaratish: kim, qaysi action, qaysi campaign, nechta ball, qancha subsidiyalandi.
+- [ ] Mijozga cancel/refunddan keyingi ball qaytishi, voucher muddati va ishlatish shartini oddiy tilda ko‘rsatish.
+
+**Acceptance:** rezerv qilingan ball checkout xatosida qaytadi; quote va action jami mos; provider qoplamaydigan chegirma hech qachon qo‘llanmaydi.
+
+## 3-bosqich — Action-to-Earn quest va referral
+
+- [ ] Quest katalogini faqat tekshiriladigan eventlarga bog‘lash: birinchi successful action, provider katalogini qidirish, qayta kelish yoki provider tasdiqlagan promo action.
+- [ ] “AI orqali buyurtma” rewardini faqat real action final holatiga bog‘lash; chat xabari, tap yoki ochilgan ekranga ball bermaslik.
+- [ ] Referralni faqat yangi, tekshirilgan foydalanuvchining eligible completed actionidan keyin berish.
+- [ ] Anti-fraud: signed Telegram init data, session/device risk signal, self-referral bloklash, tezkor takrorlanish limitlari, manual review queue va campaign kill-switch.
+- [ ] Har quest uchun userga beriladigan aniq foyda, status va “nima uchun ball berilmadi” sababi ko‘rsatilishi.
+
+**Acceptance:** self-referral va duplicate accountlar reward olmaydi; reward decision auditdan qayta tiklanadi; kampaniya admin tomonidan darhol pause qilinadi.
+
+## 4-bosqich — Telegram Mini App
+
+- [ ] Telegram Mini Appga kirishdan oldin bot, mini app URL, Telegram init-data verification, privacy/terms hamda support oqimini tayyorlash.
+- [ ] Yangi `apps/tma` ilovasini faqat rewards wallet, quest, voucher va Zayuno katalogiga deep-link sifatida boshlash; mavjud mobile/API dizayn tizimidan foydalanish.
+- [ ] Dizayn Zayuno brendining mavjud ko‘k/binafsha visual tiliga mos bo‘lishi; yashil neon rangni yangi mustaqil brend qarorisiz kiritmaslik.
+- [ ] Telegram deep-linklari provider/catalog/questni ochsin, lekin action confirmation va paymentdagi mavjud xavfsizlik qoidalarini chetlab o‘tmasin.
+- [ ] Analytics: acquisition source, quest completion, quote, paid action, redemption, retention va fraud eventlari uchun privacy-safe eventlar.
+- [ ] Accessibility, tor ekran, loading/error/offline holatlari va web/mobile parity tekshiruvlari.
+
+**Acceptance:** Telegram auth imzosi backendda tekshiriladi; Mini App hech qachon balans yoki voucherga clientdan ishonmaydi; payment/link flow mavjud provider checkoutga qaytadi.
+
+## 5-bosqich — faqat validatsiyadan keyingi Tycoon/engagement eksperimenti
+
+- [ ] Daily streak, AI quest progress yoki kolleksiya kabi yengil engagement elementlarini A/B test sifatida sinash.
+- [ ] Tap/clicker bo‘lsa, u faqat kosmetik progress yoki reward multiplier eligibility bo‘lsin; redeem qilinadigan ballni tapning o‘zi bermasin.
+- [ ] Lucky wheel yoki mystery boxdan oldin yuridik/promo qoidalari, sovrin inventorysi, odds disclosure, budget cap, fraud kontrolleri va provider ruxsatini tayyorlash.
+- [ ] Real provider brendini o‘yin kartasida ishlatishdan oldin brand approval olish; aks holda generic “hamkor xizmat” nomidan foydalanish.
+- [ ] 7/30 kun retention, redemption conversion va provider ROI baseline’dan sezilarli yaxshi bo‘lmasa eksperimentni yopish.
+
+## Texnik tekshiruvlar
+
+- [ ] Unit: ledger append/reversal/idempotency, eligibility, expiry, reservation va fraud limitlari.
+- [ ] Integration: provider action webhook → reward, reward → quote → action → refund/release oqimi.
+- [ ] E2E: mobile va Telegram Mini Appdan voucher ishlatish, expired voucher, provider rejection, offline/retry va parallel request holatlari.
+- [ ] Security: Telegram init-data, authorization, rate limit, race condition, negative balance, campaign budget bypass va PII log redaction testlari.
+- [ ] Ops: dashboard/alertlar — reward outflow, redemption failure, provider budget, fraud hold, webhook lag va campaign health.
+- [ ] Har bosqichdan keyin API/mobile/admin/MCP buildlari, migration review va `git diff --check`ni qayd etish.
+
+**Holat / handoff:** Reja yaratildi, implementatsiya boshlanmadi. Keyingi konkret ish — 0-bosqich uchun pilot provider, reward subsidiyasi va campaign economics’ini tasdiqlash; shundan keyin ledger DB sxemasi va `RewardsModule` alohida taskda implementatsiya qilinadi. Pasted manbadagi tap/clicker hamda 50 000 coin = 25 000 so‘m kabi misollar majburiyat emas; ular provider kelishuvi va economics tasdiqlangandan keyingina experiment bo‘lishi mumkin.
+
+# Joriy ish — Mijoz chatidagi sandbox/to‘lov ishonchliligi va variant UX (2026-09-18)
+
+- [x] Ichki `[LIVE_DATA*]` markerlarining mobile chatga chiqish yo‘lini topib, barcha user-facing javobdan olib tashlash.
+- [x] Variantlarni “hammasi/boshqa variantlar” so‘rovlarida AI xatosisiz deterministic ro‘yxat qilib ko‘rsatish.
+- [x] Customer quote tafsilotidan SKU va ichki identifikatorlarni olib tashlash; delivery fee hamda service fee’ni provider javobiga mos nomlash.
+- [x] Demo/sandbox checkout va statusni real buyurtma/to‘lov sifatida ko‘rsatmaslik; `PAID` da’vosini faqat production providerning ishonchli payment tasdig‘i bilan chiqarish.
+- [x] MaxWay/iTicket mobile chat regressiya testlari, API/mobile build va deploy tekshiruvini bajarish.
+
+**Chegara:** test iTicket mock serveriga bevosita o‘zgartirish kiritilmaydi. Mijoz tomoni providerning sandbox yoki ishonchsiz holatini real to‘lov deb aytmasligi backendda himoyalanadi.
+
+**Holat / handoff:** Bajarildi. `ConsumerChatService` endi Gemini oqimidagi `[LIVE_DATA*]` markerlarni user-facing javobga chiqarmaydi, provider tanlovini follow-up typo xabarlarida saqlaydi va variant ro‘yxatini deterministic qaytaradi. Quote/action tasdiqlarida SKU/ichki ID ko‘rsatilmaydi, fee nomlari provider qaytargan alohida qiymatlardan olinadi. Sandbox, demo va vaqtinchalik tunnel checkoutlari sinov sifatida ko‘rsatiladi; `PAID` faqat provider metadata’sida ishonchli payment tasdig‘i bo‘lsa real deb aytiladi. Delivery/physical provider uchun generated contract `LOCATIONS`ni capability ro‘yxatidan tushib qolsa ham majburiy qiladi. Onboarding matnlari 4 bosqichga moslandi, yordam kontaktlari va canonical enum ko‘rsatmalari aniqlandi. Mobile food card’dan SKU olib tashlandi; home quick actions avvalgi commitda dinamik va loading paytida qayta bosilmaydigan qilingan. `bin/cloudflared.exe` va `scripts/iticket-mock-server.mjs` foydalanuvchi o‘zgarishlari sifatida stage qilinmadi.
+
+**Tekshiruv:** `@zayuno/shared`, `@zayuno/api`, `@zayuno/mcp` buildlari; mobile typecheck; provider portal docs, onboarding E2E, credential/sandbox, customer presenter, provider cache/chat, Coffee Time, MCP consistency, universal provider flow va consumer memory testlari — barchasi PASS. `git diff --check` — PASS. Pushdan keyin production deploy statusi CI/CD pipeline’ga bog‘liq; bu ish lokal test va commit/pushni qamrab oladi.
