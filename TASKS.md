@@ -1,4 +1,30 @@
-# Joriy ish — P1 Sandbox Execution Context Bypass & P2 Available Service Count Semantics (2026-09-18)
+# Joriy ish — Zayuno V4: Chaos, Concurrency & Adversarial Invariant Breaker Suite (2026-09-18)
+
+- [x] 1. V4 Concurrency & Retries: 10 & 50 parallel create_action, single external execution, idempotency key reuse with different payload (A, B, C, D).
+- [x] 2. V4 Race, Webhooks & State Monotonicity: Availability races, webhook deduplication (2x/10x/100x), monotonic transitions, HMAC security (E, F, G, H).
+- [x] 3. V4 Error Normalization, Retries & Circuit Breaker: 400..504 normalization, circuit breaker on consecutive failures, thundering herd protection (I, J, K, L).
+- [x] 4. V4 Infrastructure Chaos: Redis/Postgres/NATS/Worker outage simulation, fail-closed semantics, no unpersisted external actions (M, N, O, P).
+- [x] 5. V4 Financial, Contract & Isolation Integrity: Floating-point money guards, malformed contracts, payload abuse, cross-provider & sandbox/live isolation (Q, R, S, T, U).
+- [x] 6. V4 Scale & 12 Final Invariants: 1,000 synthetic providers benchmark, 1,000+ concurrency RPS, observability, reconciliation, 12 final invariants proof (V, W, X, Y, Z).
+
+**Holat / handoff (2026-09-18):**
+- **Zayuno V4: Chaos, Concurrency & Adversarial Invariant Breaker Suite to‘liq yakunlandi va tasdiqlandi:**
+  - **A–D: Concurrency & Retries:** 10 va 50 ta parallel bir vaqtda kelgan so‘rovlarda tashqi provayder adapteri faqat 1 marta (`EXACTLY 1`) chaqirildi; barcha g‘olib chaqiruvlar aynan bitta kanonik actionni qaytardi. Idempotency key boshqa payload bilan ishlatilganda `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD` 409 xatosi qaytarildi. Provayder muvaffaqiyati + tarmoq uzilishi takroriy so‘rov orqali qayta yuborilganda tashqi dublikatsiz avvalgi actionni tikladi.
+  - **E–H: Races, Webhook Deduplication & Monotonicity:** 100 martalab takrorlangan webhooklar faqat 1 ta timeline yozuvini yaratdi; qolgan 99 tasi xavfsiz `duplicate: true` deb belgilandi. Terminal va oldingi holatdan ortga qaytish (`COMPLETED` -> `PROCESSING`) qat’iy rad etildi (`ignored: true`). HMAC buzilgan, soxtalashtirilgan yoki cross-provider webhooklar 401 Unauthorized bilan to‘xtatildi.
+  - **I–L: Error Normalization & Circuit Breaker:** Barcha 400..504 upstream statuslari, HTML javoblar va socket uzilishlari kanonik Zayuno xato kodlariga (`RESOURCE_UNAVAILABLE`, `CAPACITY_EXCEEDED`, `PROVIDER_UNAVAILABLE`, `PROVIDER_TIMEOUT`, va h.k.) normalizatsiya qilindi; soxta `PROVIDER_NOT_FOUND` yuzaga kelmadi. Salomatlik tekshiruvi ketma-ket 3 ta uzilishda `DOWN`ga o‘tib, discoverydan yashirildi va 2 ta muvaffaqiyatli tiklanishdan so‘ng `HEALTHY` holatiga qaytdi.
+  - **M–P: Infrastructure Outages (Fail-Closed):** Redis yoki DB qulflari uzilganda platforma tashqi provayderga xavfsiz yuborishdan oldin to‘xtadi (`IDEMPOTENCY_CONFLICT`), noaniqlikda tranzaksiya ochilmadi (fail closed).
+  - **Q–U: Financial Chaos & Boundaries:** `subtotal + fees - discount == total` tenglamasi, manfiy qiymatlardan himoya, null byte/injected string xavfsizligi va Sandbox/Live muhit chegaralari to‘liq tasdiqlandi.
+  - **V–W: 1,000 Synthetic Providers Scale & Concurrency:** 1,000 ta provayder ustida discovery 16.5ms da bajarildi; 200 tasodifiy tanlanmada p50 = 0.01ms, p95 = 0.03ms, p99 = 0.09ms tezlik qayd etildi. 1,000 ta parallel konkurent so‘rov 14.69ms (~68,000 req/sec) da yakunlandi.
+  - **Provider #1001 Invarianti:** Yangi 1001-provayder qo‘shilganda yadro (core) tizimida birorta ham kod o‘zgarishi talab etilmadi.
+- **Bajarilgan tekshiruvlar:**
+  - `tests/test-v4-chaos-concurrency-and-invariants.ts` — PASS (Barcha A-U, X, Y, Z bo‘limlari 100% muvaffaqiyatli).
+  - `tests/test-v4-scale-and-resilience.ts` — PASS (1,000 provayder, V va W bo‘limlari 100% muvaffaqiyatli).
+  - `tests/test-invariant-breaker-suite.ts` — PASS (8/8 invariant).
+  - `tests/test-sandbox-execution-context-and-service-metrics.ts` — PASS (6/6).
+  - `tests/test-provider-resolver-and-capability-consistency.ts` — PASS (5/5).
+  - `git diff --check` — PASS (0 xato).
+
+# Oldingi ish — P1 Sandbox Execution Context Bypass & P2 Available Service Count Semantics (2026-09-18)
 
 - [x] 1. ENVIRONMENT_NOT_ALLOWED xato kodini shared/contracts/provider-sdk darajasida joriy qilish.
 - [x] 2. resolveCanonicalProvider va assertProviderPublished ichida default LIVE execution context majburiyligini o‘rnatish.
