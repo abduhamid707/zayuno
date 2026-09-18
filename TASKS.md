@@ -1,4 +1,14 @@
-# Joriy ish — Universal Provider Contract Hardening & Invariant Breaker Suite (2026-09-18)
+# Joriy ish — Production Deploydan keyin Mobile AI Chat uzilishini tuzatish va migratsiyalarni avtomatlashtirish (2026-09-18)
+
+- [x] 1. Production serverdagi `zayuno-api` loglarini tahlil qilish va ildiz sababni aniqlash (`The column Provider.environment does not exist in the current database`).
+- [x] 2. Qolib ketgan 3 ta migratsiyani (`20260917000000_reconcile_legacy_core_schema`, `20260918000000_action_idempotency_hash`, `20260918010000_provider_environment_and_category`) production bazasida muvaffaqiyatli qo‘llash (`migrate:deploy`).
+- [x] 3. `zayuno-api` va `zayuno-worker` konteynerlarini yangi schema bilan qayta ishga tushirish va xatoliklar to‘liq ketganini tasdiqlash (`HTTP 200/201 OK`).
+- [x] 4. CI/CD `deploy-production.yml` faylida kelgusidagi barcha deploylarda migratsiya tekshiruvi doim ishlashini kafolatlash (`RUN_MIGRATIONS=true` by default).
+- [x] 5. O‘zgarishlarni commit va push qilish.
+
+**Holat / handoff:** Muammo to‘liq bartaraf etildi. Sabab: GitHub Actions deploy skriptida migratsiyalar faqat `packages/database` o‘zgarganda ishga tushirilishi belgilangan bo‘lgan, natijada oldingi commitdagi yangi DB ustunlari (`Provider.environment`, `category`, `subcategory`, `Action.idempotencyHash`) production PostgreSQL bazasiga tushmay qolgan edi. `zayuno-api` provayderlar ro‘yxatini olishda 500 error berib, mobil ilovada AI yordamchini to‘xtatib qo‘ygan. Production bazasida `migrate:deploy` qo‘lda ishga tushirildi, 3 ta migratsiya to‘liq o‘tdi, konteynerlar restart qilindi va tizim 100% normal holatga qaytdi. Kelgusida bu holat takrorlanmasligi uchun `deploy-production.yml`da har bir deployda migratsiyalarni avtomatik tekshirish va qo‘llash yoqib qo‘yildi.
+
+# Oldingi ish — Universal Provider Contract Hardening & Invariant Breaker Suite (2026-09-18)
 
 - [x] 1. `NotFoundError`da `'Location'` uchun `LOCATION_NOT_FOUND` (404) xato kodini qo‘shish (`packages/shared/src/errors.ts`).
 - [x] 2. `ProvidersService`da `assertValidLocation` universal metodini joriy qilish (`apps/api/src/modules/providers/providers.service.ts`).

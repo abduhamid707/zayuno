@@ -109,15 +109,10 @@ jobs:
         shell: bash
         run: |
           INPUT_MIGRATIONS="${{ github.event.inputs.run_migrations }}"
-          if [ "$INPUT_MIGRATIONS" = "true" ] || [ "$INPUT_MIGRATIONS" = "false" ]; then
-            RESOLVED_MIGRATIONS="$INPUT_MIGRATIONS"
+          if [ "$INPUT_MIGRATIONS" = "false" ]; then
+            RESOLVED_MIGRATIONS=false
           else
-            CHANGED_FILES=$(git diff --name-only "${TARGET_SHA}^" "$TARGET_SHA" || true)
-            if echo "$CHANGED_FILES" | grep -Eq '^packages/database/(prisma/|src/seed\.ts$|.*schema\.prisma|.*migrations/)'; then
-              RESOLVED_MIGRATIONS=true
-            else
-              RESOLVED_MIGRATIONS=false
-            fi
+            RESOLVED_MIGRATIONS=true
           fi
           echo "RUN_MIGRATIONS=$RESOLVED_MIGRATIONS" >> $GITHUB_ENV
           echo "Run migrations: $RESOLVED_MIGRATIONS"
