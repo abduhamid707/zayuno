@@ -8,18 +8,27 @@ import {
 
 /**
  * Canonical Provider Publishing Gate.
- * A provider is strictly published and allowed for public discovery, quotes,
- * and actions if and only if ALL four canonical conditions are met:
+ * For LIVE providers, strictly published and allowed for public discovery,
+ * quotes, and actions if and only if ALL four canonical conditions are met:
  * 1. status === ProviderStatus.ACTIVE
  * 2. metadata.reviewStatus === 'APPROVED'
  * 3. metadata.isPublished === true
  * 4. metadata.isCertified === true
  *
- * There are NO legacy bypasses.
+ * For SANDBOX providers, allows testing when active or sandbox status,
+ * provided they are not inactive or suspended.
  */
 export function isProviderPublished(provider: any): boolean {
   if (!provider) return false;
   const metadata = (provider.metadata as Record<string, any>) || {};
+  const isSandbox = provider.environment === 'SANDBOX' || provider.status === ProviderStatus.SANDBOX;
+  if (isSandbox) {
+    return (
+      (provider.status === ProviderStatus.ACTIVE || provider.status === ProviderStatus.SANDBOX) &&
+      provider.status !== ProviderStatus.DISABLED &&
+      provider.status !== ProviderStatus.SUSPENDED
+    );
+  }
   return (
     provider.status === ProviderStatus.ACTIVE &&
     metadata.reviewStatus === 'APPROVED' &&

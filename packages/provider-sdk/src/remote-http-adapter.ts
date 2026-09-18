@@ -146,7 +146,7 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
     // Remote APIs commonly include generic `Not Found` or `Unauthorized` JSON
     // labels. Preserve explicit canonical business codes, but let the endpoint
     // context classify generic transport failures at the Core boundary.
-    if (hasGenericProviderCode && upstreamStatusCode === 404 && (endpointPath === '/availability' || endpointPath === '/search')) {
+    if (upstreamStatusCode === 404 && (endpointPath === '/availability' || endpointPath === '/search')) {
       code = 'CAPABILITY_NOT_SUPPORTED';
     } else if (hasGenericProviderCode && upstreamStatusCode === 404 && endpointPath.startsWith('/offerings/')) {
       code = 'OFFERING_NOT_FOUND';
@@ -154,16 +154,28 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
       code = 'PROVIDER_AUTHENTICATION_ERROR';
     }
 
-    const retryable = code === 'RATE_LIMITED' || code === 'PROVIDER_TIMEOUT' || code === 'PROVIDER_UNAVAILABLE';
-    const statusCode = code === 'PROVIDER_AUTHENTICATION_ERROR'
-      ? 502
-      : upstreamStatusCode === 408
-        ? 504
-        : upstreamStatusCode >= 500
-          ? 502
-          : upstreamStatusCode;
+    // A remote upstream call can never mean the provider itself is missing from Zayuno
+    if (code === 'PROVIDER_NOT_FOUND') {
+      code = endpointPath === '/availability' || endpointPath === '/search'
+        ? 'CAPABILITY_NOT_SUPPORTED'
+        : endpointPath.startsWith('/offerings/')
+          ? 'OFFERING_NOT_FOUND'
+          : 'RESOURCE_NOT_FOUND';
+    }
+
+    const isCapacityOrInventory = code === 'RESOURCE_UNAVAILABLE' || code === 'CAPACITY_EXCEEDED' || code === 'INVALID_SELECTION';
+    const retryable = !isCapacityOrInventory && (code === 'RATE_LIMITED' || code === 'PROVIDER_TIMEOUT' || code === 'PROVIDER_UNAVAILABLE');
+    const statusCode = isCapacityOrInventory
+      ? (code === 'CAPACITY_EXCEEDED' ? 422 : 409)
+      : code === 'PROVIDER_AUTHENTICATION_ERROR'
+        ? 502
+        : upstreamStatusCode === 408
+          ? 504
+          : upstreamStatusCode >= 500
+            ? 502
+            : upstreamStatusCode;
     return new ProviderError(
-      'Provider request could not be completed.',
+      providerMessage || 'Provider request could not be completed.',
       statusCode,
       code,
       {

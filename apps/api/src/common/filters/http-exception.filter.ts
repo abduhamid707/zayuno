@@ -62,6 +62,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     const code = normalizeZayunoErrorCode(rawCode, status, Array.isArray(message) ? message.join('; ') : message);
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
+      if (code === 'RESOURCE_UNAVAILABLE') {
+        status = HttpStatus.CONFLICT;
+      } else if (code === 'CAPACITY_EXCEEDED') {
+        status = HttpStatus.UNPROCESSABLE_ENTITY;
+      } else if (code === 'INVALID_SELECTION') {
+        status = HttpStatus.BAD_REQUEST;
+      }
+    }
+
     const presentation = getAgentErrorPresentation({
       errorCode: code,
       statusCode: status,

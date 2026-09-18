@@ -51,3 +51,17 @@ export class ActionCancellationError extends ProviderError {
     this.name = 'ActionCancellationError';
   }
 }
+
+export class ResourceUnavailableError extends ProviderError {
+  constructor(message = 'The requested resource or inventory is unavailable.', details?: any) {
+    super(message, 409, 'RESOURCE_UNAVAILABLE', { ...(details || {}), retryable: false });
+    this.name = 'ResourceUnavailableError';
+  }
+}
+
+export class CapacityExceededError extends ProviderError {
+  constructor(message = 'The requested quantity exceeds available capacity.', details?: any) {
+    super(message, 422, 'CAPACITY_EXCEEDED', { ...(details || {}), retryable: false });
+    this.name = 'CapacityExceededError';
+  }
+}

@@ -12,6 +12,7 @@ import {
   CheckAvailabilityInput,
   ProviderCapability
 } from '@zayuno/contracts';
+import { CapabilityNotSupportedError } from '@zayuno/provider-sdk';
 import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
 import { assertDeclaredDynamicParameters } from '../../common/dynamic-parameter-validation';
 
@@ -62,7 +63,14 @@ export class CatalogService {
     this.assertSafeParameters(parameters);
 
     const cleanSlug = providerSlug.toLowerCase().trim();
+    // 1. Provider exists & published
     await this.providersService.assertProviderPublished(cleanSlug);
+    // 2. Capability supported?
+    const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
+    if (!adapter.getCatalog) {
+      throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.CATALOG);
+    }
+    // 3. Location valid?
     if (locationId) {
       await this.providersService.assertValidLocation(cleanSlug, locationId);
     }
@@ -73,12 +81,8 @@ export class CatalogService {
     });
 
     return this.readThroughCache(cacheKey, CATALOG_CACHE_POLICY, async () => {
-      const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
-      if (!adapter.getCatalog) {
-        throw new BadRequestException(`Provider "${cleanSlug}" does not implement getCatalog.`);
-      }
       await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, { locationId });
-      const rawCatalog = await adapter.getCatalog({
+      const rawCatalog = await adapter.getCatalog!({
         providerSlug: cleanSlug,
         locationId,
         categorySlug,
@@ -102,7 +106,14 @@ export class CatalogService {
     this.assertSafeParameters(parameters);
 
     const cleanSlug = providerSlug.toLowerCase().trim();
+    // 1. Provider exists & published
     await this.providersService.assertProviderPublished(cleanSlug);
+    // 2. Capability supported?
+    const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
+    if (!adapter.getOffering) {
+      throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.CATALOG);
+    }
+    // 3. Location valid?
     if (locationId) {
       await this.providersService.assertValidLocation(cleanSlug, locationId);
     }
@@ -113,15 +124,11 @@ export class CatalogService {
     });
 
     return this.readThroughCache(cacheKey, OFFERING_CACHE_POLICY, async () => {
-      const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
-      if (!adapter.getOffering) {
-        throw new BadRequestException(`Provider "${cleanSlug}" does not implement getOffering.`);
-      }
       await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, {
         locationId,
         offeringIds: [offeringId]
       });
-      const rawOffering = await adapter.getOffering({
+      const rawOffering = await adapter.getOffering!({
         providerSlug: cleanSlug,
         offeringId,
         locationId,
@@ -140,7 +147,14 @@ export class CatalogService {
     this.assertSafeParameters(parameters);
 
     const cleanSlug = providerSlug.toLowerCase().trim();
+    // 1. Provider exists & published
     await this.providersService.assertProviderPublished(cleanSlug);
+    // 2. Capability supported? Manifest must match execution: strictly require SEARCH capability
+    const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.SEARCH);
+    if (!adapter.searchOfferings) {
+      throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.SEARCH);
+    }
+    // 3. Location valid?
     if (locationId) {
       await this.providersService.assertValidLocation(cleanSlug, locationId);
     }
@@ -156,35 +170,17 @@ export class CatalogService {
     });
 
     return this.readThroughCache(cacheKey, SEARCH_CACHE_POLICY, async () => {
-      try {
-        const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.SEARCH);
-        if (adapter.searchOfferings) {
-          await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, { locationId });
-          const rawOfferings = await adapter.searchOfferings({
-            providerSlug: cleanSlug,
-            query: normalizedQuery,
-            categorySlug,
-            locationId,
-            limit,
-            parameters
-          });
-          const metaOfferings = await this.getProviderMetadataOfferings(cleanSlug);
-          return this.overlayMediaFromMetadata(rawOfferings, metaOfferings);
-        }
-        // A declaration without an implementation is treated as unavailable
-        // SEARCH capability. The catalog fallback below remains capability-led.
-      } catch (error) {
-        if (!this.isCapabilityNotSupported(error)) throw error;
-      }
-
-      return this.searchCatalogFallback(
-        cleanSlug,
-        normalizedQuery,
+      await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, { locationId });
+      const rawOfferings = await adapter.searchOfferings!({
+        providerSlug: cleanSlug,
+        query: normalizedQuery,
         categorySlug,
         locationId,
         limit,
         parameters
-      );
+      });
+      const metaOfferings = await this.getProviderMetadataOfferings(cleanSlug);
+      return this.overlayMediaFromMetadata(rawOfferings, metaOfferings);
     });
   }
 
@@ -319,18 +315,46 @@ export class CatalogService {
     this.assertSafeParameters(input.parameters);
 
     const cleanSlug = input.providerSlug.toLowerCase().trim();
+    // 1. Provider exists & published
     await this.providersService.assertProviderPublished(cleanSlug);
+
+    // 2. Capability supported? (offerings require CATALOG capability)
+    const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
+
+    // 3. Location valid?
     if (input.locationId) {
       await this.providersService.assertValidLocation(cleanSlug, input.locationId);
     }
-    const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
-    await assertDeclaredDynamicParameters(adapter, cleanSlug, input.parameters, {
-      locationId: input.locationId,
-      offeringIds: input.items.map(item => item.offeringId)
-    });
+
+    // 4. Dynamic parameters & availability execution
     if (adapter.checkAvailability) {
-      return AvailabilityResultSchema.parse(await adapter.checkAvailability(input));
+      try {
+        await assertDeclaredDynamicParameters(adapter, cleanSlug, input.parameters, {
+          locationId: input.locationId,
+          offeringIds: input.items.map(item => item.offeringId)
+        });
+        return AvailabilityResultSchema.parse(await adapter.checkAvailability(input));
+      } catch (err: any) {
+        // Missing /availability endpoint or unsupported capability must return canonical NOT_SUPPORTED
+        if (
+          err?.code === 'CAPABILITY_NOT_SUPPORTED' ||
+          err?.errorCode === 'CAPABILITY_NOT_SUPPORTED' ||
+          err?.statusCode === 404 ||
+          err?.status === 404
+        ) {
+          return {
+            availabilityStatus: AvailabilityStatus.NOT_SUPPORTED,
+            isAvailable: null,
+            unavailableItems: [],
+            availableItems: [],
+            checkedAt: new Date().toISOString(),
+            parameters: input.parameters || {}
+          };
+        }
+        throw err;
+      }
     }
+
     return {
       availabilityStatus: AvailabilityStatus.NOT_SUPPORTED,
       isAvailable: null,

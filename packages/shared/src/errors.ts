@@ -12,6 +12,9 @@ export const ZAYUNO_ERROR_CODES = [
   'INVALID_VARIANT',
   'INVALID_OPTION',
   'INVALID_QUANTITY',
+  'INVALID_SELECTION',
+  'RESOURCE_UNAVAILABLE',
+  'CAPACITY_EXCEEDED',
   'UNSUPPORTED_PARAMETER',
   'INVALID_PARAMETER',
   'VALIDATION_ERROR',
@@ -75,7 +78,25 @@ const ERROR_CODE_ALIASES: Record<string, ZayunoErrorCode> = {
   TOO_MANY_REQUESTS: 'RATE_LIMITED',
   'TOO MANY REQUESTS': 'RATE_LIMITED',
   GATEWAY_TIMEOUT: 'PROVIDER_TIMEOUT',
-  REQUEST_TIMEOUT: 'PROVIDER_TIMEOUT'
+  REQUEST_TIMEOUT: 'PROVIDER_TIMEOUT',
+  OUT_OF_STOCK: 'RESOURCE_UNAVAILABLE',
+  'OUT OF STOCK': 'RESOURCE_UNAVAILABLE',
+  SOLD_OUT: 'RESOURCE_UNAVAILABLE',
+  'SOLD OUT': 'RESOURCE_UNAVAILABLE',
+  INSUFFICIENT_INVENTORY: 'RESOURCE_UNAVAILABLE',
+  'INSUFFICIENT INVENTORY': 'RESOURCE_UNAVAILABLE',
+  INSUFFICIENT_STOCK: 'RESOURCE_UNAVAILABLE',
+  'INSUFFICIENT STOCK': 'RESOURCE_UNAVAILABLE',
+  NOT_ENOUGH_SEATS: 'RESOURCE_UNAVAILABLE',
+  'NOT ENOUGH SEATS': 'RESOURCE_UNAVAILABLE',
+  NOT_ENOUGH_TICKETS: 'RESOURCE_UNAVAILABLE',
+  'NOT ENOUGH TICKETS': 'RESOURCE_UNAVAILABLE',
+  MAX_QUANTITY_EXCEEDED: 'CAPACITY_EXCEEDED',
+  'MAX QUANTITY EXCEEDED': 'CAPACITY_EXCEEDED',
+  LIMIT_EXCEEDED: 'CAPACITY_EXCEEDED',
+  'LIMIT EXCEEDED': 'CAPACITY_EXCEEDED',
+  EXCEEDS_CAPACITY: 'CAPACITY_EXCEEDED',
+  'EXCEEDS CAPACITY': 'CAPACITY_EXCEEDED'
 };
 
 const ERROR_PRESENTATIONS: Record<ZayunoErrorCode, Omit<AgentErrorPresentation, 'errorCode'>> = {
@@ -125,6 +146,24 @@ const ERROR_PRESENTATIONS: Record<ZayunoErrorCode, Omit<AgentErrorPresentation, 
     retryable: false,
     customerMessage: 'Miqdor qabul qilinmadi. Kerakli miqdorni aniqlashtirib olamiz.',
     agentMessage: 'Quantity is invalid. Ask for a positive, provider-allowed quantity and request a new quote.',
+    recommendedAction: 'REFINE_SELECTION'
+  },
+  INVALID_SELECTION: {
+    retryable: false,
+    customerMessage: 'Tanlangan o‘rindiq yoki kombinatsiya mos kelmadi. Boshqa qulay variantni tanlab ko‘ramiz.',
+    agentMessage: 'The selected item, seat, or configuration is invalid. Refresh available options and refine selection.',
+    recommendedAction: 'REFINE_SELECTION'
+  },
+  RESOURCE_UNAVAILABLE: {
+    retryable: false,
+    customerMessage: 'Afsuski, so‘ralgan mahsulot yoki xizmat hozirda tugagan yoki yetarli emas. Boshqa variantni tanlaymiz.',
+    agentMessage: 'Requested resource is out of stock or unavailable. Suggest alternative offerings or different quantities.',
+    recommendedAction: 'REFINE_SELECTION'
+  },
+  CAPACITY_EXCEEDED: {
+    retryable: false,
+    customerMessage: 'So‘ralgan miqdor mavjud chegaradan ortiq. Miqdorni kamaytirib ko‘ramiz.',
+    agentMessage: 'Requested capacity or quantity exceeds available limit. Ask user to reduce quantity or choose another variant.',
     recommendedAction: 'REFINE_SELECTION'
   },
   UNSUPPORTED_PARAMETER: {
@@ -264,9 +303,82 @@ export function normalizeZayunoErrorCode(
   if (text.includes('INVALID_OPTION')) return 'INVALID_OPTION';
   if (text.includes('INVALID_QUANTITY')) return 'INVALID_QUANTITY';
   if (text.includes('AVAILABILITY') && text.includes('UNKNOWN')) return 'AVAILABILITY_UNKNOWN';
-  if (text.includes('PROVIDER') && text.includes('NOT FOUND')) return 'PROVIDER_NOT_FOUND';
-  if (text.includes('LOCATION') && text.includes('NOT FOUND')) return 'LOCATION_NOT_FOUND';
-  if (text.includes('OFFERING') && text.includes('NOT FOUND')) return 'OFFERING_NOT_FOUND';
+
+  // Specific Provider / Location / Offering not found heuristics
+  if (
+    normalizedCode === 'PROVIDER_NOT_FOUND' ||
+    normalizedCode === 'NO_SUCH_PROVIDER' ||
+    text.includes('PROVIDER NOT FOUND') ||
+    text.includes('PROVIDER DOES NOT EXIST') ||
+    text.includes('NO PROVIDER FOUND')
+  ) {
+    return 'PROVIDER_NOT_FOUND';
+  }
+  if (
+    normalizedCode === 'LOCATION_NOT_FOUND' ||
+    text.includes('LOCATION NOT FOUND') ||
+    text.includes('LOCATION DOES NOT EXIST')
+  ) {
+    return 'LOCATION_NOT_FOUND';
+  }
+  if (
+    normalizedCode === 'OFFERING_NOT_FOUND' ||
+    text.includes('OFFERING NOT FOUND') ||
+    text.includes('OFFERING DOES NOT EXIST') ||
+    text.includes('NO OFFERING FOUND')
+  ) {
+    return 'OFFERING_NOT_FOUND';
+  }
+
+  // Capacity and Inventory Exhaustion
+  if (
+    normalizedCode === 'RESOURCE_UNAVAILABLE' ||
+    normalizedCode === 'OUT_OF_STOCK' ||
+    normalizedCode === 'SOLD_OUT' ||
+    normalizedCode === 'INSUFFICIENT_INVENTORY' ||
+    normalizedCode === 'NOT_ENOUGH_SEATS' ||
+    normalizedCode === 'NOT_ENOUGH_TICKETS' ||
+    text.includes('OUT OF STOCK') ||
+    text.includes('SOLD OUT') ||
+    text.includes('NOT ENOUGH SEATS') ||
+    text.includes('NOT ENOUGH TICKETS') ||
+    text.includes('INSUFFICIENT INVENTORY') ||
+    text.includes('INSUFFICIENT STOCK') ||
+    text.includes('NO AVAILABLE SEATS') ||
+    text.includes('NO AVAILABLE TICKETS')
+  ) {
+    return 'RESOURCE_UNAVAILABLE';
+  }
+
+  if (
+    normalizedCode === 'CAPACITY_EXCEEDED' ||
+    normalizedCode === 'MAX_QUANTITY_EXCEEDED' ||
+    normalizedCode === 'LIMIT_EXCEEDED' ||
+    text.includes('CAPACITY EXCEEDED') ||
+    text.includes('MAXIMUM QUANTITY') ||
+    text.includes('MAX QUANTITY') ||
+    text.includes('LIMIT EXCEEDED') ||
+    text.includes('EXCEEDS AVAILABLE') ||
+    text.includes('EXCEEDS CAPACITY') ||
+    text.includes('EXCEEDS LIMIT') ||
+    text.includes('EXCEEDS MAXIMUM') ||
+    (text.includes('EXCEEDS') && (text.includes('QUANTITY') || text.includes('ALLOWED') || text.includes('LIMIT') || text.includes('CAPACITY'))) ||
+    (text.includes('MAXIMUM') && text.includes('QUANTITY')) ||
+    text.includes('TOO MANY TICKETS') ||
+    text.includes('TOO MANY SEATS') ||
+    text.includes('TOO MANY ITEMS')
+  ) {
+    return 'CAPACITY_EXCEEDED';
+  }
+
+  if (
+    normalizedCode === 'INVALID_SELECTION' ||
+    text.includes('INVALID SELECTION') ||
+    text.includes('SEAT NOT AVAILABLE') ||
+    text.includes('SECTOR NOT AVAILABLE')
+  ) {
+    return 'INVALID_SELECTION';
+  }
 
   const status = typeof statusCode === 'number' ? statusCode : Number(statusCode);
   if (status === 401) return 'UNAUTHORIZED';
@@ -394,5 +506,17 @@ export class ProviderIntegrationError extends ZayunoError {
     );
     this.providerSlug = providerSlug;
     this.externalStatusCode = externalStatusCode;
+  }
+}
+
+export class ResourceUnavailableError extends ZayunoError {
+  constructor(message = 'The requested resource or inventory is unavailable.', details?: any) {
+    super(message, 409, 'RESOURCE_UNAVAILABLE', { ...(asRecord(details) || {}), retryable: false });
+  }
+}
+
+export class CapacityExceededError extends ZayunoError {
+  constructor(message = 'The requested quantity exceeds available capacity.', details?: any) {
+    super(message, 422, 'CAPACITY_EXCEEDED', { ...(asRecord(details) || {}), retryable: false });
   }
 }

@@ -8,6 +8,7 @@ import {
   NormalizedQuote,
   ProviderCapability
 } from '@zayuno/contracts';
+import { CapabilityNotSupportedError } from '@zayuno/provider-sdk';
 import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
 import { assertDeclaredDynamicParameters } from '../../common/dynamic-parameter-validation';
 
@@ -34,15 +35,28 @@ export class QuotesService {
     }
 
     const cleanSlug = input.providerSlug.toLowerCase().trim();
-    const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
-    const isSandboxSimulator = Boolean(
-      options?.allowSandboxSimulator && cleanSlug === 'sandbox-provider'
-    );
-
-    if (!provider || (!isProviderPublished(provider) && !isSandboxSimulator)) {
-      throw new BadRequestException('Provider is not published for public quotes.');
+    // 1. Provider exists & published
+    let provider: any;
+    if (this.providersService) {
+      provider = await this.providersService.assertProviderPublished(cleanSlug);
+    } else {
+      provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
+      if (!provider) {
+        throw new NotFoundError('Provider', cleanSlug);
+      }
+      const isSandbox = provider.environment === 'SANDBOX' || provider.status === 'SANDBOX';
+      if (!isProviderPublished(provider) && !isSandbox && !options?.allowSandboxSimulator) {
+        throw new NotFoundError('Provider', cleanSlug);
+      }
     }
 
+    // 2. Capability supported?
+    const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.QUOTE);
+    if (!adapter.requestQuote) {
+      throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.QUOTE);
+    }
+
+    // 3. Location valid?
     if (input.locationId) {
       if (this.providersService) {
         await this.providersService.assertValidLocation(cleanSlug, input.locationId);
@@ -50,16 +64,14 @@ export class QuotesService {
         await this.assertValidLocationFallback(cleanSlug, input.locationId, provider.id);
       }
     }
-    const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.QUOTE);
-    if (!adapter.requestQuote) {
-      throw new BadRequestException(`Provider "${cleanSlug}" does not implement requestQuote.`);
-    }
+
+    // 4. Dynamic parameters & adapter execution
     await assertDeclaredDynamicParameters(adapter, cleanSlug, input.parameters, {
       locationId: input.locationId,
       offeringIds: input.items.map(item => item.offeringId)
     });
 
-    const quote = await adapter.requestQuote(input);
+    const quote = await adapter.requestQuote!(input);
 
     // Persist Quote in database with expiration
     if (provider) {

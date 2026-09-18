@@ -307,7 +307,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 3. get_provider
   {
     name: 'get_provider',
-    description: 'Get public provider details, capabilities, operational status, and deployment environment by slug. LIVE is the default environment; request SANDBOX or STAGING explicitly.',
+    description: 'Get public provider details, capabilities, operational status, and deployment environment by slug. Preserves the provider registered environment; specify environment explicitly only when filtering by LIVE, SANDBOX, or STAGING.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -323,7 +323,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         environment: {
           type: 'string',
           enum: ['LIVE', 'SANDBOX', 'STAGING'],
-          description: 'Deployment environment. Defaults to LIVE.'
+          description: 'Optional deployment environment filter (LIVE, SANDBOX, or STAGING). When omitted, resolves the provider in its registered environment.'
         }
       },
       required: ['providerSlug']
@@ -361,7 +361,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 4. get_provider_capabilities
   {
     name: 'get_provider_capabilities',
-    description: 'Retrieve the explicit capability matrix for a provider (e.g. CATALOG, QUOTE, ACTION_CREATE, LOCATIONS, PAYMENT_OPTIONS). LIVE is the default environment; request SANDBOX or STAGING explicitly. Use this to determine which tools can be invoked against the provider.',
+    description: 'Retrieve the explicit capability matrix for a provider (e.g. CATALOG, QUOTE, ACTION_CREATE, LOCATIONS, PAYMENT_OPTIONS). Preserves the provider registered environment; specify environment explicitly only when filtering. Use this to determine which tools can be invoked against the provider.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -377,7 +377,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         environment: {
           type: 'string',
           enum: ['LIVE', 'SANDBOX', 'STAGING'],
-          description: 'Deployment environment. Defaults to LIVE.'
+          description: 'Optional deployment environment filter (LIVE, SANDBOX, or STAGING). When omitted, resolves the provider in its registered environment.'
         }
       },
       required: ['providerSlug']
@@ -519,7 +519,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 7. search_catalog
   {
     name: 'search_catalog',
-    description: 'Search static or real-time provider offerings. If a provider declares CATALOG but not SEARCH, Zayuno automatically filters its catalog locally. For dynamic domains such as tickets, appointments, hotels, and transport, pass structured parameters (dates, origin/destination, passengers, capacity, or preferences).',
+    description: 'Search provider offerings with keyword queries and optional dynamic parameters. Requires SEARCH capability on the provider; if undeclared, check capabilities and use get_catalog. For dynamic domains such as tickets, appointments, hotels, and transport, pass structured parameters (dates, origin/destination, passengers, capacity, or preferences).',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,

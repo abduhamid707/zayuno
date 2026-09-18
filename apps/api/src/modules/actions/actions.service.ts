@@ -31,7 +31,7 @@ import {
   PaymentStatus,
   ProviderCapability
 } from '@zayuno/contracts';
-import { QuoteExpiredError, QuoteMismatchError, ActionCancellationError } from '@zayuno/provider-sdk';
+import { QuoteExpiredError, QuoteMismatchError, ActionCancellationError, CapabilityNotSupportedError } from '@zayuno/provider-sdk';
 import { RedisService } from '../../common/services/redis.service';
 import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
 import { assertDeclaredDynamicParameters } from '../../common/dynamic-parameter-validation';
@@ -175,18 +175,39 @@ export class ActionsService {
         }
       }
 
-      const provider = await prisma.provider.findUnique({
-        where: { slug: cleanSlug }
-      });
-      if (!provider) {
-        throw new NotFoundError('Provider', cleanSlug);
-      }
-      const isSandboxSimulator = Boolean(options?.allowSandboxSimulator && cleanSlug === 'sandbox-provider');
-      if (!isProviderPublished(provider) && !isSandboxSimulator) {
-        throw new BadRequestException('Provider is not published for public actions.');
+      // 1. Provider exists & published
+      let provider: any;
+      if (this.providersService) {
+        provider = await this.providersService.assertProviderPublished(cleanSlug);
+      } else {
+        provider = await prisma.provider.findUnique({
+          where: { slug: cleanSlug }
+        });
+        if (!provider) {
+          throw new NotFoundError('Provider', cleanSlug);
+        }
+        const isSandbox = provider.environment === 'SANDBOX' || provider.status === 'SANDBOX';
+        if (!isProviderPublished(provider) && !isSandbox && !options?.allowSandboxSimulator) {
+          throw new NotFoundError('Provider', cleanSlug);
+        }
       }
 
-      // 2. A persisted quote is mandatory. It must belong to this provider and
+      // 2. Capability supported?
+      const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.ACTION_CREATE);
+      if (!adapter.createAction) {
+        throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.ACTION_CREATE);
+      }
+
+      // 3. Location validity check
+      if (input.locationId) {
+        if (this.providersService) {
+          await this.providersService.assertValidLocation(cleanSlug, input.locationId);
+        } else {
+          await this.assertValidLocationFallback(cleanSlug, input.locationId, provider.id);
+        }
+      }
+
+      // 4. A persisted quote is mandatory. It must belong to this provider and
       // remain valid; Core must not delegate this safety check to an adapter.
       const dbQuote = await prisma.quote.findUnique({
         where: { id: input.quoteId }
@@ -201,7 +222,7 @@ export class ActionsService {
         throw new QuoteExpiredError(input.quoteId);
       }
 
-      // 2b. Quote Integrity Guard: verify items, quantities, customizations, location and destination
+      // 4b. Quote Integrity Guard: verify items, quantities, customizations, location and destination
       if (Array.isArray(dbQuote.lines) && dbQuote.lines.length > 0) {
         this.assertQuoteItemIntegrity(input.quoteId, dbQuote.lines, input.items);
       }
@@ -219,20 +240,7 @@ export class ActionsService {
         );
       }
 
-      // Location validity check
-      if (input.locationId) {
-        if (this.providersService) {
-          await this.providersService.assertValidLocation(cleanSlug, input.locationId);
-        } else {
-          await this.assertValidLocationFallback(cleanSlug, input.locationId, provider.id);
-        }
-      }
-
-      // 3. Obtain Adapter and Check Capability
-      const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.ACTION_CREATE);
-      if (!adapter.createAction) {
-        throw new BadRequestException(`Provider "${cleanSlug}" does not implement createAction.`);
-      }
+      // 5. Dynamic parameters validation
       await assertDeclaredDynamicParameters(adapter, cleanSlug, input.parameters, {
         locationId: input.locationId,
         offeringIds: input.items.map(item => item.offeringId)
@@ -429,7 +437,7 @@ export class ActionsService {
 
     const adapter = await this.registry.assertAndGetCapability(action.provider.slug, ProviderCapability.ACTION_CANCEL);
     if (!adapter.cancelAction) {
-      throw new BadRequestException(`Provider "${action.provider.slug}" does not implement cancelAction.`);
+      throw new CapabilityNotSupportedError(action.provider.slug, ProviderCapability.ACTION_CANCEL);
     }
 
     const cancelResult = await adapter.cancelAction({

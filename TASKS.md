@@ -1,3 +1,51 @@
+# Joriy ish — Single Provider Resolver, Capability Consistency va Error Normalization (2026-09-18)
+
+- [x] 1. Single Provider Resolver: barcha vositalar (`get_provider`, `get_provider_capabilities`, `get_locations`, `get_catalog`, `search_catalog`, `get_offering`, `check_availability`, `request_quote`, `create_action`) uchun yagona kanonik provayder aniqlovchini (`resolveCanonicalProvider` / `getPublicProviderInfo`) joriy qilish, discoverydan keyin sandbox muhiti tushib qolmasligini ta'minlash (`environment` ko'rsatilmaganda mavjud bo'lgan provider muhitini saqlash, faqat aniq ko'rsatilgandagina filterlash).
+- [x] 2. Capability Manifest & Execution 1:1 Parity: e'lon qilinmagan qobiliyatlarning yashirin fallback orqali bajarilishini butunlay to'xtatish (`search_catalog`da `SEARCH` bo'lmasa sukut saqlab catalogga fallback qilmaslik, `CAPABILITY_NOT_SUPPORTED` qaytarish).
+- [x] 3. Deterministik Tekshiruv Tartibi: barcha xizmatlarda qat'iy tartib: `Provider mavjudligi (PROVIDER_NOT_FOUND)` -> `Qobiliyat mavjudligi (CAPABILITY_NOT_SUPPORTED)` -> `Filial/Location to'g'riligi (LOCATION_NOT_FOUND)` -> `Adapter/tarmoq chaqiruvi`. Qobiliyatsizlik holati provayder tarmog'i yoki filial tekshiruviga yetib bormasligi shart.
+- [x] 4. Availability Semantikasi: agar provayder `AVAILABILITY` qobiliyatiga ega bo'lmasa, yoki adapter 404 bersa, hech qachon `PROVIDER_NOT_FOUND` chiqarmaslik; kanonik `NOT_SUPPORTED` yoki `CAPABILITY_NOT_SUPPORTED` qaytarish. Xato normalizatsiyasidagi provayder nomiga bog'liq soxta `PROVIDER_NOT_FOUND` bugini tuzatish.
+- [x] 5. Error Normalization: haddan tashqari ko'p miqdorda (masalan 999 999 ta chipta/seat) so'ralganda yoki inventar yetishmaganda 500 `INTERNAL_ERROR` o'rniga kanonik `RESOURCE_UNAVAILABLE` yoki `CAPACITY_EXCEEDED` xato kodlarini qaytarish.
+- [x] 6. Cross-Tool Consistency va Regressiya Testlari: barcha qoidalar, tartiblar va vositalararo uyg'unlikni tekshiruvchi maxsus suite yozish va monorepo build/testlarini to'liq o'tkazish.
+- [ ] 7. Deploy va tekshiruv: o'zgarishlarni commit va push qilish, production serverda tekshirish.
+
+**Holat / handoff (2026-09-18):**
+1. **O‘zgargan fayllar:**
+   - `packages/shared/src/errors.ts`: Yangi kanonik xato kodlari (`RESOURCE_UNAVAILABLE`, `CAPACITY_EXCEEDED`, `INVALID_SELECTION`), xato aliaslari (`OUT_OF_STOCK`, `SOLD_OUT`, `INSUFFICIENT_INVENTORY`, `MAX_QUANTITY_EXCEEDED`), `ResourceUnavailableError`, `CapacityExceededError` sinflari qo‘shildi. `normalizeZayunoErrorCode`dagi soxta `PROVIDER_NOT_FOUND` xatosi tuzatildi (upstream mock provider xabarlari endi provayder yo‘q deb xato talqin qilinmaydi).
+   - `packages/provider-sdk/src/errors.ts`: `ResourceUnavailableError` va `CapacityExceededError` SDK darajasida eksport qilindi.
+   - `packages/provider-sdk/src/remote-http-adapter.ts`: Upstream `/availability` yoki `/search` 404 xatolari `CAPABILITY_NOT_SUPPORTED`ga xaritalandi; upstreamdan kelgan hech qanday xato Core darajasida `PROVIDER_NOT_FOUND` bo‘lib chiqmaydi. Imkoniyat/inventar yetishmovchiligi xatolari 409/422 status bilan `retryable: false` qilib qaytariladi.
+   - `packages/shared/src/publishing.ts`: `isProviderPublished` sandbox muhitidagi faol provayderlarni ruxsat etilgan deb belgilaydi.
+   - `apps/api/src/modules/providers/providers.service.ts`: `resolveCanonicalProvider` yagona manba sifatida barcha vositalar uchun integratsiya qilindi; `environment` ko‘rsatilmaganda provayderning ro‘yxatga olingan muhiti (SANDBOX/LIVE) saqlanadi va discovery konteksti uzilmaydi.
+   - `apps/api/src/modules/catalog/catalog.service.ts`: `getCatalog`, `getOffering`, `searchOfferings` va `checkAvailability`da deterministik tekshiruv tartibi (`Provider` -> `Capability` -> `Location` -> `Adapter execution`) o‘rnatildi. `searchOfferings`da `SEARCH` qobiliyati bo‘lmaganda yashirin catalog fallback butunlay to‘xtatildi va `CAPABILITY_NOT_SUPPORTED` qaytarildi. `checkAvailability` remote 404 yoki unsupported capabilityda `NOT_SUPPORTED` availability holatini qaytaradi.
+   - `apps/api/src/modules/quotes/quotes.service.ts`: Deterministik tartib (`Provider` -> `Capability` -> `Location` -> `Execution`) o‘rnatildi.
+   - `apps/api/src/modules/actions/actions.service.ts`: Deterministik tartib va capability enforcement mustahkamlandi.
+   - `apps/api/src/common/filters/http-exception.filter.ts`: 500 error o‘rniga `RESOURCE_UNAVAILABLE` (409), `CAPACITY_EXCEEDED` (422) va `INVALID_SELECTION` (400) statuslari normalizatsiya qilindi.
+   - `apps/mcp/src/tools.ts`: `get_provider`, `get_provider_capabilities`, `search_catalog` tavsiflari yagona kanonik resolver va qat’iy `SEARCH` qobiliyati talablariga moslashtirildi.
+   - `tests/test-provider-resolver-and-capability-consistency.ts`: Barcha 5 ta asosiy qoidani sinovdan o‘tkazuvchi keng qamrovli test suite yaratildi va 100% PASS qildi.
+   - `tests/test-provider-environment-and-category.ts`: Yangi kanonik resolver muhit qoidalariga moslashtirildi.
+2. **Bajarilgan tekshiruvlar:**
+   - `pnpm exec tsx tests/test-provider-resolver-and-capability-consistency.ts`: Barcha 5 ta test guruhi PASS.
+   - `pnpm exec tsx tests/test-invariant-breaker-suite.ts`: Barcha 8 ta Invariant PASS.
+   - `pnpm exec tsx tests/test-openai-plugin-mcp-contract.ts`: Barcha 11 bosqich PASS.
+   - `pnpm exec tsx tests/test-provider-environment-and-category.ts`: PASS.
+   - `pnpm exec tsx tests/test-public-payment-and-cancel-dto.ts`: PASS.
+   - `pnpm exec tsx tests/test-location-and-quote-persistence.ts`: PASS.
+   - `pnpm exec tsx tests/test-action-quote-deduplication-tenant-isolation.ts`: PASS.
+   - `pnpm exec tsx tests/test-onboarding-catalog-resilience.ts`: PASS.
+   - `pnpm exec tsx tests/test-ai-integration-kit-and-profiles.ts`: PASS.
+   - `pnpm -r run build`: 19 ta workspace loyihasi 100% muvaffaqiyatli qurildi (0 xato).
+   - `git diff --check`: 0 xato.
+3. **Qolgan ish:** O‘zgarishlarni commit va push qilish, production serverda tekshirish.
+
+# Oldingi ish — iTicket Mock Serveri va Tunnelni Uzluksiz (Doimiy) Ishlatish (2026-09-18)
+
+- [x] Cloudflare tunnelning kechasi Wi-Fi uzilishi sababli eskirib qolgan sessiyasini tozalash.
+- [x] Yangi tunnelni HTTP/2 protokoli (`--protocol http2`) bilan ishga tushirish (Windows TCP barqarorligi uchun).
+- [x] Doimiy keep-alive xizmatini (`scripts/keepalive-tunnel.mjs`) fonda yoqish (har 15 soniyada ping berib, Cloudflare idle timeout va uzilishlarini oldini oladi).
+- [x] Barcha endpointlarni (`/health`, `/provider-info`, `/catalog`, `/quote`, `/actions`) yangi public URL orqali tekshirish.
+- [x] Provider Contract v1 enumiga moslab `/provider-info`dagi `category` qiymatini `entertainment`dan `TICKETING`ga o‘zgartirish, `SEARCH` va `ACTION_CANCEL` qobiliyatlarini qo‘shish.
+
+**Holat / handoff:** Mock server (3005 port), HTTP/2 Cloudflare tunnel hamda har 15 soniyada ping yuborib turuvchi keep-alive daemon ishga tushirildi. Jonli va barqaror URL: `https://wedding-watches-river-printable.trycloudflare.com`. `/provider-info` javobidagi kategoriya `TICKETING` qilib muvofiqlashtirildi, testdan o‘tishga tayyor.
+
 # Joriy ish — Production Deploydan keyin Mobile AI Chat uzilishini tuzatish va migratsiyalarni avtomatlashtirish (2026-09-18)
 
 - [x] 1. Production serverdagi `zayuno-api` loglarini tahlil qilish va ildiz sababni aniqlash (`The column Provider.environment does not exist in the current database`).

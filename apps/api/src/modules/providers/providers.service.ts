@@ -246,8 +246,18 @@ export class ProvidersService {
     };
   }
 
-  async getProviderBySlug(slug: string): Promise<ProviderInfo> {
-    const cleanSlug = slug.toLowerCase().trim();
+  /**
+   * Canonical Provider Resolver: Single source of truth for provider discovery and execution.
+   * Resolves a provider by slug across all tools and routes.
+   * When environment is explicitly supplied, enforces exact environment match.
+   * When environment is omitted, preserves the provider's registered environment (LIVE, SANDBOX, STAGING)
+   * so discovery context is never dropped.
+   */
+  async resolveCanonicalProvider(slug: string, environment?: string): Promise<ProviderInfo> {
+    const cleanSlug = (slug || '').toLowerCase().trim();
+    if (!cleanSlug) {
+      throw new NotFoundError('Provider', slug);
+    }
     const provider = await prisma.provider.findUnique({
       where: { slug: cleanSlug },
       include: { locations: true }
@@ -257,30 +267,32 @@ export class ProvidersService {
       throw new NotFoundError('Provider', cleanSlug);
     }
 
-    if (!this.isPublished(provider)) throw new NotFoundError('Provider', cleanSlug);
+    if (!this.isPublished(provider)) {
+      throw new NotFoundError('Provider', cleanSlug);
+    }
+
+    if (environment !== undefined && provider.environment !== this.resolveProviderEnvironment(environment)) {
+      throw new NotFoundError('Provider', cleanSlug);
+    }
+
     return this.mapToProviderInfo(provider);
   }
 
+  async getProviderBySlug(slug: string, environment?: string): Promise<ProviderInfo> {
+    return this.resolveCanonicalProvider(slug, environment);
+  }
+
   async getPublicProviderBySlug(slug: string, environment?: string): Promise<PublicProviderInfo> {
-    return this.mapToPublicProviderInfo(await this.getPublicProviderInfo(slug, environment));
+    const provider = await this.resolveCanonicalProvider(slug, environment);
+    return this.mapToPublicProviderInfo(provider);
   }
 
-  private async getPublicProviderInfo(slug: string, environment?: string): Promise<ProviderInfo> {
-    const provider = await this.getProviderBySlug(slug);
-    if (provider.environment !== this.resolveProviderEnvironment(environment)) {
-      throw new NotFoundError('Provider', slug.toLowerCase().trim());
-    }
-    return provider;
+  async getPublicProviderInfo(slug: string, environment?: string): Promise<ProviderInfo> {
+    return this.resolveCanonicalProvider(slug, environment);
   }
 
-  async assertProviderPublished(slug: string, environment?: string): Promise<void> {
-    const provider = await this.getProviderBySlug(slug);
-    // Internal catalog/quote/action paths retain their existing sandbox support.
-    // Callers that need an environment boundary pass it explicitly; public
-    // discovery routes always resolve an omitted environment to LIVE above.
-    if (environment !== undefined && provider.environment !== this.resolveProviderEnvironment(environment)) {
-      throw new NotFoundError('Provider', slug.toLowerCase().trim());
-    }
+  async assertProviderPublished(slug: string, environment?: string): Promise<ProviderInfo> {
+    return this.resolveCanonicalProvider(slug, environment);
   }
 
   async getProviderForActor(actor?: { providerId?: string; role?: UserRole }): Promise<ProviderInfo> {
