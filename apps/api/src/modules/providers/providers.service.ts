@@ -19,6 +19,8 @@ import {
   sanitizePublicSupportContact,
   isProviderPublished,
   isProviderDiscoveryReady,
+  evaluateProviderEligibility,
+  getStoredProviderEligibilityPolicy,
   computeAvailableServiceCount,
   getDynamicServiceMessage,
   getWelcomeMessage,
@@ -55,9 +57,14 @@ import {
   normalizeProviderCategory,
   normalizeProviderEnvironment,
   requiresActiveLocations,
+  ProviderComplianceStatus,
+  ProviderOperatingProfile,
+  ProviderDiscoveryVisibility,
+  ProviderEligibilityPolicyUpdate,
+  ProviderEligibilityPolicyUpdateSchema,
   WelcomeInfo
 } from '@zayuno/contracts';
-import { ProviderCertificationRunner, CertificationReport } from '@zayuno/provider-sdk';
+import { ProviderCertificationRunner, CertificationReport, CapabilityNotSupportedError } from '@zayuno/provider-sdk';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID, randomBytes, timingSafeEqual } from 'crypto';
 import { lookup } from 'dns/promises';
@@ -161,7 +168,12 @@ export class ProvidersService {
       orderBy: { name: 'asc' }
     });
 
-    return providers.filter(p => this.isDiscoveryReady(p)).map(p => this.mapToProviderInfo(p));
+    // SANDBOX/STAGING are never live AI discovery. Explicit non-live requests
+    // are test/operations flows and retain the publication gate without the
+    // LIVE eligibility requirement.
+    return providers
+      .filter(p => targetEnvironment === ProviderEnvironment.LIVE ? this.isDiscoveryReady(p) : this.isPublished(p))
+      .map(p => this.mapToProviderInfo(p));
   }
 
   async listPublicProviders(status?: ProviderStatus | string, environment?: string): Promise<PublicProviderInfo[]> {
@@ -193,7 +205,15 @@ export class ProvidersService {
       orderBy: { name: 'asc' }
     });
 
-    let results = providers.filter(p => this.isDiscoveryReady(p)).map(p => this.mapToProviderInfo(p));
+    let results = providers
+      .filter(p => targetEnvironment === ProviderEnvironment.LIVE ? this.isDiscoveryReady(p) : this.isPublished(p))
+      .map(p => this.mapToProviderInfo(p));
+
+    // SQL narrows candidates by declared capability; the final filter uses
+    // effective eligibility so stale transactional declarations never leak to AI.
+    if (filter.capability) {
+      results = results.filter((provider) => provider.capabilities.includes(filter.capability!));
+    }
 
     if (targetCategory) {
       results = results.filter((provider) => provider.category === targetCategory);
@@ -293,6 +313,72 @@ export class ProvidersService {
 
   async assertProviderPublished(slug: string, environment?: string): Promise<ProviderInfo> {
     return this.resolveCanonicalProvider(slug, environment);
+  }
+
+  /** Applies the Provider Eligibility Engine after manifest capability lookup. */
+  async assertProviderCapabilityEligible(
+    slug: string,
+    capability: ProviderCapability,
+    environment?: string
+  ): Promise<ProviderInfo> {
+    const provider = await this.resolveCanonicalProvider(slug, environment);
+    if (provider.environment !== ProviderEnvironment.LIVE) return provider;
+    const eligibility = evaluateProviderEligibility(provider);
+    if (!eligibility.allowedCapabilities.includes(capability)) {
+      throw new CapabilityNotSupportedError(slug, capability);
+    }
+    return provider;
+  }
+
+  async getProviderEligibility(slug: string): Promise<ReturnType<typeof evaluateProviderEligibility>> {
+    const provider = await prisma.provider.findUnique({ where: { slug: slug.toLowerCase().trim() }, include: { locations: true } });
+    if (!provider) throw new NotFoundError('Provider', slug);
+    return evaluateProviderEligibility(provider);
+  }
+
+  async runCompatibilityAudit(slug: string): Promise<ReturnType<typeof evaluateProviderEligibility>> {
+    const cleanSlug = slug.toLowerCase().trim();
+    const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug }, include: { locations: true } });
+    if (!provider) throw new NotFoundError('Provider', cleanSlug);
+    const eligibility = evaluateProviderEligibility(provider);
+    const metadata = (provider.metadata as Record<string, any>) || {};
+    await prisma.provider.update({
+      where: { slug: cleanSlug },
+      data: {
+        metadata: {
+          ...metadata,
+          eligibility: {
+            ...getStoredProviderEligibilityPolicy(provider),
+            lastCompatibilityAuditAt: new Date().toISOString(),
+            missingRequirements: eligibility.missingRequirements
+          }
+        }
+      }
+    });
+    return eligibility;
+  }
+
+  async updateProviderEligibility(slug: string, input: ProviderEligibilityPolicyUpdate): Promise<ProviderInfo> {
+    const parsed = ProviderEligibilityPolicyUpdateSchema.safeParse(input);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
+    const cleanSlug = slug.toLowerCase().trim();
+    const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
+    if (!provider) throw new NotFoundError('Provider', cleanSlug);
+    const current = getStoredProviderEligibilityPolicy(provider);
+    const next: any = { ...current, ...parsed.data };
+    if (next.complianceStatus === ProviderComplianceStatus.GRANDFATHERED) {
+      const expiresAt = new Date(next.waiver?.expiresAt || '');
+      if (!next.waiver?.waiverReason || !next.waiver?.approvedBy || Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+        throw new BadRequestException('GRANDFATHERED requires waiverReason, approvedBy, and a future expiresAt.');
+      }
+    }
+    if (next.complianceStatus !== ProviderComplianceStatus.GRANDFATHERED) delete next.waiver;
+    const metadata = (provider.metadata as Record<string, any>) || {};
+    const updated = await prisma.provider.update({
+      where: { slug: cleanSlug },
+      data: { metadata: { ...metadata, eligibility: next } }
+    });
+    return this.mapToProviderInfo(updated);
   }
 
   async getProviderForActor(actor?: { providerId?: string; role?: UserRole }): Promise<ProviderInfo> {
@@ -527,6 +613,7 @@ export class ProvidersService {
   async getLocations(providerSlug: string, input?: GetLocationsInput, environment?: string): Promise<Location[]> {
     await this.getPublicProviderInfo(providerSlug, environment);
     const adapter = await this.registry.assertAndGetCapability(providerSlug, ProviderCapability.LOCATIONS);
+    await this.assertProviderCapabilityEligible(providerSlug, ProviderCapability.LOCATIONS, environment);
     if (adapter.getLocations) {
       return adapter.getLocations(input);
     }
@@ -1271,6 +1358,12 @@ export class ProvidersService {
         requiredChanges: [],
         lastCertificationReport: null,
         lastCertifiedAt: null,
+        eligibility: {
+          ...getStoredProviderEligibilityPolicy(provider),
+          complianceStatus: ProviderComplianceStatus.RECERTIFICATION_REQUIRED,
+          certifiedCapabilities: [],
+          discoveryVisibility: ProviderDiscoveryVisibility.HIDDEN
+        },
         integrationUpdatedAt: new Date().toISOString(),
         integrationUpdatedBy: actor?.id || 'operations'
       }
@@ -1323,7 +1416,18 @@ export class ProvidersService {
           ...(await this.getMetadata(cleanSlug)),
           isCertified: report.isProductionReady,
           lastCertificationReport: report as any,
-          lastCertifiedAt: new Date().toISOString()
+          lastCertifiedAt: new Date().toISOString(),
+          eligibility: {
+            ...getStoredProviderEligibilityPolicy(provider),
+            contractVersion: 'v2 current',
+            complianceStatus: report.isProductionReady ? ProviderComplianceStatus.COMPLIANT : ProviderComplianceStatus.FAILED,
+            profile: determineProviderCapabilityProfile(provider.capabilities as ProviderCapability[]) === 'TRANSACTIONAL'
+              ? ProviderOperatingProfile.TRANSACTIONAL
+              : ProviderOperatingProfile.READ_ONLY,
+            discoveryVisibility: report.isProductionReady ? ProviderDiscoveryVisibility.VISIBLE : ProviderDiscoveryVisibility.HIDDEN,
+            certifiedCapabilities: report.isProductionReady ? provider.capabilities : [],
+            waiver: undefined
+          }
         } as any
       }
     });
@@ -1405,7 +1509,18 @@ export class ProvidersService {
           reviewReasonCode: null,
           reviewReason: null,
           requiredChanges: [],
-          publishedAt: new Date().toISOString()
+          publishedAt: new Date().toISOString(),
+          eligibility: {
+            ...getStoredProviderEligibilityPolicy(provider),
+            contractVersion: 'v2 current',
+            complianceStatus: ProviderComplianceStatus.COMPLIANT,
+            profile: determineProviderCapabilityProfile(provider.capabilities as ProviderCapability[]) === 'TRANSACTIONAL'
+              ? ProviderOperatingProfile.TRANSACTIONAL
+              : ProviderOperatingProfile.READ_ONLY,
+            discoveryVisibility: ProviderDiscoveryVisibility.VISIBLE,
+            certifiedCapabilities: provider.capabilities,
+            waiver: undefined
+          }
         }
       }
     });
@@ -1565,6 +1680,9 @@ export class ProvidersService {
     subcategory: string;
   }>) {
     const cleanSlug = slug.toLowerCase().trim();
+    if (data.metadata?.eligibility !== undefined) {
+      throw new BadRequestException('Eligibility policy must use the dedicated eligibility endpoint so waiver expiry and compliance rules are validated.');
+    }
     const updateData: any = { ...data };
     if (data.secret) {
       updateData.encryptedSecret = encryptSecret(data.secret, this.getEncryptionKey());
@@ -1673,6 +1791,7 @@ export class ProvidersService {
     const supportContact = sanitizePublicSupportContact(normalizeSupportContact(rawSupport));
     const environment = normalizeProviderEnvironment(p.environment || meta.environment) || ProviderEnvironment.LIVE;
     const category = normalizeProviderCategory(p.category || meta.category) || defaultProviderCategoryForType(p.type as ProviderType);
+    const eligibility = evaluateProviderEligibility(p);
     const subcategory = typeof (p.subcategory || meta.subcategory) === 'string'
       ? String(p.subcategory || meta.subcategory).trim() || undefined
       : undefined;
@@ -1692,11 +1811,18 @@ export class ProvidersService {
       geography: meta.geography || ['UZ'],
       adapterType: p.adapterType,
       authMethod: p.config?.authMethod || 'API_KEY',
-      capabilities: p.capabilities as any,
+      // Only expose currently eligible capabilities to AI/public callers.
+      // Admin uses its operational endpoint, which intentionally retains the
+      // declared manifest for compatibility remediation.
+      capabilities: environment === ProviderEnvironment.LIVE ? eligibility.allowedCapabilities : p.capabilities as any,
       baseUrl: p.baseUrl || undefined,
       supportContact,
       isCertified: meta.isCertified || false,
       isPublished,
+      contractVersion: eligibility.policy.contractVersion,
+      complianceStatus: eligibility.policy.complianceStatus,
+      profile: eligibility.policy.profile,
+      discoveryVisibility: eligibility.discoveryVisibility,
       // Prevent stale registration metadata from contradicting the canonical
       // publication state on the provider record.
       metadata: { ...safeMeta, isPublished }

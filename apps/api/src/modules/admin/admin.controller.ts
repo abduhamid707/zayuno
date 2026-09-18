@@ -274,6 +274,18 @@ export class AdminController {
     });
   }
 
+  @Post('providers/:slug/compatibility-audit')
+  @ApiOperation({ summary: 'Evaluate Provider Eligibility Engine requirements without changing operational status' })
+  async runCompatibilityAudit(@Param('slug') slug: string) {
+    return this.providersService.runCompatibilityAudit(slug);
+  }
+
+  @Put('providers/:slug/eligibility')
+  @ApiOperation({ summary: 'Set contract version, compliance, profile, visibility, or an expiring governance waiver' })
+  async updateProviderEligibility(@Param('slug') slug: string, @Body() body: any) {
+    return this.providersService.updateProviderEligibility(slug, body);
+  }
+
   @Post('providers/:slug/publish')
   @ApiOperation({
     summary:

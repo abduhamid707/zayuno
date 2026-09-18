@@ -30,7 +30,14 @@ function provider(slug: string, environment: ProviderEnvironment, category: Prov
       fulfillmentMode: 'REMOTE',
       reviewStatus: 'APPROVED',
       isCertified: true,
-      isPublished: true
+      isPublished: true,
+      eligibility: {
+        contractVersion: 'v2 current',
+        complianceStatus: 'COMPLIANT',
+        profile: 'READ_ONLY',
+        discoveryVisibility: 'VISIBLE',
+        certifiedCapabilities: ['METADATA']
+      }
     },
     locations: []
   };

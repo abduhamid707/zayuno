@@ -17,6 +17,7 @@ import { MetricsCollector } from '@zayuno/observability';
 import {
   isProviderDiscoveryReady,
   isProviderPublished,
+  evaluateProviderEligibility,
   normalizeSupportContact,
   redactForLogs,
   sanitizePublicSupportContact,
@@ -208,6 +209,7 @@ export class AdminService {
     return providers.map((p) => {
       const meta = (p.metadata as any) || {};
       const discovery = isProviderDiscoveryReady(p);
+      const eligibility = evaluateProviderEligibility(p);
       const supportContact = sanitizePublicSupportContact(
         normalizeSupportContact((p.config as any)?.supportContact || meta.supportContact),
       );
@@ -217,6 +219,7 @@ export class AdminService {
         name: p.name,
         status: p.status,
         type: p.type,
+        environment: p.environment,
         category: meta.category || 'general',
         geography: meta.geography || ['UZ'],
         capabilities: p.capabilities,
@@ -229,6 +232,7 @@ export class AdminService {
         isPublished: isProviderPublished(p),
         discoveryReady: discovery.isReady,
         discoveryUnreadyReasons: discovery.unreadyReasons,
+        eligibility,
         actionsCount: p._count.actions,
         quotesCount: p._count.quotes,
         locationsCount: p.locations.length,

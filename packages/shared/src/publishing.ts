@@ -5,15 +5,19 @@ import {
   ProviderType,
   requiresActiveLocations
 } from '@zayuno/contracts';
+import { evaluateProviderEligibility } from './provider-eligibility.js';
 
 /**
  * Canonical Provider Publishing Gate.
  * For LIVE providers, strictly published and allowed for public discovery,
- * quotes, and actions if and only if ALL four canonical conditions are met:
+ * explicit public discovery if and only if the publication conditions are met.
+ * Capability-level eligibility is handled by Provider Eligibility Engine.
  * 1. status === ProviderStatus.ACTIVE
  * 2. metadata.reviewStatus === 'APPROVED'
  * 3. metadata.isPublished === true
- * 4. metadata.isCertified === true
+ * Certification/compliance is intentionally not checked here: an ACTIVE
+ * legacy provider can remain an operational, read-only integration while its
+ * transactional capabilities are revoked by the eligibility engine.
  *
  * For SANDBOX providers, allows testing when active or sandbox status,
  * provided they are not inactive or suspended.
@@ -32,8 +36,7 @@ export function isProviderPublished(provider: any): boolean {
   return (
     provider.status === ProviderStatus.ACTIVE &&
     metadata.reviewStatus === 'APPROVED' &&
-    metadata.isPublished === true &&
-    metadata.isCertified === true
+    metadata.isPublished === true
   );
 }
 
@@ -52,15 +55,15 @@ export interface ProviderDiscoveryReadiness {
  * - Must not be marked unhealthy (DOWN) or temporarily unavailable.
  */
 export function isProviderDiscoveryReady(provider: any): ProviderDiscoveryReadiness {
-  const unreadyReasons: string[] = [];
+  if (!provider) return { isReady: false, unreadyReasons: ['PROVIDER_NOT_FOUND'] };
 
-  if (!provider) {
-    return { isReady: false, unreadyReasons: ['PROVIDER_NOT_FOUND'] };
-  }
+  const eligibility = evaluateProviderEligibility(provider);
+  const unreadyReasons = [...eligibility.missingRequirements];
 
   const metadata = (provider.metadata as Record<string, any>) || {};
 
-  // 1. Publishing Gate Check
+  // 1. Publication gate (compliance/health/environment are owned by the
+  // Eligibility Engine above, keeping dimensions independent).
   if (!isProviderPublished(provider)) {
     if (provider.status !== ProviderStatus.ACTIVE) {
       unreadyReasons.push(`STATUS_${provider.status || 'UNKNOWN'}`);
@@ -68,21 +71,9 @@ export function isProviderDiscoveryReady(provider: any): ProviderDiscoveryReadin
     if (metadata.reviewStatus !== 'APPROVED') {
       unreadyReasons.push(`REVIEW_${metadata.reviewStatus || 'DRAFT'}`);
     }
-    if (metadata.isCertified !== true) {
-      unreadyReasons.push('NOT_CERTIFIED');
-    }
     if (metadata.isPublished !== true) {
       unreadyReasons.push('NOT_PUBLISHED');
     }
-  }
-
-  // 2. Health & Temporary Availability
-  const healthData = (metadata.healthMonitoring as Record<string, any>) || {};
-  const isDown = metadata.healthStatus === 'DOWN' || healthData.state === 'DOWN';
-  const isUnavailable = metadata.isTemporarilyUnavailable === true || healthData.isTemporarilyUnavailable === true;
-
-  if (isDown || isUnavailable) {
-    unreadyReasons.push('PROVIDER_UNHEALTHY_OR_UNAVAILABLE');
   }
 
   const capabilities: ProviderCapability[] = provider.capabilities || [];
@@ -124,7 +115,7 @@ export function isProviderDiscoveryReady(provider: any): ProviderDiscoveryReadin
   }
 
   return {
-    isReady: unreadyReasons.length === 0,
-    unreadyReasons
+    isReady: eligibility.isDiscoveryEligible && unreadyReasons.length === 0,
+    unreadyReasons: [...new Set(unreadyReasons)]
   };
 }

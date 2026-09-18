@@ -30,7 +30,7 @@ export interface HealthProbeResult {
  * Pure, deterministic Health State Machine transition evaluator.
  *
  * Rules:
- * 1. 1-2 failures: DEGRADED, isTemporarilyUnavailable = false (still visible in AI discovery).
+ * 1. 1-2 failures: DEGRADED, isTemporarilyUnavailable = false (operationally active, but hidden by Provider Eligibility Engine from AI discovery).
  * 2. 3 consecutive failures: DOWN, isTemporarilyUnavailable = true (hidden from AI discovery).
  * 3. 1st success after DOWN: RECOVERING, isTemporarilyUnavailable = true (still hidden).
  * 4. 2nd consecutive success (meets recoveryThreshold): HEALTHY, isTemporarilyUnavailable = false (restored to discovery).

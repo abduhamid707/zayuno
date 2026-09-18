@@ -194,6 +194,9 @@ export class ActionsService {
 
       // 2. Capability supported?
       const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.ACTION_CREATE);
+      if (this.providersService) {
+        await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.ACTION_CREATE);
+      }
       if (!adapter.createAction) {
         throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.ACTION_CREATE);
       }
@@ -376,7 +379,10 @@ export class ActionsService {
     const stored = this.mapDbActionToNormalized(dbAction);
 
     try {
-      const adapter = await this.registry.assertAndGetCapability(dbAction.provider.slug, ProviderCapability.ACTION_STATUS);
+    const adapter = await this.registry.assertAndGetCapability(dbAction.provider.slug, ProviderCapability.ACTION_STATUS);
+    if (this.providersService) {
+      await this.providersService.assertProviderCapabilityEligible(dbAction.provider.slug, ProviderCapability.ACTION_STATUS);
+    }
       if (!adapter.getAction) {
         return { action: stored, providerVerified: false };
       }
@@ -436,6 +442,9 @@ export class ActionsService {
     }
 
     const adapter = await this.registry.assertAndGetCapability(action.provider.slug, ProviderCapability.ACTION_CANCEL);
+    if (this.providersService) {
+      await this.providersService.assertProviderCapabilityEligible(action.provider.slug, ProviderCapability.ACTION_CANCEL);
+    }
     if (!adapter.cancelAction) {
       throw new CapabilityNotSupportedError(action.provider.slug, ProviderCapability.ACTION_CANCEL);
     }
@@ -499,6 +508,9 @@ export class ActionsService {
 
     this.assertActionAccess(action, access);
     const adapter = await this.registry.assertAndGetCapability(action.provider.slug, ProviderCapability.PAYMENT_OPTIONS);
+    if (this.providersService) {
+      await this.providersService.assertProviderCapabilityEligible(action.provider.slug, ProviderCapability.PAYMENT_OPTIONS);
+    }
     if (adapter.getPaymentOptions) {
       const options = await adapter.getPaymentOptions({
         providerSlug: action.provider.slug,

@@ -52,6 +52,9 @@ export class QuotesService {
 
     // 2. Capability supported?
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.QUOTE);
+    if (this.providersService) {
+      await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.QUOTE);
+    }
     if (!adapter.requestQuote) {
       throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.QUOTE);
     }

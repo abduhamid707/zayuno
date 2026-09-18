@@ -63,6 +63,8 @@ async function main() {
       {
         slug: 'toshkent-express',
         status: 'ACTIVE',
+        environment: 'LIVE',
+        capabilities: ['METADATA', 'HEALTH', 'CATALOG', 'SEARCH'],
         adapterType: 'rest',
         metadata: {
           reviewStatus: 'APPROVED',
@@ -75,6 +77,8 @@ async function main() {
       {
         slug: 'fast-courier',
         status: 'ACTIVE',
+        environment: 'LIVE',
+        capabilities: ['METADATA', 'HEALTH', 'CATALOG', 'SEARCH'],
         adapterType: 'rest',
         metadata: {
           reviewStatus: 'APPROVED',
@@ -87,6 +91,7 @@ async function main() {
       {
         slug: 'sandbox-provider',
         status: 'ACTIVE',
+        environment: 'SANDBOX',
         adapterType: 'sandbox',
         metadata: {
           reviewStatus: 'APPROVED',
@@ -100,6 +105,7 @@ async function main() {
       {
         slug: 'mock-poyez',
         status: 'SANDBOX',
+        environment: 'SANDBOX',
         adapterType: 'mock',
         metadata: {
           reviewStatus: 'APPROVED',
@@ -113,6 +119,7 @@ async function main() {
       {
         slug: 'draft-provider',
         status: 'DRAFT',
+        environment: 'LIVE',
         metadata: {
           reviewStatus: 'DRAFT',
           isPublished: false,

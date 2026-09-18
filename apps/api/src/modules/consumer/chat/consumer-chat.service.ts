@@ -661,6 +661,27 @@ STRICT RULES:
           personalizationContext,
         )
       : availableProviders;
+    // Do not let an empty food category fall through to the model as a vague
+    // "no provider" answer. Capture the request so Operations can fill the
+    // gap and give the customer a truthful, actionable fallback.
+    if (this.isFoodRequest(prompt) && !providers.some((provider: any) => this.isFoodProvider(provider))) {
+      if (this.unmetDemandService) {
+        await this.unmetDemandService.recordUnmetDemand({
+          category: 'FOOD_AND_DRINK',
+          queryIntent: prompt,
+          reasonCode: 'NO_PROVIDER_IN_CATEGORY',
+          source: 'CONSUMER_CHAT',
+          userId: input.userId,
+        });
+      }
+      return {
+        prompt,
+        history,
+        plan: this.emptyPlan('food_clarification'),
+        liveContext: [],
+        directAnswer: "Hozir faol va tekshirilgan ovqat hamkori yo‘q. So‘rovingizni saqladik; hamkor qaytganda xabar berishimizni xohlasangiz, “qo‘shilganda xabar ber” deb yozing.",
+      };
+    }
     // Every free-text wish goes through the same semantic router. In particular,
     // an AI outage must never become a guessed provider, cart or generic menu.
     const previousPlan = await this.readFoodRequest(input.userId, input.conversationId);
@@ -4251,7 +4272,14 @@ USER=${JSON.stringify(prompt)}`;
   }
 
   private isFoodProvider(provider: any): boolean {
-    return this.isEligibleProvider(provider);
+    if (!this.isEligibleProvider(provider)) return false;
+    const identity = this.providerIdentity(provider);
+    return String(provider?.category || '').toUpperCase() === 'FOOD_AND_DRINK' ||
+      /food|restaurant|cafe|coffee|fast.?food|restoran|kafe|ovqat|taom|pizza|lavash|burger|sushi/.test(identity);
+  }
+
+  private isFoodRequest(prompt: string): boolean {
+    return /food|restaurant|cafe|coffee|fast.?food|restoran|kafe|ovqat|taom|pizza|lavash|burger|sushi|menyu/i.test(prompt);
   }
 
   private isEligibleProvider(provider: any): boolean {

@@ -67,6 +67,7 @@ export class CatalogService {
     await this.providersService.assertProviderPublished(cleanSlug);
     // 2. Capability supported?
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
+    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG);
     if (!adapter.getCatalog) {
       throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.CATALOG);
     }
@@ -110,6 +111,7 @@ export class CatalogService {
     await this.providersService.assertProviderPublished(cleanSlug);
     // 2. Capability supported?
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
+    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG);
     if (!adapter.getOffering) {
       throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.CATALOG);
     }
@@ -151,6 +153,7 @@ export class CatalogService {
     await this.providersService.assertProviderPublished(cleanSlug);
     // 2. Capability supported? Manifest must match execution: strictly require SEARCH capability
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.SEARCH);
+    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.SEARCH);
     if (!adapter.searchOfferings) {
       throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.SEARCH);
     }
@@ -320,6 +323,7 @@ export class CatalogService {
 
     // 2. Capability supported? (offerings require CATALOG capability)
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
+    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG);
 
     // 3. Location valid?
     if (input.locationId) {

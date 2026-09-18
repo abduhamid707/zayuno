@@ -82,6 +82,11 @@ const DISCOVERY_REASON_LABELS: Record<string, string> = {
   PROVIDER_UNHEALTHY_OR_UNAVAILABLE:
     'Provider ishlamayapti yoki vaqtincha yopiq',
   NO_ACTIVE_LOCATIONS: 'Kamida bitta faol filial kerak',
+  ENVIRONMENT_NOT_LIVE: 'LIVE muhiti talab qilinadi',
+  PUBLICATION_NOT_APPROVED: 'Publication approval yo‘q',
+  DISCOVERY_HIDDEN_BY_POLICY: 'Discovery visibility policy HIDDEN',
+  COMPLIANCE_FAILED: 'Compliance audit xatolik bergan',
+  WAIVER_MISSING_OR_EXPIRED: 'Waiver yo‘q yoki muddati tugagan',
 };
 
 const formatDiscoveryReason = (reason: string) => {
@@ -656,6 +661,45 @@ export default function App() {
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ['admin-providers'] }),
   });
+  const compatibilityAuditMutation = useMutation({
+    mutationFn: async (slug: string) => {
+      const res = await apiFetch(`/api/v1/admin/providers/${slug}/compatibility-audit`, { method: 'POST' });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-providers'] }),
+  });
+  const profileMutation = useMutation({
+    mutationFn: async ({ slug, profile }: { slug: string; profile: 'READ_ONLY' | 'TRANSACTIONAL' }) => {
+      const res = await apiFetch(`/api/v1/admin/providers/${slug}/eligibility`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile }),
+      });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-providers'] }),
+  });
+  const waiverMutation = useMutation({
+    mutationFn: async ({ slug, waiver }: { slug: string; waiver: any }) => {
+      const res = await apiFetch(`/api/v1/admin/providers/${slug}/eligibility`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ complianceStatus: 'GRANDFATHERED', discoveryVisibility: 'LIMITED', waiver }),
+      });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-providers'] }),
+  });
+  const configureWaiver = (provider: any) => {
+    const waiverReason = window.prompt('Waiver sababi (majburiy):');
+    if (!waiverReason?.trim()) return;
+    const approvedBy = window.prompt('Tasdiqlovchi (admin/owner):');
+    if (!approvedBy?.trim()) return;
+    const expiresAt = window.prompt('Tugash vaqti (ISO, masalan 2026-10-01T00:00:00.000Z):');
+    if (!expiresAt?.trim()) return;
+    const allowedRaw = window.prompt('Ruxsat etilgan capabilitylar (vergul bilan):', 'METADATA,HEALTH,CATALOG,SEARCH');
+    const allowedCapabilities = String(allowedRaw || '').split(',').map((value) => value.trim()).filter(Boolean);
+    if (!allowedCapabilities.length) return;
+    waiverMutation.mutate({ slug: provider.slug, waiver: { waiverReason: waiverReason.trim(), approvedBy: approvedBy.trim(), expiresAt: expiresAt.trim(), allowedCapabilities } });
+  };
   const reopenMutation = useMutation({
     mutationFn: async (slug: string) =>
       (
@@ -2135,6 +2179,45 @@ export default function App() {
                                   'Discovery readiness talablari bajarilmagan.'}
                               </p>
                             )}
+                          </div>
+
+                          <div className="rounded-xl border border-sky-500/25 bg-sky-950/15 p-3 text-xs space-y-2">
+                            <div className="flex flex-wrap items-center gap-2 font-semibold text-sky-100">
+                              <span>Provider Eligibility Engine</span>
+                              <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px]">{p.eligibility?.policy?.contractVersion || 'v1 legacy'}</span>
+                              <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px]">{p.eligibility?.policy?.complianceStatus || 'RECERTIFICATION_REQUIRED'}</span>
+                              <span className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px]">{p.eligibility?.discoveryVisibility || 'HIDDEN'}</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <label className="text-slate-400">Profil</label>
+                              <select
+                                value={p.eligibility?.policy?.profile || 'READ_ONLY'}
+                                onChange={(event) => profileMutation.mutate({ slug: p.slug, profile: event.target.value as 'READ_ONLY' | 'TRANSACTIONAL' })}
+                                disabled={profileMutation.isPending}
+                                className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[11px] text-slate-200"
+                              >
+                                <option value="READ_ONLY">READ_ONLY</option>
+                                <option value="TRANSACTIONAL">TRANSACTIONAL</option>
+                              </select>
+                              <button
+                                onClick={() => compatibilityAuditMutation.mutate(p.slug)}
+                                disabled={compatibilityAuditMutation.isPending}
+                                className="rounded border border-sky-500/40 px-2 py-1 text-[11px] font-semibold text-sky-200 hover:bg-sky-500/10 disabled:opacity-60"
+                              >
+                                {compatibilityAuditMutation.isPending && compatibilityAuditMutation.variables === p.slug ? 'Audit...' : 'Run compatibility audit'}
+                              </button>
+                              <button
+                                onClick={() => configureWaiver(p)}
+                                disabled={waiverMutation.isPending}
+                                className="rounded border border-violet-500/40 px-2 py-1 text-[11px] font-semibold text-violet-200 hover:bg-violet-500/10 disabled:opacity-60"
+                              >
+                                {p.eligibility?.policy?.complianceStatus === 'GRANDFATHERED' ? 'Waiver yangilash' : 'Vaqtinchalik waiver'}
+                              </button>
+                            </div>
+                            {(p.eligibility?.missingRequirements || []).length > 0 && (
+                              <p className="text-[11px] text-amber-200">Yetishmayapti: {p.eligibility.missingRequirements.map(formatDiscoveryReason).join(', ')}</p>
+                            )}
+                            {p.eligibility?.isTransactionalEligible ? <p className="text-[11px] text-emerald-300">Transactional flow ruxsat etilgan</p> : <p className="text-[11px] text-slate-400">Quote, action va payment faqat COMPLIANT transactional certificationdan keyin ochiladi.</p>}
                           </div>
 
                           <div>

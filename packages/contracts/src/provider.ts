@@ -52,6 +52,29 @@ export enum ProviderEnvironment {
 }
 
 /**
+ * Contract governance is deliberately separate from operational status.
+ * `ACTIVE` answers whether the integration is operating; these values decide
+ * which AI surfaces and capabilities it may use.
+ */
+export enum ProviderComplianceStatus {
+  COMPLIANT = 'COMPLIANT',
+  RECERTIFICATION_REQUIRED = 'RECERTIFICATION_REQUIRED',
+  FAILED = 'FAILED',
+  GRANDFATHERED = 'GRANDFATHERED'
+}
+
+export enum ProviderOperatingProfile {
+  READ_ONLY = 'READ_ONLY',
+  TRANSACTIONAL = 'TRANSACTIONAL'
+}
+
+export enum ProviderDiscoveryVisibility {
+  VISIBLE = 'VISIBLE',
+  LIMITED = 'LIMITED',
+  HIDDEN = 'HIDDEN'
+}
+
+/**
  * Provider-level commercial verticals. Product/catalog categories and
  * fulfilment mode intentionally remain separate dimensions.
  */
@@ -218,6 +241,28 @@ export enum ProviderCapability {
   WEBHOOK = 'WEBHOOK'
 }
 
+export const ProviderComplianceWaiverSchema = z.object({
+  waiverReason: z.string().trim().min(3).max(500),
+  approvedBy: z.string().trim().min(2).max(160),
+  expiresAt: IsoDateTimeSchema,
+  allowedCapabilities: z.array(z.nativeEnum(ProviderCapability)).min(1)
+});
+export type ProviderComplianceWaiver = z.infer<typeof ProviderComplianceWaiverSchema>;
+
+/** Durable metadata policy persisted under `metadata.eligibility`. */
+export const ProviderEligibilityPolicySchema = z.object({
+  contractVersion: z.string().trim().min(1).max(64).default('v1 legacy'),
+  complianceStatus: z.nativeEnum(ProviderComplianceStatus).default(ProviderComplianceStatus.RECERTIFICATION_REQUIRED),
+  profile: z.nativeEnum(ProviderOperatingProfile).default(ProviderOperatingProfile.READ_ONLY),
+  discoveryVisibility: z.nativeEnum(ProviderDiscoveryVisibility).default(ProviderDiscoveryVisibility.HIDDEN),
+  certifiedCapabilities: z.array(z.nativeEnum(ProviderCapability)).default([]),
+  waiver: ProviderComplianceWaiverSchema.optional()
+});
+export type ProviderEligibilityPolicy = z.infer<typeof ProviderEligibilityPolicySchema>;
+
+export const ProviderEligibilityPolicyUpdateSchema = ProviderEligibilityPolicySchema.partial();
+export type ProviderEligibilityPolicyUpdate = z.infer<typeof ProviderEligibilityPolicyUpdateSchema>;
+
 /**
  * Explicit categorization of capabilities.
  * Mandatory capabilities MUST be implemented and certified before a provider can be published.
@@ -351,6 +396,10 @@ export const ProviderInfoSchema = z.object({
   supportContact: optionalNullable(z.union([z.string(), StructuredSupportContactSchema])),
   isCertified: z.boolean().default(false),
   isPublished: z.boolean().default(false),
+  contractVersion: z.string().default('v1 legacy'),
+  complianceStatus: z.nativeEnum(ProviderComplianceStatus).default(ProviderComplianceStatus.RECERTIFICATION_REQUIRED),
+  profile: z.nativeEnum(ProviderOperatingProfile).default(ProviderOperatingProfile.READ_ONLY),
+  discoveryVisibility: z.nativeEnum(ProviderDiscoveryVisibility).default(ProviderDiscoveryVisibility.HIDDEN),
   metadata: optionalNullable(z.record(z.any()), {})
 });
 export type ProviderInfo = z.infer<typeof ProviderInfoSchema>;

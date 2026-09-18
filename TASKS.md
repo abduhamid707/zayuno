@@ -1,4 +1,43 @@
-# Joriy ish — Single Provider Resolver, Capability Consistency va Error Normalization (2026-09-18)
+# Joriy ish — Provider Eligibility Engine verification va push (2026-09-18)
+
+- [x] 1. Eligibility Engine o‘zgarishlari uchun fokuslangan regressiya testlarini ishga tushirish.
+- [x] 2. Tegishli workspace buildlarini va `git diff --check`ni bajarish.
+- [ ] 3. Toza natijani commit qilib, `origin/main`ga push qilish.
+
+**Holat / handoff (2026-09-18):** Foydalanuvchi build/test hamda push uchun aniq ruxsat berdi. Joriy worktree’da faqat Provider Eligibility Engine ishi va uning TASKS yozuvi o‘zgargan.
+
+**Bajarilgan tekshiruvlar:**
+- `pnpm exec tsx tests/test-provider-environment-and-category.ts` — PASS.
+- `pnpm exec tsx tests/test-provider-resolver-and-capability-consistency.ts` — PASS (5/5).
+- `pnpm exec tsx tests/test-customer-experience-and-presenter.ts` — PASS.
+- `pnpm exec tsx tests/test-provider-certification-adversarial.ts` — PASS.
+- `pnpm --filter @zayuno/contracts build`, `@zayuno/shared build`, `@zayuno/api build`, `@zayuno/admin build`, `@zayuno/sandbox-provider build` — PASS. Admin build faqat oldindan mavjud PostCSS module-type va large-chunk warninglarini chiqardi.
+- `git diff --check` — PASS.
+
+**Qolgan qadam:** Commit va `origin/main`ga push.
+
+# Oldingi ish — Provider Eligibility Engine: discovery va transactional gate (2026-09-18)
+
+- [x] 1. Provider holati, muhit, compliance, profil va discovery ko‘rinishini mustaqil dimensionlar sifatida contract va persistence qatlamiga kiritish.
+- [x] 2. Eligibility engine: LIVE/ACTIVE/health/compliance/publication qoidalari bilan discovery hamda capability-level transactional gate’larni markazlashtirish.
+- [x] 3. Provider service, catalog/quote/action oqimlari va customer fallback’ni yangi gate’ga ulash; legacy providerlar uchun xavfsiz recertification yo‘lini berish.
+- [x] 4. Admin panelda compatibility auditi, missing requirementlar, profil va vaqtinchalik waiver boshqaruvini qo‘shish.
+- [x] 5. O‘zgargan fayllar va bajarilgan tekshiruvlarni handoff yozuviga kiritish (foydalanuvchi talabiga ko‘ra build/test ishga tushirilmaydi).
+
+**Holat / handoff (2026-09-18):** Yakunlandi.
+
+- `packages/contracts/src/provider.ts`ga `ProviderComplianceStatus`, `ProviderOperatingProfile`, `ProviderDiscoveryVisibility`, versioned eligibility policy va expiring waiver schema qo‘shildi. Ular DB migration talab qilmaydigan, mavjud `Provider.metadata.eligibility` JSON policy sifatida saqlanadi.
+- `packages/shared/src/provider-eligibility.ts` yangi markaziy Provider Eligibility Engine: LIVE + ACTIVE + publication + health + compliance qoidalarini alohida hisoblaydi. Eski integratsiyalar avtomatik `RECERTIFICATION_REQUIRED`: faqat `METADATA`, `HEALTH`, `CATALOG`, `SEARCH` bo‘lsa `LIMITED` read-only discovery oladi; `QUOTE`, `ACTION_CREATE`, payment va boshqa transactional qobiliyatlar re-certification tugamaguncha revoke qilinadi. `GRANDFATHERED` faqat `waiverReason`, `approvedBy`, future `expiresAt` va `allowedCapabilities` bilan ishlaydi.
+- Provider service hamda catalog, quote, action, payment va location oqimlari effective capability gate’ga ulandi. Public AI payload endi declared emas, faqat eligibility ruxsat bergan capabilitylarni oladi. Certification/publish natijasida `v2 current + COMPLIANT` va certified capability evidence saqlanadi. Generic admin update eligibility metadata’sini chetlab o‘tolmaydi.
+- Admin panelda Provider Eligibility Engine kartasi (contract, compliance, visibility, missing checklist), `Run compatibility audit`, `READ_ONLY`/`TRANSACTIONAL` profile selector va expiring waiver boshqaruvi qo‘shildi. Audit operation statusini o‘zgartirmaydi.
+- Customer chatdagi food-provider bug tuzatildi: food faqat haqiqiy food providerlar bilan aniqlanadi. Faol/tekshirilgan ovqat hamkori bo‘lmasa demand saqlanadi va notification opt-in’ga aniq fallback beriladi.
+- Sandbox/STAGING faqat explicit test/operations oqimlarida saqlanadi; LIVE AI discoveryga kiritilmaydi.
+
+**Tekshiruvlar:** Foydalanuvchi ko‘rsatmasiga binoan build, test va boshqa token talab qiladigan tekshiruvlar ishga tushirilmadi.
+
+**Qolgan ish / navbatdagi qadam:** Kod bo‘yicha qolgan ish yo‘q. Keyin zarur bo‘lsa foydalanuvchi ruxsati bilan faqat fokuslangan verification ishlatiladi.
+
+# Oldingi ish — Single Provider Resolver, Capability Consistency va Error Normalization (2026-09-18)
 
 - [x] 1. Single Provider Resolver: barcha vositalar (`get_provider`, `get_provider_capabilities`, `get_locations`, `get_catalog`, `search_catalog`, `get_offering`, `check_availability`, `request_quote`, `create_action`) uchun yagona kanonik provayder aniqlovchini (`resolveCanonicalProvider` / `getPublicProviderInfo`) joriy qilish, discoverydan keyin sandbox muhiti tushib qolmasligini ta'minlash (`environment` ko'rsatilmaganda mavjud bo'lgan provider muhitini saqlash, faqat aniq ko'rsatilgandagina filterlash).
 - [x] 2. Capability Manifest & Execution 1:1 Parity: e'lon qilinmagan qobiliyatlarning yashirin fallback orqali bajarilishini butunlay to'xtatish (`search_catalog`da `SEARCH` bo'lmasa sukut saqlab catalogga fallback qilmaslik, `CAPABILITY_NOT_SUPPORTED` qaytarish).
@@ -2688,3 +2727,12 @@ Pasted strategiyadagi `AI Tycoon + Tap-to-Eat` g‘oyasi marketing tajribasi sif
 3. `pnpm -r run build` va `pnpm --filter @zayuno/api... run build` orqali monorepodagi barcha workspace paketlar 0 xato bilan build bo‘lishi tasdiqlandi.
 4. `git diff --check` PASS (0 xato).
 5. O‘zgarishlar commit qilinib, `origin/main` ga push qilindi.
+
+# Joriy ish — Lean CI type patch (2026-09-18)
+
+- [x] Screenshotdagi `sandbox-provider` TypeScript xatosi oldingi `002cb43` commitda yopilganini tekshirish.
+- [x] `mock-poyez` `/provider-info` javobidagi yetishmayotgan `environment` contract maydonini qo‘shish.
+- [x] Faqat nishonlangan package buildini bajarish; keng build va deep testlarni o‘tkazib yuborish.
+- [x] Patchni kichik commit qilib `origin/main`ga yuborish.
+
+**Holat / handoff:** Foydalanuvchi tez ishlash uchun keng buildlar va chuqur testlarni chetlab o‘tishni so‘radi. Screenshotdagi `sandbox-provider` TS2741 xatosi allaqachon `002cb43`da tuzatilgan; `@zayuno/sandbox-provider`ning nishonlangan buildi PASS. `integrations/mock-poyez/src/server.ts`dagi `/provider-info` javobiga `ProviderEnvironment.SANDBOX` qo‘shildi, chunki `ProviderInfo` contracti environmentni talab qiladi. `@zayuno/mock-poyez`ning nishonlangan buildi PASS. Keng build/test bajarilmadi. Patch `c48e758` sifatida `origin/main`ga yuborildi. `TASKS.md`da boshqa davom etayotgan ishning alohida, stage qilinmagan yozuvlari borligi sabab bu handoff yozuvi alohida commit qilinmadi.
