@@ -11,6 +11,10 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+  getAgentErrorPresentation,
+  normalizeZayunoErrorCode,
+} from "@zayuno/shared";
 import type { Response } from "express";
 import { JwtAuthGuard } from "../../../common/guards/jwt-auth.guard";
 import { ConsumerChatService } from "./consumer-chat.service";
@@ -71,9 +75,7 @@ export class ConsumerChatController {
         userEmail: req.user.email,
       });
     } catch (error: any) {
-      this.logger.warn(
-        `Consumer chat failed: ${String(error?.message || error)}`,
-      );
+      this.logFailure("request", error);
       return {
         content: this.publicErrorMessage(error),
       };
@@ -130,9 +132,7 @@ export class ConsumerChatController {
     } catch (error: any) {
       // Provider contracts, infrastructure details and internal exception text
       // must never be exposed in the customer chat.
-      this.logger.warn(
-        `Consumer chat stream failed: ${String(error?.message || error)}`,
-      );
+      this.logFailure("stream", error);
       const message = this.publicErrorMessage(error);
       if (!res.destroyed) {
         res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
@@ -143,20 +143,75 @@ export class ConsumerChatController {
     }
   }
 
-  private publicErrorMessage(error: any): string {
-    if (error?.status === HttpStatus.BAD_REQUEST) {
-      const message = String(error?.message || "");
+  private publicErrorMessage(error: unknown): string {
+    const { code, status, message } = this.errorDetails(error);
+    if (status === HttpStatus.BAD_REQUEST) {
       if (/1[–-]1200/.test(message)) {
         return "Xabar 1 200 belgidan uzun. Ro‘yxatni qismlarga bo‘lib yuboring.";
       }
       if (/bitta faol hamkor/i.test(message)) {
         return "Bir so‘rovda bitta hamkor tanlang. Boshqa hamkor uchun yangi so‘rov yuboring.";
       }
-      if (/expired/i.test(message)) {
-        return "Bu tanlovning muddati tugagan. Katalogdan qayta tanlang.";
-      }
-      return "Xabardagi ma’lumotni aniqlashtirib, yana yuboring.";
     }
-    return "Zayuno hozir javob bera olmadi. Birozdan so‘ng qayta urinib ko‘ring.";
+
+    return getAgentErrorPresentation({
+      errorCode: code,
+      statusCode: status,
+      message,
+    }).customerMessage;
+  }
+
+  private logFailure(scope: "request" | "stream", error: unknown): void {
+    const { code, status } = this.errorDetails(error);
+    this.logger.warn(`Consumer chat ${scope} failed [${code}/${status}]`);
+  }
+
+  private errorDetails(error: unknown): {
+    code: string;
+    status: number;
+    message: string;
+  } {
+    const candidate = this.asRecord(error);
+    const getResponse = candidate?.getResponse;
+    const response =
+      typeof getResponse === "function"
+        ? getResponse.call(error)
+        : candidate?.response;
+    const responseRecord = this.asRecord(response);
+    const rawMessage =
+      responseRecord?.message ??
+      candidate?.message ??
+      (typeof response === "string" ? response : "");
+    const message = Array.isArray(rawMessage)
+      ? rawMessage.map((part) => String(part)).join("; ")
+      : String(rawMessage || "");
+    const getStatus = candidate?.getStatus;
+    const rawStatus =
+      typeof getStatus === "function"
+        ? getStatus.call(error)
+        : candidate?.statusCode ?? candidate?.status ?? responseRecord?.statusCode;
+    const parsedStatus = Number(rawStatus);
+    const status =
+      Number.isInteger(parsedStatus) && parsedStatus >= 100 && parsedStatus <= 599
+        ? parsedStatus
+        : HttpStatus.INTERNAL_SERVER_ERROR;
+    const rawCode =
+      candidate?.errorCode ??
+      responseRecord?.errorCode ??
+      responseRecord?.code ??
+      candidate?.code ??
+      responseRecord?.error;
+
+    return {
+      code: normalizeZayunoErrorCode(rawCode, status, message),
+      status,
+      message,
+    };
+  }
+
+  private asRecord(value: unknown): Record<string, any> | undefined {
+    return value && typeof value === "object"
+      ? (value as Record<string, any>)
+      : undefined;
   }
 }

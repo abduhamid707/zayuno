@@ -1,3 +1,33 @@
+# Joriy ish — P0 "Zayuno hozir javob bera olmadi" generic error fallback fix (2026-09-18)
+
+- [x] 1. `consumer-chat.controller.ts`: exception shakllarini kanonik Zayuno error taxonomy'ga normalizatsiya qilib, xavfsiz customer xabarini qaytarish.
+- [x] 2. `consumer-chat.service.ts`: tashqi action yuborilgandan keyingi holatda pending orderni noto'g'ri o'chiradigan recovery patchni olib tashlash; action holati idempotency/reconciliation qatlamida saqlanadi.
+- [x] 3. Controller error-mapping uchun fokuslangan regression testini qo'shish.
+- [x] 4. Fokuslangan testlar va `git diff --check` ni ishga tushirish (foydalanuvchi ko'rsatmasiga binoan keng build/full-suite kutilmaydi).
+- [ ] 5. TASKS.md handoff, commit va pushni yakunlash.
+
+**Sabab:** `publicErrorMessage()` faqat `status === 400` + 3 ta regex pattern ni qo'llab-quvvatlaydi. Boshqa barcha xatolar (503, 409, 422, QuoteMismatchError, QuoteExpiredError, provider failures) "Zayuno hozir javob bera olmadi" ga tushadi. Bu P0 bug: foydalanuvchi "Tasdiqlayman" yozganda, `createAction` xato otsa, user-friendly xabar o'rniga generic fallback ko'rinadi.
+
+**Holat / handoff (2026-09-18):**
+- `ConsumerChatController` endi Nest `HttpException`, Zayuno typed error va nested response shakllaridan kod/statusni bitta `normalizeZayunoErrorCode()` yo'li bilan oladi; customerga `getAgentErrorPresentation()`ning xavfsiz kanonik matni qaytadi.
+- 409 holatlari ajratildi: oddiy `CONFLICT` holat yangilanishini, `IDEMPOTENCY_CONFLICT` kutish/holat tekshiruvini, payload collision esa yangi quote/key kerakligini bildiradi. Raw provider matni customer chat va controller logiga chiqmaydi.
+- Gemini qoldirgan `createAction` recovery catch'i olib tashlandi: u provider action qaytgandan keyingi `QUOTE_MISMATCH`da pending orderni o'chirib, real buyurtmani reconciliation qilmasdan dublikat xavfini tug'dirardi. Pending order va idempotency key endi saqlanadi.
+- `pnpm exec tsx --tsconfig tsconfig.base.json tests/test-consumer-chat-error-mapping.ts` — PASS.
+- `git diff --check` — PASS.
+- Keng API build/full-suite foydalanuvchi ko'rsatmasiga binoan ishga tushirilmadi. Qo'shimcha, o'zgarmagan `tests/test-error-taxonomy-and-catalog-fallback.ts` qayta ishga tushirilganda `registerZayunoTools`dagi oldindan mavjud `CapabilityNotSupportedError` bilan yiqildi; bu patch tegmagan modul va alohida follow-up talab qiladi.
+- Navbatdagi qadam: yakuniy diffni tekshirib commit va `origin/main`ga push qilish.
+
+# Joriy ish — iTicket Mock Serverni eng oxirgi kod bilan qayta ishga tushirish va VIP variantni tekshirish (2026-09-18)
+
+- [x] 1. Eski Node mock server jarayoni (`task-555`) to‘liq to‘xtatildi.
+- [x] 2. `scripts/iticket-mock-server.mjs` diskdagi eng so‘nggi kod bilan qayta ishga tushirildi (PID: 25956, StartTime: 19:34:24).
+- [x] 3. Cloudflare tunnel holati tekshirildi (200 OK, HEALTHY).
+- [x] 4. Direct provider testlari bajarildi:
+  - `POST /quote` (item_mangu_5, var_vip, qty 1) -> total: 1,000,000 UZS.
+  - `POST /actions` (item_mangu_5, var_vip, qty 1) -> total: 1,000,000 UZS.
+
+**Holat / handoff:** Mock server yangilangan kod bilan ishlab turibdi. VIP variant narxi `POST /quote` va `POST /actions` da aynan 1,000,000 UZS sifatida bir xil qaytishi tasdiqlandi. Jonli tunnel URL: `https://wedding-watches-river-printable.trycloudflare.com`.
+
 # Joriy ish — P0 Quote/Action Price Integrity & Financial Authority Enforcement (2026-09-18)
 
 - [x] 1. Enrich adapter.createAction payload with quote snapshot and resolve lines dynamically.
