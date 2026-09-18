@@ -2,7 +2,7 @@
 
 - [x] 1. Eligibility Engine o‘zgarishlari uchun fokuslangan regressiya testlarini ishga tushirish.
 - [x] 2. Tegishli workspace buildlarini va `git diff --check`ni bajarish.
-- [ ] 3. Toza natijani commit qilib, `origin/main`ga push qilish.
+- [x] 3. Toza natijani commit qilib, `origin/main`ga push qilish.
 
 **Holat / handoff (2026-09-18):** Foydalanuvchi build/test hamda push uchun aniq ruxsat berdi. Joriy worktree’da faqat Provider Eligibility Engine ishi va uning TASKS yozuvi o‘zgargan.
 
@@ -14,7 +14,7 @@
 - `pnpm --filter @zayuno/contracts build`, `@zayuno/shared build`, `@zayuno/api build`, `@zayuno/admin build`, `@zayuno/sandbox-provider build` — PASS. Admin build faqat oldindan mavjud PostCSS module-type va large-chunk warninglarini chiqardi.
 - `git diff --check` — PASS.
 
-**Qolgan qadam:** Commit va `origin/main`ga push.
+**Yakun:** `0898f4c feat(providers): add eligibility engine` commit yaratildi va `origin/main`ga muvaffaqiyatli push qilindi. Qolgan ish yo‘q.
 
 # Oldingi ish — Provider Eligibility Engine: discovery va transactional gate (2026-09-18)
 
