@@ -5,6 +5,7 @@
  */
 export const ZAYUNO_ERROR_CODES = [
   'PROVIDER_NOT_FOUND',
+  'ENVIRONMENT_NOT_ALLOWED',
   'RESOURCE_NOT_FOUND',
   'LOCATION_NOT_FOUND',
   'OFFERING_NOT_FOUND',
@@ -104,6 +105,12 @@ const ERROR_PRESENTATIONS: Record<ZayunoErrorCode, Omit<AgentErrorPresentation, 
     retryable: false,
     customerMessage: 'Bu xizmat hamkori topilmadi. Boshqa hamkorni tanlaymiz.',
     agentMessage: 'Provider was not found. Discover a provider or correct providerSlug.',
+    recommendedAction: 'DISCOVER_PROVIDER'
+  },
+  ENVIRONMENT_NOT_ALLOWED: {
+    retryable: false,
+    customerMessage: 'Bu xizmat joriy muhitda mavjud emas.',
+    agentMessage: 'Provider is not accessible in the current execution environment context. Switch to the matching environment (e.g. SANDBOX) or select a LIVE provider.',
     recommendedAction: 'DISCOVER_PROVIDER'
   },
   RESOURCE_NOT_FOUND: {
@@ -304,6 +311,15 @@ export function normalizeZayunoErrorCode(
   if (text.includes('INVALID_QUANTITY')) return 'INVALID_QUANTITY';
   if (text.includes('AVAILABILITY') && text.includes('UNKNOWN')) return 'AVAILABILITY_UNKNOWN';
 
+  if (
+    normalizedCode === 'ENVIRONMENT_NOT_ALLOWED' ||
+    text.includes('ENVIRONMENT_NOT_ALLOWED') ||
+    text.includes('ENVIRONMENT NOT ALLOWED') ||
+    text.includes('ENVIRONMENT MISMATCH')
+  ) {
+    return 'ENVIRONMENT_NOT_ALLOWED';
+  }
+
   // Specific Provider / Location / Offering not found heuristics
   if (
     normalizedCode === 'PROVIDER_NOT_FOUND' ||
@@ -455,6 +471,17 @@ export class NotFoundError extends ZayunoError {
           ? 'LOCATION_NOT_FOUND'
           : 'RESOURCE_NOT_FOUND';
     super(msg, 404, resourceCode, { resource, identifier, retryable: false });
+  }
+}
+
+export class EnvironmentNotAllowedError extends ZayunoError {
+  constructor(providerSlug: string, actualEnvironment: string, requestedEnvironment: string) {
+    super(
+      `Provider "${providerSlug}" operates in environment "${actualEnvironment}" and cannot be accessed from "${requestedEnvironment}" execution context.`,
+      403,
+      'ENVIRONMENT_NOT_ALLOWED',
+      { providerSlug, actualEnvironment, requestedEnvironment, retryable: false }
+    );
   }
 }
 

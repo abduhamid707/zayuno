@@ -64,6 +64,7 @@ export const CreateActionInputSchema = z.object({
   fulfillmentType: optionalNullable(z.string()).describe('e.g. STANDARD, EXPRESS, PICKUP, DIGITAL'),
   paymentMethod: optionalNullable(z.string()).describe('e.g. "payme", "card", "cash", "invoice"'),
   parameters: optionalNullable(z.record(z.any())).describe('Custom parameters passed to provider adapter'),
+  environment: optionalNullable(z.string()).describe('Target execution environment context (e.g. LIVE, SANDBOX). Defaults to LIVE.'),
   userConfirmed: z.literal(true).describe('Must be true after the user explicitly confirms the reviewed quote')
 });
 export type CreateActionInput = z.infer<typeof CreateActionInputSchema>;
@@ -135,7 +136,8 @@ export type PublicAction = z.infer<typeof PublicActionSchema>;
 
 export const GetActionInputSchema = z.object({
   providerSlug: optionalNullable(z.string()),
-  actionId: z.string().min(1).describe('Public ID (e.g. "ZY-ACT-12345") or UUID')
+  actionId: z.string().min(1).describe('Public ID (e.g. "ZY-ACT-12345") or UUID'),
+  environment: optionalNullable(z.string()).describe('Target execution environment context (defaults to LIVE)')
 });
 export type GetActionInput = z.infer<typeof GetActionInputSchema>;
 
@@ -157,7 +159,8 @@ export const CancelActionInputSchema = z.object({
   providerSlug: optionalNullable(z.string()),
   actionId: z.string().min(1).describe('Public action ID or UUID'),
   reasonCode: optionalNullable(CancellationReasonCodeSchema).describe('Stable cancellation category; defaults to CUSTOMER_CANCELLED'),
-  reason: optionalNullable(z.string().trim().min(3).max(500)).describe('Clear human-readable reason for cancellation')
+  reason: optionalNullable(z.string().trim().min(3).max(500)).describe('Clear human-readable reason for cancellation'),
+  environment: optionalNullable(z.string()).describe('Target execution environment context (defaults to LIVE)')
 });
 export type CancelActionInput = z.infer<typeof CancelActionInputSchema>;
 

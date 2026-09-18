@@ -56,18 +56,24 @@ export class CatalogService {
     private redisService: RedisService
   ) {}
 
-  async getCatalog(providerSlug: string, locationId?: string, categorySlug?: string, parameters?: Record<string, any>): Promise<Catalog> {
+  async getCatalog(
+    providerSlug: string,
+    locationId?: string,
+    categorySlug?: string,
+    parameters?: Record<string, any>,
+    environment?: string
+  ): Promise<Catalog> {
     if (!providerSlug) {
       throw new BadRequestException('providerSlug is required to fetch catalog.');
     }
     this.assertSafeParameters(parameters);
 
     const cleanSlug = providerSlug.toLowerCase().trim();
-    // 1. Provider exists & published
-    await this.providersService.assertProviderPublished(cleanSlug);
+    // 1. Provider exists & published in target environment
+    await this.providersService.assertProviderPublished(cleanSlug, environment);
     // 2. Capability supported?
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
-    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG);
+    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG, environment);
     if (!adapter.getCatalog) {
       throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.CATALOG);
     }
@@ -97,7 +103,13 @@ export class CatalogService {
     });
   }
 
-  async getOffering(providerSlug: string, offeringId: string, locationId?: string, parameters?: Record<string, any>): Promise<Offering> {
+  async getOffering(
+    providerSlug: string,
+    offeringId: string,
+    locationId?: string,
+    parameters?: Record<string, any>,
+    environment?: string
+  ): Promise<Offering> {
     if (!providerSlug) {
       throw new BadRequestException('providerSlug is required to fetch offering.');
     }
@@ -107,11 +119,11 @@ export class CatalogService {
     this.assertSafeParameters(parameters);
 
     const cleanSlug = providerSlug.toLowerCase().trim();
-    // 1. Provider exists & published
-    await this.providersService.assertProviderPublished(cleanSlug);
+    // 1. Provider exists & published in target environment
+    await this.providersService.assertProviderPublished(cleanSlug, environment);
     // 2. Capability supported?
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
-    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG);
+    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG, environment);
     if (!adapter.getOffering) {
       throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.CATALOG);
     }
@@ -142,18 +154,26 @@ export class CatalogService {
     });
   }
 
-  async searchOfferings(providerSlug: string, query: string, categorySlug?: string, locationId?: string, limit = 20, parameters?: Record<string, any>): Promise<Offering[]> {
+  async searchOfferings(
+    providerSlug: string,
+    query: string,
+    categorySlug?: string,
+    locationId?: string,
+    limit = 20,
+    parameters?: Record<string, any>,
+    environment?: string
+  ): Promise<Offering[]> {
     if (!providerSlug) {
       throw new BadRequestException('providerSlug is required to search catalog. No default provider fallback is permitted.');
     }
     this.assertSafeParameters(parameters);
 
     const cleanSlug = providerSlug.toLowerCase().trim();
-    // 1. Provider exists & published
-    await this.providersService.assertProviderPublished(cleanSlug);
+    // 1. Provider exists & published in target environment
+    await this.providersService.assertProviderPublished(cleanSlug, environment);
     // 2. Capability supported? Manifest must match execution: strictly require SEARCH capability
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.SEARCH);
-    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.SEARCH);
+    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.SEARCH, environment);
     if (!adapter.searchOfferings) {
       throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.SEARCH);
     }
@@ -311,19 +331,19 @@ export class CatalogService {
     });
   }
 
-  async checkAvailability(input: CheckAvailabilityInput): Promise<AvailabilityResult> {
+  async checkAvailability(input: CheckAvailabilityInput, environment?: string): Promise<AvailabilityResult> {
     if (!input.providerSlug) {
       throw new BadRequestException('providerSlug is required.');
     }
     this.assertSafeParameters(input.parameters);
 
     const cleanSlug = input.providerSlug.toLowerCase().trim();
-    // 1. Provider exists & published
-    await this.providersService.assertProviderPublished(cleanSlug);
+    // 1. Provider exists & published in target environment
+    await this.providersService.assertProviderPublished(cleanSlug, environment);
 
     // 2. Capability supported? (offerings require CATALOG capability)
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
-    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG);
+    await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG, environment);
 
     // 3. Location valid?
     if (input.locationId) {

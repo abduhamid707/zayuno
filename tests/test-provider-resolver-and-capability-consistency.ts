@@ -206,46 +206,52 @@ async function runConsistencySuite() {
   );
 
   // -------------------------------------------------------------------------
-  // TEST 1: Single Provider Resolver & Environment Context Preservation
+  // TEST 1: Single Provider Resolver & Environment Context Enforcement
   // -------------------------------------------------------------------------
-  console.log('👉 [Test 1] Canonical Provider Resolver: Environment Context Preservation...');
+  console.log('👉 [Test 1] Canonical Provider Resolver: Environment Context Enforcement...');
   {
-    // 1a. Sandbox provider resolved without explicit environment (Discovery -> Tool execution)
-    const sb = await providersService.resolveCanonicalProvider('coffee-time-sandbox');
-    assert.equal(sb.slug, 'coffee-time-sandbox');
-    assert.equal(sb.environment, ProviderEnvironment.SANDBOX);
-    assert.equal(sb.status, ProviderStatus.SANDBOX);
+    // 1a. Sandbox provider resolved without explicit environment (defaults to LIVE) -> throws ENVIRONMENT_NOT_ALLOWED
+    let caughtLiveDefault = false;
+    try {
+      await providersService.resolveCanonicalProvider('coffee-time-sandbox');
+    } catch (err: any) {
+      caughtLiveDefault = true;
+      assert.equal(err.code, 'ENVIRONMENT_NOT_ALLOWED');
+    }
+    assert.ok(caughtLiveDefault, 'Expected ENVIRONMENT_NOT_ALLOWED when accessing sandbox provider from default LIVE context');
 
-    // 1b. Sandbox provider resolved with explicit environment="SANDBOX"
+    // 1b. Sandbox provider resolved with explicit environment="SANDBOX" -> succeeds
     const sbExplicit = await providersService.resolveCanonicalProvider('coffee-time-sandbox', 'SANDBOX');
     assert.equal(sbExplicit.slug, 'coffee-time-sandbox');
+    assert.equal(sbExplicit.environment, ProviderEnvironment.SANDBOX);
+    assert.equal(sbExplicit.status, ProviderStatus.SANDBOX);
 
-    // 1c. Sandbox provider requested with environment="LIVE" -> throws PROVIDER_NOT_FOUND
+    // 1c. Sandbox provider requested with explicit environment="LIVE" -> throws ENVIRONMENT_NOT_ALLOWED
     let caughtLiveFilter = false;
     try {
       await providersService.resolveCanonicalProvider('coffee-time-sandbox', 'LIVE');
     } catch (err: any) {
       caughtLiveFilter = true;
-      assert.equal(err.code, 'PROVIDER_NOT_FOUND');
+      assert.equal(err.code, 'ENVIRONMENT_NOT_ALLOWED');
     }
-    assert.ok(caughtLiveFilter, 'Expected PROVIDER_NOT_FOUND when requesting sandbox provider with environment=LIVE');
+    assert.ok(caughtLiveFilter, 'Expected ENVIRONMENT_NOT_ALLOWED when requesting sandbox provider with environment=LIVE');
 
-    // 1d. Live provider resolved without explicit environment
+    // 1d. Live provider resolved without explicit environment (defaults to LIVE) -> succeeds
     const live = await providersService.resolveCanonicalProvider('hh-uz');
     assert.equal(live.slug, 'hh-uz');
     assert.equal(live.environment, ProviderEnvironment.LIVE);
 
-    // 1e. Live provider requested with environment="SANDBOX" -> throws PROVIDER_NOT_FOUND
+    // 1e. Live provider requested with environment="SANDBOX" -> throws ENVIRONMENT_NOT_ALLOWED
     let caughtSbFilter = false;
     try {
       await providersService.resolveCanonicalProvider('hh-uz', 'SANDBOX');
     } catch (err: any) {
       caughtSbFilter = true;
-      assert.equal(err.code, 'PROVIDER_NOT_FOUND');
+      assert.equal(err.code, 'ENVIRONMENT_NOT_ALLOWED');
     }
-    assert.ok(caughtSbFilter, 'Expected PROVIDER_NOT_FOUND when requesting live provider with environment=SANDBOX');
+    assert.ok(caughtSbFilter, 'Expected ENVIRONMENT_NOT_ALLOWED when requesting live provider with environment=SANDBOX');
 
-    console.log('   ✅ Single canonical provider resolution successfully preserves environment context.');
+    console.log('   ✅ Single canonical provider resolution successfully enforces environment boundaries.');
   }
 
   // -------------------------------------------------------------------------
@@ -264,8 +270,8 @@ async function runConsistencySuite() {
     }
     assert.ok(caughtSearchCap, 'Expected CAPABILITY_NOT_SUPPORTED when provider lacks SEARCH; zero silent fallback allowed');
 
-    // 2b. Provider WITH SEARCH capability (coffee-time-sandbox) called with searchOfferings
-    const results = await catalogService.searchOfferings('coffee-time-sandbox', 'latte');
+    // 2b. Provider WITH SEARCH capability (coffee-time-sandbox) called with searchOfferings in SANDBOX environment
+    const results = await catalogService.searchOfferings('coffee-time-sandbox', 'latte', undefined, undefined, 20, undefined, 'SANDBOX');
     assert.ok(Array.isArray(results), 'Expected search results array for provider with SEARCH capability');
 
     console.log('   ✅ Strict capability parity verified: undeclared capabilities rejected without fallback.');
@@ -314,27 +320,28 @@ async function runConsistencySuite() {
 
     // 3c. Step 3: Provider exists and has capability, but locationId is invalid -> LOCATION_NOT_FOUND
     try {
-      // coffee-time-sandbox has CATALOG capability, but 'fake-loc-invalid' does not exist
-      await catalogService.getCatalog('coffee-time-sandbox', 'fake-loc-invalid');
+      // coffee-time-sandbox has CATALOG capability in SANDBOX environment, but 'fake-loc-invalid' does not exist
+      await catalogService.getCatalog('coffee-time-sandbox', 'fake-loc-invalid', undefined, undefined, 'SANDBOX');
       assert.fail('Expected error');
     } catch (err: any) {
       assert.equal(err.code, 'LOCATION_NOT_FOUND', 'Location check must fail after capability check passes');
     }
 
     try {
-      // coffee-time-sandbox has SEARCH capability, but 'fake-loc-invalid' does not exist
-      await catalogService.searchOfferings('coffee-time-sandbox', 'latte', undefined, 'fake-loc-invalid');
+      // coffee-time-sandbox has SEARCH capability in SANDBOX environment, but 'fake-loc-invalid' does not exist
+      await catalogService.searchOfferings('coffee-time-sandbox', 'latte', undefined, 'fake-loc-invalid', 20, undefined, 'SANDBOX');
       assert.fail('Expected error');
     } catch (err: any) {
       assert.equal(err.code, 'LOCATION_NOT_FOUND', 'Location check must fail for search after capability passes');
     }
 
     try {
-      // coffee-time-sandbox has QUOTE capability, but 'fake-loc-invalid' does not exist
+      // coffee-time-sandbox has QUOTE capability in SANDBOX environment, but 'fake-loc-invalid' does not exist
       await quotesService.requestQuote({
         providerSlug: 'coffee-time-sandbox',
         items: [{ offeringId: 'item-1', quantity: 1 }],
-        locationId: 'fake-loc-invalid'
+        locationId: 'fake-loc-invalid',
+        environment: 'SANDBOX'
       });
       assert.fail('Expected error');
     } catch (err: any) {

@@ -13,7 +13,11 @@ export class QuotesController {
 
   @Post()
   @ApiOperation({ summary: 'Calculate verified pricing, fees, and line-item breakdown for a provider offering' })
-  async requestQuote(@Body() body: RequestQuoteInput) {
-    return this.quotesService.requestQuote(body);
+  async requestQuote(@Body() body: RequestQuoteInput, @Req() req?: any) {
+    const effectiveEnv = body.environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
+    return this.quotesService.requestQuote({
+      ...body,
+      environment: effectiveEnv
+    });
   }
 }

@@ -33,8 +33,10 @@ export class ActionsController {
   @ApiOperation({ summary: 'Execute an explicitly confirmed action with idempotency' })
   async createAction(@Body() body: CreateActionInput, @Req() request: any) {
     const headerKey = request.headers['idempotency-key'] as string | undefined;
+    const effectiveEnv = body.environment || request.headers['x-zayuno-environment'] || request.headers['x-execution-context'];
     const action = await this.actionsService.createAction({
       ...body,
+      environment: effectiveEnv,
       idempotencyKey: body.idempotencyKey || headerKey
     }, request.user?.id);
     return projectPublicAction(action);
@@ -42,19 +44,39 @@ export class ActionsController {
 
   @Get(':actionId')
   @ApiOperation({ summary: 'Get live status and timeline of an action' })
-  async getAction(@Param('actionId') actionId: string, @Req() request: any) {
-    return projectPublicAction(await this.actionsService.getAction({ actionId }, request.user));
+  async getAction(
+    @Param('actionId') actionId: string,
+    @Query('environment') environment: string,
+    @Req() request: any
+  ) {
+    const effectiveEnv = environment || request.headers['x-zayuno-environment'] || request.headers['x-execution-context'];
+    return projectPublicAction(await this.actionsService.getAction({ actionId, environment: effectiveEnv }, request.user));
   }
 
   @Post(':actionId/cancel')
   @ApiOperation({ summary: 'Cancel an eligible active action' })
-  async cancelAction(@Param('actionId') actionId: string, @Body() body: { reasonCode?: any; reason?: string }, @Req() request?: any) {
-    return this.actionsService.cancelAction({ actionId, reasonCode: body?.reasonCode || 'CUSTOMER_CANCELLED', reason: body?.reason }, request?.user);
+  async cancelAction(
+    @Param('actionId') actionId: string,
+    @Body() body: { reasonCode?: any; reason?: string; environment?: string },
+    @Req() request?: any
+  ) {
+    const effectiveEnv = body?.environment || request?.headers['x-zayuno-environment'] || request?.headers['x-execution-context'];
+    return this.actionsService.cancelAction({
+      actionId,
+      reasonCode: body?.reasonCode || 'CUSTOMER_CANCELLED',
+      reason: body?.reason,
+      environment: effectiveEnv
+    }, request?.user);
   }
 
   @Get(':actionId/payment-options')
   @ApiOperation({ summary: 'Retrieve provider-supplied checkout URLs and payment options' })
-  async getPaymentOptions(@Param('actionId') actionId: string, @Req() request: any) {
-    return this.actionsService.getPaymentOptions(actionId, request.user);
+  async getPaymentOptions(
+    @Param('actionId') actionId: string,
+    @Query('environment') environment: string,
+    @Req() request: any
+  ) {
+    const effectiveEnv = environment || request.headers['x-zayuno-environment'] || request.headers['x-execution-context'];
+    return this.actionsService.getPaymentOptions(actionId, request.user, effectiveEnv);
   }
 }

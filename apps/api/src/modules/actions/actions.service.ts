@@ -7,6 +7,7 @@ import { prisma, ActionStatus as DbActionStatus, PaymentStatus as DbPaymentStatu
 import {
   generatePublicActionId,
   NotFoundError,
+  EnvironmentNotAllowedError,
   IdempotencyError,
   IdempotencyPayloadConflictError,
   createIdempotencyPayloadHash,
@@ -29,7 +30,8 @@ import {
   CancelActionResultSchema,
   ActionStatus,
   PaymentStatus,
-  ProviderCapability
+  ProviderCapability,
+  ProviderEnvironment
 } from '@zayuno/contracts';
 import { QuoteExpiredError, QuoteMismatchError, ActionCancellationError, CapabilityNotSupportedError } from '@zayuno/provider-sdk';
 import { RedisService } from '../../common/services/redis.service';
@@ -175,10 +177,11 @@ export class ActionsService {
         }
       }
 
-      // 1. Provider exists & published
+      // 1. Provider exists & published in execution environment
+      const env = input.environment;
       let provider: any;
       if (this.providersService) {
-        provider = await this.providersService.assertProviderPublished(cleanSlug);
+        provider = await this.providersService.assertProviderPublished(cleanSlug, env);
       } else {
         provider = await prisma.provider.findUnique({
           where: { slug: cleanSlug }
@@ -195,7 +198,7 @@ export class ActionsService {
       // 2. Capability supported?
       const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.ACTION_CREATE);
       if (this.providersService) {
-        await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.ACTION_CREATE);
+        await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.ACTION_CREATE, env);
       }
       if (!adapter.createAction) {
         throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.ACTION_CREATE);
@@ -213,10 +216,14 @@ export class ActionsService {
       // 4. A persisted quote is mandatory. It must belong to this provider and
       // remain valid; Core must not delegate this safety check to an adapter.
       const dbQuote = await prisma.quote.findUnique({
-        where: { id: input.quoteId }
+        where: { id: input.quoteId },
+        include: { provider: true }
       });
       if (!dbQuote) {
         throw new BadRequestException('The quoteId is unknown. Request a fresh verified quote before creating an action.');
+      }
+      if (dbQuote.provider && dbQuote.provider.environment !== provider.environment) {
+        throw new EnvironmentNotAllowedError(cleanSlug, dbQuote.provider.environment, provider.environment);
       }
       if (dbQuote.providerId !== provider.id) {
         throw new BadRequestException('The quoteId does not belong to the requested provider.');
@@ -367,6 +374,10 @@ export class ActionsService {
       throw new NotFoundError('Action', input.actionId);
     }
     this.assertActionAccess(action, access);
+    const targetEnv = (input.environment || ProviderEnvironment.LIVE).toUpperCase().trim();
+    if (action.provider && action.provider.environment !== targetEnv) {
+      throw new EnvironmentNotAllowedError(action.provider.slug, action.provider.environment, targetEnv);
+    }
     return this.mapDbActionToNormalized(action);
   }
 
@@ -376,12 +387,16 @@ export class ActionsService {
       throw new NotFoundError('Action', input.actionId);
     }
     this.assertActionAccess(dbAction, access);
+    const targetEnv = (input.environment || ProviderEnvironment.LIVE).toUpperCase().trim();
+    if (dbAction.provider && dbAction.provider.environment !== targetEnv) {
+      throw new EnvironmentNotAllowedError(dbAction.provider.slug, dbAction.provider.environment, targetEnv);
+    }
     const stored = this.mapDbActionToNormalized(dbAction);
 
     try {
     const adapter = await this.registry.assertAndGetCapability(dbAction.provider.slug, ProviderCapability.ACTION_STATUS);
     if (this.providersService) {
-      await this.providersService.assertProviderCapabilityEligible(dbAction.provider.slug, ProviderCapability.ACTION_STATUS);
+      await this.providersService.assertProviderCapabilityEligible(dbAction.provider.slug, ProviderCapability.ACTION_STATUS, targetEnv);
     }
       if (!adapter.getAction) {
         return { action: stored, providerVerified: false };
@@ -424,6 +439,10 @@ export class ActionsService {
     }
 
     this.assertActionAccess(action, access);
+    const targetEnv = (input.environment || ProviderEnvironment.LIVE).toUpperCase().trim();
+    if (action.provider && action.provider.environment !== targetEnv) {
+      throw new EnvironmentNotAllowedError(action.provider.slug, action.provider.environment, targetEnv);
+    }
 
     if (action.status === DbActionStatus.CANCELLED) {
       return {
@@ -500,16 +519,20 @@ export class ActionsService {
     });
   }
 
-  async getPaymentOptions(actionId: string, access?: AccessScope) {
+  async getPaymentOptions(actionId: string, access?: AccessScope, environment?: string) {
     const action = await this.findActionByIdOrPublicId(actionId);
     if (!action) {
       throw new NotFoundError('Action', actionId);
     }
 
     this.assertActionAccess(action, access);
+    const targetEnv = (environment || ProviderEnvironment.LIVE).toUpperCase().trim();
+    if (action.provider && action.provider.environment !== targetEnv) {
+      throw new EnvironmentNotAllowedError(action.provider.slug, action.provider.environment, targetEnv);
+    }
     const adapter = await this.registry.assertAndGetCapability(action.provider.slug, ProviderCapability.PAYMENT_OPTIONS);
     if (this.providersService) {
-      await this.providersService.assertProviderCapabilityEligible(action.provider.slug, ProviderCapability.PAYMENT_OPTIONS);
+      await this.providersService.assertProviderCapabilityEligible(action.provider.slug, ProviderCapability.PAYMENT_OPTIONS, targetEnv);
     }
     if (adapter.getPaymentOptions) {
       const options = await adapter.getPaymentOptions({

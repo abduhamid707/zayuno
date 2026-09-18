@@ -636,4 +636,7 @@ export interface WelcomeInfo {
   welcomeMessage: string;
   availableServiceCount: number | null;
   dynamicServiceMessage: string;
+  discoverableProviderCount?: number;
+  readOnlyProviderCount?: number;
+  transactionalProviderCount?: number;
 }

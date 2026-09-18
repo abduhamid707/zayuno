@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, Body, UseGuards, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body, UseGuards, BadRequestException, Req } from '@nestjs/common';
 import { CheckAvailabilityInput, SearchCatalogInput } from '@zayuno/contracts';
 import { ApiTags, ApiOperation, ApiSecurity } from '@nestjs/swagger';
 import { CatalogService } from './catalog.service';
@@ -17,9 +17,12 @@ export class CatalogController {
     @Param('slug') slug: string,
     @Query('locationId') locationId?: string,
     @Query('category') categorySlug?: string,
-    @Query('context') context?: string
+    @Query('context') context?: string,
+    @Query('environment') environment?: string,
+    @Req() req?: any
   ) {
-    return this.catalogService.getCatalog(slug, locationId, categorySlug, this.parseContext(context));
+    const effectiveEnv = environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
+    return this.catalogService.getCatalog(slug, locationId, categorySlug, this.parseContext(context), effectiveEnv);
   }
 
   @Get('providers/:slug/offerings/:offeringId')
@@ -28,9 +31,12 @@ export class CatalogController {
     @Param('slug') slug: string,
     @Param('offeringId') offeringId: string,
     @Query('locationId') locationId?: string,
-    @Query('context') context?: string
+    @Query('context') context?: string,
+    @Query('environment') environment?: string,
+    @Req() req?: any
   ) {
-    return this.catalogService.getOffering(slug, offeringId, locationId, this.parseContext(context));
+    const effectiveEnv = environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
+    return this.catalogService.getOffering(slug, offeringId, locationId, this.parseContext(context), effectiveEnv);
   }
 
   @Get('search')
@@ -41,39 +47,46 @@ export class CatalogController {
     @Query('category') categorySlug?: string,
     @Query('locationId') locationId?: string,
     @Query('limit') limit?: string,
-    @Query('context') context?: string
+    @Query('context') context?: string,
+    @Query('environment') environment?: string,
+    @Req() req?: any
   ) {
     if (!providerSlug) {
       throw new BadRequestException('Query parameter "provider" is required for search. Example: /api/v1/search?provider=sandbox-provider&q=standard');
     }
+    const effectiveEnv = environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
     return this.catalogService.searchOfferings(
       providerSlug,
       query,
       categorySlug,
       locationId,
       limit ? parseInt(limit, 10) : 20,
-      this.parseContext(context)
+      this.parseContext(context),
+      effectiveEnv
     );
   }
 
   @Post('search')
   @ApiOperation({ summary: 'Structured dynamic offering search with provider-specific context' })
-  async searchOfferingsStructured(@Body() body: SearchCatalogInput) {
+  async searchOfferingsStructured(@Body() body: SearchCatalogInput, @Req() req?: any) {
     if (!body?.providerSlug) throw new BadRequestException('providerSlug is required.');
+    const effectiveEnv = (body as any)?.environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
     return this.catalogService.searchOfferings(
       body.providerSlug,
       body.query || '',
       body.categorySlug,
       body.locationId,
       body.limit || 20,
-      body.parameters
+      body.parameters,
+      effectiveEnv
     );
   }
 
   @Post('availability')
   @ApiOperation({ summary: 'Check availability for items before quotation' })
-  async checkAvailability(@Body() body: CheckAvailabilityInput) {
-    return this.catalogService.checkAvailability(body);
+  async checkAvailability(@Body() body: CheckAvailabilityInput, @Req() req?: any) {
+    const effectiveEnv = (body as any)?.environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
+    return this.catalogService.checkAvailability(body, effectiveEnv);
   }
 
 

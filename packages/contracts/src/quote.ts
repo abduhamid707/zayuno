@@ -17,7 +17,8 @@ export const RequestQuoteInputSchema = z.object({
   fulfillmentType: optionalNullable(z.string()).describe('Fulfillment mode (e.g. STANDARD, EXPRESS, PICKUP, DIGITAL)'),
   destination: optionalNullable(AddressSchema).describe('Optional physical delivery address or service destination'),
   promoCode: optionalNullable(z.string().trim().min(1).max(64)).describe('Optional provider-issued promotion or discount code. The provider validates and prices it; Zayuno never invents discounts.'),
-  parameters: optionalNullable(z.record(z.any())).describe('Optional domain or provider-specific parameters')
+  parameters: optionalNullable(z.record(z.any())).describe('Optional domain or provider-specific parameters'),
+  environment: optionalNullable(z.string()).describe('Target execution environment context (e.g. LIVE, SANDBOX). Defaults to LIVE.')
 });
 export type RequestQuoteInput = z.infer<typeof RequestQuoteInputSchema>;
 

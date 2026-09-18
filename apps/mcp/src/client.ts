@@ -121,32 +121,35 @@ export class ZayunoApiClient {
   }
 
   // 2. Catalog & Offerings
-  async getCatalog(slug: string, locationId?: string, category?: string, parameters?: Record<string, any>) {
+  async getCatalog(slug: string, locationId?: string, category?: string, parameters?: Record<string, any>, environment?: string) {
     const params = new URLSearchParams();
     if (locationId) params.append('locationId', locationId);
     if (category) params.append('category', category);
+    if (environment) params.append('environment', environment);
     if (parameters) params.append('context', JSON.stringify(parameters));
     const query = params.toString() ? `?${params.toString()}` : '';
     return this.request(`/api/v1/providers/${slug}/catalog${query}`);
   }
 
-  async searchCatalog(providerSlug: string, query: string, category?: string, locationId?: string, limit?: number, parameters?: Record<string, any>) {
+  async searchCatalog(providerSlug: string, query: string, category?: string, locationId?: string, limit?: number, parameters?: Record<string, any>, environment?: string) {
     if (parameters && Object.keys(parameters).length > 0) {
       return this.request('/api/v1/search', {
         method: 'POST',
-        body: JSON.stringify({ providerSlug, query: query || '', categorySlug: category, locationId, limit: limit || 20, parameters })
+        body: JSON.stringify({ providerSlug, query: query || '', categorySlug: category, locationId, limit: limit || 20, parameters, environment })
       });
     }
     const params = new URLSearchParams({ provider: providerSlug, q: query });
     if (category) params.append('category', category);
     if (locationId) params.append('locationId', locationId);
     if (limit) params.append('limit', String(limit));
+    if (environment) params.append('environment', environment);
     return this.request(`/api/v1/search?${params.toString()}`);
   }
 
-  async getOffering(slug: string, offeringId: string, locationId?: string, parameters?: Record<string, any>) {
+  async getOffering(slug: string, offeringId: string, locationId?: string, parameters?: Record<string, any>, environment?: string) {
     const params = new URLSearchParams();
     if (locationId) params.append('locationId', locationId);
+    if (environment) params.append('environment', environment);
     if (parameters) params.append('context', JSON.stringify(parameters));
     const query = params.toString() ? `?${params.toString()}` : '';
     return this.request(`/api/v1/providers/${slug}/offerings/${encodeURIComponent(offeringId)}${query}`);
@@ -178,18 +181,20 @@ export class ZayunoApiClient {
     });
   }
 
-  async getAction(actionId: string) {
-    return this.request(`/api/v1/actions/${actionId}`);
+  async getAction(actionId: string, environment?: string) {
+    const query = environment ? `?environment=${encodeURIComponent(environment)}` : '';
+    return this.request(`/api/v1/actions/${actionId}${query}`);
   }
 
-  async cancelAction(actionId: string, reason?: string, reasonCode = 'CUSTOMER_CANCELLED') {
+  async cancelAction(actionId: string, reason?: string, reasonCode = 'CUSTOMER_CANCELLED', environment?: string) {
     return this.request(`/api/v1/actions/${actionId}/cancel`, {
       method: 'POST',
-      body: JSON.stringify({ reasonCode, reason })
+      body: JSON.stringify({ reasonCode, reason, environment })
     });
   }
 
-  async getPaymentOptions(actionId: string) {
-    return this.request(`/api/v1/actions/${actionId}/payment-options`);
+  async getPaymentOptions(actionId: string, environment?: string) {
+    const query = environment ? `?environment=${encodeURIComponent(environment)}` : '';
+    return this.request(`/api/v1/actions/${actionId}/payment-options${query}`);
   }
 }

@@ -65,3 +65,5 @@ export class CapacityExceededError extends ProviderError {
     this.name = 'CapacityExceededError';
   }
 }
+
+export { QuoteMismatchError, EnvironmentNotAllowedError } from '@zayuno/shared';

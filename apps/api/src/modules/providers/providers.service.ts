@@ -14,6 +14,7 @@ import {
   decryptSecret,
   generateApiKey,
   NotFoundError,
+  EnvironmentNotAllowedError,
   checkReservedBrand,
   normalizeSupportContact,
   sanitizePublicSupportContact,
@@ -98,6 +99,9 @@ export class ProvidersService {
     count: number;
     dynamicMessage: string;
     welcomeMessage: string;
+    discoverableProviderCount: number;
+    readOnlyProviderCount: number;
+    transactionalProviderCount: number;
     timestamp: number;
   } | null = null;
   private readonly SERVICE_COUNT_TTL_MS = 60_000;
@@ -109,7 +113,10 @@ export class ProvidersService {
         customerMessage: this.serviceCountCache.welcomeMessage,
         welcomeMessage: this.serviceCountCache.welcomeMessage,
         availableServiceCount: this.serviceCountCache.count,
-        dynamicServiceMessage: this.serviceCountCache.dynamicMessage
+        dynamicServiceMessage: this.serviceCountCache.dynamicMessage,
+        discoverableProviderCount: this.serviceCountCache.discoverableProviderCount,
+        readOnlyProviderCount: this.serviceCountCache.readOnlyProviderCount,
+        transactionalProviderCount: this.serviceCountCache.transactionalProviderCount
       };
     }
 
@@ -119,14 +126,41 @@ export class ProvidersService {
         include: { locations: true }
       });
 
-      const count = computeAvailableServiceCount(providers);
-      const dynamicServiceMessage = getDynamicServiceMessage(count);
-      const welcomeMessage = getWelcomeMessage(count);
+      let discoverableProviderCount = 0;
+      let readOnlyProviderCount = 0;
+      let transactionalProviderCount = 0;
+
+      for (const provider of providers) {
+        if (!this.isDiscoveryReady(provider)) continue;
+        const mapped = this.mapToProviderInfo(provider);
+        const eligibility = evaluateProviderEligibility(mapped);
+        if (eligibility.isDiscoveryEligible) {
+          discoverableProviderCount++;
+          if (eligibility.isTransactionalEligible) {
+            transactionalProviderCount++;
+          } else {
+            readOnlyProviderCount++;
+          }
+        }
+      }
+
+      const computedOfferingCount = computeAvailableServiceCount(providers);
+      const count = computedOfferingCount > 0 ? computedOfferingCount : discoverableProviderCount;
+      const providerMetrics = {
+        discoverableProviderCount,
+        readOnlyProviderCount,
+        transactionalProviderCount
+      };
+      const dynamicServiceMessage = getDynamicServiceMessage(count, false, providerMetrics);
+      const welcomeMessage = getWelcomeMessage(count, false, providerMetrics);
 
       this.serviceCountCache = {
         count,
         dynamicMessage: dynamicServiceMessage,
         welcomeMessage,
+        discoverableProviderCount,
+        readOnlyProviderCount,
+        transactionalProviderCount,
         timestamp: now
       };
 
@@ -134,7 +168,10 @@ export class ProvidersService {
         customerMessage: welcomeMessage,
         welcomeMessage,
         availableServiceCount: count,
-        dynamicServiceMessage
+        dynamicServiceMessage,
+        discoverableProviderCount,
+        readOnlyProviderCount,
+        transactionalProviderCount
       };
     } catch {
       const fallback = getWelcomeMessage(null);
@@ -142,7 +179,10 @@ export class ProvidersService {
         customerMessage: fallback,
         welcomeMessage: fallback,
         availableServiceCount: null,
-        dynamicServiceMessage: getDynamicServiceMessage(null)
+        dynamicServiceMessage: getDynamicServiceMessage(null),
+        discoverableProviderCount: 0,
+        readOnlyProviderCount: 0,
+        transactionalProviderCount: 0
       };
     }
   }
@@ -269,11 +309,16 @@ export class ProvidersService {
   /**
    * Canonical Provider Resolver: Single source of truth for provider discovery and execution.
    * Resolves a provider by slug across all tools and routes.
-   * When environment is explicitly supplied, enforces exact environment match.
-   * When environment is omitted, preserves the provider's registered environment (LIVE, SANDBOX, STAGING)
-   * so discovery context is never dropped.
+   * Default execution context across API and MCP is LIVE.
+   * If caller in LIVE context requests a SANDBOX/STAGING provider (or vice versa),
+   * throws EnvironmentNotAllowedError.
+   * Pass options.allowAnyEnvironment = true only for internal admin/debug operations.
    */
-  async resolveCanonicalProvider(slug: string, environment?: string): Promise<ProviderInfo> {
+  async resolveCanonicalProvider(
+    slug: string,
+    environment?: string,
+    options?: { allowAnyEnvironment?: boolean }
+  ): Promise<ProviderInfo> {
     const cleanSlug = (slug || '').toLowerCase().trim();
     if (!cleanSlug) {
       throw new NotFoundError('Provider', slug);
@@ -291,8 +336,11 @@ export class ProvidersService {
       throw new NotFoundError('Provider', cleanSlug);
     }
 
-    if (environment !== undefined && provider.environment !== this.resolveProviderEnvironment(environment)) {
-      throw new NotFoundError('Provider', cleanSlug);
+    if (!options?.allowAnyEnvironment) {
+      const targetEnvironment = this.resolveProviderEnvironment(environment);
+      if (provider.environment !== targetEnvironment) {
+        throw new EnvironmentNotAllowedError(cleanSlug, provider.environment, targetEnvironment);
+      }
     }
 
     return this.mapToProviderInfo(provider);

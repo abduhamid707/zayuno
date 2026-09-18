@@ -35,10 +35,11 @@ export class QuotesService {
     }
 
     const cleanSlug = input.providerSlug.toLowerCase().trim();
+    const env = input.environment;
     // 1. Provider exists & published
     let provider: any;
     if (this.providersService) {
-      provider = await this.providersService.assertProviderPublished(cleanSlug);
+      provider = await this.providersService.assertProviderPublished(cleanSlug, env);
     } else {
       provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
       if (!provider) {
@@ -53,7 +54,7 @@ export class QuotesService {
     // 2. Capability supported?
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.QUOTE);
     if (this.providersService) {
-      await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.QUOTE);
+      await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.QUOTE, env);
     }
     if (!adapter.requestQuote) {
       throw new CapabilityNotSupportedError(cleanSlug, ProviderCapability.QUOTE);

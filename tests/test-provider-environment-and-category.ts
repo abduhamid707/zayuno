@@ -127,16 +127,16 @@ async function main() {
     assert.equal(mcpFindResult.providers[0].environment, 'SANDBOX');
     assert.equal(mcpFindResult.providers[0].category, 'FOOD_AND_DRINK');
 
-    // Canonical resolver preserves registered sandbox environment when environment is omitted
-    assert.deepEqual(
-      await service.getCapabilities('sandbox-food'),
-      ['METADATA'],
-      'Canonical resolver preserves registered sandbox environment when environment is omitted.'
+    // Canonical resolver rejects sandbox provider in default LIVE context
+    await assert.rejects(
+      () => service.getCapabilities('sandbox-food'),
+      (err: any) => err.code === 'ENVIRONMENT_NOT_ALLOWED',
+      'Canonical resolver rejects sandbox provider when default LIVE environment context is used.'
     );
     // Explicit LIVE filter on a sandbox provider must reject
     await assert.rejects(
       () => service.getCapabilities('sandbox-food', ProviderEnvironment.LIVE),
-      /Provider/, 
+      (err: any) => err.code === 'ENVIRONMENT_NOT_ALLOWED',
       'Explicit LIVE filter on a sandbox provider must reject.'
     );
     assert.deepEqual(

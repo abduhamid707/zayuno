@@ -79,7 +79,26 @@ async function runInvariantBreakerSuite() {
       isCertified: true,
       isPublished: true,
       fulfillmentMode: ProviderFulfillmentMode.ONSITE,
-      environment: ProviderEnvironment.LIVE
+      environment: ProviderEnvironment.LIVE,
+      eligibility: {
+        contractVersion: 'v2 current',
+        complianceStatus: 'COMPLIANT',
+        profile: 'TRANSACTIONAL',
+        discoveryVisibility: 'VISIBLE',
+        certifiedCapabilities: [
+          ProviderCapability.METADATA,
+          ProviderCapability.HEALTH,
+          ProviderCapability.LOCATIONS,
+          ProviderCapability.CATALOG,
+          ProviderCapability.SEARCH,
+          ProviderCapability.QUOTE,
+          ProviderCapability.ACTION_CREATE,
+          ProviderCapability.ACTION_STATUS,
+          ProviderCapability.ACTION_CANCEL,
+          ProviderCapability.PAYMENT_OPTIONS,
+          ProviderCapability.WEBHOOK
+        ]
+      }
     },
     locations: [{ id: 'loc-ct-internal', providerLocationId: 'ct-branch-1', isActive: true }]
   };
@@ -108,7 +127,23 @@ async function runInvariantBreakerSuite() {
       isCertified: true,
       isPublished: true,
       fulfillmentMode: ProviderFulfillmentMode.DELIVERY,
-      environment: ProviderEnvironment.LIVE
+      environment: ProviderEnvironment.LIVE,
+      eligibility: {
+        contractVersion: 'v2 current',
+        complianceStatus: 'COMPLIANT',
+        profile: 'TRANSACTIONAL',
+        discoveryVisibility: 'VISIBLE',
+        certifiedCapabilities: [
+          ProviderCapability.METADATA,
+          ProviderCapability.HEALTH,
+          ProviderCapability.LOCATIONS,
+          ProviderCapability.CATALOG,
+          ProviderCapability.QUOTE,
+          ProviderCapability.ACTION_CREATE,
+          ProviderCapability.ACTION_STATUS,
+          ProviderCapability.ACTION_CANCEL
+        ]
+      }
     },
     locations: [{ id: 'loc-evos-internal', providerLocationId: 'evos-branch-1', isActive: true }]
   };

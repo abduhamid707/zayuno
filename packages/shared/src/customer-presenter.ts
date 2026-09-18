@@ -33,24 +33,57 @@ function isTicketPresentation(value: any, providerInfo?: any): boolean {
   );
 }
 
+export interface ProviderMetricCounts {
+  discoverableProviderCount?: number;
+  readOnlyProviderCount?: number;
+  transactionalProviderCount?: number;
+}
+
 /**
- * Returns the dynamic service message bucket based on the available service count.
+ * Returns the dynamic service message bucket based on the available service count and provider availability.
  */
-export function getDynamicServiceMessage(count?: number | null, isStale?: boolean): string {
-  if (count === null || count === undefined || isStale || isNaN(count) || count <= 0) {
-    return 'Faol hamkorlar katalogidan sizga mos variantni topib beraman.';
+export function getDynamicServiceMessage(
+  count?: number | null,
+  isStale?: boolean,
+  providerMetrics?: ProviderMetricCounts
+): string {
+  // If structured provider metrics are available and no offerings count exists (or count <= 0)
+  if ((count === undefined || count === null || count <= 0) && providerMetrics && (providerMetrics.discoverableProviderCount || 0) > 0) {
+    const discoverable = providerMetrics.discoverableProviderCount || 0;
+    const transactional = providerMetrics.transactionalProviderCount || 0;
+    if (transactional > 0) {
+      return `${discoverable} ta tasdiqlangan hamkorlar xizmatidan sizga mosini topib beraman.`;
+    }
+    return `${discoverable} ta tasdiqlangan hamkor xizmati va ma’lumotlar bazasidan sizga mos variantni topib beraman.`;
   }
 
-  if (count <= 24) return 'O‘nlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.';
-  if (count <= 199) return '100 dan ortiq mahsulot va xizmat orasidan tanlashingiz mumkin.';
-  return 'Yuzlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.';
+  if (count && !isNaN(count) && count > 0 && !isStale) {
+    if (count <= 24) return 'O‘nlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.';
+    if (count <= 199) return '100 dan ortiq mahsulot va xizmat orasidan tanlashingiz mumkin.';
+    return 'Yuzlab mahsulot va xizmatlar orasidan sizga mosini topib beraman.';
+  }
+
+  if (providerMetrics && (providerMetrics.discoverableProviderCount || 0) > 0) {
+    const discoverable = providerMetrics.discoverableProviderCount || 0;
+    const transactional = providerMetrics.transactionalProviderCount || 0;
+    if (transactional > 0) {
+      return `${discoverable} ta tasdiqlangan hamkorlar xizmatidan sizga mosini topib beraman.`;
+    }
+    return `${discoverable} ta tasdiqlangan hamkor xizmati va ma’lumotlar bazasidan sizga mos variantni topib beraman.`;
+  }
+
+  return 'Faol hamkorlar katalogidan sizga mos variantni topib beraman.';
 }
 
 /**
  * Generates the standardized natural customer welcome message.
  */
-export function getWelcomeMessage(serviceCount?: number | null, isStale?: boolean): string {
-  const dynamicMessage = getDynamicServiceMessage(serviceCount, isStale);
+export function getWelcomeMessage(
+  serviceCount?: number | null,
+  isStale?: boolean,
+  providerMetrics?: ProviderMetricCounts
+): string {
+  const dynamicMessage = getDynamicServiceMessage(serviceCount, isStale, providerMetrics);
   return `Assalomu alaykum! Zayuno orqali tasdiqlangan hamkorlar xizmatlaridan foydalanish oson.\n\n${dynamicMessage} Katalog, narx, provider talablari va buyurtma holatini bitta chatda boshqaramiz. Nima kerakligini yozing.`;
 }
 

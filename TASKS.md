@@ -1,4 +1,33 @@
-# Joriy ish — CI regression repair after eligibility engine (2026-09-18)
+# Joriy ish — P1 Sandbox Execution Context Bypass & P2 Available Service Count Semantics (2026-09-18)
+
+- [x] 1. ENVIRONMENT_NOT_ALLOWED xato kodini shared/contracts/provider-sdk darajasida joriy qilish.
+- [x] 2. resolveCanonicalProvider va assertProviderPublished ichida default LIVE execution context majburiyligini o‘rnatish.
+- [x] 3. Catalog, Quotes va Actions servicelarda context propagation va environment boundary (quote <-> action) tekshiruvini kiritish.
+- [x] 4. getWelcomeInfo() va getWelcomeMessage() semantikasini structured provider/service hisoblash bilan boyitish.
+- [x] 5. MCP tools va controllerlarda environment header/param qo‘llab-quvvatlashini moslash.
+- [x] 6. Yangi test suite yozish va barcha regressiya testlarini tekshirish.
+
+**Holat / handoff (2026-09-18):**
+- **P1 — Sandbox Execution Context Bypass bartaraf etildi:**
+  - Platforma bo‘yicha "Discovery environment == Execution environment" deterministik invariant o‘rnatildi.
+  - Standart ijro konteksti (API va MCP vositalarida) qat’iy ravishda `LIVE` deb belgilandi.
+  - `SANDBOX` provayderlariga kontekstsiz yoki `LIVE` kontekstida to‘g‘ridan-to‘g‘ri murojaat qilish `ENVIRONMENT_NOT_ALLOWED` (HTTP 403, non-retryable) xatosi bilan to‘xtatiladi.
+  - Cross-environment operatsiyalar qat’iy taqiqlandi: `SANDBOX` quote bilan `LIVE` buyurtma yaratish yoki aksincha harakatlar bloklandi.
+  - Hech qanday provayder nomi yoki slugi hardcode qilinmadi; mexanizm 1000+ provayder uchun universal va provayder-agnostik ishlaydi.
+- **P2 — Available Service Count Semantics yangilandi:**
+  - `WelcomeInfo` kontraktiga `discoverableProviderCount`, `readOnlyProviderCount`, va `transactionalProviderCount` qo‘shildi.
+  - `computeAvailableServiceCount` takomillashtirildi; katalog takliflari 0 bo‘lgan holatda ham, kashf qilinishi mumkin bo‘lgan faol provayderlar mavjud bo‘lsa, mijozga soxta "0 ta xizmat" xabari ko‘rsatilmaydi, balki tasdiqlangan hamkorlar soniga asoslangan aniq dinamik xabar qaytariladi.
+- **Bajarilgan tekshiruvlar:**
+  - `tests/test-sandbox-execution-context-and-service-metrics.ts` — PASS (barcha 6 ta P1 & P2 holatlari to‘liq tasdiqlandi).
+  - `tests/test-provider-resolver-and-capability-consistency.ts` — PASS (barcha 5 ta holat).
+  - `tests/test-invariant-breaker-suite.ts` — PASS (barcha 8 ta invariant).
+  - `tests/test-provider-environment-and-category.ts` — PASS.
+  - `tests/test-customer-experience-and-presenter.ts` — PASS.
+  - `@zayuno/contracts`, `@zayuno/shared`, `@zayuno/provider-sdk`, `@zayuno/api` TypeScript buildlari — PASS (0 xato).
+  - `git diff --check` — PASS (0 xato).
+
+
+# Oldingi ish — CI regression repair after eligibility engine (2026-09-18)
 
 - [x] Canonical Poyez provider metadata va Coffee Time test fixture contractlarini moslash.
 - [x] Eligibility engine sababli provider onboarding/publishing/health/discovery regressiyalarini tuzatish.
