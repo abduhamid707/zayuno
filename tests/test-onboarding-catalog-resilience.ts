@@ -44,7 +44,7 @@ async function main() {
   assert.equal(normalized[0].offerings[1].imageUrl, undefined);
   assert.deepEqual(normalizeCatalogSections({}), []);
 
-  const provider = { slug: 'bellissimo', name: 'Bellissimo Pizza', type: 'DELIVERY', metadata: { category: 'food_delivery' } };
+  const provider = { slug: 'bellissimo', name: 'Bellissimo Pizza', type: 'DELIVERY', capabilities: ['CATALOG'], metadata: { category: 'food_delivery' } };
   const chat: any = new ConsumerChatService(
     { listProviders: async () => [provider] } as any,
     {} as any,

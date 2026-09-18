@@ -3,6 +3,11 @@ import { ProvidersService } from '../apps/api/src/modules/providers/providers.se
 import { ProviderRegistryService } from '../apps/api/src/modules/providers/provider-registry.service.ts';
 import { prisma } from '../packages/database/src/client.ts';
 import { UserRole, ProviderStatus } from '../packages/database/src/index.ts';
+import {
+  ProviderComplianceStatus,
+  ProviderDiscoveryVisibility,
+  ProviderOperatingProfile
+} from '../packages/contracts/src/provider.ts';
 import { isProviderPublished, isProviderDiscoveryReady } from '../packages/shared/src/publishing.ts';
 
 
@@ -191,6 +196,15 @@ async function main() {
     saved.metadata.isPublished = true;
     saved.metadata.catalogSummary = { totalCount: 10, availableCount: 10 };
     saved.locations = [{ id: 'loc_01', isActive: true }];
+    // The fixture simulates the certification + operations approval path. A
+    // real publish writes this policy atomically with the legacy fields.
+    saved.metadata.eligibility = {
+      contractVersion: 'v2 current',
+      complianceStatus: ProviderComplianceStatus.COMPLIANT,
+      profile: ProviderOperatingProfile.TRANSACTIONAL,
+      discoveryVisibility: ProviderDiscoveryVisibility.VISIBLE,
+      certifiedCapabilities: saved.capabilities
+    };
     dbProviders.set('fast-deliveries', saved);
 
     // Now canonical publishing gate must pass!

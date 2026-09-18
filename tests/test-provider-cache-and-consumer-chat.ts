@@ -42,7 +42,11 @@ async function main() {
   };
   const catalog = new CatalogService(
     { assertAndGetCapability: async () => adapter } as any,
-    { assertProviderPublished: async () => undefined } as any,
+    {
+      assertProviderPublished: async () => undefined,
+      assertProviderCapabilityEligible: async () => undefined,
+      assertValidLocation: async () => undefined,
+    } as any,
     redis as any,
   );
 
@@ -80,7 +84,11 @@ async function main() {
   );
   const unsupportedCatalog = new CatalogService(
     { assertAndGetCapability: async () => ({}) } as any,
-    { assertProviderPublished: async () => undefined } as any,
+    {
+      assertProviderPublished: async () => undefined,
+      assertProviderCapabilityEligible: async () => undefined,
+      assertValidLocation: async () => undefined,
+    } as any,
     redis as any,
   );
   const unsupportedAvailability = await unsupportedCatalog.checkAvailability(availabilityInput);
@@ -190,8 +198,8 @@ async function main() {
   const scopeChat = new ConsumerChatService(
     {
       listProviders: async () => [
-        { slug: "maxway", name: "MaxWay", type: "DELIVERY", capabilities: ["CATALOG"] },
-        { slug: "evos", name: "EVOS", type: "DELIVERY", capabilities: ["CATALOG"] },
+        { slug: "maxway", name: "MaxWay", type: "DELIVERY", category: "FOOD_AND_DRINK", capabilities: ["CATALOG"] },
+        { slug: "evos", name: "EVOS", type: "DELIVERY", category: "FOOD_AND_DRINK", capabilities: ["CATALOG"] },
       ],
     } as any,
     {

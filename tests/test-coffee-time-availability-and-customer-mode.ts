@@ -222,7 +222,13 @@ async function main() {
       createAction: async () => ({ id: 'act_1', publicId: 'ZY-TEST-1', providerSlug: 'coffee-time', providerName: 'Coffee Time', paymentUrl: 'https://zayuno.uz/pay/1', status: 'AWAITING_PAYMENT', paymentStatus: 'PENDING', total: 24000, currency: 'UZS', fulfillmentType: 'DELIVERY', metadata: { sandbox: true }, createdAt: '2026-09-18T10:00:00.000Z', updatedAt: '2026-09-18T10:00:00.000Z' }),
       getAction: async () => ({ id: 'act_1', publicId: 'ZY-TEST-1', providerSlug: 'coffee-time', providerName: 'Coffee Time', status: 'CONFIRMED', paymentStatus: 'PAID', total: 24000, currency: 'UZS', fulfillmentType: 'DELIVERY', createdAt: '2026-09-18T10:00:00.000Z', updatedAt: '2026-09-18T10:00:00.000Z' }),
       cancelAction: async () => ({ success: true, actionId: 'ZY-TEST-1', previousStatus: 'AWAITING_PAYMENT', newStatus: 'CANCELLED', message: 'Cancelled', refundInitiated: false }),
-      getPaymentOptions: async () => [{ checkoutUrl: 'https://zayuno.uz/pay/1' }]
+      getPaymentOptions: async () => [{
+        id: 'card-online',
+        name: 'Onlayn karta orqali to‘lov',
+        type: 'CARD_ONLINE',
+        isOnline: true,
+        checkoutUrl: 'https://zayuno.uz/pay/1'
+      }]
     } as any;
 
     const mockArgs: Record<string, any> = {

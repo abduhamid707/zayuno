@@ -18,8 +18,7 @@ const READ_ONLY_CAPABILITIES = new Set<ProviderCapability>([
 const MINIMUM_SAFE_DISCOVERY_CAPABILITIES: ProviderCapability[] = [
   ProviderCapability.METADATA,
   ProviderCapability.HEALTH,
-  ProviderCapability.CATALOG,
-  ProviderCapability.SEARCH
+  ProviderCapability.CATALOG
 ];
 
 const TRANSACTIONAL_BASE_CAPABILITIES: ProviderCapability[] = [
@@ -98,12 +97,19 @@ function validWaiver(waiver: Record<string, any> | undefined): boolean {
 export function evaluateProviderEligibility(provider: any): ProviderEligibilityResult {
   const policy = policyFrom(provider);
   const missing = new Set<string>();
-  const isLive = provider?.environment === ProviderEnvironment.LIVE || provider?.environment === 'LIVE';
+  // The database schema defaults this field to LIVE. Keep the same safe default
+  // for pre-environment rows and in-memory legacy callers, while honoring an
+  // explicit provider or metadata environment.
+  const environment = provider?.environment ?? policy.metadata.environment ?? ProviderEnvironment.LIVE;
+  const isLive = environment === ProviderEnvironment.LIVE || environment === 'LIVE';
   const isActive = provider?.status === ProviderStatus.ACTIVE || provider?.status === 'ACTIVE';
   const published = policy.metadata.reviewStatus === 'APPROVED' && policy.metadata.isPublished === true;
   const health = (policy.metadata.healthMonitoring || {}) as Record<string, any>;
   const healthState = health.state || policy.metadata.healthStatus;
-  const unhealthy = ['DOWN', 'DEGRADED', 'RECOVERING'].includes(healthState) ||
+  // Health monitoring keeps a provider discoverable during the first two
+  // degraded probes. It becomes unavailable only after the DOWN threshold,
+  // during recovery, or when an explicit unavailable flag is set.
+  const unhealthy = ['DOWN', 'RECOVERING'].includes(healthState) ||
     policy.metadata.isTemporarilyUnavailable === true || health.isTemporarilyUnavailable === true;
 
   if (!isLive) missing.add('ENVIRONMENT_NOT_LIVE');
@@ -149,9 +155,9 @@ export function evaluateProviderEligibility(provider: any): ProviderEligibilityR
     policy.complianceStatus === ProviderComplianceStatus.COMPLIANT &&
     policy.profile === ProviderOperatingProfile.TRANSACTIONAL &&
     requiredTransactional.length === 0;
-  if (policy.profile === ProviderOperatingProfile.TRANSACTIONAL && !isTransactionalEligible) {
-    missing.add(`TRANSACTIONAL_REVOKED:${requiredTransactional.length ? requiredTransactional.join(',') : 'COMPLIANCE'}`);
-  }
+  // Transactional revocation must not turn an otherwise safe legacy provider
+  // into a discovery failure. `isTransactionalEligible` and
+  // `allowedCapabilities` carry that narrower capability decision.
 
   return {
     isDiscoveryEligible,

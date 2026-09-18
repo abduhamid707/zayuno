@@ -134,7 +134,7 @@ async function runTests() {
   };
   const readinessAfter3Fail = isProviderDiscoveryReady(providerAfter3Fail);
   assert.equal(readinessAfter3Fail.isReady, false, 'DOWN provider must be hidden from discovery');
-  assert.ok(readinessAfter3Fail.unreadyReasons.includes('PROVIDER_UNHEALTHY_OR_UNAVAILABLE'));
+  assert.ok(readinessAfter3Fail.unreadyReasons.includes('HEALTH_DOWN'));
   console.log('    ✓ 3rd failure triggers DOWN state and hides provider from AI discovery.');
 
   // --------------------------------------------------------------------------
@@ -171,7 +171,9 @@ async function runTests() {
       isTemporarilyUnavailable: stateAfter1SuccessAfterDown.isTemporarilyUnavailable
     }
   };
-  assert.equal(isProviderDiscoveryReady(providerRecovering).isReady, false, 'RECOVERING with 1 success must remain hidden');
+  const recoveringReadiness = isProviderDiscoveryReady(providerRecovering);
+  assert.equal(recoveringReadiness.isReady, false, 'RECOVERING with 1 success must remain hidden');
+  assert.ok(recoveringReadiness.unreadyReasons.includes('HEALTH_RECOVERING'));
   console.log('    ✓ 1st success transitions to RECOVERING and remains safely hidden pending confirmation.');
 
   // --------------------------------------------------------------------------
@@ -413,18 +415,19 @@ async function runTests() {
   console.log('    ✓ Internal demo sandbox providers are isolated from external HTTP health polling.');
 
   // --------------------------------------------------------------------------
-  // TEST 20: Existing publishing gate 4-pillar rules remain 100% intact
+  // TEST 20: Publication and legacy eligibility remain separate dimensions
   // --------------------------------------------------------------------------
-  console.log('  [20/20] Verifying all 4 canonical publishing pillars are required...');
+  console.log('  [20/20] Verifying publication fields and legacy eligibility remain separate...');
   // Missing ACTIVE status
   assert.equal(isProviderPublished({ ...baseProvider, status: ProviderStatus.DRAFT }), false);
   // Missing APPROVED review
   assert.equal(isProviderPublished({ ...baseProvider, metadata: { ...baseProvider.metadata, reviewStatus: 'PENDING_APPROVAL' } }), false);
   // Missing isPublished
   assert.equal(isProviderPublished({ ...baseProvider, metadata: { ...baseProvider.metadata, isPublished: false } }), false);
-  // Missing isCertified
-  assert.equal(isProviderPublished({ ...baseProvider, metadata: { ...baseProvider.metadata, isCertified: false } }), false);
-  console.log('    ✓ 4 canonical publishing gate pillars remain strictly enforced without legacy bypasses.');
+  // isCertified is intentionally evaluated by the eligibility engine, so a
+  // legacy provider can retain the limited read-only path while recertifying.
+  assert.equal(isProviderPublished({ ...baseProvider, metadata: { ...baseProvider.metadata, isCertified: false } }), true);
+  console.log('    ✓ Publication and legacy eligibility dimensions remain separate.');
 
   console.log('\n================================================================');
   console.log('🎉 ALL 20 PROVIDER HEALTH MONITORING & LIFECYCLE TESTS PASSED!');

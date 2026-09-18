@@ -9,7 +9,7 @@ It is **not affiliated with O‘zbekiston Temir Yo‘llari** and must never acce
 - Public base URL: `https://poyez-sandbox.shopla.uz`
 - Provider slug: `poyez-sandbox`
 - Provider type: `TICKETING`
-- Category: `railway_tickets`
+- Category: `TICKETING`
 - Geography: `UZ`
 - Shared secret env: `POYEZ_SANDBOX_SHARED_SECRET`
 
