@@ -1,3 +1,19 @@
+# Joriy ish — MCP typed error envelope regressionini tuzatish (2026-09-18)
+
+- [x] 1. `search_catalog` toolida `CapabilityNotSupportedError` qayta otilishining sababini reproduce qilish.
+- [x] 2. Provider manifestida SEARCH bo'lmagan holatni qat'iy rad etib, remote SEARCH endpointi capability-404 qaytarganda CATALOG fallbackni tiklash.
+- [x] 3. Fokuslangan regression testini ishga tushirish va `git diff --check`ni tekshirish.
+- [ ] 4. Hamma tayyor commitlarni `origin/main`ga push qilish va handoffni yangilash.
+
+**Sabab:** MCP `registerZayunoTools()` boundary'i typed xatoni structured envelopega to'g'ri o'raydi. Failure uning ichida emas: `CatalogService.searchOfferings()` remote adapterdan `CAPABILITY_NOT_SUPPORTED` qaytganda `searchCatalogFallback()`ni chaqirmaydi. Shu bilan birga manifestida SEARCH bo'lmagan providerni silent fallback qilish mumkin emas; ikki holat alohida saqlanadi.
+
+**Holat / handoff (2026-09-18):**
+- `registerZayunoTools()` alohida reproduce qilindi va `CapabilityNotSupportedError`ni MCP structured envelope'iga to'g'ri o'rashi tasdiqlandi; avvalgi diagnosis shu boundary haqida noto'g'ri edi.
+- `CatalogService.searchOfferings()` endi manifestida `SEARCH` bo'lgan remote provider `/search` uchun capability-404 qaytarganda warning yozib, aynan o'sha providerning `CATALOG` capability'siga fallback qiladi. Manifestida `SEARCH` bo'lmagan provider esa fallback qilmaydi va `CAPABILITY_NOT_SUPPORTED` qaytaradi.
+- `tests/test-error-taxonomy-and-catalog-fallback.ts` — PASS.
+- `tests/test-provider-resolver-and-capability-consistency.ts` — PASS.
+- `git diff --check` — PASS. Foydalanuvchi ko'rsatmasiga muvofiq keng build yoki full-suite ishga tushirilmadi.
+
 # Joriy ish — P0 "Zayuno hozir javob bera olmadi" generic error fallback fix (2026-09-18)
 
 - [x] 1. `consumer-chat.controller.ts`: exception shakllarini kanonik Zayuno error taxonomy'ga normalizatsiya qilib, xavfsiz customer xabarini qaytarish.

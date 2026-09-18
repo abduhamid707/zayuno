@@ -96,26 +96,22 @@ async function main() {
   assert.equal(mcpError.structuredContent.retryable, false);
   assert.equal(mcpError.structuredContent.recommendedAction, 'USE_CATALOG');
 
-  const catalogCalls: any[] = [];
   const catalogAdapter = {
     hasCapability: (capability: ProviderCapability) => capability === ProviderCapability.CATALOG,
-    getCatalog: async (input: any) => {
-      catalogCalls.push(input);
-      return {
-        providerSlug: 'catalog-only',
-        categories: [],
-        offerings: [
-          {
-            id: 'tea-green', providerId: 'catalog-only', offeringCode: 'tea-green', title: 'Green Tea',
-            description: 'Fresh green tea', categorySlug: 'drinks', basePrice: 12_000, currency: 'UZS'
-          },
-          {
-            id: 'coffee-latte', providerId: 'catalog-only', offeringCode: 'coffee-latte', title: 'Latte',
-            description: 'Coffee with milk', categorySlug: 'drinks', basePrice: 18_000, currency: 'UZS'
-          }
-        ]
-      };
-    }
+    getCatalog: async () => ({
+      providerSlug: 'catalog-only',
+      categories: [],
+      offerings: [
+        {
+          id: 'tea-green', providerId: 'catalog-only', offeringCode: 'tea-green', title: 'Green Tea',
+          description: 'Fresh green tea', categorySlug: 'drinks', basePrice: 12_000, currency: 'UZS'
+        },
+        {
+          id: 'coffee-latte', providerId: 'catalog-only', offeringCode: 'coffee-latte', title: 'Latte',
+          description: 'Coffee with milk', categorySlug: 'drinks', basePrice: 18_000, currency: 'UZS'
+        }
+      ]
+    })
   };
   const cache = new Map<string, string>();
   const catalog = new CatalogService(
@@ -128,6 +124,7 @@ async function main() {
     } as any,
     {
       assertProviderPublished: async () => undefined,
+      assertProviderCapabilityEligible: async () => undefined,
       getProviderBySlug: async () => ({ metadata: {} })
     } as any,
     {
@@ -138,9 +135,13 @@ async function main() {
       delByPattern: async () => 0
     } as any
   );
-  const matches = await catalog.searchOfferings('catalog-only', 'green tea', 'drinks', 'main-store', 10);
-  assert.deepEqual(matches.map((item) => item.id), ['tea-green']);
-  assert.ok(catalogCalls.some((input) => input.locationId === 'main-store'));
+  await assert.rejects(
+    () => catalog.searchOfferings('catalog-only', 'green tea', 'drinks', 'main-store', 10),
+    (error: any) => error?.code === 'CAPABILITY_NOT_SUPPORTED' && error?.details?.capability === ProviderCapability.SEARCH,
+    'A provider without declared SEARCH must never silently fall back to CATALOG.',
+  );
+  const catalogOnlyResult = await catalog.getCatalog('catalog-only');
+  assert.deepEqual(catalogOnlyResult.offerings.map((item) => item.id), ['tea-green', 'coffee-latte']);
 
   const originalNodeEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'test';
@@ -198,6 +199,7 @@ async function main() {
       } as any,
       {
         assertProviderPublished: async () => undefined,
+        assertProviderCapabilityEligible: async () => undefined,
         getProviderBySlug: async () => ({ metadata: {} })
       } as any,
       {
@@ -209,8 +211,16 @@ async function main() {
       } as any
     );
 
-    const fallbackMatches = await remoteCatalog.searchOfferings('json-error-provider', 'green tea', 'drinks', undefined, 10);
+    const fallbackMatches = await remoteCatalog.searchOfferings(
+      'json-error-provider',
+      'green tea',
+      'drinks',
+      undefined,
+      10,
+    );
     assert.deepEqual(fallbackMatches.map((item) => item.id), ['green-tea']);
+    const remoteCatalogResult = await remoteCatalog.getCatalog('json-error-provider');
+    assert.deepEqual(remoteCatalogResult.offerings.map((item) => item.id), ['green-tea']);
 
     const availability = await remoteAdapter.checkAvailability({
       providerSlug: 'json-error-provider',
@@ -254,7 +264,7 @@ async function main() {
     else process.env.NODE_ENV = originalNodeEnv;
   }
 
-  console.log('Typed error taxonomy, generic JSON capability fallback, and full-response timeout passed.');
+  console.log('Typed error taxonomy, MCP envelope, remote capability fallback, and full-response timeout passed.');
 }
 
 main().catch((error) => {

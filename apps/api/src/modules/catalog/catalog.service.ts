@@ -194,32 +194,49 @@ export class CatalogService {
 
     return this.readThroughCache(cacheKey, SEARCH_CACHE_POLICY, async () => {
       await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, { locationId });
-      const rawOfferings = await adapter.searchOfferings!({
-        providerSlug: cleanSlug,
-        query: normalizedQuery,
-        categorySlug,
-        locationId,
-        limit,
-        parameters
-      });
-      const metaOfferings = await this.getProviderMetadataOfferings(cleanSlug);
-      return this.overlayMediaFromMetadata(rawOfferings, metaOfferings);
+      try {
+        const rawOfferings = await adapter.searchOfferings!({
+          providerSlug: cleanSlug,
+          query: normalizedQuery,
+          categorySlug,
+          locationId,
+          limit,
+          parameters
+        });
+        const metaOfferings = await this.getProviderMetadataOfferings(cleanSlug);
+        return this.overlayMediaFromMetadata(rawOfferings, metaOfferings);
+      } catch (error) {
+        if (!this.isCapabilityNotSupported(error)) throw error;
+
+        // The manifest declared SEARCH, but its remote implementation reports
+        // that endpoint as unavailable. CATALOG remains a safe same-provider
+        // fallback; providers that never declare SEARCH are rejected above.
+        this.logger.warn(`Provider ${cleanSlug} declared SEARCH but returned CAPABILITY_NOT_SUPPORTED; falling back to CATALOG.`);
+        return this.searchCatalogFallback(
+          cleanSlug,
+          normalizedQuery,
+          categorySlug,
+          locationId,
+          limit,
+          parameters,
+          environment
+        );
+      }
     });
   }
 
-  /** SEARCH is optional; CATALOG is the universal discovery boundary. */
+  /** A declared SEARCH endpoint may fall back to the same provider's CATALOG on capability-level failure. */
   private async searchCatalogFallback(
     providerSlug: string,
     query: string,
     categorySlug?: string,
     locationId?: string,
     limit = 20,
-    parameters?: Record<string, any>
+    parameters?: Record<string, any>,
+    environment?: string
   ): Promise<Offering[]> {
     // getCatalog performs the CATALOG capability and dynamic-parameter checks.
-    // Do not use this fallback for a SEARCH provider outage: only an absent
-    // SEARCH capability reaches here, so failure is never disguised as no data.
-    const catalog = await this.getCatalog(providerSlug, locationId, categorySlug, parameters);
+    const catalog = await this.getCatalog(providerSlug, locationId, categorySlug, parameters, environment);
     const normalizedCategory = this.normalizeSearchText(categorySlug || '');
     const boundedLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.floor(limit), 1), 100) : 20;
 
