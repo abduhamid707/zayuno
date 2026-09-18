@@ -6,6 +6,7 @@
 export const ZAYUNO_ERROR_CODES = [
   'PROVIDER_NOT_FOUND',
   'RESOURCE_NOT_FOUND',
+  'LOCATION_NOT_FOUND',
   'OFFERING_NOT_FOUND',
   'CAPABILITY_NOT_SUPPORTED',
   'INVALID_VARIANT',
@@ -88,6 +89,12 @@ const ERROR_PRESENTATIONS: Record<ZayunoErrorCode, Omit<AgentErrorPresentation, 
     retryable: false,
     customerMessage: 'So‘ralgan ma’lumot topilmadi. Kerakli variantni qayta tanlaymiz.',
     agentMessage: 'Requested resource was not found. Refresh the relevant catalog or identifier.',
+    recommendedAction: 'REFINE_SELECTION'
+  },
+  LOCATION_NOT_FOUND: {
+    retryable: false,
+    customerMessage: 'So‘ralgan filial yoki manzil topilmadi. Boshqa manzilni tanlaymiz.',
+    agentMessage: 'Location was not found for this provider. Refresh provider locations.',
     recommendedAction: 'REFINE_SELECTION'
   },
   OFFERING_NOT_FOUND: {
@@ -258,6 +265,7 @@ export function normalizeZayunoErrorCode(
   if (text.includes('INVALID_QUANTITY')) return 'INVALID_QUANTITY';
   if (text.includes('AVAILABILITY') && text.includes('UNKNOWN')) return 'AVAILABILITY_UNKNOWN';
   if (text.includes('PROVIDER') && text.includes('NOT FOUND')) return 'PROVIDER_NOT_FOUND';
+  if (text.includes('LOCATION') && text.includes('NOT FOUND')) return 'LOCATION_NOT_FOUND';
   if (text.includes('OFFERING') && text.includes('NOT FOUND')) return 'OFFERING_NOT_FOUND';
 
   const status = typeof statusCode === 'number' ? statusCode : Number(statusCode);
@@ -331,7 +339,9 @@ export class NotFoundError extends ZayunoError {
       ? 'PROVIDER_NOT_FOUND'
       : resource.toLowerCase() === 'offering'
         ? 'OFFERING_NOT_FOUND'
-        : 'RESOURCE_NOT_FOUND';
+        : resource.toLowerCase() === 'location'
+          ? 'LOCATION_NOT_FOUND'
+          : 'RESOURCE_NOT_FOUND';
     super(msg, 404, resourceCode, { resource, identifier, retryable: false });
   }
 }

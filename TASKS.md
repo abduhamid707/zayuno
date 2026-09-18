@@ -1,3 +1,40 @@
+# Joriy ish — Universal Provider Contract Hardening & Invariant Breaker Suite (2026-09-18)
+
+- [x] 1. `NotFoundError`da `'Location'` uchun `LOCATION_NOT_FOUND` (404) xato kodini qo‘shish (`packages/shared/src/errors.ts`).
+- [x] 2. `ProvidersService`da `assertValidLocation` universal metodini joriy qilish (`apps/api/src/modules/providers/providers.service.ts`).
+- [x] 3. `CatalogService`da (`getCatalog`, `getOffering`, `searchOfferings`, `checkAvailability`) va `QuotesService`/`ActionsService`da `locationId` tekshiruvini ulash (`apps/api/src/modules/catalog/catalog.service.ts`, `quotes.service.ts`, `actions.service.ts`).
+- [x] 4. Provider Discovery muhit va statusini muvofiqlashtirish: `list_providers(status="SANDBOX")` va `findProviders`da sandbox muhitini avtomatik tan olish (`apps/api/src/modules/providers/providers.service.ts`, `packages/contracts/src/provider.ts`).
+- [x] 5. Kategoriya, subkategoriya va fulfillment taxanomiyasini boyitish (`packages/contracts/src/provider.ts`, `providers.service.ts`).
+- [x] 6. Quote yaxlitligi (Quote Integrity Guard) va muddati o‘tgan quote tekshiruvini `ActionsService`da mustahkamlash (`apps/api/src/modules/actions/actions.service.ts`, `packages/provider-sdk/src/errors.ts`).
+- [x] 7. 8 ta platforma invariantini tekshiruvchi `tests/test-invariant-breaker-suite.ts` testini yozish va mavjud barcha testlar bilan birga ishga tushirish.
+- [x] 8. Monorepo paketlarini (`pnpm -r run build`) va `git diff --check`ni to‘liq tekshirish.
+- [x] 9. O‘zgarishlarni tekshirib, commit qilish va `origin/main` branchiga push qilish.
+
+**Holat / handoff:** Barcha 8 ta invariant va platforma shartnoma xavfsizligi to‘liq mustahkamlandi, commit qilinib `origin/main` branchiga push qilindi.
+1. **O‘zgargan fayllar:**
+   - `packages/shared/src/errors.ts`: `LOCATION_NOT_FOUND` kanonik xato kodi qo‘shildi; `NotFoundError('Location', ...)` 404 qaytaradi.
+   - `packages/provider-sdk/src/errors.ts`: `QuoteMismatchError` (400, `QUOTE_MISMATCH`) aniqlandi va eksport qilindi.
+   - `packages/contracts/src/provider.ts`: `FindProvidersInputSchema`ga `subcategory` va `fulfillmentMode` filtrlari qo‘shildi.
+   - `apps/mcp/src/tools.ts`: `find_providers` MCP vositasiga yangi granular filtrlar ulandi.
+   - `apps/api/src/modules/providers/providers.service.ts`: Universal `assertValidLocation` metodi kiritildi (DB location + adapter fallback), `status="SANDBOX"` filtri `ProviderEnvironment.SANDBOX`ga xavfsiz aliaslandi.
+   - `apps/api/src/modules/catalog/catalog.service.ts`: `getCatalog`, `getOffering`, `searchOfferings` va `checkAvailability`da universal filial mavjudligi tekshiruvi integratsiya qilindi.
+   - `apps/api/src/modules/quotes/quotes.service.ts`: `requestQuote`da filial tekshiruvi ulandi.
+   - `apps/api/src/modules/actions/actions.service.ts`: `createAction`da universal `assertQuoteItemIntegrity` (item soni, offeringId, variantId, quantity, selectedOptions, locationId va destination mosligi), quote muddati (`QUOTE_EXPIRED`) va `assertValidLocation` qat’iy qo‘shildi.
+   - `tests/test-invariant-breaker-suite.ts`: 8 ta adversarial invariant breaker testlari yozildi va barchasi PASS bo‘ldi.
+2. **Bajarilgan tekshiruvlar:**
+   - `pnpm exec tsx tests/test-invariant-breaker-suite.ts`: Barcha 8 ta Invariant PASS (Availability truthfulness, Idempotency collision guard, Quote integrity, Expired quote rejection, Location isolation, State machine cancellation idempotency, Strict Public DTO boundaries, Financial math uniformity).
+   - `pnpm exec tsx tests/test-openai-plugin-mcp-contract.ts`: Barcha 11 bosqich va Coffee Time wire-level flowlari PASS.
+   - `pnpm exec tsx tests/test-public-payment-and-cancel-dto.ts`: PASS.
+   - `pnpm exec tsx tests/test-provider-environment-and-category.ts`: PASS.
+   - `pnpm exec tsx tests/test-location-and-quote-persistence.ts`: PASS.
+   - `pnpm exec tsx tests/test-action-quote-deduplication-tenant-isolation.ts`: PASS.
+   - `pnpm exec tsx tests/test-onboarding-catalog-resilience.ts`: PASS.
+   - `pnpm exec tsx tests/test-ai-integration-kit-and-profiles.ts`: PASS.
+   - `pnpm -r run build`: Barcha paketlar (`@zayuno/contracts`, `@zayuno/shared`, `@zayuno/provider-sdk`, `@zayuno/database`, `@zayuno/api`, `@zayuno/admin`, `@zayuno/provider-portal`, `@zayuno/mcp`, `@zayuno/worker`, `integrations/*`) muvaffaqiyatli qurildi (exit code 0).
+   - `git diff --check`: 0 xatolik, toza diff.
+   - Foydalanuvchi taqiqlagan fayllar (`bin/cloudflared.exe`, `scripts/iticket-mock-server.mjs`) o‘zgartirilmadi.
+3. **Qolgan ish:** Yangi topshiriq bo‘yicha keyingi qadamlar foydalanuvchi ko‘rsatmasiga binoan. O‘zgarishlar GitHub `origin/main` ga yuborildi.
+
 # Joriy ish — iTicket.UZ provayder mock serveri va real Mangu 5 integratsiyasi (2026-09-17)
 
 - [x] iTicket.uz dan real ma'lumotlar (Mangu 5 MMA Humo Arena, Toshkent City Sayilgoh, Imom Buxoriy muzeyi, Islom sivilizatsiyasi markazi, Yalla ansambli)ni olish.

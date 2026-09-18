@@ -88,6 +88,11 @@ async function main() {
     assert.equal(sandbox.providers[0].environment, ProviderEnvironment.SANDBOX);
     assert.equal(calls.at(-1).environment, ProviderEnvironment.SANDBOX);
 
+    const sandboxListByStatus = await service.listPublicProviders('SANDBOX' as any);
+    assert.deepEqual(sandboxListByStatus.map((value) => value.slug), ['sandbox-food']);
+    assert.equal(sandboxListByStatus[0].environment, ProviderEnvironment.SANDBOX);
+    assert.equal(calls.at(-1).environment, ProviderEnvironment.SANDBOX);
+
     const mcpFind = ZAYUNO_MCP_TOOLS.find((tool) => tool.name === 'find_providers')!;
     let mcpFilter: any;
     const mcpFindResult = await mcpFind.handler(

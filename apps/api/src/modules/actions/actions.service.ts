@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
+import { ProvidersService } from '../providers/providers.service';
 import { NatsService } from '../../common/services/nats.service';
 import { prisma, ActionStatus as DbActionStatus, PaymentStatus as DbPaymentStatus, UserRole } from '@zayuno/database';
 import {
@@ -19,6 +20,7 @@ import {
 import { ZayunoEventTopic } from '@zayuno/event-schemas';
 import {
   CreateActionInput,
+  ActionItemInput,
   NormalizedAction,
   GetActionInput,
   CancelActionInput,
@@ -29,7 +31,7 @@ import {
   PaymentStatus,
   ProviderCapability
 } from '@zayuno/contracts';
-import { QuoteExpiredError, ActionCancellationError } from '@zayuno/provider-sdk';
+import { QuoteExpiredError, QuoteMismatchError, ActionCancellationError } from '@zayuno/provider-sdk';
 import { RedisService } from '../../common/services/redis.service';
 import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
 import { assertDeclaredDynamicParameters } from '../../common/dynamic-parameter-validation';
@@ -47,7 +49,8 @@ export class ActionsService {
   constructor(
     private registry: ProviderRegistryService,
     private natsService: NatsService,
-    private redisService: RedisService
+    private redisService: RedisService,
+    private providersService?: ProvidersService
   ) {}
 
   async createAction(input: CreateActionInput, userId?: string, options?: { allowSandboxSimulator?: boolean }): Promise<NormalizedAction> {
@@ -196,6 +199,33 @@ export class ActionsService {
       }
       if (new Date() > dbQuote.expiresAt) {
         throw new QuoteExpiredError(input.quoteId);
+      }
+
+      // 2b. Quote Integrity Guard: verify items, quantities, customizations, location and destination
+      if (Array.isArray(dbQuote.lines) && dbQuote.lines.length > 0) {
+        this.assertQuoteItemIntegrity(input.quoteId, dbQuote.lines, input.items);
+      }
+      const quotedLocationId = (dbQuote.parameters as any)?.providerLocationId;
+      if (quotedLocationId && input.locationId && input.locationId !== quotedLocationId) {
+        throw new QuoteMismatchError(
+          input.quoteId,
+          `Location mismatch: quote was created for location "${quotedLocationId}", but action requested "${input.locationId}".`
+        );
+      }
+      if (dbQuote.destination && input.destination?.raw && dbQuote.destination !== input.destination.raw) {
+        throw new QuoteMismatchError(
+          input.quoteId,
+          `Destination mismatch: quote was calculated for "${dbQuote.destination}", but action requested "${input.destination.raw}".`
+        );
+      }
+
+      // Location validity check
+      if (input.locationId) {
+        if (this.providersService) {
+          await this.providersService.assertValidLocation(cleanSlug, input.locationId);
+        } else {
+          await this.assertValidLocationFallback(cleanSlug, input.locationId, provider.id);
+        }
       }
 
       // 3. Obtain Adapter and Check Capability
@@ -648,5 +678,89 @@ export class ActionsService {
       [DbActionStatus.FAILED]: ActionStatus.FAILED
     };
     return statusMap[status] || ActionStatus.CREATED;
+  }
+
+  private assertQuoteItemIntegrity(quoteId: string, quoteLines: any[], actionItems: ActionItemInput[]): void {
+    if (!Array.isArray(actionItems) || actionItems.length === 0) {
+      throw new QuoteMismatchError(quoteId, 'Action must contain items matching the verified quote.');
+    }
+
+    if (quoteLines.length !== actionItems.length) {
+      throw new QuoteMismatchError(
+        quoteId,
+        `Item count mismatch: quote contains ${quoteLines.length} item(s), but action requested ${actionItems.length}.`
+      );
+    }
+
+    for (const item of actionItems) {
+      const cleanOfferingId = String(item.offeringId).trim();
+      const cleanVariantId = item.variantId ? String(item.variantId).trim() : null;
+
+      const matchingLine = quoteLines.find((line: any) => {
+        const lineOfferingId = String(line.offeringId || '').trim();
+        const lineVariantId = line.variantId ? String(line.variantId).trim() : null;
+        return lineOfferingId === cleanOfferingId && lineVariantId === cleanVariantId;
+      });
+
+      if (!matchingLine) {
+        throw new QuoteMismatchError(
+          quoteId,
+          `Item "${cleanOfferingId}"${cleanVariantId ? ` (variant: ${cleanVariantId})` : ''} was not in quote "${quoteId}".`
+        );
+      }
+
+      if (matchingLine.quantity !== item.quantity) {
+        throw new QuoteMismatchError(
+          quoteId,
+          `Quantity mismatch for item "${cleanOfferingId}": quoted ${matchingLine.quantity}, but requested ${item.quantity}.`
+        );
+      }
+
+      // Check customizations / selectedOptions if present in either
+      const lineOpts = Array.isArray(matchingLine.selectedOptions) ? matchingLine.selectedOptions : [];
+      const itemOpts = Array.isArray(item.selectedOptions) ? item.selectedOptions : [];
+
+      if (lineOpts.length !== itemOpts.length) {
+        throw new QuoteMismatchError(
+          quoteId,
+          `Selected options count mismatch for item "${cleanOfferingId}": quoted ${lineOpts.length}, requested ${itemOpts.length}.`
+        );
+      }
+
+      for (const opt of itemOpts) {
+        const matchedOpt = lineOpts.find((lo: any) =>
+          lo.groupId === opt.groupId &&
+          lo.optionId === opt.optionId &&
+          (lo.quantity ?? 1) === (opt.quantity ?? 1)
+        );
+        if (!matchedOpt) {
+          throw new QuoteMismatchError(
+            quoteId,
+            `Option "${opt.optionId}" in group "${opt.groupId}" for item "${cleanOfferingId}" does not match the verified quote.`
+          );
+        }
+      }
+    }
+  }
+
+  private async assertValidLocationFallback(cleanSlug: string, locationId: string, providerId?: string): Promise<void> {
+    const loc = await prisma.location.findFirst({
+      where: {
+        ...(providerId ? { providerId } : { provider: { slug: cleanSlug } }),
+        isActive: true,
+        OR: [{ id: locationId }, { providerLocationId: locationId }]
+      }
+    });
+    if (loc) return;
+    try {
+      const adapter = await this.registry.getAdapter(cleanSlug);
+      if (adapter && adapter.getLocations) {
+        const remote = await adapter.getLocations({ providerSlug: cleanSlug, activeOnly: true });
+        if (Array.isArray(remote) && remote.some(l => (l.id === locationId || l.providerLocationId === locationId) && l.isActive !== false)) {
+          return;
+        }
+      }
+    } catch {}
+    throw new NotFoundError('Location', locationId);
   }
 }

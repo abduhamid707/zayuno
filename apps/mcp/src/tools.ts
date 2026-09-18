@@ -175,6 +175,15 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           type: 'string',
           description: 'Canonical provider category such as FOOD_AND_DRINK, LOGISTICS, or TICKETING. Legacy aliases such as food_delivery are normalized by the API.'
         },
+        subcategory: {
+          type: 'string',
+          description: 'Optional granular subcategory (e.g. "food_delivery", "fine_dining", "developer_simulator").'
+        },
+        fulfillmentMode: {
+          type: 'string',
+          enum: ['ONSITE', 'DELIVERY', 'PICKUP', 'REMOTE', 'HYBRID'],
+          description: 'Optional fulfillment mode filter (e.g. DELIVERY, ONSITE, REMOTE).'
+        },
         environment: {
           type: 'string',
           enum: ['LIVE', 'SANDBOX', 'STAGING'],

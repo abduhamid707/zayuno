@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
+import { ProvidersService } from '../providers/providers.service';
 import { prisma } from '@zayuno/database';
-import { isProviderPublished } from '@zayuno/shared';
+import { isProviderPublished, NotFoundError } from '@zayuno/shared';
 import {
   RequestQuoteInput,
   NormalizedQuote,
@@ -12,7 +13,10 @@ import { assertDeclaredDynamicParameters } from '../../common/dynamic-parameter-
 
 @Injectable()
 export class QuotesService {
-  constructor(private registry: ProviderRegistryService) {}
+  constructor(
+    private registry: ProviderRegistryService,
+    private providersService?: ProvidersService
+  ) {}
 
   async requestQuote(
     input: RequestQuoteInput,
@@ -37,6 +41,14 @@ export class QuotesService {
 
     if (!provider || (!isProviderPublished(provider) && !isSandboxSimulator)) {
       throw new BadRequestException('Provider is not published for public quotes.');
+    }
+
+    if (input.locationId) {
+      if (this.providersService) {
+        await this.providersService.assertValidLocation(cleanSlug, input.locationId);
+      } else {
+        await this.assertValidLocationFallback(cleanSlug, input.locationId, provider.id);
+      }
     }
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.QUOTE);
     if (!adapter.requestQuote) {
@@ -86,5 +98,26 @@ export class QuotesService {
     }
 
     return quote;
+  }
+
+  private async assertValidLocationFallback(cleanSlug: string, locationId: string, providerId?: string): Promise<void> {
+    const loc = await prisma.location.findFirst({
+      where: {
+        ...(providerId ? { providerId } : { provider: { slug: cleanSlug } }),
+        isActive: true,
+        OR: [{ id: locationId }, { providerLocationId: locationId }]
+      }
+    });
+    if (loc) return;
+    try {
+      const adapter = await this.registry.getAdapter(cleanSlug);
+      if (adapter && adapter.getLocations) {
+        const remote = await adapter.getLocations({ providerSlug: cleanSlug, activeOnly: true });
+        if (Array.isArray(remote) && remote.some(l => (l.id === locationId || l.providerLocationId === locationId) && l.isActive !== false)) {
+          return;
+        }
+      }
+    } catch {}
+    throw new NotFoundError('Location', locationId);
   }
 }

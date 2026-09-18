@@ -63,6 +63,9 @@ export class CatalogService {
 
     const cleanSlug = providerSlug.toLowerCase().trim();
     await this.providersService.assertProviderPublished(cleanSlug);
+    if (locationId) {
+      await this.providersService.assertValidLocation(cleanSlug, locationId);
+    }
     const cacheKey = this.cacheKey(cleanSlug, 'catalog', {
       locationId: locationId || null,
       categorySlug: categorySlug || null,
@@ -100,6 +103,9 @@ export class CatalogService {
 
     const cleanSlug = providerSlug.toLowerCase().trim();
     await this.providersService.assertProviderPublished(cleanSlug);
+    if (locationId) {
+      await this.providersService.assertValidLocation(cleanSlug, locationId);
+    }
     const cacheKey = this.cacheKey(cleanSlug, 'offering', {
       offeringId,
       locationId: locationId || null,
@@ -135,6 +141,9 @@ export class CatalogService {
 
     const cleanSlug = providerSlug.toLowerCase().trim();
     await this.providersService.assertProviderPublished(cleanSlug);
+    if (locationId) {
+      await this.providersService.assertValidLocation(cleanSlug, locationId);
+    }
     const normalizedQuery = String(query || '')
       .trim()
       .toLowerCase();
@@ -311,6 +320,9 @@ export class CatalogService {
 
     const cleanSlug = input.providerSlug.toLowerCase().trim();
     await this.providersService.assertProviderPublished(cleanSlug);
+    if (input.locationId) {
+      await this.providersService.assertValidLocation(cleanSlug, input.locationId);
+    }
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
     await assertDeclaredDynamicParameters(adapter, cleanSlug, input.parameters, {
       locationId: input.locationId,

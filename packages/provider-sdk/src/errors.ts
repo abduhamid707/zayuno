@@ -38,6 +38,13 @@ export class QuoteExpiredError extends ProviderError {
   }
 }
 
+export class QuoteMismatchError extends ProviderError {
+  constructor(quoteId: string, reason: string) {
+    super(`Action payload does not match verified quote "${quoteId}": ${reason}`, 400, 'QUOTE_MISMATCH', { quoteId, reason, retryable: false });
+    this.name = 'QuoteMismatchError';
+  }
+}
+
 export class ActionCancellationError extends ProviderError {
   constructor(actionId: string, reason: string) {
     super(`Action "${actionId}" cannot be cancelled: ${reason}`, 400, 'ACTION_NOT_CANCELLABLE', { actionId, reason, retryable: false });

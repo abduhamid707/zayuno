@@ -413,6 +413,8 @@ export type ProviderHealthMonitoringData = z.infer<typeof ProviderHealthMonitori
 
 export const FindProvidersInputSchema = z.object({
   category: z.string().trim().min(1).max(100).optional().describe('Canonical provider category (e.g. FOOD_AND_DRINK, LOGISTICS). Legacy aliases such as food_delivery are normalized at the boundary.'),
+  subcategory: z.string().trim().min(1).max(100).optional().describe('Optional subcategory filter (e.g. food_delivery, fine_dining, developer_simulator)'),
+  fulfillmentMode: z.nativeEnum(ProviderFulfillmentMode).optional().describe('Optional fulfillment mode filter (ONSITE, DELIVERY, PICKUP, REMOTE, HYBRID)'),
   environment: z.string().trim().min(1).max(32).optional().describe('Deployment environment. Public discovery defaults to LIVE; SANDBOX and STAGING are explicit non-production environments.'),
   capability: z.nativeEnum(ProviderCapability).optional().describe('Filter by required capability flag'),
   geography: z.string().optional().describe('Filter by geographic coverage (e.g. UZ, Tashkent, Samarkand)'),

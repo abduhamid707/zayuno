@@ -140,11 +140,21 @@ export class ProvidersService {
     }
   }
 
-  async listProviders(status?: ProviderStatus, environment?: string): Promise<ProviderInfo[]> {
-    const targetEnvironment = this.resolveProviderEnvironment(environment);
+  async listProviders(status?: ProviderStatus | string, environment?: string): Promise<ProviderInfo[]> {
+    const rawStatus = typeof status === 'string' ? status.toUpperCase().trim() : undefined;
+    const isSandboxStatusFilter = rawStatus === 'SANDBOX';
+
+    // When caller requests status="SANDBOX" without explicit environment, alias targetEnvironment to SANDBOX
+    const effectiveEnv = environment || (isSandboxStatusFilter ? ProviderEnvironment.SANDBOX : undefined);
+    const targetEnvironment = this.resolveProviderEnvironment(effectiveEnv);
+
+    const whereStatus = (status && !isSandboxStatusFilter)
+      ? (status as DbProviderStatus)
+      : DbProviderStatus.ACTIVE;
+
     const providers = await prisma.provider.findMany({
       where: {
-        ...(status ? { status } : { status: ProviderStatus.ACTIVE }),
+        status: whereStatus,
         environment: targetEnvironment as any
       },
       include: { locations: true },
@@ -154,7 +164,7 @@ export class ProvidersService {
     return providers.filter(p => this.isDiscoveryReady(p)).map(p => this.mapToProviderInfo(p));
   }
 
-  async listPublicProviders(status?: ProviderStatus, environment?: string): Promise<PublicProviderInfo[]> {
+  async listPublicProviders(status?: ProviderStatus | string, environment?: string): Promise<PublicProviderInfo[]> {
     return (await this.listProviders(status, environment)).map((provider) => this.mapToPublicProviderInfo(provider));
   }
 
@@ -162,7 +172,7 @@ export class ProvidersService {
     const targetEnvironment = this.resolveProviderEnvironment(filter.environment);
     const targetCategory = this.resolveProviderCategory(filter.category);
     const where: any = {
-      status: ProviderStatus.ACTIVE,
+      status: DbProviderStatus.ACTIVE,
       environment: targetEnvironment as any
     };
 
@@ -187,6 +197,15 @@ export class ProvidersService {
 
     if (targetCategory) {
       results = results.filter((provider) => provider.category === targetCategory);
+    }
+
+    if (filter.subcategory) {
+      const normalizedSub = filter.subcategory.trim().toLowerCase();
+      results = results.filter((provider) => (provider.subcategory || '').toLowerCase() === normalizedSub);
+    }
+
+    if (filter.fulfillmentMode) {
+      results = results.filter((provider) => provider.fulfillmentMode === filter.fulfillmentMode);
     }
 
     if (filter.geography) {
@@ -519,6 +538,45 @@ export class ProvidersService {
       isActive: l.isActive,
       metadata: (l.metadata as any) || {}
     }));
+  }
+
+  async assertValidLocation(providerSlug: string, locationId?: string): Promise<void> {
+    if (!locationId) return;
+    const cleanLocationId = String(locationId).trim();
+    if (!cleanLocationId) return;
+    const cleanSlug = providerSlug.toLowerCase().trim();
+
+    // 1. Check database locations for this provider
+    const dbLocation = await prisma.location.findFirst({
+      where: {
+        provider: { slug: cleanSlug },
+        isActive: true,
+        OR: [
+          { id: cleanLocationId },
+          { providerLocationId: cleanLocationId }
+        ]
+      }
+    });
+    if (dbLocation) return;
+
+    // 2. Fallback to adapter getLocations if provider implements dynamic LOCATIONS capability
+    try {
+      const adapter = await this.registry.getAdapter(cleanSlug);
+      if (adapter && adapter.getLocations) {
+        const remoteLocations = await adapter.getLocations({ providerSlug: cleanSlug, activeOnly: true });
+        if (Array.isArray(remoteLocations)) {
+          const matched = remoteLocations.find(l =>
+            (l.id && l.id === cleanLocationId) ||
+            (l.providerLocationId && l.providerLocationId === cleanLocationId)
+          );
+          if (matched && matched.isActive !== false) return;
+        }
+      }
+    } catch {
+      // Ignore capability/network lookup error; fall through to NotFoundError
+    }
+
+    throw new NotFoundError('Location', cleanLocationId);
   }
 
   async registerProvider(input: RegisterProviderInput, owner?: { id?: string; role?: UserRole }): Promise<{
