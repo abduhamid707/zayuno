@@ -4,13 +4,15 @@
 - [x] Eligibility engine sababli provider onboarding/publishing/health/discovery regressiyalarini tuzatish.
 - [x] Eski service mocklaridagi capability gate compatibilitysini tiklash.
 - [x] Faqat buzilgan individual testlarni nishonlab tekshirish; keng suite/buildni o‘tkazib yuborish.
-- [ ] Patchlarni commit qilib `origin/main`ga yuborish.
+- [x] Patchlarni commit qilib `origin/main`ga yuborish.
 
 **Holat / handoff:** GitHub Actions regression runida 42 testdan 8 tasi yiqildi. Foydalanuvchi talabiga binoan full suite yoki keng build kutilmaydi; faqat rasmlardagi asosiy sabablar nishonlangan testlar bilan tuzatiladi.
 
 **Eligibility policy correction (2026-09-18):** Quyidagi tarixiy handoffdagi `METADATA + HEALTH + CATALOG + SEARCH` talabi eskirgan: `SEARCH` contractda optional. Legacy limited discovery uchun `METADATA + HEALTH + CATALOG` yetarli; muhit ko‘rsatilmasa schema/DTO defaultiga mos `LIVE` qabul qilinadi. `isProviderPublished` legacy read-only holatni saqlaydi, transactional ruxsat esa eligibility engine orqali alohida beriladi.
 
 **Bajarilgan tekshiruvlar:** `test-publishing-gate-and-readiness`, `test-provider-onboarding-journey`, `test-onboarding-catalog-resilience`, `test-coffee-time-availability-and-customer-mode`, `test-sandbox-production-credential-mapping`, `test-provider-health-monitoring-and-lifecycle`, hamda `test-provider-cache-and-consumer-chat` — PASS. Production HTTP E2E qayta ishga tushirilmadi: foydalanuvchi ko‘rsatmasiga muvofiq keng/deep test chetlab o‘tildi; uning M/H/C va LIVE-default sharti nishonlangan health/readiness testlari bilan qamrab olindi. `git diff --check` — PASS.
+
+**Yakun (2026-09-18):** `e5cc6d5 fix(ci): reconcile provider eligibility regressions` `origin/main`ga push qilindi. Keyingi GitHub Actions runi aynan shu commitni tekshiradi.
 
 # Oldingi ish — Provider Eligibility Engine verification va push (2026-09-18)
 
