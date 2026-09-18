@@ -66,4 +66,4 @@ export class CapacityExceededError extends ProviderError {
   }
 }
 
-export { QuoteMismatchError, EnvironmentNotAllowedError } from '@zayuno/shared';
+export { EnvironmentNotAllowedError } from '@zayuno/shared';
