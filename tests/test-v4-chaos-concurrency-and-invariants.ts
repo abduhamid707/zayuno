@@ -413,17 +413,23 @@ async function runV4ChaosSuite() {
     },
     createAction: async (input: any) => {
       coffeeExternalActionCallCount++;
+      const subtotal = input.quote ? input.quote.subtotal : 30000;
+      const total = input.quote ? input.quote.total : 30000;
+      const fees = input.quote ? input.quote.fees : 0;
+      const discount = input.quote ? input.quote.discount : 0;
+      const currency = input.quote ? input.quote.currency : 'UZS';
+      const lines = input.quote && input.quote.lines ? input.quote.lines : [];
       return {
         externalActionId: `ext-coffee-order-${Date.now()}`,
         providerSlug: sandboxCoffeeProvider.slug,
         status: ActionStatus.AWAITING_PAYMENT,
         paymentUrl: 'https://checkout.sandboxcoffee.uz/pay/101',
-        lines: [],
-        subtotal: 30000,
-        fees: 0,
-        discount: 0,
-        total: 30000,
-        currency: 'UZS'
+        lines,
+        subtotal,
+        fees,
+        discount,
+        total,
+        currency
       };
     },
     verifyWebhook: async (headers: any, rawBody: string, secret: string) => {
@@ -948,6 +954,143 @@ async function runV4ChaosSuite() {
       assert.ok(fc.total >= 0, 'Total price cannot be negative');
     }
     console.log('   ✅ Section Q passed: financial math consistency verified.');
+
+    // SECTION Q2: Quote/Action Price Integrity & Authority (VIP vs Base Variant & Provider Total Conflict)
+    console.log('\n👉 [Section Q2] Quote/Action Price Integrity & Financial Authority Enforcement...');
+    const vipQuote = {
+      id: 'quote-v4-vip-test',
+      providerId: sandboxCoffeeProvider.id,
+      locationId: 'sb-branch-1',
+      subtotal: 1000000,
+      fees: 0,
+      discount: 0,
+      total: 1000000,
+      currency: 'UZS',
+      expiresAt: new Date(Date.now() + 1000000),
+      lines: [
+        {
+          offeringId: 'sb_latte',
+          offeringTitle: 'Sandbox Latte',
+          variantId: 'var_vip',
+          variantTitle: 'VIP Ring-side',
+          unitPrice: 1000000,
+          quantity: 1,
+          optionsTotal: 0,
+          lineTotal: 1000000
+        }
+      ]
+    };
+
+    // Mock quote in prisma
+    const prevQuoteFindUnique = prisma.quote.findUnique;
+    prisma.quote.findUnique = (async (args: any) => {
+      if (args.where.id === vipQuote.id) {
+        return {
+          ...vipQuote,
+          provider: sandboxCoffeeProvider
+        };
+      }
+      if (args.where.id === 'quote-v4-vip-conflict-test') {
+        return {
+          ...vipQuote,
+          id: 'quote-v4-vip-conflict-test',
+          provider: sandboxCoffeeProvider
+        };
+      }
+      return (prevQuoteFindUnique as any)(args);
+    }) as any;
+
+    try {
+      // 1. VIP action created: total must be 1,000,000 UZS (not falling back to basePrice 28,000 UZS)
+      const vipActionRes = await actionsService.createAction(
+        {
+          idempotencyKey: 'idem-vip-price-integrity',
+          providerSlug: sandboxCoffeeProvider.slug,
+          quoteId: vipQuote.id,
+          locationId: 'sb-branch-1',
+          items: [
+            {
+              offeringId: 'sb_latte',
+              variantId: 'var_vip',
+              quantity: 1
+            }
+          ],
+          userConfirmed: true,
+          environment: ProviderEnvironment.SANDBOX
+        },
+        'user-v4-client-1',
+        { allowSandboxSimulator: true }
+      );
+
+      assert.equal(vipActionRes.total, 1000000, 'Action total must strictly bind to quote total: 1,000,000 UZS');
+      assert.equal(vipActionRes.subtotal, 1000000, 'Action subtotal must strictly bind to quote subtotal');
+      assert.equal(vipActionRes.lines[0].unitPrice, 1000000, 'Action line item unitPrice must be 1,000,000 UZS');
+      assert.equal(vipActionRes.currency, 'UZS');
+
+      // 2. Conflicting provider total must throw QUOTE_MISMATCH
+      const vipQuoteConflict = {
+        ...vipQuote,
+        id: 'quote-v4-vip-conflict-test'
+      };
+
+      const conflictingAdapterRegistry: any = {
+        assertAndGetCapability: async () => ({
+          createAction: async () => ({
+            id: 'act-conflicting-1',
+            externalActionId: 'ext-conflicting-1',
+            providerSlug: sandboxCoffeeProvider.slug,
+            status: ActionStatus.AWAITING_PAYMENT,
+            total: 28000, // Conflict! Quoted 1,000,000 UZS
+            currency: 'UZS',
+            nextAction: {
+              type: 'OPEN_URL',
+              url: 'https://sandbox.checkout.example/pay/conflicting'
+            }
+          })
+        }),
+        getProvider: async () => sandboxCoffeeProvider
+      };
+
+      const conflictActionsService = new ActionsService(
+        conflictingAdapterRegistry,
+        natsService,
+        redisService,
+        providersService
+      );
+
+      await assert.rejects(
+        () =>
+          conflictActionsService.createAction(
+            {
+              idempotencyKey: 'idem-conflicting-provider-total',
+              providerSlug: sandboxCoffeeProvider.slug,
+              quoteId: vipQuoteConflict.id,
+              locationId: 'sb-branch-1',
+              items: [
+                {
+                  offeringId: 'sb_latte',
+                  variantId: 'var_vip',
+                  quantity: 1
+                }
+              ],
+              userConfirmed: true,
+              environment: ProviderEnvironment.SANDBOX
+            },
+            'user-v4-client-1',
+            { allowSandboxSimulator: true }
+          ),
+        (err: any) => {
+          assert.equal(err.code, 'QUOTE_MISMATCH');
+          assert.match(err.message, /Provider returned total \(28000\) does not match verified quote total \(1000000\)/);
+          return true;
+        },
+        'Must reject with QUOTE_MISMATCH when provider returns conflicting financial total'
+      );
+
+      console.log('   ✅ Section Q2 passed: quote/action price integrity & provider total conflict rejection verified.');
+    } finally {
+      prisma.quote.findUnique = prevQuoteFindUnique;
+    }
 
     // SECTION R & S
     console.log('\n👉 [Section R & S] Payload Abuse & Contract Malformation...');

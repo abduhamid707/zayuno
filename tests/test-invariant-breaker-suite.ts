@@ -340,19 +340,24 @@ async function runInvariantBreakerSuite() {
         expiresAt: new Date(Date.now() + 300_000).toISOString()
       };
     },
-    createAction: async (input: any) => ({
-      id: `ext-coffee-${Date.now()}`,
-      publicId: 'ZY-COFFEE-INV-1',
-      providerSlug: 'coffee-time',
-      status: ActionStatus.AWAITING_PAYMENT,
-      paymentUrl: 'https://checkout.coffeetime.uz/pay/123',
-      lines: [],
-      subtotal: 38000,
-      fees: 0,
-      discount: 0,
-      total: 38000,
-      currency: 'UZS'
-    }),
+    createAction: async (input: any) => {
+      const subtotal = input.quote ? input.quote.subtotal : 38000;
+      const total = input.quote ? input.quote.total : 38000;
+      const currency = input.quote ? input.quote.currency : 'UZS';
+      return {
+        id: `ext-coffee-${Date.now()}`,
+        publicId: 'ZY-COFFEE-INV-1',
+        providerSlug: 'coffee-time',
+        status: ActionStatus.AWAITING_PAYMENT,
+        paymentUrl: 'https://checkout.coffeetime.uz/pay/123',
+        lines: input.quote?.lines || [],
+        subtotal,
+        fees: 0,
+        discount: 0,
+        total,
+        currency
+      };
+    },
     cancelAction: async () => ({
       success: true,
       actionId: 'ext-coffee-123',

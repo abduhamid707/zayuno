@@ -1,4 +1,34 @@
-# Joriy ish — Zayuno V4: Chaos, Concurrency & Adversarial Invariant Breaker Suite (2026-09-18)
+# Joriy ish — P0 Quote/Action Price Integrity & Financial Authority Enforcement (2026-09-18)
+
+- [x] 1. Enrich adapter.createAction payload with quote snapshot and resolve lines dynamically.
+- [x] 2. ActionsService: Enforce dbQuote financial authority (subtotal, fees, discount, total, currency, lines) and throw QuoteMismatchError on conflicting provider totals.
+- [x] 3. Update iticket mock server to dynamically calculate variant prices in POST /actions.
+- [x] 4. Add comprehensive test suite for base variant vs VIP variant quote/action price integrity and conflicting total rejection.
+- [x] 5. Run full test suite & regression verification.
+- [ ] 6. Push verified changes to git repository.
+
+**Holat / handoff (2026-09-18):**
+- **P0 — Quote/Action Price Integrity & Financial Authority to‘liq tiklandi va tasdiqlandi:**
+  - **Ildiz sababi (Root cause):**
+    1. `ActionsService.createAction` da `providerAction.total` va `lines` qiymatlari tasdiqlangan `dbQuote` ustidan ustuvor qo‘yilgan edi va kelishmovchilik bo‘lsa xatolik otilmasdan tashqi provayderning noto‘g‘ri/stale summasi qabul qilib olinardi.
+    2. `adapter.createAction` payloadiga tasdiqlangan kvota (`quoteSnapshot`) uzatilmas edi, oqibatda tashqi provayderlar narxni qayta hisoblashga majbur bo‘lar yoki default basePrice'ga tayanardi.
+    3. `scripts/iticket-mock-server.mjs` da `POST /actions` 50,000 UZS qiymatini qat’iy qaytarardi va tanlangan variant narxini inobatga olmas edi.
+  - **Kiritilgan universal, provayder-agnostik yechim:**
+    1. `CreateActionInputSchema` kontraktiga ixtiyoriy kanonik `quote` snapshot (`id`, `subtotal`, `fees`, `discount`, `total`, `currency`, `lines`) maydoni qo‘shildi.
+    2. `ActionsService.createAction` endi provayder adapteriga to‘liq kvota snapshotini yuboradi.
+    3. **Moliyaviy invariant himoyasi:** Foydalanuvchi tasdiqlagan `dbQuote` harakat yaratishning birdan-bir kanonik va yakuniy manbasi hisoblanadi. Agar tashqi provayder kelishilgan kvotadan farq qiluvchi `total` yoki `currency` qaytarsa, tranzaksiya jim yopilib ketmaydi, balki darhol `QuoteMismatchError` (`QUOTE_MISMATCH`, 400 Bad Request) bilan to‘xtatiladi.
+    4. Harakat yozuvi (`dbAction`) narxlari, liniyalari, soliq/chegirma va yakuniy summasi qat’iy ravishda tasdiqlangan `dbQuote` dan olinadi.
+    5. `scripts/iticket-mock-server.mjs` dinamik variant narxini (VIP 1,000,000 UZS, standart 50,000 UZS) to‘liq hisoblaydigan qilindi.
+    6. Hech qanday `providerSlug === 'iticket-uz'` kabi maxsus hardcode qilinmadi; yechim 1000+ provayder uchun universal ishlaydi.
+  - **Bajarilgan tekshiruvlar:**
+    - `tests/test-v4-chaos-concurrency-and-invariants.ts` (Section Q2: VIP variant narxi 1,000,000 UZS saqlanishi, ziddiyatli provayder javobida `QUOTE_MISMATCH` otilishi) — PASS (100%).
+    - `tests/test-v4-scale-and-resilience.ts` (1,000 provayder, V va W bo‘limlari) — PASS.
+    - `tests/test-invariant-breaker-suite.ts` (8/8 invariant) — PASS.
+    - `tests/test-sandbox-execution-context-and-service-metrics.ts` (6/6 test) — PASS.
+    - `@zayuno/contracts`, `@zayuno/provider-sdk`, `@zayuno/api` TypeScript buildlari — PASS (0 xato).
+    - `git diff --check` — PASS (0 xato).
+
+# Oldingi ish — Zayuno V4: Chaos, Concurrency & Adversarial Invariant Breaker Suite (2026-09-18)
 
 - [x] 1. V4 Concurrency & Retries: 10 & 50 parallel create_action, single external execution, idempotency key reuse with different payload (A, B, C, D).
 - [x] 2. V4 Race, Webhooks & State Monotonicity: Availability races, webhook deduplication (2x/10x/100x), monotonic transitions, HMAC security (E, F, G, H).

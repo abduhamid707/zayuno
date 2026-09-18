@@ -256,9 +256,20 @@ export class ActionsService {
         offeringIds: input.items.map(item => item.offeringId)
       });
 
-      // 4. Call Provider Adapter
+      // 4. Call Provider Adapter with canonical quote snapshot
+      const quoteSnapshot = {
+        id: dbQuote.id,
+        subtotal: Number(dbQuote.subtotal),
+        fees: dbQuote.fees !== null && dbQuote.fees !== undefined ? Number(dbQuote.fees) : 0,
+        discount: dbQuote.discount !== null && dbQuote.discount !== undefined ? Number(dbQuote.discount) : 0,
+        total: Number(dbQuote.total),
+        currency: (dbQuote.currency as 'UZS' | 'USD' | 'EUR') || 'UZS',
+        lines: Array.isArray(dbQuote.lines) ? (dbQuote.lines as any) : []
+      };
+
       const providerAction = await adapter.createAction({
         ...input,
+        quote: quoteSnapshot,
         idempotencyKey: scopedIdempotencyKey
       });
       // The checkout URL must originate from the provider. Core only normalizes the
@@ -268,32 +279,38 @@ export class ActionsService {
 
       const publicId = generatePublicActionId(cleanSlug);
 
-      // 5. Persist Action in Database
-      // Normalize lines, totals and pricing: external providers often return a lightweight
-      // confirmation payload (order ID + payment URL) while the canonical verified item lines
-      // and pricing are already locked and persisted in dbQuote.
-      const resolvedLines =
-        providerAction.lines && Array.isArray(providerAction.lines) && providerAction.lines.length > 0 ? providerAction.lines : (dbQuote.lines as any) || [];
+      // 5. Financial Authority & Integrity Guard:
+      // A confirmed, verified quote (dbQuote) is the SOLE authoritative financial source for action creation.
+      // Under no circumstances may an adapter or mutable catalog retroactively alter the agreed pricing.
+      // If the provider returns a conflicting total or currency, fail closed with QUOTE_MISMATCH.
+      const expectedTotal = Number(dbQuote.total);
+      if (providerAction.total !== undefined && providerAction.total !== null) {
+        const returnedTotal = Number(providerAction.total);
+        if (Math.abs(returnedTotal - expectedTotal) > 0.001) {
+          throw new QuoteMismatchError(
+            input.quoteId,
+            `Provider returned total (${returnedTotal}) does not match verified quote total (${expectedTotal}).`
+          );
+        }
+      }
 
-      const resolvedSubtotal = providerAction.subtotal !== undefined && providerAction.subtotal !== null ? providerAction.subtotal : Number(dbQuote.subtotal);
+      const expectedCurrency = dbQuote.currency || 'UZS';
+      if (providerAction.currency && providerAction.currency !== expectedCurrency) {
+        throw new QuoteMismatchError(
+          input.quoteId,
+          `Provider returned currency (${providerAction.currency}) does not match verified quote currency (${expectedCurrency}).`
+        );
+      }
 
-      const resolvedFees =
-        providerAction.fees !== undefined && providerAction.fees !== null
-          ? providerAction.fees
-          : dbQuote.fees !== undefined && dbQuote.fees !== null
-            ? Number(dbQuote.fees)
-            : 0;
-
-      const resolvedDiscount =
-        providerAction.discount !== undefined && providerAction.discount !== null
-          ? providerAction.discount
-          : dbQuote.discount !== undefined && dbQuote.discount !== null
-            ? Number(dbQuote.discount)
-            : 0;
-
-      const resolvedTotal = providerAction.total !== undefined && providerAction.total !== null ? providerAction.total : Number(dbQuote.total);
-
-      const resolvedCurrency = providerAction.currency || dbQuote.currency || 'UZS';
+      // Persist canonical financial snapshot locked from dbQuote
+      const resolvedLines = (dbQuote.lines as any) && Array.isArray(dbQuote.lines) && dbQuote.lines.length > 0
+        ? (dbQuote.lines as any)
+        : (providerAction.lines as any) || [];
+      const resolvedSubtotal = Number(dbQuote.subtotal);
+      const resolvedFees = Number(dbQuote.fees || 0);
+      const resolvedDiscount = Number(dbQuote.discount || 0);
+      const resolvedTotal = expectedTotal;
+      const resolvedCurrency = expectedCurrency;
 
       const dbAction = await prisma.action.create({
         data: {

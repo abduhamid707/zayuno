@@ -412,6 +412,62 @@ const server = http.createServer(async (req, res) => {
     }
 
     const actionId = `act_iticket_${Date.now()}`;
+
+    // Dynamically calculate lines and totals from body.quote or body.items
+    let subtotal = 0;
+    let fees = 0;
+    let discount = 0;
+    let total = 0;
+    let currency = body.quote?.currency || 'UZS';
+    let lines = [];
+
+    if (body.quote && Array.isArray(body.quote.lines) && body.quote.lines.length > 0) {
+      lines = body.quote.lines;
+      subtotal = Number(body.quote.subtotal);
+      fees = Number(body.quote.fees || 0);
+      discount = Number(body.quote.discount || 0);
+      total = Number(body.quote.total);
+    } else {
+      const items = body.items || [];
+      for (const item of items) {
+        const off = catalogData.offerings.find(o => o.id === item.offeringId) || catalogData.offerings[0];
+        const variant = off.variants?.find(v => v.id === item.variantId) || off.variants?.[0] || { basePrice: off.basePrice, name: 'Standart' };
+        const qty = item.quantity || 1;
+        const unitPrice = variant.basePrice !== undefined ? variant.basePrice : off.basePrice;
+        const lineTotal = unitPrice * qty;
+        subtotal += lineTotal;
+
+        lines.push({
+          offeringId: off.id,
+          offeringTitle: off.title,
+          variantId: variant.id,
+          variantTitle: variant.name,
+          quantity: qty,
+          unitPrice,
+          optionsTotal: 0,
+          lineTotal,
+          selectedOptions: []
+        });
+      }
+
+      if (lines.length === 0) {
+        const off = catalogData.offerings[0];
+        const unitPrice = off.basePrice;
+        subtotal = unitPrice;
+        lines.push({
+          offeringId: off.id,
+          offeringTitle: off.title,
+          variantId: off.variants?.[0]?.id,
+          quantity: 1,
+          unitPrice,
+          optionsTotal: 0,
+          lineTotal: unitPrice,
+          selectedOptions: []
+        });
+      }
+      total = subtotal + fees - discount;
+    }
+
     const action = {
       id: actionId,
       publicId: `ZY-ITICKET-${Date.now().toString().slice(-5)}`,
@@ -420,22 +476,13 @@ const server = http.createServer(async (req, res) => {
       quoteId: body.quoteId || 'quote_iticket_123',
       status: 'AWAITING_PAYMENT',
       paymentStatus: 'PENDING',
-      subtotal: 50000,
-      fees: 0,
-      discount: 0,
-      total: 50000,
-      currency: 'UZS',
+      subtotal,
+      fees,
+      discount,
+      total,
+      currency,
       customer: body.customer || { name: 'Ali Valiyev', phone: '+998901234567' },
-      lines: [
-        {
-          offeringId: 'item_mangu_5',
-          offeringTitle: 'MANGU 5 (MANGU MMA)',
-          quantity: 1,
-          unitPrice: 50000,
-          optionsTotal: 0,
-          lineTotal: 50000
-        }
-      ],
+      lines,
       nextAction: {
         type: 'OPEN_URL',
         url: `https://iticket.uz/pay/${actionId}`,

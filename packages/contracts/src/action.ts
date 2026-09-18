@@ -65,6 +65,17 @@ export const CreateActionInputSchema = z.object({
   paymentMethod: optionalNullable(z.string()).describe('e.g. "payme", "card", "cash", "invoice"'),
   parameters: optionalNullable(z.record(z.any())).describe('Custom parameters passed to provider adapter'),
   environment: optionalNullable(z.string()).describe('Target execution environment context (e.g. LIVE, SANDBOX). Defaults to LIVE.'),
+  quote: optionalNullable(
+    z.object({
+      id: z.string().optional(),
+      subtotal: z.number().nonnegative(),
+      fees: z.number().nonnegative().default(0),
+      discount: z.number().nonnegative().default(0),
+      total: z.number().nonnegative(),
+      currency: CurrencySchema.default('UZS'),
+      lines: z.array(QuoteLineSchema).default([])
+    })
+  ).describe('Canonical verified quote snapshot passed down to provider adapter'),
   userConfirmed: z.literal(true).describe('Must be true after the user explicitly confirms the reviewed quote')
 });
 export type CreateActionInput = z.infer<typeof CreateActionInputSchema>;
