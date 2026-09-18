@@ -4,7 +4,7 @@
 - [x] 2. `consumer-chat.service.ts`: tashqi action yuborilgandan keyingi holatda pending orderni noto'g'ri o'chiradigan recovery patchni olib tashlash; action holati idempotency/reconciliation qatlamida saqlanadi.
 - [x] 3. Controller error-mapping uchun fokuslangan regression testini qo'shish.
 - [x] 4. Fokuslangan testlar va `git diff --check` ni ishga tushirish (foydalanuvchi ko'rsatmasiga binoan keng build/full-suite kutilmaydi).
-- [ ] 5. TASKS.md handoff, commit va pushni yakunlash.
+- [x] 5. TASKS.md handoff, commit va pushni yakunlash.
 
 **Sabab:** `publicErrorMessage()` faqat `status === 400` + 3 ta regex pattern ni qo'llab-quvvatlaydi. Boshqa barcha xatolar (503, 409, 422, QuoteMismatchError, QuoteExpiredError, provider failures) "Zayuno hozir javob bera olmadi" ga tushadi. Bu P0 bug: foydalanuvchi "Tasdiqlayman" yozganda, `createAction` xato otsa, user-friendly xabar o'rniga generic fallback ko'rinadi.
 
@@ -15,7 +15,7 @@
 - `pnpm exec tsx --tsconfig tsconfig.base.json tests/test-consumer-chat-error-mapping.ts` — PASS.
 - `git diff --check` — PASS.
 - Keng API build/full-suite foydalanuvchi ko'rsatmasiga binoan ishga tushirilmadi. Qo'shimcha, o'zgarmagan `tests/test-error-taxonomy-and-catalog-fallback.ts` qayta ishga tushirilganda `registerZayunoTools`dagi oldindan mavjud `CapabilityNotSupportedError` bilan yiqildi; bu patch tegmagan modul va alohida follow-up talab qiladi.
-- Navbatdagi qadam: yakuniy diffni tekshirib commit va `origin/main`ga push qilish.
+- Kod commit'i `49c2141 fix(chat): map typed action errors safely` sifatida `origin/main`ga push qilindi.
 
 # Joriy ish — iTicket Mock Serverni eng oxirgi kod bilan qayta ishga tushirish va VIP variantni tekshirish (2026-09-18)
 
