@@ -7,6 +7,7 @@ import {
   PaymentMethodType,
   PaymentStatus,
   ProviderCapability,
+  ProviderEnvironment,
   ProviderStatus,
   ProviderType,
   type AvailabilityResult,
@@ -431,7 +432,7 @@ export function createPoyezSandboxApp(): Express {
   app.get('/provider-info', (_req, res) => {
     const slug = process.env.PROVIDER_SLUG || SLUG;
     return res.json({
-      id: slug, slug, name: PROVIDER_NAME, description: DISCLAIMER, status: ProviderStatus.SANDBOX,
+      id: slug, slug, name: PROVIDER_NAME, description: DISCLAIMER, status: ProviderStatus.SANDBOX, environment: ProviderEnvironment.SANDBOX,
       type: ProviderType.TICKETING, category: 'railway_tickets', geography: ['UZ'], adapterType: 'remote-http', authMethod: 'API_KEY',
       capabilities: Object.values(ProviderCapability), baseUrl: publicBase, isCertified: false, isPublished: false,
       metadata: { sandbox: true, dynamicInventory: true, inventoryKinds: ['TRIP', 'CAR', 'SEAT'], securePassengerHandoff: true, holdDurationSeconds: HOLD_TTL_MS / 1000 }
