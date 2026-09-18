@@ -3,7 +3,7 @@
 - [x] 1. `search_catalog` toolida `CapabilityNotSupportedError` qayta otilishining sababini reproduce qilish.
 - [x] 2. Provider manifestida SEARCH bo'lmagan holatni qat'iy rad etib, remote SEARCH endpointi capability-404 qaytarganda CATALOG fallbackni tiklash.
 - [x] 3. Fokuslangan regression testini ishga tushirish va `git diff --check`ni tekshirish.
-- [ ] 4. Hamma tayyor commitlarni `origin/main`ga push qilish va handoffni yangilash.
+- [x] 4. Hamma tayyor commitlarni `origin/main`ga push qilish va handoffni yangilash.
 
 **Sabab:** MCP `registerZayunoTools()` boundary'i typed xatoni structured envelopega to'g'ri o'raydi. Failure uning ichida emas: `CatalogService.searchOfferings()` remote adapterdan `CAPABILITY_NOT_SUPPORTED` qaytganda `searchCatalogFallback()`ni chaqirmaydi. Shu bilan birga manifestida SEARCH bo'lmagan providerni silent fallback qilish mumkin emas; ikki holat alohida saqlanadi.
 
@@ -13,6 +13,7 @@
 - `tests/test-error-taxonomy-and-catalog-fallback.ts` — PASS.
 - `tests/test-provider-resolver-and-capability-consistency.ts` — PASS.
 - `git diff --check` — PASS. Foydalanuvchi ko'rsatmasiga muvofiq keng build yoki full-suite ishga tushirilmadi.
+- Kod commit'i `6b4261b fix(catalog): fall back after remote search capability error` sifatida `origin/main`ga push qilindi.
 
 # Joriy ish — P0 "Zayuno hozir javob bera olmadi" generic error fallback fix (2026-09-18)
 
