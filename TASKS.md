@@ -6,7 +6,7 @@
 - [x] 4. Availability Semantikasi: agar provayder `AVAILABILITY` qobiliyatiga ega bo'lmasa, yoki adapter 404 bersa, hech qachon `PROVIDER_NOT_FOUND` chiqarmaslik; kanonik `NOT_SUPPORTED` yoki `CAPABILITY_NOT_SUPPORTED` qaytarish. Xato normalizatsiyasidagi provayder nomiga bog'liq soxta `PROVIDER_NOT_FOUND` bugini tuzatish.
 - [x] 5. Error Normalization: haddan tashqari ko'p miqdorda (masalan 999 999 ta chipta/seat) so'ralganda yoki inventar yetishmaganda 500 `INTERNAL_ERROR` o'rniga kanonik `RESOURCE_UNAVAILABLE` yoki `CAPACITY_EXCEEDED` xato kodlarini qaytarish.
 - [x] 6. Cross-Tool Consistency va Regressiya Testlari: barcha qoidalar, tartiblar va vositalararo uyg'unlikni tekshiruvchi maxsus suite yozish va monorepo build/testlarini to'liq o'tkazish.
-- [ ] 7. Deploy va tekshiruv: o'zgarishlarni commit va push qilish, production serverda tekshirish.
+- [x] 7. Deploy va tekshiruv: o'zgarishlarni commit va push qilish, production serverda tekshirish.
 
 **Holat / handoff (2026-09-18):**
 1. **O‘zgargan fayllar:**
@@ -34,7 +34,14 @@
    - `pnpm exec tsx tests/test-ai-integration-kit-and-profiles.ts`: PASS.
    - `pnpm -r run build`: 19 ta workspace loyihasi 100% muvaffaqiyatli qurildi (0 xato).
    - `git diff --check`: 0 xato.
-3. **Qolgan ish:** O‘zgarishlarni commit va push qilish, production serverda tekshirish.
+   - `Production Live Verification (https://api.zayuno.uz)`:
+     - `GET /api/v1/providers?status=SANDBOX` -> HTTP 200 OK (6 ta sandbox provider).
+     - `GET /api/v1/providers/coffee-time` (environment parametri berilmaganda) -> HTTP 200 OK (`slug: "coffee-time"`, `environment: "SANDBOX"`). Context uzilmadi, soxta PROVIDER_NOT_FOUND batamom yo‘qotildi!
+     - `GET /api/v1/providers/coffee-time/capabilities` -> HTTP 200 OK (11 ta capability to‘liq qaytdi).
+     - `GET /api/v1/providers/coffee-time?environment=LIVE` -> HTTP 404 `PROVIDER_NOT_FOUND` (muhit filtri qat’iy tekshiriladi).
+     - `GET /api/v1/providers/coffee-time/catalog?locationId=fake-location-999` -> HTTP 404 `LOCATION_NOT_FOUND` (filial guard to‘g‘ri ishlamoqda).
+     - `POST /api/v1/availability` -> HTTP 201 OK (`availabilityStatus: "UNAVAILABLE"`).
+3. **Qolgan ish:** Vazifa to‘liq yakunlandi. Barcha 7 ta bosqich bajarildi va productionda tekshirildi.
 
 # Oldingi ish — iTicket Mock Serveri va Tunnelni Uzluksiz (Doimiy) Ishlatish (2026-09-18)
 
