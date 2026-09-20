@@ -17,7 +17,17 @@ pnpm test:review
 
 Development: http://localhost:3001. Core API defaults to http://localhost:4000
 locally or https://api.zayuno.uz on the production domain; VITE_API_URL can
-override it. Browser testing of public pages does not require an account.
+override it. During `vite dev`, browser requests use the same-origin `/api`
+proxy targeting `VITE_API_URL` (including `.env.local`). This keeps HttpOnly
+session cookies working when localhost uses the production API. Only the local
+dev proxy removes the upstream cookie Domain/Secure attributes; production cookie
+settings remain unchanged. After switching from direct API requests, log in once
+to establish cookies on localhost. Production builds keep the configured API URL;
+webhook instructions always use the public API URL.
+
+Session restoration tries the refresh cookie once when the access cookie expires.
+Concurrent restores share one request so rotating refresh tokens are not reused.
+Browser testing of public pages does not require an account.
 Authenticated provider operations require the actual backend and a test account.
 
 ## Where to edit

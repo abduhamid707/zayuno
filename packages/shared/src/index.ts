@@ -13,3 +13,6 @@ export * from './public-action';
 export * from './public-payment-option';
 export * from './constants';
 export * from './trusted-internal-targets';
+export * from './catalog-projection';
+export * from './conversation-requirements';
+export * from './quote-input';

@@ -1,6 +1,6 @@
 import https from 'node:https';
 
-const TUNNEL_HEALTH_URL = process.env.TUNNEL_URL || 'https://wedding-watches-river-printable.trycloudflare.com/health';
+const TUNNEL_HEALTH_URL = process.env.TUNNEL_URL || 'https://mysterious-bidder-mechanisms-realm.trycloudflare.com/health';
 
 console.log(`[KeepAlive] Active keep-alive daemon started for: ${TUNNEL_HEALTH_URL}`);
 console.log(`[KeepAlive] Pinging every 15 seconds to prevent idle timeout and connection drop...`);

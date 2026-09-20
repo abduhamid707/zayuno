@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { CurrencySchema, IsoDateTimeSchema, optionalNullable } from './common';
 import { DynamicParameterDeclarationSchema } from './dynamic-parameters';
+import { CatalogProjectionSchema } from './projection';
+import { PresentationHintsSchema } from './provider-manifest';
 
 export const OptionItemSchema = z.object({
   id: z.string(),
@@ -97,6 +99,7 @@ export function sortOfferingMedia(media?: MediaItem[]): MediaItem[] {
 }
 
 export const OfferingSchema = z.object({
+  presentationHints: PresentationHintsSchema.optional(),
   id: z.string(),
   providerId: z.string(),
   offeringCode: z.string().describe('Provider-specific catalog item identifier'),
@@ -150,6 +153,7 @@ export const CatalogSchema = z.object({
 export type Catalog = z.infer<typeof CatalogSchema>;
 
 export const GetCatalogInputSchema = z.object({
+  ...CatalogProjectionSchema.shape,
   providerSlug: z.string().min(1),
   locationId: optionalNullable(z.string()),
   categorySlug: optionalNullable(z.string()),
@@ -158,6 +162,7 @@ export const GetCatalogInputSchema = z.object({
 export type GetCatalogInput = z.infer<typeof GetCatalogInputSchema>;
 
 export const GetOfferingInputSchema = z.object({
+  ...CatalogProjectionSchema.shape,
   providerSlug: z.string().min(1),
   offeringId: z.string().min(1),
   locationId: optionalNullable(z.string()),
@@ -166,6 +171,7 @@ export const GetOfferingInputSchema = z.object({
 export type GetOfferingInput = z.infer<typeof GetOfferingInputSchema>;
 
 export const SearchCatalogInputSchema = z.object({
+  ...CatalogProjectionSchema.shape,
   providerSlug: z.string().min(1),
   query: z.string().default('').describe('Free-text query. May be empty when structured parameters fully describe the search intent.'),
   categorySlug: optionalNullable(z.string()),

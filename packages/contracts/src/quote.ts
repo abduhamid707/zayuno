@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { CurrencySchema, AddressSchema, IsoDateTimeSchema, optionalNullable } from './common';
+import { CurrencySchema, AddressSchema, IsoDateTimeSchema, optionalNullable, ActionLocationSchema, CustomerContactSchema } from './common';
 import { SelectedOptionSchema } from './catalog';
+import { CapabilityRequirementsSchema } from './provider-manifest';
 
 export const QuoteItemInputSchema = z.object({
   offeringId: z.string().min(1).describe('Target offering or item identifier'),
@@ -13,7 +14,10 @@ export type QuoteItemInput = z.infer<typeof QuoteItemInputSchema>;
 export const RequestQuoteInputSchema = z.object({
   providerSlug: z.string().min(1).describe('Unique provider slug'),
   locationId: optionalNullable(z.string()).describe('Optional provider location identifier'),
-  items: z.array(QuoteItemInputSchema).min(1).describe('Array of items requested'),
+  items: z.array(QuoteItemInputSchema).default([]).describe('Offering inputs; may be empty only if the provider manifest permits parameter-based input'),
+  locations: z.array(ActionLocationSchema).optional(),
+  customer: CustomerContactSchema.optional(),
+  paymentMethod: z.string().optional(),
   fulfillmentType: optionalNullable(z.string()).describe('Fulfillment mode (e.g. STANDARD, EXPRESS, PICKUP, DIGITAL)'),
   destination: optionalNullable(AddressSchema).describe('Optional physical delivery address or service destination'),
   promoCode: optionalNullable(z.string().trim().min(1).max(64)).describe('Optional provider-issued promotion or discount code. The provider validates and prices it; Zayuno never invents discounts.'),
@@ -49,6 +53,7 @@ export const QuoteDiscountSchema = z.object({
 export type QuoteDiscount = z.infer<typeof QuoteDiscountSchema>;
 
 export const NormalizedQuoteSchema = z.object({
+  requirements: CapabilityRequirementsSchema.optional().describe('Additional requirements for creating the action from this quote'),
   id: z.string().describe('Unique platform quote ID'),
   providerSlug: z.string(),
   locationId: optionalNullable(z.string()),

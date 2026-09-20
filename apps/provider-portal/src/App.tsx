@@ -48,6 +48,8 @@ import {
 } from 'lucide-react';
 import { ProtectedGate } from './ProtectedGate';
 import { ProviderEmptyState } from './ProviderEmptyState';
+import { providerProfileQuery } from './provider-profile-query';
+import { createProviderSessionClient } from './provider-session';
 import { SandboxSimulator } from './SandboxSimulator';
 import { CertificationView } from './CertificationView';
 import { RequestInspector } from './RequestInspector';
@@ -62,11 +64,13 @@ const DocsViewer = lazy(() => import('./DocsViewer').then(module => ({ default: 
 const OnboardingWizard = lazy(() => import('./OnboardingWizard').then(module => ({ default: module.OnboardingWizard })));
 const AuthView = lazy(() => import('./AuthView').then(module => ({ default: module.AuthView })));
 
-const API_BASE =
+const PUBLIC_API_BASE =
   (import.meta as any).env?.VITE_API_URL ||
   (typeof window !== 'undefined' && window.location.hostname.includes('zayuno.uz')
     ? 'https://api.zayuno.uz'
     : 'http://localhost:4000');
+const API_BASE = (import.meta as any).env?.VITE_USE_DEV_API_PROXY ? '' : PUBLIC_API_BASE;
+const providerSession = createProviderSessionClient(API_BASE);
 const SHOW_LOCAL_SIMULATOR = (import.meta as any).env?.VITE_ENABLE_LOCAL_SIMULATOR === 'true' || true;
 
 const SANDBOX_PROVIDER_SLUG = 'sandbox-provider';
@@ -89,10 +93,9 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/v1/auth/session`, { credentials: 'include' })
-      .then(response => response.ok ? response.json() : null)
+    providerSession.restore()
       .then(data => {
-        if (cancelled || !data?.authenticated || !data.accessToken) return;
+        if (cancelled || !data) return;
         setToken(data.accessToken);
         setUserProfile(data.user || null);
       })
@@ -103,19 +106,19 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return;
+    let cancelled = false;
     const refresh = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/v1/auth/refresh`, { method: 'POST', credentials: 'include' });
-        if (!response.ok) throw new Error('refresh failed');
-        const data = await response.json();
-        if (data.accessToken) setToken(data.accessToken);
-        if (data.user) setUserProfile(data.user);
+        const data = await providerSession.refresh();
+        if (cancelled) return;
+        setToken(data?.accessToken || '');
+        setUserProfile(data?.user || null);
       } catch {
-        // Keep the current UI stable for transient network errors; the next protected request will re-authenticate.
+        // A transient network error must not discard the current session.
       }
     };
     const timer = window.setInterval(refresh, 10 * 60 * 1000);
-    return () => window.clearInterval(timer);
+    return () => { cancelled = true; window.clearInterval(timer); };
   }, [token]);
 
   // Auth form state
@@ -427,6 +430,7 @@ export default function App() {
     try {
       const response = await fetch(`${API_BASE}/api/v1/auth/register-owner`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: fullName.trim(),
@@ -469,7 +473,6 @@ export default function App() {
         setUserProfile(data.user);
         setAuthModalOpen(false);
         setAuthSuccess('Email tasdiqlandi va tizimga kirdingiz!');
-        refetchProvider();
       } else {
         setAuthSuccess('Email muvaffaqiyatli tasdiqlandi! Endi parolingiz bilan tizimga kirishingiz mumkin.');
         setAuthModalTab('login');
@@ -517,30 +520,19 @@ export default function App() {
     setTimeout(() => setCopiedText(null), 2000);
   };
 
-  const { data: providerData, isPending: providerLoading, isError: providerFailed, refetch: refetchProvider } = useQuery({
-    queryKey: ['provider-details', token],
-    queryFn: async () => {
-      try {
-        const res = await apiFetch('/api/v1/providers/me');
-        return res.json();
-      } catch (error) {
-        // A verified new account has no application yet; show its first business step.
-        if (
-          error instanceof Error &&
-          (error.message === 'Your account is not assigned to a provider application yet.' ||
-            error.message.includes('not assigned to a provider') ||
-            error.message.includes('Requires one of roles') ||
-            error.message.includes('403') ||
-            error.message.includes('404'))
-        ) {
-          return null;
-        }
-        throw error;
-      }
-    },
-    enabled: !!token,
-    retry: 1
-  });
+  const { data: providerData, isPending: providerLoading, isError: providerFailed, refetch: refetchProvider } = useQuery(
+    providerProfileQuery(token, userProfile, apiFetch),
+  );
+
+  const handleProviderCreated = (created: { id?: string }) => {
+    if (created.id && created.id !== userProfile?.providerId) {
+      // Registration updates the database assignment before the JWT refresh.
+      // Changing the query key loads the newly assigned business immediately.
+      setUserProfile((current: any) => ({ ...current, providerId: created.id }));
+    } else {
+      void refetchProvider();
+    }
+  };
 
   const providerRequiresLocations = requiresActiveLocations(
     providerData?.type as ProviderType | undefined,
@@ -704,7 +696,7 @@ export default function App() {
         setCreatedCredentials(data.credentials);
         setWizardStep(4); // Move to credential handoff step
       }
-      refetchProvider();
+      handleProviderCreated(data.provider || data);
     }
   });
 
@@ -887,6 +879,7 @@ export default function App() {
         {activeTab === 'onboarding' && (
           !authReady && !token ? <div className="workspace-loading" role="status"><RefreshCw className="animate-spin" size={20} /> Sessiya tekshirilmoqda…</div> : <OnboardingWizard
             apiBase={API_BASE}
+            publicApiBase={PUBLIC_API_BASE}
             token={token}
             onAuthSuccess={(newToken, user) => {
               setToken(newToken);
@@ -897,11 +890,8 @@ export default function App() {
                 url.searchParams.delete('token');
                 window.history.replaceState({}, '', url.toString());
               }
-              refetchProvider();
             }}
-            onProviderCreated={() => {
-              refetchProvider();
-            }}
+            onProviderCreated={handleProviderCreated}
             onNavigateTab={(tab) => setActiveTab(tab)}
             onOpenDoc={(docId) => {
               setSelectedDoc(docId);
@@ -1695,7 +1685,6 @@ export default function App() {
                 ? destination.searchParams.get('tab')
                 : 'apps') as WorkspaceTab;
               window.history.replaceState({}, '', `${destination.pathname}${destination.search}`);
-              refetchProvider();
               setActiveTab(nextTab);
             }}
             onOpenDocs={() => {

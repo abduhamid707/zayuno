@@ -11,6 +11,8 @@ import {
 import { CapabilityNotSupportedError } from '@zayuno/provider-sdk';
 import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
 import { assertDeclaredDynamicParameters } from '../../common/dynamic-parameter-validation';
+import { assertActionRequirements } from '../../common/action-requirements';
+import { canonicalQuoteInput, manifestOf } from '@zayuno/shared';
 
 @Injectable()
 export class QuotesService {
@@ -26,9 +28,7 @@ export class QuotesService {
     if (!input.providerSlug) {
       throw new BadRequestException('providerSlug is required.');
     }
-    if (!input.items || input.items.length === 0) {
-      throw new BadRequestException('At least one item is required to request a quote.');
-    }
+    input.items ??= [];
     const forbiddenKey = findForbiddenParameterKey(input.parameters);
     if (forbiddenKey) {
       throw new BadRequestException(`Sensitive identity or payment field "${forbiddenKey}" is not allowed in quote parameters. Use the provider-owned secure handoff.`);
@@ -70,9 +70,13 @@ export class QuotesService {
     }
 
     // 4. Dynamic parameters & adapter execution
+    assertActionRequirements(provider, input, 'QUOTE');
+    const manifest = manifestOf(provider);
     await assertDeclaredDynamicParameters(adapter, cleanSlug, input.parameters, {
       locationId: input.locationId,
-      offeringIds: input.items.map(item => item.offeringId)
+      offeringIds: input.items.map(item => item.offeringId),
+      declarations: [manifest?.parametersSchema, manifest?.requirements?.QUOTE?.parametersSchema,
+        manifest?.fulfillmentRequirements?.[input.fulfillmentType || '']?.parametersSchema]
     });
 
     const quote = await adapter.requestQuote!(input);
@@ -92,6 +96,8 @@ export class QuotesService {
       await prisma.quote.create({
         data: {
           id: quote.id,
+          requestInput: { ...canonicalQuoteInput(input), ...(input.customer ? { customer: input.customer } : {}),
+            ...(quote.requirements ? { requirements: quote.requirements } : {}) } as any,
           providerId: provider.id,
           // `input.locationId` belongs to the provider API. The database
           // relation must instead use Zayuno's internal Location.id.

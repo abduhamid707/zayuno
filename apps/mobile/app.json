@@ -51,7 +51,7 @@
     "scheme": "zayuno",
     "android": {
       "package": "uz.zayuno.mobile",
-      "versionCode": 12,
+      "versionCode": 14,
       "allowBackup": false,
       "blockedPermissions": [
         "android.permission.ACTIVITY_RECOGNITION",

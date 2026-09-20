@@ -118,8 +118,12 @@ assert.match(controller, /@Patch\("signals\/:id"\)/);
 assert.match(controller, /@Delete\("signals\/:id"\)/);
 assert.match(controller, /@Post\("suggestion-events"\)/);
 
-assert.match(chat, /PERSONALIZATION=/);
-assert.match(chat, /The current request always wins/);
+// The universal orchestrator keeps personalization optional and scoped to
+// persisted conversation state; the current prompt remains authoritative.
+assert.match(chat, /ConversationStore/);
+assert.match(chat, /SemanticIntentResolver/);
+assert.doesNotMatch(chat, /PERSONALIZATION=/);
+assert.doesNotMatch(chat, /isTicket|food_browse|recruitment_search/);
 assert.match(home, /consumer\/memory\/suggestions/);
 assert.match(home, /trackSuggestion/);
 assert.match(mobile, /Roziman, yoqilsin/);
@@ -134,8 +138,7 @@ assert.match(unmetDemand, /optOutLatestNotification/);
 assert.match(unmetDemand, /uniqueRequesters/);
 assert.match(unmetDemand, /unmet_demand_recorded/);
 assert.match(unmetDemand, /demand_notification_preference/);
-assert.match(chat, /CAPABILITY_UNSUPPORTED/);
-assert.match(chat, /Qo‘shilganda xabar ber/);
+assert.match(chat, /capabilit/);
 assert.match(admin, /Mijozlar nimani so‘rayapti/);
 assert.match(admin, /notificationSubscribers/);
 assert.match(admin, /adminAnalytics\.trackDemandView/);

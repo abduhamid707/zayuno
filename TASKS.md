@@ -1,3 +1,127 @@
+# Joriy ish — Barcha joriy o‘zgarishlarni push qilish (2026-09-20)
+
+- [x] 1. Foydalanuvchi barcha tracked/untracked ishlarni push qilishni tasdiqladi; Git holati va origin tekshirildi.
+- [ ] 2. Barcha o‘zgarishlarni stage qilish, staged diffni tekshirish va commit yaratish.
+- [ ] 3. origin/main ga push qilish va working tree tozaligini tasdiqlash.
+
+**Holat / handoff:** Scope portal fixlari bilan cheklanmaydi: universal orchestrator/contracts/API/MCP/mobile refactor, migratsiyalar, testlar, audit/docs va tunnel yangilanishlari ham kiradi. Oldingi agentlar checklistlari saqlanadi. Oldingi qaydlar bo‘yicha universal refactor review 42/42 PASS; portal build va fokuslangan regressionlar ushbu suhbatda PASS. Push so‘rovi uchun keng testlar qayta bajarilmaydi. Keyingi qadam: staged diff/check, commit va push. Production deploy natijasi alohida tasdiqlanmagan.
+
+**Progress:** 61 ta fayl stage qilindi. Audit Markdown faylidagi trailing whitespace tozalandi; `git diff --cached --check` PASS. Stage ichida .env yoki private-key fayllari yo‘q. `origin/main`ga nisbatan mavjud bitta lokal docs commit ham pushga kiradi. Keyingi qadam: umumiy commit yaratish va barcha lokal commitlarni origin/main ga push qilish.
+
+# Joriy ish — Provider portal refreshda session 401 (2026-09-20)
+
+- [x] 1. Localhost → production API cookie va session restore sababini aniqlash.
+- [x] 2. Cookie saqlanishi va access token muddati tugaganda session tiklanishini tuzatish.
+- [x] 3. Fokuslangan session/proxy regressiyasi, portal build va lokal serverni tekshirish.
+- [x] 4. Fayllar, tekshiruvlar, cheklovlar va keyingi qadamni qayd etish.
+
+**Holat / handoff:** Sahifa refreshida /auth/session 401, login ekrani qaytmoqda. API cookie SameSite=Lax, localhost portal production APIga bevosita murojaat qiladi; restore faqat access cookiega tayanadi, refresh fallback yo‘q. Oldingi null-provider fix saqlanadi. Hozircha yangi kod o‘zgarmadi; keyingi qadam: dev API proxy va session lifecycle implementatsiyasi. Maxfiy ma’lumotlar saqlanmaydi.
+
+**Progress:** Vite dev proxy `.env.local` VITE_API_URL targetini oladi, dev brauzer API_BASE relative; faqat dev proxy upstream cookie Domain/Secure atributlarini local HTTPga moslaydi (HttpOnly/SameSite/Path saqlanadi). Production build va public webhook URL o‘zgarmaydi. Session restore 401dan keyin refresh qiladi; restore/refresh single-flight StrictMode dublikat rotatsiyasini to‘xtatadi. Auth/onboarding signup/verify/login credentials include. Timer kechikkan natijasi logoutdan keyin sessionni qaytarmaydi.
+- `tests/test-provider-session.ts` — PASS (restore, expiry, concurrent rotation, signed out, network/server errors).
+- `tests/test-provider-dev-proxy.ts` — PASS (real HTTP isolated upstream orqali Set-Cookie rewrite, 3 session reload, anonymous 401, logout cookie).
+- `tests/test-provider-profile-query.ts`, `tests/test-onboarding-wizard-e2e-flow.ts` — PASS.
+- `pnpm --filter @zayuno/provider-portal build` — PASS; `git diff --check` — PASS. localhost:4001 App.tsx — HTTP 200, VITE_USE_DEV_API_PROXY=true.
+- O‘zgargan/yangi fayllar: `apps/provider-portal/vite.config.ts`, `scripts/dev-api-proxy.ts`, `src/provider-session.ts`, `src/App.tsx`, `src/OnboardingWizard.tsx`, `README.md` (barchasi provider-portal ichida); `tests/test-provider-session.ts`, `tests/test-provider-dev-proxy.ts`, `tests/run-all-review-tests.ts`, `TASKS.md`.
+- Production deploy/commit/push bajarilmadi. Real foydalanuvchi paroli/tokeni ishlatilmadi; foydalanuvchi hisobida browser login hali tekshirilmagan. Keyingi qadam: lokal proxyning productionga anonymous transportini tekshirish, handoff; foydalanuvchi yangi local cookie uchun bir marta qayta login qiladi.
+
+**Yakun:** localhost:4001/api/v1/auth/session proxysi productiondan kutilgan anonymous 401/UNAUTHORIZED JSON qaytardi (transport ishlaydi). Barcha fokuslangan tekshiruvlar yakunlandi, to‘siq yo‘q. Foydalanuvchi localhost sahifasini yangilab bir marta kirishi kerak; keyingi reloadlar local HttpOnly cookie bilan sessionni tiklaydi. Google OAuth uchun productionda sozlangan callback/portal redirect bu lokal email-login fixida o‘zgartirilmadi.
+
+# Joriy ish — Provider portal null providerId login holati (2026-09-20)
+
+- [x] 1. Login, session va providers/me oqimida profil xatosining sababini aniqlash.
+- [x] 2. Provider biriktirilmagan hisob uchun to‘g‘ri onboarding/bo‘sh holatni tiklash.
+- [x] 3. Fokuslangan regressiya tekshiruvi va portal buildini bajarish.
+- [x] 4. Natija, o‘zgargan fayllar va deploy holatini qayd etish.
+
+**Holat / handoff:** Sabab: HttpExceptionFilter raw message o‘rniga canonical customerMessage beradi, portal esa eski inglizcha matnni tekshirgan. App.tsx va yangi provider-profile-query.ts yangilandi: explicit null assignment onboarding holatini beradi; 403/404 va boshqa API xatolari yashirilmaydi. Provider yaratilganda assignment/query key yangilanadi. Auth callbacklardagi eski token bilan manual refetch olib tashlandi. Build/regressiya hali bajarilmagan. Keyingi qadam: query lifecycle testi va portal build. Boshqa agent o‘zgarishlari saqlanadi; production o‘zgarmadi, tokenlar yozilmaydi.
+
+**Yakuniy holat:** Lokal fix va tekshiruvlar tugadi. O‘zgargan fayllar: `apps/provider-portal/src/App.tsx`, yangi `apps/provider-portal/src/provider-profile-query.ts`, yangi `tests/test-provider-profile-query.ts`, `tests/run-all-review-tests.ts` (regressiya runnerga qo‘shildi), `TASKS.md`.
+- `pnpm exec tsx tests/test-provider-profile-query.ts` — PASS: signed-out so‘rovsiz holat, null assignment, o‘sha token bilan biznes yaratishdan keyingi query transition, boshqa hisobga o‘tish, unknown assignment API tekshiruvi va real API xatolarini yashirmaslik.
+- `pnpm exec tsx tests/test-onboarding-wizard-e2e-flow.ts` — PASS (8 bosqich); `pnpm exec tsx tests/test-review-dashboard-ux.ts` — PASS.
+- `pnpm --filter @zayuno/provider-portal build` — PASS (TypeScript + Vite; mavjud module-type/chunk-size ogohlantirishlari).
+- `git diff --check` — PASS. `http://localhost:4001/src/provider-profile-query.ts` — HTTP 200 va yangi null guard serve qilinayotgani tasdiqlandi.
+- Commit/push/production deploy bajarilmadi. Production hisobi o‘zgartirilmadi, berilgan tokenlar ishlatilmadi. Brauzerda real login/onboarding submit sinovi bajarilmadi. Lokal ishda to‘siq yo‘q; keyingi foydalanuvchi qadami: localhost:4001 sahifasini yangilash va Biznesni ulash orqali davom etish.
+# Joriy ish — Zayuno Admin Panelni ishga tushirish (2026-09-20)
+
+- [x] 1. Portlar va backend bog'liqliklarini tekshirish — port 3000 band (PID 35164, boshqa loyiha), port 3001 bo'sh.
+- [x] 2. Backend shart emas — `apps/admin/.env.local` orqali `VITE_API_URL=https://api.zayuno.uz` qo'yildi.
+- [x] 3. Zayuno Admin Panelni fonda ishga tushirish (`pnpm --filter @zayuno/admin run dev -- --port 3001`, task-406).
+- [x] 4. HTTP 200 tasdiqlandi. Admin panel: **http://localhost:3001** (prod API: https://api.zayuno.uz).
+
+# Joriy ish — iTicket Mock Provider Cloudflare Tunnelini Yangilash (2026-09-20)
+
+- [x] 1. Eskirgan va DNS ENOTFOUND bo'lib qolgan eski tunnel jarayonini tozalash.
+- [x] 2. Yangi HTTP/2 Cloudflare tunnelini ishga tushirish (`https://mysterious-bidder-mechanisms-realm.trycloudflare.com`).
+- [x] 3. Direct provider testlari (`/health`, `/provider-info`, `POST /quote`, `POST /actions` VIP 1,000,000 UZS) orqali to'liq tasdiqlash.
+- [x] 4. Yangi URL bilan keep-alive daemonini (`scripts/keepalive-tunnel.mjs`) qayta yoqish (har 15s ping).
+
+**Holat / handoff:** Mock server (`task-590`, port 3005) 153,000+ soniyadan beri sog'lom ishlab turibdi. Cloudflare tezkor tunnelining 48 soatlik muddati tugagani sababli yangi URL yaratildi va keep-alive ulandi. Yangi jonli URL: `https://mysterious-bidder-mechanisms-realm.trycloudflare.com`.
+
+# Joriy ish — Mobil ilova APK build qilish va qurilmaga o'rnatish (2026-09-20)
+
+- [x] 1. Android build muhiti (JDK 21, Android SDK D:/AndroidSdk) va qurilma ulanish holatini (adb) tekshirish.
+- [x] 2. Universal release APK build jarayonini ishga tushirish (`apps/mobile/scripts/build-apk.mjs` — versionCode 14, 55.9 MB).
+- [x] 3. Qurilmaga APK'ni o'rnatish (`adb install -r zayuno.apk` — Success).
+- [x] 4. Ilovani qurilmada ishga tushirish (`monkey` / `GoogleSignInActivity` ekrani ochildi) va TASKS.md handoffni yangilash.
+
+**Holat / handoff (2026-09-20):**
+- **Qurilma:** `RRCW5071L9F` muvaffaqiyatli avtorizatsiya qilindi (`device`).
+- **Build:** `apps/mobile/app.json` da `versionCode: 14` ga yangilandi; Gradle `assembleRelease` muvaffaqiyatli yakunlandi (2m 41s).
+- **Yaratilgan APK fayllar:**
+  - `D:\works\DEV\Zayuno\zayuno.apk` (55.9 MB, 58,568,737 bytes)
+  - `D:\works\DEV\Zayuno\zayuno-v14.apk` (55.9 MB)
+  - `D:\works\DEV\Zayuno\apps\mobile\zayuno.apk`
+- **O'rnatish (Install):** `adb install -r D:\works\DEV\Zayuno\zayuno.apk` -> **Success**.
+- **Ishga tushirish (Launch):** Ilova qurilmada ochildi va Google Sign-In avtorizatsiya ekrani faollashdi.
+- Qolgan ish yo'q.
+
+# Joriy ish — Universal action assistant refactor (2026-09-20)
+
+**ENG SO‘NGGI HANDOFF — foydalanuvchi regressiya ishini shu agent yakunlashni buyurdi.** APK alohida qoladi. Bu refactor regressiya tekshiruvlari tugamaguncha release-certified deb belgilanmaydi. Batafsil: `docs/zayuno-universal-orchestrator-refactor.md`.
+
+**Yakuniy holat:** Phase 1–5 kodi va fokuslangan testlari PASS. Isolated Postgres HTTP boundary, real health/lease E2E va `pnpm test:review` (42/42 suite) PASS. Eski private-method testlar universal public flowga migratsiya qilindi. APK/production migration/deploy/commit/push bajarilmadi. `apps/mobile/app.json`dagi versionCode 12→13 avvalgi foydalanuvchi o‘zgarishi, bu agent o‘zgartirmadi.
+
+**Aniq qolgan ishlar:** 7 synthetic provider + haqiqiy provider #1001 certification/E2E matrixasini kengaytirish; multi-offering chat (hozir >1 tanlov aniq rad qilinadi); mavjud Redis v3 pending session migratsiyasi; mavjud provider manifestlarini to‘liq moslashtirish; Gemini jonli NL va real mobile UX regressiyasi; parameter-only certification adversarial probes; APK. Core action API items[] ko‘p elementni qabul qiladi, cheklov chat sessioniga tegishli.
+
+**Regression holati:** legacy private chat-method va domain-specific presenter/MCP schema kutilmalari public universal flowga moslab qayta yozildi; production kodiga food/ticket branchlar qaytarilmadi. `pnpm test:review` — 42/42 PASS. `test-action-guardrails` va `test-consumer-chat-error-mapping` ham PASS (controller testi `--tsconfig apps/api/tsconfig.json` bilan).
+
+**Muhit:** isolated Redis `zayuno-universal-refactor-redis` 127.0.0.1:16379; isolated Postgres `zayuno-universal-refactor-db` 127.0.0.1:15432, DB `zayuno_universal_test`. Ularda biznes ma’lumoti yo‘q, shu ishning testlari uchun yaratildi, hozir ishlamoqda. Yangi migration shu isolated DBda qo‘llandi; mavjud lokal/prod DBga tegilmadi. Prisma client normal engine bilan generate qilindi. Keyingi agent test DBni explicit tanlasin, `.env` bazasi eski schema ekanligi kuzatildi.
+
+- [x] Phase 1: canonical projection (FULL default, profiles/select), declarative provider branding; test/build.
+- [x] Phase 2: Redis authoritative ConversationState, schema-driven requirements va generic slot filling; test/build.
+- [x] Phase 3: consumer chat domain branches va shared presenter exceptions o‘rniga universal orchestration/semantic intents/generic mobile renderer; test/build.
+- [x] Phase 4: manifest orqali customer/action requirements, nullable customer persistence va migration; test/build.
+- [x] Phase 5: generic location roles, parameter-only quote/action, quote/idempotency binding; test/build.
+- [x] Universal refactor legacy regression testlarini public contractlarga migratsiya qilish va full review runnerni yakunlash (42/42 PASS).
+- [ ] 7 synthetic domain va provider #1001 certification/regression testlari, mavjud invariantlar tekshiruvi.
+- [ ] Mobile version/build oshirish, production-like installable APK build va mavjud qurilma imkonida flow tekshiruvi.
+- [x] docs/zayuno-universal-orchestrator-refactor.md yakuniy hisobot va handoff.
+
+**Progress 3 (2026-09-20):** Isolated DB bilan `test-http-boundary-regression` va `test-production-health-and-lease-real-e2e` PASS. Onboarding/catalog, presenter, Coffee Time, consumer-memory, provider-cache/universal-chat va OpenAI MCP contract regressiyalari yangi generic output, manifest, Redis ConversationStore va parameter-only required fieldsga moslashtirildi. `pnpm test:review`: **42/42 PASS, 0 failure, 79.65s**. Contracts/shared/provider-sdk/API/MCP buildlari, mobile typecheck va `git diff --check` PASS. APK build, production deploy, commit/push bajarilmadi.
+
+**Holat / handoff:** Boshlang‘ich topshiriq va oldingi audit o‘qildi. Mavjud user o‘zgarishlari: TASKS.md, apps/mobile/app.json, docs/zayuno-universality-architecture-audit.md (untracked). Ular saqlanadi. Hozircha kod o‘zgarmadi, test/build/deploy bajarilmadi. Keyingi qadam: Phase 1 contract/API/MCP projection va backend→mobile branding yo‘lini implement qilish. Maxfiy ma’lumot yozilmaydi. Deploy/push hali bajarilmagan.
+
+**Progress 1:** Projection contract/shared funksiyalari, API catalog/search/detail boundary, MCP profiles/select, manifest/branding schema, provider registration/public DTO va mobile generic logo implement qilindi. `test-catalog-projection`, `test-mcp-tool-consistency`, contracts/shared/API/MCP build va mobile typecheck PASS. `test-public-provider-dto` lokal DBda `Provider.environment` ustuni yo‘qligi sabab FAIL (oldingi migratsiya yetishmaydi). Prisma client normal generate PASS; oldin `--no-engine` artefakti ham testga to‘sqinlik qilgan. Phase 1 DB regression hali tekshirilishi kerak, shuning uchun checkbox ochiq. Phase 2 conversation contract, schema requirements va Redis-only token lock/store yozildi; hali test qilinmagan. Keyingi qadam: isolated DB, Phase 2 testlari, keyin yangi orchestratorni eski chat o‘rniga ulash.
+
+**Progress 2:** Public DTO unit test eskirgan methodni mock qilgan: `getProviderBySlug` o‘rniga hozirgi `resolveCanonicalProvider` boundary mock qilindi, yangi branding/manifest allowlist tekshirildi — PASS. Phase 1 yakunlandi. Phase 2 `test-universal-conversation-state` haqiqiy isolated Redisda PASS (restart, tenant/conversation isolation, parallel lock, Redis unavailable fail-closed, generic slots/roles). API build PASS. Alohida test konteynerlari: zayuno-universal-refactor-redis (127.0.0.1:16379), zayuno-universal-refactor-db (127.0.0.1:15432, zayuno_universal_test); mavjud bazalar o‘zgartirilmadi. Phase 2 qatlamlari tayyor, chat integratsiyasi Phase 3da davom etadi.
+
+# Joriy ish — Zayuno arxitektura audit hisoboti (docs/zayuno-universality-architecture-audit.md) (2026-09-20)
+
+- [x] 1. Codebase qatlamlari, canonical modellar, capability va orchestration tuzilishini chuqur tadqiq qilish.
+- [x] 2. Provider/domain-specific qidiruvlar (iticket, evos, food, ticket va h.k.) o'tkazib, leak va chegaralarni tekshirish.
+- [x] 3. 16 ta bo'limdan iborat to'liq, dalillarga asoslangan arxitektura audit hisobotini `docs/zayuno-universality-architecture-audit.md`ga yozish.
+- [x] 4. Handoff va holatni yangilash.
+
+**Holat / handoff (2026-09-20):**
+- Hech qanday ishlab chiqarish kodi o‘zgartirilmadi, refactor qilinmadi yoki fix qilinmadi. Faqat toza tizimli audit o‘tkazildi.
+- Barcha 16 ta bo‘lim bo‘yicha chuqur tahlil tayyorlandi va `docs/zayuno-universality-architecture-audit.md` fayliga to‘liq yozildi.
+- Audit natijalari:
+  1. **Core API, Contracts va Provider SDK:** Haqiqatan ham universal, provayder-agnostik action layer (1,000 provayder kod o‘zgarishisiz ishlay oladi).
+  2. **Domain/Provider Leaks:** Asosiy cheklanishlar va tuzoqlar (traps) `apps/api/src/modules/consumer/chat/consumer-chat.service.ts` (FoodConstraints, recruitment regexlar), `apps/mobile/src/components/food/ProviderPickerCard.tsx` (EVOS/MaxWay logolari), hamda Postgres `Action` jadvalidagi majburiy `customerName` va `customerPhone` maydonlarida ekanligi aniqlandi.
+  3. **AI Payload Bloat:** Katalog va qidiruvda projection / select yo'qligi sababli LLM contextiga yuzlab kilobayt keraksiz JSON uzatilayotgani ko'rsatildi.
+- `git diff --check` — PASS (0 xato). Yangi hisobot fayli: `docs/zayuno-universality-architecture-audit.md`.
+
 # Joriy ish — MCP typed error envelope regressionini tuzatish (2026-09-18)
 
 - [x] 1. `search_catalog` toolida `CapabilityNotSupportedError` qayta otilishining sababini reproduce qilish.

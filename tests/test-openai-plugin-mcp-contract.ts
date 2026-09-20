@@ -303,8 +303,8 @@ async function main() {
     search_catalog: ['providerSlug'],
     get_offering: ['providerSlug', 'offeringId'],
     check_availability: ['providerSlug', 'items'],
-    request_quote: ['providerSlug', 'items'],
-    create_action: ['providerSlug', 'quoteId', 'items', 'userConfirmed'],
+    request_quote: ['providerSlug'],
+    create_action: ['providerSlug', 'quoteId', 'userConfirmed'],
     get_action: ['actionId'],
     cancel_action: ['actionId'],
     get_payment_options: ['actionId']
@@ -867,7 +867,7 @@ async function main() {
       items: [{ offeringId: 'ct_cappuccino', quantity: 1 }]
     });
     assert.ok(createdAction.actionId);
-    assert.ok(createdAction.customerMessage.includes('Haqiqiy providerga yuborilmaydi'));
+    assert.ok(createdAction.customerMessage.includes('Bu haqiqiy to‘lov tasdig‘i emas'));
     const actionRefId = createdAction.actionId;
 
     // 10. Safety Guardrail: duplicate create_action with same idempotencyKey -> Idempotent

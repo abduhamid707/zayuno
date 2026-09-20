@@ -159,6 +159,7 @@ function getHealthGuidance(status: string, checkedUrl: string): HealthGuidance {
 
 interface OnboardingWizardProps {
   apiBase: string;
+  publicApiBase?: string;
   token: string;
   onAuthSuccess: (token: string, user: any) => void;
   onProviderCreated: (provider: any) => void;
@@ -214,6 +215,7 @@ const InfoTooltip: React.FC<{
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   apiBase,
+  publicApiBase = apiBase,
   token,
   onAuthSuccess,
   onProviderCreated,
@@ -503,7 +505,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
   const handleCopyCredentialSetup = async () => {
     if (!createdCredentials?.sandboxApiKey && !createdCredentials?.sandboxWebhookSecret) return;
-    const webhookEndpoint = `${apiBase.replace(/\/$/, '')}/api/v1/webhooks/${registeredProviderSlug}`;
+    const webhookEndpoint = `${publicApiBase.replace(/\/$/, '')}/api/v1/webhooks/${registeredProviderSlug}`;
     const lines = [
       '# Zayuno server sozlamalari',
       createdCredentials.sandboxApiKey ? `ZAYUNO_API_KEY=${createdCredentials.sandboxApiKey}` : '',
@@ -531,6 +533,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     try {
       const res = await fetch(`${apiBase}/api/v1/auth/register-owner`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password, name: fullName.trim() })
       });
@@ -567,6 +570,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     try {
       const verifyRes = await fetch(`${apiBase}/api/v1/auth/verify-email`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: cleanToken })
       });
@@ -584,6 +588,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         // Fallback: attempt login with password if verify didn't return token
         const loginRes = await fetch(`${apiBase}/api/v1/auth/login`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim().toLowerCase(), password })
         });
@@ -2840,7 +2845,7 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
                 <div className="space-y-2 text-[11px] text-slate-300 leading-relaxed">
                   <p><strong>1. Zayuno → sizning API’ingiz:</strong> 2-qadamda kiritilgan <code className="text-sky-300 font-mono">Provider API key</code> serveringizning <code className="text-sky-300 font-mono">.env</code> faylida turadi. <code className="text-sky-300 font-mono">/health</code>, <code className="text-sky-300 font-mono">/catalog</code> va buyurtma endpointlari kelgan <code className="text-sky-300 font-mono">x-provider-api-key</code> headerini shu qiymat bilan tekshiradi.</p>
                   <p><strong>2. Sizning serveringiz → Zayuno:</strong> yuqoridagi <code className="text-indigo-300 font-mono">ZAYUNO_API_KEY</code> faqat Zayuno REST API chaqiruvlari uchun ishlatiladi. Uni o‘z endpointlaringizni himoyalash uchun ishlatmang.</p>
-                  {requiresWebhookSigning && <p><strong>3. Buyurtma statusi:</strong> event JSON’ining raw body’sini <code className="text-indigo-300 font-mono">ZAYUNO_WEBHOOK_SECRET</code> bilan HMAC-SHA256 imzolang, keyin <code className="break-all text-indigo-300 font-mono">POST {apiBase.replace(/\/$/, '')}/api/v1/webhooks/{registeredProviderSlug}</code> ga <code className="text-indigo-300 font-mono">x-zayuno-signature</code> headeri bilan yuboring.</p>}
+                  {requiresWebhookSigning && <p><strong>3. Buyurtma statusi:</strong> event JSON’ining raw body’sini <code className="text-indigo-300 font-mono">ZAYUNO_WEBHOOK_SECRET</code> bilan HMAC-SHA256 imzolang, keyin <code className="break-all text-indigo-300 font-mono">POST {publicApiBase.replace(/\/$/, '')}/api/v1/webhooks/{registeredProviderSlug}</code> ga <code className="text-indigo-300 font-mono">x-zayuno-signature</code> headeri bilan yuboring.</p>}
                   <p className="text-amber-400"><strong>Xavfsizlik:</strong> bu qiymatlarni faqat backend <code className="font-mono">.env</code> fayliga saqlang. Frontend, Git, URL yoki AI chatga yubormang.</p>
                 </div>
               </div>

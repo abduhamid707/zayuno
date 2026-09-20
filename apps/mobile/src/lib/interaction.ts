@@ -24,6 +24,8 @@ export type InteractionChoice = {
   prompt: string;
   groupId: string;
   multiSelect?: boolean;
+  fieldPath?: string;
+  value?: unknown;
 };
 
 export type InteractionGroup = {
@@ -40,6 +42,9 @@ export type ProviderCardItem = {
   name: string;
   logoUrl?: string;
   brandColor?: string;
+  secondaryColor?: string;
+  iconUrl?: string;
+  displayName?: string;
   badge?: string;
   cuisine?: string;
   prompt: string;
@@ -81,7 +86,8 @@ export type CatalogSectionItem = {
 
 export type ChatInteraction = {
   version: 1;
-  kind: "choice_cards" | "provider_list" | "catalog_menu";
+  kind: "choice_cards" | "provider_list" | "catalog_menu" | "universal";
+  components?: Array<{ type: string; [key: string]: any }>;
   layout?: "actions";
   title?: string;
   subtitle?: string;

@@ -37,6 +37,8 @@ import { QuoteExpiredError, QuoteMismatchError, ActionCancellationError, Capabil
 import { RedisService } from '../../common/services/redis.service';
 import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
 import { assertDeclaredDynamicParameters } from '../../common/dynamic-parameter-validation';
+import { assertActionRequirements } from '../../common/action-requirements';
+import { canonicalQuoteInput, manifestOf } from '@zayuno/shared';
 
 type AccessScope = {
   id?: string;
@@ -60,6 +62,7 @@ export class ActionsService {
       throw new BadRequestException('providerSlug is required.');
     }
     const cleanSlug = input.providerSlug.toLowerCase().trim();
+    input.items ??= [];
 
     // Idempotency key: use client-provided key or generate a unique random UUID
     const idempotencyKey = input.idempotencyKey || randomUUID();
@@ -85,6 +88,8 @@ export class ActionsService {
       items: input.items || [],
       customer: input.customer || null,
       destination: input.destination || null,
+      ...(input.locations?.length ? { locations: input.locations } : {}),
+      ...(input.promoCode ? { promoCode: input.promoCode } : {}),
       fulfillmentType: input.fulfillmentType || null,
       paymentMethod: input.paymentMethod || null,
       parameters: input.parameters || {}
@@ -251,9 +256,25 @@ export class ActionsService {
       }
 
       // 5. Dynamic parameters validation
+      assertActionRequirements(provider, input, 'ACTION_CREATE', (dbQuote as any).requestInput?.requirements);
+      const manifest = manifestOf(provider);
+      const boundInput = (dbQuote as any).requestInput;
+      if (!input.items.length && !boundInput) throw new QuoteMismatchError(input.quoteId, 'Parameter-based actions require a quote with bound inputs.');
+      if (boundInput) {
+        const { customer: quotedCustomer, requirements: _requirements, ...quotedInput } = boundInput;
+        if (createIdempotencyPayloadHash(quotedInput) !== createIdempotencyPayloadHash(canonicalQuoteInput(input))) {
+          throw new QuoteMismatchError(input.quoteId, 'Action inputs differ from the reviewed quote. Request a fresh quote.');
+        }
+        for (const [field, value] of Object.entries(quotedCustomer || {})) {
+          if ((input.customer as any)?.[field] !== value) throw new QuoteMismatchError(input.quoteId, 'Quoted customer field changed.');
+        }
+      }
       await assertDeclaredDynamicParameters(adapter, cleanSlug, input.parameters, {
         locationId: input.locationId,
-        offeringIds: input.items.map(item => item.offeringId)
+        offeringIds: input.items.map(item => item.offeringId),
+        declarations: [manifest?.parametersSchema, manifest?.requirements?.QUOTE?.parametersSchema, manifest?.requirements?.ACTION_CREATE?.parametersSchema,
+          boundInput?.requirements?.parametersSchema,
+          manifest?.fulfillmentRequirements?.[input.fulfillmentType || '']?.parametersSchema]
       });
 
       // 4. Call Provider Adapter with canonical quote snapshot
@@ -329,8 +350,10 @@ export class ActionsService {
           discount: resolvedDiscount,
           total: resolvedTotal,
           currency: resolvedCurrency,
-          customerName: input.customer?.name || 'Customer',
-          customerPhone: input.customer?.phone || '+998900000000',
+          customerName: input.customer?.name || null,
+          customerPhone: input.customer?.phone || null,
+          customerEmail: input.customer?.email || null,
+          locations: input.locations as any,
           destination: input.destination?.raw,
           latitude: input.destination?.coordinates?.latitude,
           longitude: input.destination?.coordinates?.longitude,
@@ -665,8 +688,9 @@ export class ActionsService {
       total: Number(dbAction.total),
       currency: dbAction.currency as any,
       customer: {
-        name: dbAction.customerName,
-        phone: dbAction.customerPhone
+        name: dbAction.customerName || undefined,
+        phone: dbAction.customerPhone || undefined,
+        email: dbAction.customerEmail || undefined
       },
       destination: dbAction.destination ? { raw: dbAction.destination } : undefined,
       fulfillmentType: dbAction.fulfillmentType,
@@ -676,6 +700,7 @@ export class ActionsService {
       idempotencyKey: dbAction.idempotencyKey || undefined,
       supportContact,
       parameters: (dbAction.parameters as any) || {},
+      locations: dbAction.locations || undefined,
       metadata: normalizedMetadata,
       timeline: (dbAction.timeline || []).map((e: any) => ({
         id: e.id,

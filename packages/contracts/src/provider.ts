@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProviderBrandingSchema, ProviderManifestSchema } from './provider-manifest';
 import { IsoDateTimeSchema, optionalNullable } from './common';
 import { Location, GetLocationsInput } from './location';
 import {
@@ -377,6 +378,8 @@ export const RequiredSupportContactSchema = z.union([
 ]);
 
 export const ProviderInfoSchema = z.object({
+  branding: ProviderBrandingSchema.optional(),
+  manifest: ProviderManifestSchema.optional(),
   id: z.string(),
   slug: z.string(),
   name: z.string(),
@@ -410,6 +413,8 @@ export type ProviderInfo = z.infer<typeof ProviderInfoSchema>;
  * in the internal ProviderInfo contract.
  */
 export const PublicProviderInfoSchema = z.object({
+  branding: ProviderBrandingSchema.optional(),
+  manifest: ProviderManifestSchema.optional(),
   slug: z.string(),
   name: z.string(),
   description: optionalNullable(z.string()),
@@ -499,6 +504,8 @@ export const ProviderLogoSchema = z.string().max(96_000).refine(value => {
 }, 'Logo must be a public HTTPS URL or a PNG/JPEG/WebP image under 96 KB');
 
 export const RegisterProviderInputSchema = z.object({
+  branding: ProviderBrandingSchema.optional(),
+  manifest: ProviderManifestSchema.optional(),
   name: z.string().trim().min(2).max(160),
   logoUrl: ProviderLogoSchema.nullable().optional(),
   slug: z.string().min(2).regex(/^[a-z0-9-]+$/),

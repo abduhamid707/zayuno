@@ -3,7 +3,7 @@ import { ProvidersService } from '../apps/api/src/modules/providers/providers.se
 
 async function main() {
   const service = new ProvidersService({} as any);
-  (service as any).getProviderBySlug = async () => ({
+  const fixture = {
     id: 'internal-provider-id',
     slug: 'provider-demo',
     name: 'Provider Demo',
@@ -28,10 +28,13 @@ async function main() {
       lastCertificationReport: { endpoint: '/internal/certification' },
       healthMonitoring: { lastFailureAt: '2026-09-18T00:00:00.000Z' }
     }
-  });
+  };
+  (service as any).resolveCanonicalProvider = async () => fixture;
+  (service as any).getProviderBySlug = async () => fixture;
 
   const provider = await service.getPublicProviderBySlug('provider-demo');
   assert.deepEqual(Object.keys(provider).sort(), [
+    'branding',
     'capabilities',
     'category',
     'description',
@@ -39,6 +42,7 @@ async function main() {
     'fulfillmentMode',
     'geography',
     'logoUrl',
+    'manifest',
     'name',
     'slug',
     'status',

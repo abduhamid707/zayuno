@@ -178,7 +178,7 @@ function executeChatStream(
         messages,
         conversationId,
         selections: selections.map(
-          ({ id, groupId, kind, title, providerSlug, offeringId, quantity, sku, variantId }) => ({
+          ({ id, groupId, kind, title, providerSlug, offeringId, quantity, sku, variantId, fieldPath, value }) => ({
             id,
             groupId,
             kind,
@@ -188,6 +188,8 @@ function executeChatStream(
             quantity,
             sku,
             variantId,
+            fieldPath,
+            value,
           }),
         ),
       }),

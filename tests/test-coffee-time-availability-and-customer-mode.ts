@@ -127,7 +127,7 @@ async function main() {
     // Customer quote formatting check
     const quoteCustomerMsg = formatCustomerQuote(quote);
     assert.match(quoteCustomerMsg, /91 000 so‘m/);
-    assert.match(quoteCustomerMsg, /taxminan 25 daqiqa/);
+    assert.match(quoteCustomerMsg, /Taxminiy bajarilish vaqti: 25 daqiqa/);
     assert.match(quoteCustomerMsg, /tasdiqlaysizmi/i);
 
     // 2b. Create Action without idempotencyKey from client
@@ -161,8 +161,8 @@ async function main() {
     const actionResult = await createActionTool.handler(actionInput, fakeClient);
     assert.ok(createdIdempotencyKey, 'Server must generate idempotency key when omitted by client');
     assert.ok(actionResult.customerMessage, 'Action result must contain customerMessage');
-    assert.match(actionResult.customerMessage, /Sinov buyurtmasi yaratildi\./);
-    assert.match(actionResult.customerMessage, /Haqiqiy providerga yuborilmaydi va bu sahifada haqiqiy to‘lov amalga oshmaydi\./);
+    assert.match(actionResult.customerMessage, /Sinov so‘rovi yaratildi\./);
+    assert.match(actionResult.customerMessage, /Bu haqiqiy to‘lov tasdig‘i emas\./);
     assert.match(actionResult.customerMessage, /\[Sinov sahifasini ochish\]/);
 
     // 2c. Retry action creation with same quoteId -> must use the exact same idempotency key

@@ -104,7 +104,7 @@ model Provider {
   category        ProviderCategory     @default(OTHER)
   subcategory     String?
   adapterType     String               @default("sandbox") // Identifier used by AdapterRegistryService
-  capabilities    ProviderCapability[]
+  capabilities    ProviderCapability[]  @default([])
   baseUrl         String?
   encryptedSecret String               // AES-256-GCM encrypted provider credentials
   webhookSecret   String               // HMAC secret for inbound webhook verification
@@ -333,6 +333,7 @@ model ApiKey {
 }
 
 model Quote {
+  requestInput    Json?
   id              String       @id @default(uuid())
   providerId      String
   locationId      String?
@@ -369,8 +370,10 @@ model Action {
   total            Decimal       @db.Decimal(12, 2)
   currency         String        @default("UZS")
   
-  customerName     String
-  customerPhone    String
+  customerName     String?
+  customerPhone    String?
+  customerEmail    String?
+  locations        Json?
   destination      String?
   latitude         Float?
   longitude        Float?

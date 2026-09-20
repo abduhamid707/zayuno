@@ -25,7 +25,7 @@ import {
 
 // Discovery should return enough to select a provider, never its embedded catalog/config.
 function providerSummary(provider: any) {
-  const keys = ['slug', 'name', 'description', 'logoUrl', 'status', 'type', 'environment', 'category', 'subcategory', 'geography', 'capabilities', 'fulfillmentMode', 'supportContact'];
+  const keys = ['slug', 'name', 'description', 'logoUrl', 'branding', 'manifest', 'status', 'type', 'environment', 'category', 'subcategory', 'geography', 'capabilities', 'fulfillmentMode', 'supportContact'];
   return Object.fromEntries(keys.filter(key => provider[key] !== undefined).map(key => [key, provider[key]]));
 }
 
@@ -80,7 +80,8 @@ const catalogOfferingOutputProperties = {
 const catalogOfferingOutputSchema = {
   type: 'object',
   properties: catalogOfferingOutputProperties,
-  required: ['id', 'name', 'price']
+  // Projection may deliberately omit any offering field.
+  required: []
 };
 
 export interface McpToolDefinition {
@@ -345,6 +346,8 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         name: { type: 'string' },
         description: { type: 'string' },
         logoUrl: { type: 'string' },
+        branding: { type: 'object' },
+        manifest: { type: 'object' },
         status: { type: 'string' },
         type: { type: 'string' },
         environment: { type: 'string' },
@@ -482,6 +485,8 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        responseProfile: { type: 'string', enum: ['MINIMAL', 'COMPACT', 'STANDARD', 'FULL'], description: 'Canonical offering projection; defaults to FULL.' },
+        select: { type: 'array', items: { type: 'string' }, description: 'Canonical dotted offering paths; overrides responseProfile.' },
         providerSlug: {
           type: 'string',
           description: 'Unique slug of the target capability provider (e.g. "sandbox-provider").'
@@ -525,7 +530,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       return {
         ...(Array.isArray(catalog) ? {} : catalog), providerSlug: args.providerSlug, locationId: catalog?.locationId ?? args.locationId,
         customerMessage,
-        offerings: offerings.map(catalogOffering)
+        offerings: offerings.map((offering: any) => args.select || (args.responseProfile && args.responseProfile !== 'FULL') ? projectOffering(offering, args) : catalogOffering(offering))
       };
     }
   },
@@ -542,6 +547,8 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        responseProfile: { type: 'string', enum: ['MINIMAL', 'COMPACT', 'STANDARD', 'FULL'] },
+        select: { type: 'array', items: { type: 'string' } },
         providerSlug: {
           type: 'string',
           description: 'Target provider slug to search within (e.g. "sandbox-provider").'
@@ -593,7 +600,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       return {
         customerMessage,
         ...(Array.isArray(result) ? { total: result.length } : result), providerSlug: args.providerSlug,
-        offerings: offerings.map(catalogOffering)
+        offerings: offerings.map((offering: any) => args.select || (args.responseProfile && args.responseProfile !== 'FULL') ? projectOffering(offering, args) : catalogOffering(offering))
       };
     }
   },
@@ -610,6 +617,8 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        responseProfile: { type: 'string', enum: ['MINIMAL', 'COMPACT', 'STANDARD', 'FULL'] },
+        select: { type: 'array', items: { type: 'string' } },
         providerSlug: {
           type: 'string',
           description: 'Unique slug of the capability provider.'
@@ -641,14 +650,14 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         ...catalogOfferingOutputProperties,
         providerSlug: { type: 'string' }
       },
-      required: ['customerMessage', 'id', 'name', 'price']
+      required: ['customerMessage']
     },
     handler: async (args, client) => {
       const offering = await client.getOffering(args.providerSlug, args.offeringId, args.locationId, args.parameters, args.environment);
       const customerMessage = formatCustomerOffering(offering);
       return {
         customerMessage,
-        ...catalogOffering(offering), providerSlug: args.providerSlug
+        ...(args.select || (args.responseProfile && args.responseProfile !== 'FULL') ? projectOffering(offering, args) : catalogOffering(offering)), providerSlug: args.providerSlug
       };
     }
   },
@@ -744,6 +753,9 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        locations: universalLocationInput(),
+        customer: { type: 'object', properties: { name: { type: 'string' }, phone: { type: 'string' }, email: { type: 'string' } } },
+        paymentMethod: { type: 'string' },
         providerSlug: {
           type: 'string',
           description: 'Unique slug of the capability provider.'
@@ -804,7 +816,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           description: 'Target execution environment context (e.g. LIVE, SANDBOX). Defaults to LIVE.'
         }
       },
-      required: ['providerSlug', 'items']
+      required: ['providerSlug']
     },
     outputSchema: {
       type: 'object',
@@ -868,6 +880,8 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
+        locations: universalLocationInput(),
+        promoCode: { type: 'string' },
         idempotencyKey: {
           type: 'string',
           description: 'Optional client-generated key (e.g. UUID) preventing duplicate action submission. If not supplied, server generates and reuses a secure key automatically.'
@@ -913,7 +927,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           type: 'object',
           description: 'Customer contact information only when the provider declares it is required for this action.',
           properties: {
-            name: { type: 'string', description: 'Customer full name (optional, defaults to "Mijoz")' },
+            name: { type: 'string', description: 'Customer full name only when declared by the provider; no fabricated defaults' },
             phone: { type: 'string', description: 'Customer phone number when the provider requires it, e.g. +998901234567' },
             email: { type: 'string', description: 'Optional customer email' }
           }
@@ -948,7 +962,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           description: 'Explicit confirmation flag acknowledging pricing review by user (must be true).'
         }
       },
-      required: ['providerSlug', 'quoteId', 'items', 'userConfirmed']
+      required: ['providerSlug', 'quoteId', 'userConfirmed']
     },
     outputSchema: {
       type: 'object',
@@ -1277,3 +1291,8 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
     );
   }
 }
+import { projectOffering } from '@zayuno/shared';
+function universalLocationInput() { return { type: 'array', items: { type: 'object', properties: {
+  role: { type: 'string' }, locationId: { type: 'string' },
+  address: { type: 'object', properties: { raw: { type: 'string' }, coordinates: { type: 'object', properties: { latitude: { type: 'number' }, longitude: { type: 'number' } }, required: ['latitude', 'longitude'] } }, required: ['raw'] },
+}, required: ['role'] } }; }

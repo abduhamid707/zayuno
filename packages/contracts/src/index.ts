@@ -9,3 +9,6 @@ export * from './provider';
 export * from './dynamic-service';
 export * from './dynamic-parameters';
 export * from './provider-protocol';
+export * from './projection';
+export * from './provider-manifest';
+export * from './conversation';

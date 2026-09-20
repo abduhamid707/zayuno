@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CurrencySchema, AddressSchema, CustomerContactSchema, IsoDateTimeSchema, optionalNullable } from './common';
+import { CurrencySchema, AddressSchema, CustomerContactSchema, IsoDateTimeSchema, optionalNullable, ActionLocationSchema } from './common';
 import { QuoteLineSchema } from './quote';
 import { StructuredSupportContactSchema } from './provider';
 
@@ -58,7 +58,9 @@ export const CreateActionInputSchema = z.object({
   providerSlug: z.string().min(1).describe('Target provider slug'),
   quoteId: z.string().min(1).describe('Verified quote ID reviewed and confirmed by the user before submission'),
   locationId: optionalNullable(z.string()),
-  items: z.array(ActionItemInputSchema).min(1).describe('Items or services requested in action'),
+  items: z.array(ActionItemInputSchema).default([]).describe('Offering inputs, or empty for declared parameter-based actions'),
+  locations: z.array(ActionLocationSchema).optional(),
+  promoCode: z.string().trim().min(1).max(64).optional(),
   customer: optionalNullable(CustomerContactSchema).describe('Customer contact info when required by the provider or fulfillment flow'),
   destination: optionalNullable(AddressSchema).describe('Optional destination address or fulfillment location'),
   fulfillmentType: optionalNullable(z.string()).describe('e.g. STANDARD, EXPRESS, PICKUP, DIGITAL'),
@@ -91,6 +93,7 @@ export const ActionEventSchema = z.object({
 export type ActionEvent = z.infer<typeof ActionEventSchema>;
 
 export const NormalizedActionSchema = z.object({
+  locations: z.array(ActionLocationSchema).optional(),
   id: z.string().describe('Internal UUID'),
   publicId: z.string().describe('Public-facing reference ID (e.g. "ZY-ACT-12345")'),
   providerSlug: z.string(),

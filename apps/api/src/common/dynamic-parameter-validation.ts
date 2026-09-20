@@ -10,6 +10,7 @@ import { ZayunoError } from '@zayuno/shared';
 type ParameterSchemaResolutionOptions = {
   locationId?: string;
   offeringIds?: string[];
+  declarations?: unknown[];
 };
 
 function isParameterObject(value: unknown): value is Record<string, unknown> {
@@ -67,7 +68,7 @@ export async function resolveDynamicParameterDeclaration(
   const config = typeof (adapter as any)?.getConfig === 'function'
     ? (adapter as any).getConfig()
     : (adapter as any)?.config;
-  const declarations: unknown[] = getDeclaredSchemas(config);
+  const declarations: unknown[] = [...getDeclaredSchemas(config), ...(options.declarations || [])];
 
   const supportsCatalog = typeof adapter.hasCapability === 'function'
     ? adapter.hasCapability(ProviderCapability.CATALOG)

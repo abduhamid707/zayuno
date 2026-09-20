@@ -1,3 +1,4 @@
+import { manifestOf } from '@zayuno/shared';
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
@@ -70,7 +71,8 @@ export class CatalogService {
 
     const cleanSlug = providerSlug.toLowerCase().trim();
     // 1. Provider exists & published in target environment
-    await this.providersService.assertProviderPublished(cleanSlug, environment);
+    const provider = await this.providersService.assertProviderPublished(cleanSlug, environment);
+    const manifest = manifestOf(provider);
     // 2. Capability supported?
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
     await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG, environment);
@@ -88,7 +90,7 @@ export class CatalogService {
     });
 
     return this.readThroughCache(cacheKey, CATALOG_CACHE_POLICY, async () => {
-      await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, { locationId });
+      await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, { locationId, declarations: [manifest?.parametersSchema, manifest?.requirements?.CATALOG?.parametersSchema] });
       const rawCatalog = await adapter.getCatalog!({
         providerSlug: cleanSlug,
         locationId,
@@ -120,7 +122,8 @@ export class CatalogService {
 
     const cleanSlug = providerSlug.toLowerCase().trim();
     // 1. Provider exists & published in target environment
-    await this.providersService.assertProviderPublished(cleanSlug, environment);
+    const provider = await this.providersService.assertProviderPublished(cleanSlug, environment);
+    const manifest = manifestOf(provider);
     // 2. Capability supported?
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.CATALOG);
     await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.CATALOG, environment);
@@ -140,7 +143,7 @@ export class CatalogService {
     return this.readThroughCache(cacheKey, OFFERING_CACHE_POLICY, async () => {
       await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, {
         locationId,
-        offeringIds: [offeringId]
+        offeringIds: [offeringId], declarations: [manifest?.parametersSchema, manifest?.requirements?.CATALOG?.parametersSchema]
       });
       const rawOffering = await adapter.getOffering!({
         providerSlug: cleanSlug,
@@ -170,7 +173,8 @@ export class CatalogService {
 
     const cleanSlug = providerSlug.toLowerCase().trim();
     // 1. Provider exists & published in target environment
-    await this.providersService.assertProviderPublished(cleanSlug, environment);
+    const provider = await this.providersService.assertProviderPublished(cleanSlug, environment);
+    const manifest = manifestOf(provider);
     // 2. Capability supported? Manifest must match execution: strictly require SEARCH capability
     const adapter = await this.registry.assertAndGetCapability(cleanSlug, ProviderCapability.SEARCH);
     await this.providersService.assertProviderCapabilityEligible(cleanSlug, ProviderCapability.SEARCH, environment);
@@ -193,7 +197,7 @@ export class CatalogService {
     });
 
     return this.readThroughCache(cacheKey, SEARCH_CACHE_POLICY, async () => {
-      await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, { locationId });
+      await assertDeclaredDynamicParameters(adapter, cleanSlug, parameters, { locationId, declarations: [manifest?.parametersSchema, manifest?.requirements?.SEARCH?.parametersSchema] });
       try {
         const rawOfferings = await adapter.searchOfferings!({
           providerSlug: cleanSlug,

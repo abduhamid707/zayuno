@@ -38,6 +38,7 @@ import {
   SelectionTray,
 } from "../../src/components/InteractionCards";
 import { ProviderPickerCard } from "../../src/components/food/ProviderPickerCard";
+import { UniversalRenderer } from "../../src/components/UniversalRenderer";
 import { InChatCatalogWidget } from "../../src/components/food/InChatCatalogWidget";
 import {
   ContextTrayDock,
@@ -619,7 +620,7 @@ export default function HomeScreen() {
   const selectChoice = useCallback(
     (choice: InteractionChoice) => {
       if (isLoading) return;
-      if (choice.groupId.startsWith("order:")) {
+      if (choice.groupId.startsWith("order:") || choice.fieldPath || choice.groupId === 'offerings' || choice.groupId === 'status') {
         sendMessageRef.current("", [choice], []);
         return;
       }
@@ -772,7 +773,9 @@ export default function HomeScreen() {
 
           {item.interaction && !shouldHideActions ? (
             <View style={styles.interactionBlock}>
-              {item.interaction.kind === "provider_list" ? (
+              {item.interaction.kind === "universal" ? (
+                <UniversalRenderer interaction={item.interaction} onSelect={selectChoice} disabled={isLoading} />
+              ) : item.interaction.kind === "provider_list" ? (
                 <ProviderPickerCard
                   providers={item.interaction.providers || []}
                   title={item.interaction.title}
@@ -782,8 +785,8 @@ export default function HomeScreen() {
                 />
               ) : item.interaction.kind === "catalog_menu" ? (
                 <InChatCatalogWidget
-                  providerSlug={item.interaction.providerSlug || "evos"}
-                  providerName={item.interaction.providerName || "Restoran"}
+                  providerSlug={item.interaction.providerSlug || ""}
+                  providerName={item.interaction.providerName || "Hamkor"}
                   providerLogoUrl={item.interaction.providerLogoUrl}
                   locationName={item.interaction.locationName}
                   categories={item.interaction.categories || []}
@@ -946,7 +949,9 @@ export default function HomeScreen() {
                   </View>
                   {streamingInteraction ? (
                     <View style={styles.interactionBlock}>
-                      {streamingInteraction.kind === "provider_list" ? (
+                      {streamingInteraction.kind === "universal" ? (
+                        <UniversalRenderer interaction={streamingInteraction} onSelect={selectChoice} disabled />
+                      ) : streamingInteraction.kind === "provider_list" ? (
                         <ProviderPickerCard
                           providers={streamingInteraction.providers || []}
                           title={streamingInteraction.title}
@@ -957,10 +962,10 @@ export default function HomeScreen() {
                       ) : streamingInteraction.kind === "catalog_menu" ? (
                         <InChatCatalogWidget
                           providerSlug={
-                            streamingInteraction.providerSlug || "evos"
+                            streamingInteraction.providerSlug || ""
                           }
                           providerName={
-                            streamingInteraction.providerName || "Restoran"
+                            streamingInteraction.providerName || "Hamkor"
                           }
                           providerLogoUrl={streamingInteraction.providerLogoUrl}
                           locationName={streamingInteraction.locationName}

@@ -34,6 +34,8 @@ type ChatSelection = {
   quantity?: number;
   sku?: string;
   variantId?: string;
+  fieldPath?: string;
+  value?: unknown;
 };
 
 type ChatBody = {
@@ -146,6 +148,7 @@ export class ConsumerChatController {
   private publicErrorMessage(error: unknown): string {
     const { code, status, message } = this.errorDetails(error);
     if (status === HttpStatus.BAD_REQUEST) {
+      if (message === 'Bir vaqtda bitta taklif tanlang.') return message;
       if (/1[–-]1200/.test(message)) {
         return "Xabar 1 200 belgidan uzun. Ro‘yxatni qismlarga bo‘lib yuboring.";
       }

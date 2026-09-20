@@ -7,6 +7,7 @@ import {
   ProviderCapabilityProfile,
   ProviderFulfillmentMode,
   ProviderInfo,
+  ProviderManifestSchema,
   ProviderType,
   determineProviderCapabilityProfile,
   getMandatoryCapabilitiesForProfile,
@@ -333,6 +334,13 @@ export class ProviderCertificationRunner {
         }
         if (!info.capabilities || info.capabilities.length === 0) throw new Error('Provider must advertise at least one capability.');
         if (!info.status) throw new Error('Provider info missing status field.');
+        const manifest = info.manifest || info.metadata?.manifest;
+        if (manifest) {
+          const parsed = ProviderManifestSchema.parse(manifest);
+          if (parsed.capabilities?.some(capability => !declaredCaps.includes(capability as ProviderCapability))) {
+            throw new Error('Manifest capability is not declared by the adapter.');
+          }
+        }
       }, [], 'CONTRACT_READINESS');
     }
 
@@ -425,6 +433,9 @@ export class ProviderCertificationRunner {
     }
 
     // 4. Catalog Capability (MANDATORY)
+    const manifest = providerInfo?.manifest || providerInfo?.metadata?.manifest;
+    const parameterOnly = manifest?.requirements?.QUOTE?.inputMode === 'PARAMETERS';
+    const certificationInput = manifest?.certificationInput || {};
     let selectedTestOffering: Offering | undefined;
     let selectedTestVariantId: string | undefined;
     let selectedTestOptions: SelectedOption[] = [];
@@ -432,6 +443,7 @@ export class ProviderCertificationRunner {
     if (this.adapter.hasCapability(ProviderCapability.CATALOG) && this.adapter.getCatalog) {
       await this.runTest(results, 'catalog', 'Catalog Structure & Offerings', ProviderCapability.CATALOG, true, async () => {
         const catalog = await this.adapter.getCatalog!({ providerSlug: this.adapter.providerSlug, locationId: testLocationId });
+        if (parameterOnly && Array.isArray(catalog.offerings)) return;
         if (!catalog.offerings || catalog.offerings.length === 0) throw new Error('Catalog has no offerings.');
 
         // Select an available offering
@@ -470,7 +482,7 @@ export class ProviderCertificationRunner {
     }
 
     // 4b. Single Offering Lookup (MANDATORY with Catalog)
-    if (this.adapter.hasCapability(ProviderCapability.CATALOG) && this.adapter.getOffering) {
+    if (!parameterOnly && this.adapter.hasCapability(ProviderCapability.CATALOG) && this.adapter.getOffering) {
       await this.runTest(results, 'offering', 'Single Offering Lookup', ProviderCapability.CATALOG, true, async () => {
         const offeringId = selectedTestOffering?.id || selectedTestOffering?.offeringCode;
         if (!offeringId) {
@@ -510,21 +522,22 @@ export class ProviderCertificationRunner {
     let testQuoteId: string | undefined;
     if (this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote) {
       await this.runTest(results, 'quote', 'Verified Quote Pricing & Math', ProviderCapability.QUOTE, true, async () => {
-        const testOfferingId = selectedTestOffering!.id || selectedTestOffering!.offeringCode;
+        const testOfferingId = selectedTestOffering?.id || selectedTestOffering?.offeringCode;
         const quote = await this.adapter.requestQuote!({
           providerSlug: this.adapter.providerSlug,
           locationId: testLocationId,
-          items: [{
-            offeringId: testOfferingId,
+          items: parameterOnly ? [] : [{
+            offeringId: testOfferingId!,
             variantId: selectedTestVariantId,
             quantity: 1,
             selectedOptions: selectedTestOptions
           }],
-          destination: certificationDestination
+          ...(!parameterOnly ? { destination: certificationDestination } : {}),
+          ...certificationInput
         });
 
-        if (quote.total <= 0) throw new Error('Quote total must be a positive number.');
-        if (!quote.lines || quote.lines.length === 0) throw new Error('Quote must return itemized lines breakdown.');
+        if (quote.total < 0) throw new Error('Quote total must be nonnegative.');
+        if (!Array.isArray(quote.lines) || (!parameterOnly && quote.lines.length === 0)) throw new Error('Quote must return an appropriate lines breakdown.');
 
         // Strict Quote Math Validation: total == subtotal + fees - discount
         const subtotal = Number(quote.subtotal);
@@ -571,7 +584,7 @@ export class ProviderCertificationRunner {
     // V2 adversarial probes are opt-in and quote-only: they cannot create a
     // provider action. Each probe is tied to QUOTE and runs only after a valid
     // quote proves the selected catalog fixture is usable.
-    if (adversarialMode && this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote) {
+    if (adversarialMode && !parameterOnly && this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote) {
       await this.runTest(
         results,
         'adversarial-invalid-selection',
@@ -735,7 +748,7 @@ export class ProviderCertificationRunner {
     let createdActionId: string | undefined;
     const testIdempKey = crypto.randomUUID();
     const createCertificationActionInput = (customerName = 'Certification Validator'): CreateActionInput => {
-      const offeringId = selectedTestOffering!.id || selectedTestOffering!.offeringCode;
+      const offeringId = selectedTestOffering?.id || selectedTestOffering?.offeringCode;
       return {
         idempotencyKey: testIdempKey,
         providerSlug: this.adapter.providerSlug,
@@ -745,13 +758,14 @@ export class ProviderCertificationRunner {
           name: customerName,
           phone: '+998901234567'
         },
-        destination: certificationDestination,
-        items: [{
-          offeringId,
+        ...(!parameterOnly ? { destination: certificationDestination } : {}),
+        items: parameterOnly ? [] : [{
+          offeringId: offeringId!,
           variantId: selectedTestVariantId,
           quantity: 1,
           selectedOptions: selectedTestOptions
         }],
+        ...certificationInput,
         userConfirmed: true
       };
     };

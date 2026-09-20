@@ -820,6 +820,8 @@ export class ProvidersService {
         },
         metadata: {
           ...((existingOwnerDraft.metadata as Record<string, any>) || {}),
+          branding: input.branding,
+          manifest: input.manifest,
           category,
           subcategory,
           environment,
@@ -893,6 +895,8 @@ export class ProvidersService {
           subcategory,
           environment,
           geography: input.geography || ['UZ'],
+          branding: input.branding,
+          manifest: input.manifest,
           description: input.description,
           supportContact: normalizedSupport,
           fulfillmentMode,
@@ -1451,6 +1455,9 @@ export class ProvidersService {
     const adapter = await this.registry.getAdapter(cleanSlug);
     const runner = new ProviderCertificationRunner(adapter);
     const report = await runner.runAllTests();
+    const certifiedInfo = report.isProductionReady && adapter.getProviderInfo ? await adapter.getProviderInfo() : undefined;
+    const certifiedManifest = certifiedInfo?.manifest || certifiedInfo?.metadata?.manifest;
+    const certifiedBranding = certifiedInfo?.branding || certifiedInfo?.metadata?.branding;
 
     if (report.isProductionReady) {
       await this.syncDiscoveryLocations(provider, adapter);
@@ -1463,6 +1470,8 @@ export class ProvidersService {
         metadata: {
           ...(await this.getMetadata(cleanSlug)),
           isCertified: report.isProductionReady,
+          ...(certifiedManifest ? { manifest: ProviderManifestSchema.parse(certifiedManifest) } : {}),
+          ...(certifiedBranding ? { branding: ProviderBrandingSchema.parse(certifiedBranding) } : {}),
           lastCertificationReport: report as any,
           lastCertifiedAt: new Date().toISOString(),
           eligibility: {
@@ -1850,6 +1859,8 @@ export class ProvidersService {
       name: p.name,
       description: meta.description || undefined,
       logoUrl: p.logoUrl || undefined,
+      branding: ProviderBrandingSchema.safeParse(meta.branding || meta.manifest?.branding).data,
+      manifest: ProviderManifestSchema.safeParse(meta.manifest).data,
       status: p.status as any,
       type: p.type as any,
       environment,
@@ -1883,6 +1894,8 @@ export class ProvidersService {
       name: provider.name,
       description: provider.description || undefined,
       logoUrl: provider.logoUrl || undefined,
+      branding: provider.branding,
+      manifest: provider.manifest,
       status: provider.status,
       type: provider.type,
       environment: provider.environment,
@@ -2287,3 +2300,4 @@ export class ProvidersService {
     }
   }
 }
+import { ProviderBrandingSchema, ProviderManifestSchema } from '@zayuno/contracts';

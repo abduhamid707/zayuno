@@ -1,36 +1,15 @@
 import { isProviderPublished, isProviderDiscoveryReady } from './publishing.js';
 import { getAgentErrorPresentation } from './errors.js';
 
-export interface CustomerQuoteFormatOptions {
-  origin?: string;
-  destination?: string;
-  departureDate?: string;
-  departureTime?: string;
-  carTitle?: string;
-  carNumber?: string | number;
-  seatNumber?: string | number;
-  seatLevelText?: string;
-  isTicket?: boolean;
-}
-
-function isTicketPresentation(value: any, providerInfo?: any): boolean {
-  const providerIdentity = [
-    providerInfo?.type,
-    providerInfo?.category,
-    providerInfo?.name,
-    providerInfo?.slug,
-    value?.providerSlug,
-    value?.providerName,
-    providerInfo?.metadata?.category,
-  ]
-    .filter(Boolean)
-    .join(' ');
-  return (
-    providerInfo?.type === 'TICKETING' ||
-    /ticket|chipta|event|concert/i.test(providerIdentity) ||
-    value?.fulfillmentType === 'DIGITAL_TICKET' ||
-    Boolean(value?.parameters?.tripId || value?.parameters?.trainNumber || value?.parameters?.origin)
-  );
+/** Presentation is provider-declared; shared code does not infer a business domain. */
+function presentationDetails(value: any, provider?: any): string[] {
+  const hints = value?.presentationHints || provider?.manifest?.presentationHints || provider?.metadata?.manifest?.presentationHints;
+  return (hints?.fields || []).flatMap((field: any) => {
+    const parts = String(field.path).split('.');
+    if (parts.some((part: string) => ['__proto__', 'constructor', 'prototype'].includes(part))) return [];
+    const content = parts.reduce((node: any, key: string) => node && Object.prototype.hasOwnProperty.call(node, key) ? node[key] : undefined, value);
+    return typeof content === 'string' || typeof content === 'number' ? [`${field.label}: ${content}`] : [];
+  });
 }
 
 export interface ProviderMetricCounts {
@@ -95,16 +74,14 @@ export function isDemoOrSandboxProvider(provider: any): boolean {
   if (!provider) return false;
   const metadata = (provider.metadata as Record<string, any>) || {};
   const config = (provider.config as Record<string, any>) || {};
-  const slug = (provider.slug || provider.providerSlug || '').toLowerCase();
 
   return (
-    slug === 'coffee-time' ||
-    slug === 'sandbox-provider' ||
+    provider.environment === 'SANDBOX' ||
+    provider.environment === 'STAGING' ||
     provider.status === 'SANDBOX' ||
     provider.adapterType === 'sandbox' ||
     metadata.sandbox === true ||
     metadata.isDemo === true ||
-    metadata.noRealTicket === true ||
     metadata.environment === 'SANDBOX' ||
     metadata.tier === 'SANDBOX' ||
     config.sandbox === true ||
@@ -258,89 +235,9 @@ export function formatUzbekCurrency(amount: number, currency = 'UZS'): string {
 export function formatCustomerQuote(quote: any, providerInfo?: any): string {
   if (!quote) return 'Kotirovka hisoblandi.';
 
-  const isTicket = isTicketPresentation(quote, providerInfo);
-
-  if (isTicket) {
-    const origin = quote.parameters?.origin || quote.parameters?.from || quote.metadata?.origin || quote.parameters?.departureStation;
-    const destination = quote.parameters?.destination || quote.parameters?.to || quote.metadata?.destination || quote.parameters?.arrivalStation;
-    const dateText = quote.parameters?.date || quote.parameters?.departureDate || quote.metadata?.date;
-    const timeText = quote.parameters?.departureTime || quote.parameters?.time || quote.metadata?.departureTime;
-
-    const carClass = quote.parameters?.carClass || quote.parameters?.preferences?.carClass || quote.metadata?.carClass;
-    const carNumber = quote.parameters?.carNumber || quote.metadata?.carNumber;
-    const seatNumber = quote.parameters?.selectedSeatNumbers?.[0] || quote.parameters?.seatNumber || quote.metadata?.seatNumber;
-    const seatLevelRaw = quote.parameters?.seatLevel || quote.metadata?.seatLevel;
-    const seatLevel = seatLevelRaw === 'UPPER' ? 'yuqori' : seatLevelRaw === 'LOWER' ? 'pastki' : seatLevelRaw;
-
-    const parts: string[] = [];
-    parts.push('Chipta topildi:');
-    parts.push('');
-
-    // Route
-    if (origin && destination) {
-      parts.push(`${origin} → ${destination}`);
-    } else if (origin) {
-      parts.push(`Jo‘nash: ${origin}`);
-    } else if (destination) {
-      parts.push(`Manzil: ${destination}`);
-    }
-
-    // Date & Time
-    if (dateText && timeText) {
-      const when = dateText === 'Bugun' || dateText.toLowerCase().includes('today') ? `Bugun, ${timeText}` : `${dateText}, ${timeText}`;
-      parts.push(when);
-    } else if (dateText) {
-      parts.push(dateText);
-    } else if (timeText) {
-      parts.push(timeText);
-    }
-
-    // Car & Seat details
-    const seatParts: string[] = [];
-    if (carClass) seatParts.push(carClass);
-    if (carNumber) seatParts.push(`${carNumber}-vagon`);
-    if (seatNumber) {
-      if (seatLevel) {
-        seatParts.push(`${seatLevel} ${seatNumber}-joy`);
-      } else {
-        seatParts.push(`${seatNumber}-joy`);
-      }
-    } else if (seatLevel) {
-      seatParts.push(`${seatLevel} joy`);
-    }
-
-    if (seatParts.length > 0) {
-      parts.push(seatParts.join(', '));
-    }
-
-    // If no route, date, time, or seat was provided at all:
-    if (!origin && !destination && !dateText && !timeText && seatParts.length === 0) {
-      parts.push('Tafsilotlar checkout sahifasida tasdiqlanadi.');
-    }
-
-    if (Array.isArray(quote.lines) && quote.lines.length > 0) {
-      for (const line of quote.lines) {
-        const title = line.variantTitle || line.variantName
-          ? `${line.offeringTitle || line.title || 'Chipta'} — ${line.variantTitle || line.variantName}`
-          : line.offeringTitle || line.title || 'Chipta';
-        const amount = line.lineTotal || line.total || (line.unitPrice * (line.quantity || 1)) || 0;
-        parts.push(`${title} × ${line.quantity || 1} — ${formatUzbekCurrency(amount, quote.currency)}`);
-      }
-    }
-    if (quote.totalFees && quote.totalFees > 0) {
-      parts.push(`Servis / bronlash to‘lovi: ${formatUzbekCurrency(quote.totalFees, quote.currency)}`);
-    }
-    const totalText = formatUzbekCurrency(quote.total || quote.subtotal || 0, quote.currency);
-    parts.push(`Jami: ${totalText}`);
-    parts.push('');
-    parts.push('Shu chiptani band qilaymi?');
-
-    return parts.join('\n');
-  }
-
-  // General service / food delivery quote
   const lines: string[] = [];
-  lines.push('Buyurtma hisob-kitobi:');
+  lines.push('So‘rov hisob-kitobi:');
+  lines.push(...presentationDetails(quote, providerInfo));
   lines.push('');
 
   if (Array.isArray(quote.lines) && quote.lines.length > 0) {
@@ -354,17 +251,16 @@ export function formatCustomerQuote(quote: any, providerInfo?: any): string {
     }
   }
 
-  if (quote.totalFees && quote.totalFees > 0) {
-    const delivery = String(providerInfo?.fulfillmentMode || quote.fulfillmentType || '').toUpperCase() === 'DELIVERY';
-    lines.push(`${delivery ? 'Yetkazib berish haqi' : 'Xizmat haqi'}: ${formatUzbekCurrency(quote.totalFees, quote.currency)}`);
-  }
+  if (Array.isArray(quote.fees) && quote.fees.length) {
+    for (const fee of quote.fees) lines.push(`${fee.name}: ${formatUzbekCurrency(fee.amount, quote.currency)}`);
+  } else if (quote.totalFees > 0) lines.push(`Xizmat haqi: ${formatUzbekCurrency(quote.totalFees, quote.currency)}`);
+  if (quote.totalDiscount > 0) lines.push(`Chegirma: ${formatUzbekCurrency(quote.totalDiscount, quote.currency)}`);
 
-  const grandTotal = formatUzbekCurrency(quote.total || quote.subtotal || 0, quote.currency);
+  const grandTotal = formatUzbekCurrency(quote.total ?? quote.subtotal ?? 0, quote.currency);
   lines.push(`Jami: ${grandTotal}`);
 
   if (quote.estimatedDurationMinutes) {
-    const delivery = String(providerInfo?.fulfillmentMode || quote.fulfillmentType || '').toUpperCase() === 'DELIVERY';
-    lines.push(`${delivery ? 'Yetkazish' : 'Taxminiy bajarilish vaqti'}: taxminan ${quote.estimatedDurationMinutes} daqiqa`);
+    lines.push(`Taxminiy bajarilish vaqti: ${quote.estimatedDurationMinutes} daqiqa`);
   }
 
   lines.push('');
@@ -377,88 +273,27 @@ export function formatCustomerQuote(quote: any, providerInfo?: any): string {
  * Formats action confirmation and payment handoff into customer-facing copy.
  */
 export function formatCustomerActionConfirmation(action: any, providerInfo?: any): string {
-  if (!action) return 'Buyurtmangiz yaratildi. To‘lov kutilmoqda.';
-
-  const isTicket = isTicketPresentation(action, providerInfo);
-  const checkoutUrl = action.nextAction?.url || action.paymentUrl;
-  const isDemo = isDemoOrSandboxAction(action, providerInfo);
-
-  if (isDemo) {
-    const subject = isTicket ? 'Sinov chipta so‘rovi' : 'Sinov buyurtmasi';
-    const link = checkoutUrl ? `\n\n[Sinov sahifasini ochish](${checkoutUrl})` : '';
-    return `${subject} yaratildi. Haqiqiy providerga yuborilmaydi va bu sahifada haqiqiy to‘lov amalga oshmaydi.${link}`;
-  }
-
-  const paymentUrl = checkoutUrl || 'https://zayuno.uz/pay';
-
-  if (isTicket) {
-    return `Chipta band qilindi. Endi to‘lovni yakunlang:
-
-[To‘lov sahifasini ochish](${paymentUrl})`;
-  }
-
-  return `Buyurtmangiz yaratildi. To‘lov kutilmoqda.
-
-[To‘lov sahifasini ochish](${paymentUrl})`;
+  if (!action) return 'So‘rov ma’lumoti topilmadi.';
+  const url = action.nextAction?.url || action.paymentUrl;
+  const sandbox = isDemoOrSandboxAction(action, providerInfo);
+  const label = sandbox ? 'Sinov sahifasini ochish' : action.nextAction?.label || 'Davom etish';
+  const link = url ? `\n\n[${label}](${url})` : '';
+  return sandbox ? `Sinov so‘rovi yaratildi. Bu haqiqiy to‘lov tasdig‘i emas.${link}`
+    : `${formatCustomerActionStatus(action, providerInfo)}${link}`;
 }
 
-/**
- * Formats action status tracking into customer-facing copy.
- */
 export function formatCustomerActionStatus(action: any, providerInfo?: any): string {
-  if (!action) return 'Buyurtma ma’lumoti topilmadi.';
-
-  const isTicket = isTicketPresentation(action, providerInfo);
-  const isDemo = isDemoOrSandboxAction(action, providerInfo);
-  const status = String(action.status || '').toUpperCase();
-  const paymentStatus = String(action.paymentStatus || '').toUpperCase();
-  const sandboxState = String(action.sandboxState || '').toUpperCase();
-
-  if (status === 'CANCELLED' || sandboxState === 'CANCELLED') {
-    if (isTicket) return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga yangi chipta topib beraman.';
-    return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga boshqa taklif topib beraman.';
+  if (!action) return 'So‘rov ma’lumoti topilmadi.';
+  if (action.status === 'CANCELLED') return 'So‘rov bekor qilingan.';
+  if (isDemoOrSandboxAction(action, providerInfo)) return 'Bu sinov so‘rovi. Provider qaytargan to‘lov holati haqiqiy to‘lov tasdig‘i emas.';
+  if (action.paymentStatus === 'PAID' && !hasVerifiedPaymentStatus(action, providerInfo)) {
+    return 'Provider to‘lov holatini qaytardi, lekin Zayuno hali uni ishonchli tasdiqlamagan.';
   }
-
-  if (paymentStatus === 'PAID') {
-    if (isDemo) {
-      return `Bu ${isTicket ? 'sinov chipta so‘rovi' : 'sinov buyurtmasi'}. Provider qaytargan to‘lov holati haqiqiy to‘lov tasdig‘i emas.`;
-    }
-    if (!hasVerifiedPaymentStatus(action, providerInfo)) {
-      return 'Provider to‘lov holatini qaytardi, lekin Zayuno hali uni ishonchli tasdiqlamagan. To‘lovni qayta tekshiring.';
-    }
-    return isTicket
-      ? 'Zo‘r, to‘lov qabul qilindi. Chiptangiz tasdiqlandi.'
-      : 'To‘lov qabul qilindi. Buyurtmangiz tasdiqlandi.';
-  }
-
-  if (status === 'AWAITING_PAYMENT' || paymentStatus === 'PENDING' || sandboxState === 'AWAITING_PAYMENT' || sandboxState === 'AWAITING_PASSENGER_DETAILS') {
-    const checkoutUrl = action.nextAction?.url || action.paymentUrl;
-    if (isDemo) {
-      const link = checkoutUrl ? `\n\n[Sinov sahifasini ochish](${checkoutUrl})` : '';
-      return `Bu ${isTicket ? 'sinov chipta so‘rovi' : 'sinov buyurtmasi'}. Haqiqiy to‘lov olinmaydi.${link}`;
-    }
-    const paymentUrl = checkoutUrl || 'https://zayuno.uz/pay';
-    if (isTicket) return `Chipta band qilingan, lekin to‘lov hali qilinmagan.
-
-[To‘lovni yakunlash](${paymentUrl})`;
-    return `Buyurtmangiz qabul qilingan, lekin to‘lov hali qilinmagan.
-
-[To‘lovni yakunlash](${paymentUrl})`;
-  }
-
-  if (status === 'FAILED') return 'Buyurtmani yakunlab bo‘lmadi.';
-  return formatCustomerStatus(status, paymentStatus);
+  return [formatCustomerStatus(action.status, action.paymentStatus), ...presentationDetails(action, providerInfo)].join('\n');
 }
 
-/**
- * Formats cancellation result into customer-facing copy.
- */
 export function formatCustomerActionCancellation(result: any, providerInfo?: any): string {
-  const isTicket = isTicketPresentation(result, providerInfo);
-  if (isTicket) {
-    return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga yangi chipta topib beraman.';
-  }
-  return 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga boshqa taklif topib beraman.';
+  return result?.success === false ? 'So‘rovni bekor qilish tasdiqlanmadi.' : 'So‘rov bekor qilingan.';
 }
 
 /**
@@ -476,15 +311,7 @@ export function formatCustomerAvailability(result: any, providerInfo?: any): str
     return 'Jonli mavjudlikni hozir ishonchli tekshirib bo‘lmadi. Yakuniy mavjudlik narx hisoblanganda tasdiqlanadi.';
   }
   if (result.isAvailable) {
-    if (Array.isArray(result.availableItems) && result.availableItems.length > 0) {
-      const isTicket = isTicketPresentation(result, providerInfo);
-      if (isTicket && result.availableItems[0]?.metadata?.recommendedSeats?.length) {
-        const seats = result.availableItems[0].metadata.recommendedSeats.map((s: any) => `${s.number}-joy`).join(', ');
-        return `Joylar mavjud (${seats}). Kotirovka hisoblashga tayyormisiz?`;
-      }
-      return 'Tanlangan mahsulotlar mavjud va buyurtma qilish uchun tayyor.';
-    }
-    return 'Tanlangan mahsulotlar mavjud va buyurtma qilish uchun tayyor.';
+    return ['Tanlangan takliflar mavjud.', ...presentationDetails(result, providerInfo)].join('\n');
   }
 
   if (Array.isArray(result.unavailableItems) && result.unavailableItems.length > 0) {

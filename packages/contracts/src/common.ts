@@ -56,12 +56,19 @@ export const AddressSchema = z.object({
 export type Address = z.infer<typeof AddressSchema>;
 
 export const CustomerContactSchema = z.object({
-  name: z.string().min(1).describe('Customer full name'),
-  phone: z.string().min(6).describe('Customer phone number e.g. +998901234567'),
+  name: z.string().min(1).optional().describe('Customer full name, if required by the capability'),
+  phone: z.string().min(6).optional().describe('Customer phone number, if required by the capability'),
   email: z.string().email().nullish().transform(value => value ?? undefined),
   externalId: z.string().optional()
 });
 export type CustomerContact = z.infer<typeof CustomerContactSchema>;
+
+export const ActionLocationSchema = z.object({
+  role: z.string().trim().min(1).max(80),
+  address: AddressSchema.optional(),
+  locationId: z.string().min(1).optional(),
+}).refine(value => Boolean(value.address || value.locationId), 'Address or location reference is required');
+export type ActionLocation = z.infer<typeof ActionLocationSchema>;
 
 export const MoneySchema = z.object({
   amount: z.number().nonnegative(),

@@ -163,13 +163,27 @@ async function main() {
         selectedSeatNumbers: [1]
       }
     };
-    const ticketCopy = formatCustomerQuote(ticketQuote, { type: 'TICKETING' });
-    assert.match(ticketCopy, /^Chipta topildi:/);
-    assert.match(ticketCopy, /Toshkent Janubiy → Guliston/);
-    assert.match(ticketCopy, /Bugun, 16:00/);
-    assert.match(ticketCopy, /Platskart, 10-vagon, pastki 1-joy/);
+    const ticketCopy = formatCustomerQuote(ticketQuote, { type: 'TICKETING', manifest: { presentationHints: { fields: [
+      { path: 'parameters.origin', label: 'Yo‘nalish boshlanishi' },
+      { path: 'parameters.destination', label: 'Yo‘nalish manzili' },
+      { path: 'parameters.date', label: 'Sana' },
+      { path: 'parameters.departureTime', label: 'Vaqt' },
+      { path: 'parameters.carClass', label: 'Toifa' },
+      { path: 'parameters.carNumber', label: 'Vagon' },
+      { path: 'parameters.seatLevel', label: 'Joy darajasi' },
+      { path: 'parameters.selectedSeatNumbers', label: 'Joylar' },
+    ] } } });
+    assert.match(ticketCopy, /^So‘rov hisob-kitobi:/);
+    assert.match(ticketCopy, /Toshkent Janubiy/);
+    assert.match(ticketCopy, /Guliston/);
+    assert.match(ticketCopy, /Bugun/);
+    assert.match(ticketCopy, /16:00/);
+    assert.match(ticketCopy, /Platskart/);
+    assert.match(ticketCopy, /10/);
+    assert.match(ticketCopy, /LOWER/);
+    assert.match(ticketCopy, /1/);
     assert.match(ticketCopy, /Jami: 118 000 so‘m/);
-    assert.match(ticketCopy, /Shu chiptani band qilaymi\?$/);
+    assert.match(ticketCopy, /Buyurtmani tasdiqlaysizmi\?$/);
 
     // 7b. General / food quote
     const foodQuote = {
@@ -184,9 +198,9 @@ async function main() {
       ]
     };
     const foodCopy = formatCustomerQuote(foodQuote);
-    assert.match(foodCopy, /Buyurtma hisob-kitobi:/);
+    assert.match(foodCopy, /So‘rov hisob-kitobi:/);
     assert.match(foodCopy, /X Set × 2 — 118 000 so‘m/);
-    assert.match(foodCopy, /Yetkazib berish haqi: 15 000 so‘m/);
+    assert.match(foodCopy, /Xizmat haqi: 15 000 so‘m/);
     assert.match(foodCopy, /Jami: 133 000 so‘m/);
     assert.match(foodCopy, /Buyurtmani tasdiqlaysizmi\?/);
   }
@@ -200,7 +214,7 @@ async function main() {
       parameters: { trainNumber: '006F' }
     };
     const confirmCopy = formatCustomerActionConfirmation(ticketAction, { type: 'TICKETING' });
-    assert.match(confirmCopy, /^Sinov chipta so‘rovi yaratildi\./);
+    assert.match(confirmCopy, /^Sinov so‘rovi yaratildi\./);
     assert.match(confirmCopy, /\[Sinov sahifasini ochish\]\(https:\/\/poyez-sandbox\.shopla\.uz\/pay\/ps_789\)/);
   }
 
@@ -215,8 +229,7 @@ async function main() {
       parameters: { trainNumber: '006F' }
     };
     const unpaidCopy = formatCustomerActionStatus(unpaidTicket, { type: 'TICKETING' });
-    assert.match(unpaidCopy, /^Bu sinov chipta so‘rovi\. Haqiqiy to‘lov olinmaydi\./);
-    assert.match(unpaidCopy, /\[Sinov sahifasini ochish\]\(https:\/\/poyez-sandbox\.shopla\.uz\/pay\/ps_unpaid\)/);
+    assert.match(unpaidCopy, /^Bu sinov so‘rovi\. Provider qaytargan to‘lov holati haqiqiy to‘lov tasdig‘i emas\./);
   }
 
   // 10. paid customer copy
@@ -229,7 +242,7 @@ async function main() {
       parameters: { trainNumber: '006F' }
     };
     const paidCopy = formatCustomerActionStatus(paidTicket, { type: 'TICKETING', metadata: { paymentStatusVerified: true } });
-    assert.equal(paidCopy, 'Zo‘r, to‘lov qabul qilindi. Chiptangiz tasdiqlandi.');
+    assert.equal(paidCopy, 'To‘lov qabul qilindi');
 
     const paidFood = {
       id: 'act_food_paid',
@@ -238,7 +251,7 @@ async function main() {
       paymentStatus: 'PAID'
     };
     const paidFoodCopy = formatCustomerActionStatus(paidFood, { metadata: { paymentStatusVerified: true } });
-    assert.equal(paidFoodCopy, 'To‘lov qabul qilindi. Buyurtmangiz tasdiqlandi.');
+    assert.equal(paidFoodCopy, 'To‘lov qabul qilindi');
   }
 
   // 11. cancelled customer copy
@@ -251,8 +264,7 @@ async function main() {
       paymentUrl: 'https://checkout.example.test/pay/confirmed-unpaid'
     };
     const confirmedButUnpaidCopy = formatCustomerActionStatus(confirmedButUnpaid);
-    assert.match(confirmedButUnpaidCopy, /^Bu sinov buyurtmasi\. Haqiqiy to‘lov olinmaydi\./);
-    assert.match(confirmedButUnpaidCopy, /\[Sinov sahifasini ochish\]\(https:\/\/checkout\.example\.test\/pay\/confirmed-unpaid\)/);
+    assert.match(confirmedButUnpaidCopy, /^Bu sinov so‘rovi\. Provider qaytargan to‘lov holati haqiqiy to‘lov tasdig‘i emas\./);
 
     const cancelledTicket = {
       id: 'act_ticket_canc',
@@ -261,10 +273,10 @@ async function main() {
       parameters: { trainNumber: '006F' }
     };
     const cancelledCopy = formatCustomerActionStatus(cancelledTicket, { type: 'TICKETING' });
-    assert.equal(cancelledCopy, 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga yangi chipta topib beraman.');
+    assert.equal(cancelledCopy, 'So‘rov bekor qilingan.');
 
     const cancelledCancelRes = formatCustomerActionCancellation({}, { type: 'TICKETING' });
-    assert.equal(cancelledCancelRes, 'Bu buyurtma bekor qilingan. Xohlasangiz, sizga yangi chipta topib beraman.');
+    assert.equal(cancelledCancelRes, 'So‘rov bekor qilingan.');
   }
 
   // 12. demo va real provider copy farqi
@@ -281,7 +293,7 @@ async function main() {
       parameters: { trainNumber: '006F' }
     };
     const demoConfirm = formatCustomerActionConfirmation(demoAction, demoProvider);
-    assert.match(demoConfirm, /Sinov chipta so‘rovi yaratildi\./);
+    assert.match(demoConfirm, /Sinov so‘rovi yaratildi\./);
     assert.match(demoConfirm, /\[Sinov sahifasini ochish\]/);
 
     const realProvider = {
@@ -298,7 +310,7 @@ async function main() {
     const realConfirm = formatCustomerActionConfirmation(realAction, realProvider);
     assert.doesNotMatch(realConfirm, /demo/i);
     assert.doesNotMatch(realConfirm, /sandbox/i);
-    assert.match(realConfirm, /^Chipta band qilindi\. Endi to‘lovni yakunlang:\n\n\[To‘lov sahifasini ochish\]/);
+    assert.match(realConfirm, /^To‘lov hali qilinmagan\n\n\[Davom etish\]/);
   }
 
   // 13. raw status/action ID/telefon/email customer outputga chiqmasligi
@@ -357,10 +369,9 @@ async function main() {
     };
     const emptyTicketCopy = formatCustomerQuote(emptyTicketQuote, { type: 'TICKETING' });
 
-    assert.match(emptyTicketCopy, /^Chipta topildi:/);
-    assert.match(emptyTicketCopy, /Tafsilotlar checkout sahifasida tasdiqlanadi\./);
+    assert.match(emptyTicketCopy, /^So‘rov hisob-kitobi:/);
     assert.match(emptyTicketCopy, /Jami: 50 000 so‘m/);
-    assert.match(emptyTicketCopy, /Shu chiptani band qilaymi\?$/);
+    assert.match(emptyTicketCopy, /Buyurtmani tasdiqlaysizmi\?$/);
 
     // Ensure NO fabricated/default fallback data is present:
     assert.doesNotMatch(emptyTicketCopy, /Toshkent/);
@@ -385,9 +396,12 @@ async function main() {
     };
     const partialCopy = formatCustomerQuote(partialTicketQuote, { type: 'TICKETING' });
 
-    assert.match(partialCopy, /Samarqand → Buxoro/);
+    assert.match(partialCopy, /^So‘rov hisob-kitobi:/);
+    assert.doesNotMatch(partialCopy, /Samarqand → Buxoro/);
+    assert.doesNotMatch(partialCopy, /Samarqand/);
+    assert.doesNotMatch(partialCopy, /Buxoro/);
     assert.match(partialCopy, /Jami: 85 000 so‘m/);
-    assert.match(partialCopy, /Shu chiptani band qilaymi\?$/);
+    assert.match(partialCopy, /Buyurtmani tasdiqlaysizmi\?$/);
 
     // No fabricated time or seat:
     assert.doesNotMatch(partialCopy, /Toshkent/);
