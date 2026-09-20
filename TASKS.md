@@ -1,3 +1,193 @@
+# Arxitektura va Bosqichlar — Managed Connectors Framework va Uzum Reference Connector (2026-09-21)
+
+Men hozir **1-variantdan boshlardim**, lekin shunchaki `UzumMarketAdapter` yozib qo‘ymasdim. Uni **birinchi “Managed Connector” sifatida universal framework ustiga** qurardim.
+
+Sababi oddiy: portalda “Connect Uzum” UI yasashdan oldin pastdagi engine ishlashi kerak. Aks holda UI tayyor bo‘ladi, lekin keyin Ozon, Billz, iiko, YCLIENTS qo‘shilganda yana alohida kod yozishga majbur bo‘lasiz.
+
+Arxitektura shunday bo‘lsin:
+
+```text
+Seller
+  ↓
+Provider Portal
+  ↓
+Managed Connector Instance
+  ↓
+Connector Runtime
+  ↓
+Uzum / Billz / iiko / YCLIENTS / Shopla
+  ↓
+Canonical Zayuno Contract
+  ↓
+Catalog / Search / Quote / Action
+  ↓
+ChatGPT / Claude / Zayuno App
+```
+
+Eng muhim joyi: core **“Uzum”ni bilmasligi kerak**.
+
+Masalan:
+
+```ts
+interface ManagedConnector {
+  authenticate(credentials): Promise<AuthResult>
+
+  getMetadata(): Promise<ProviderMetadata>
+
+  getCatalog?(context): Promise<Catalog>
+
+  search?(query, context): Promise<Offering[]>
+
+  getAvailability?(input): Promise<Availability>
+
+  requestQuote?(input): Promise<Quote>
+
+  createAction?(input): Promise<Action>
+
+  getAction?(id): Promise<Action>
+
+  cancelAction?(id): Promise<Action>
+
+  getPaymentOptions?(id): Promise<PaymentOption[]>
+
+  sync?(cursor): Promise<SyncResult>
+}
+```
+
+Uzum connector:
+
+```text
+Capabilities:
+METADATA
+CATALOG
+SEARCH
+AVAILABILITY
+```
+
+va xarid:
+
+```text
+nextAction:
+OPEN_URL → Uzum product/deep-link
+```
+
+Agar tashqi platforma real order API bermasa, uni zo‘rlab `ACTION_CREATE` qilmaymiz.
+
+Keyinchalik iiko connector:
+
+```text
+CATALOG
+SEARCH
+QUOTE
+ACTION_CREATE
+ACTION_STATUS
+WEBHOOK
+```
+
+bo‘lishi mumkin.
+
+YCLIENTS esa:
+
+```text
+CATALOG
+SEARCH
+AVAILABILITY
+QUOTE
+ACTION_CREATE
+ACTION_STATUS
+```
+
+Shunda **connectorning imkoniyati platforma nomidan emas, capability manifestidan keladi**. Mana shu Zayunoning hozirgi arxitekturasi bilan juda mos.
+
+### Hozir men agentga nima qildirardim
+
+Birinchi sprint:
+
+```text
+Managed Connectors Framework
+        ↓
+Credential Vault
+        ↓
+Connector Instance
+        ↓
+Capability Manifest
+        ↓
+Sync Engine
+        ↓
+Canonical Mapper
+        ↓
+Uzum Connector
+```
+
+Keyin ikkinchi sprintda:
+
+```text
+Provider Portal
+→ Connect marketplace
+→ Uzum
+→ API key/token
+→ Test connection
+→ Choose store
+→ Import catalog
+→ Publish to AI
+```
+
+Shundan keyin yangi connector yaratish:
+
+```text
+Uzum     → 1 connector
+Billz    → 1 connector
+iiko     → 1 connector
+YCLIENTS → 1 connector
+Shopla   → 1 connector
+```
+
+bo‘ladi.
+
+**Har safar yangi onboarding tizimi qurilmaydi.**
+
+Yana bir muhim qaror: `Provider` va `Connector`ni bitta narsa qilib yubormang.
+
+Masalan Billz’ga 500 ta do‘kon ulangan bo‘lsa:
+
+```text
+ConnectorDefinition:
+billz
+```
+
+bitta.
+
+Lekin:
+
+```text
+Provider:
+Urban Store
+
+ConnectorInstance:
+type = billz
+credentials = Urban Store credentials
+```
+
+Shunda bitta `BillzConnector` kodi orqali yuzlab biznes ulanadi.
+
+Mana shu model Zayunoni tez o‘stiradi:
+
+```text
+1 integration code
+        ↓
+100 / 1000 businesses
+```
+
+Bu siz aytayotgan **“biznesga API yozdirish emas, mavjud tizimingizni ulang”** modelining texnik asosi.
+
+Shuning uchun ketma-ketlikni men shunday qo‘yardim:
+
+**Managed Connector Framework → Uzum reference connector → No-code Connect UI → ikkinchi transactional connector (iiko/YCLIENTS/Billz).**
+
+Uzum birinchi connector sifatida frameworkni isbotlaydi. Lekin Zayunoning haqiqiy **“wow, AI action qildi”** tomonini ko‘rsatish uchun undan keyingi connector albatta `ACTION_CREATE` qila oladigan platforma bo‘lishi kerak.
+
+---
+
 # Reja / Strategiya — 1-Click Connectors (YCLIENTS, iiko, Billz) va AI-Ready Badge (2026-09-21)
 
 Haqiqatan ham, "1-click integratsiya" (Connectors) strategiyasi loyihani portlatib yuboradigan yondashuv. Bizneslarga *"Biz uchun API yozing"* deyish o'rniga, *"Siz ishlatayotgan tayyor tizimni Zayunoga ulab qo'ying, biz sizga AI'dan mijoz olib kelamiz"* desangiz, ular darhol rozi bo'lishadi.
