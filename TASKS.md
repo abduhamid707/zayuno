@@ -1,3 +1,176 @@
+# Reja / Tadqiqot — Uzum Market Seller OpenAPI tahlili va Zayuno UzumConnector integratsiyasi (2026-09-21)
+
+Used tool: read_url_content
+Viewed content.md:1-30
+Used tool: read_url_content
+Viewed content.md:1-38
+Used tool: read_url_content
+Viewed content.md:1-11
+Used tool: read_url_content
+Viewed content.md:1-100
+Searched for ""\/v"
+Searched for ""summary":"
+Viewed content.md:60-180
+Ran command: `node -e "
+const fs = require('fs');
+const raw = fs.readFileSync('C:/Users/Windows 11/.gemini/antigravity/brain/3653c194-100c-488c-b99f-b7925840a0d5/.system_generated/steps/1744/content.md', 'utf8');
+const jsonStart = raw.indexOf('{');
+const spec = JSON.parse(raw.slice(jsonStart));
+console.log('=== SECURITY SCHEMES ===');
+console.log(JSON.stringify(spec.components?.securitySchemes, null, 2));
+console.log('\n=== ALL PATHS & METHODS ===');
+for (const [path, methods] of Object.entries(spec.paths)) {
+  for (const [method, op] of Object.entries(methods)) {
+    console.log(method.toUpperCase().padEnd(6), path.padEnd(45), (op.summary || ''));
+  }
+}
+"`
+Ran command: `node -e "
+const fs = require('fs');
+const raw = fs.readFileSync('C:/Users/Windows 11/.gemini/antigravity/brain/3653c194-100c-488c-b99f-b7925840a0d5/.system_generated/steps/1744/content.md', 'utf8');
+const spec = JSON.parse(raw.slice(raw.indexOf('{')));
+
+console.log('=== GET /v1/shops Response ===');
+const shopsOp = spec.paths['/v1/shops']?.get;
+console.log(JSON.stringify(shopsOp?.responses?.['200'], null, 2));
+
+console.log('\n=== GET /v1/product/shop/{shopId} Response ===');
+const prodOp = spec.paths['/v1/product/shop/{shopId}']?.get;
+console.log(JSON.stringify(prodOp?.responses?.['200'], null, 2));
+"`
+Ran command: `node -e "
+const fs = require('fs');
+const raw = fs.readFileSync('C:/Users/Windows 11/.gemini/antigravity/brain/3653c194-100c-488c-b99f-b7925840a0d5/.system_generated/steps/1744/content.md', 'utf8');
+const spec = JSON.parse(raw.slice(raw.indexOf('{')));
+
+console.log('=== OrganizationDto ===');
+console.log(JSON.stringify(spec.components?.schemas?.OrganizationDto, null, 2));
+
+console.log('\n=== AllProducts ===');
+console.log(JSON.stringify(spec.components?.schemas?.AllProducts, null, 2));
+"`
+Ran command: `node -e "
+const fs = require('fs');
+const raw = fs.readFileSync('C:/Users/Windows 11/.gemini/antigravity/brain/3653c194-100c-488c-b99f-b7925840a0d5/.system_generated/steps/1744/content.md', 'utf8');
+const spec = JSON.parse(raw.slice(raw.indexOf('{')));
+
+console.log('=== SellerProductCard ===');
+console.log(JSON.stringify(spec.components?.schemas?.SellerProductCard, null, 2));
+"`
+Ran command: `node -e "
+const fs = require('fs');
+const raw = fs.readFileSync('C:/Users/Windows 11/.gemini/antigravity/brain/3653c194-100c-488c-b99f-b7925840a0d5/.system_generated/steps/1744/content.md', 'utf8');
+const spec = JSON.parse(raw.slice(raw.indexOf('{')));
+
+console.log('=== SkuForTable ===');
+console.log(JSON.stringify(spec.components?.schemas?.SkuForTable, null, 2));
+"`
+Ran command: `node -e "
+const fs = require('fs');
+const raw = fs.readFileSync('C:/Users/Windows 11/.gemini/antigravity/brain/3653c194-100c-488c-b99f-b7925840a0d5/.system_generated/steps/1744/content.md', 'utf8');
+const spec = JSON.parse(raw.slice(raw.indexOf('{')));
+
+console.log('=== RateLimit Headers ===');
+console.log(JSON.stringify(spec.components?.headers, null, 2));
+"`
+
+Uzum Market Seller OpenAPI spetsifikatsiyasini (`api-seller.uzum.uz`) to‘liq o‘rganib chiqdim (7,678 qatorli rasmiy OpenAPI 3.0 spec tahlil qilindi).
+
+Natijalar va Zayuno bilan qanday integratsiya bo‘lishi bo‘yicha **to‘liq texnik xulosa**:
+
+---
+
+### 1. Texnik tahlil: Uzum Seller API nimalarni beradi?
+
+| Imkoniyat | Uzum API Endpoint | Qanday ishlaydi? |
+| --- | --- | --- |
+| **Autentifikatsiya** | `Authorization: <token>` | Seller kabinetidan olingan API token (Bearer prefiksisiz headerda uzatiladi). |
+| **Do‘konni aniqlash** | `GET /v1/shops` | Sotuvchining barcha do‘konlari ro‘yxati (`id`, `name`). 1 ta token bilan bir nechta do‘konni ko‘rish mumkin. |
+| **Katalog va Mahsulotlar** | `GET /v1/product/shop/{shopId}` | Do‘kondagi barcha mahsulotlar: `productId`, `title`, `category`, `rating`, rasmlar (`image`, `previewImg`), statuslar. |
+| **SKU, Narx va Variantlar** | `skuList` (ichki obyekt) | Har bir mahsulotning variantlari (rang, o‘lcham), sotish narxi (`price`), tannarxi (`purchasePrice`), shtrixkodi (`barcode`), IKPU kodi (`ikpu`). |
+| **Ombordagi qoldiqlar** | `quantityActive` va `quantityFbs` | Mahsulot Uzum omborida nechta borligi (`quantityActive`) yoki sotuvchining o‘z omborida nechta borligi (`quantityFbs`). |
+| **Buyurtmalar** | `GET /v2/fbs/orders` | Tushgan buyurtmalarni ko‘rish va tasdiqlash (`POST /confirm`). |
+
+---
+
+### 2. Eng muhim me’moriy xulosa: Xarid jarayoni (Checkout) qanday bo‘ladi?
+
+OpenAPI’ni tekshirganimizda tasdiqlangan eng muhim fakt:
+> **Uzum Seller API’da tashqaridan turib yangi xaridor nomidan zakaz ochish (`POST /order/create`) yo‘q.**
+> Chunki Uzum o‘z xaridorlarini faqat o‘z ilovasi va sayti orqali to‘lov qildirishni xohlaydi.
+
+Bu Zayunoning arxitekturasiga **aynan mos tushadi**! Zayunoda doim **`nextAction: OPEN_URL`** handoff standarti bor.
+
+Ya’ni xaridor AI agentdan xarid qilmoqchi bo‘lganda:
+```json
+{
+  "status": "AWAITING_PAYMENT",
+  "nextAction": {
+    "type": "OPEN_URL",
+    "url": "https://uzum.uz/uz/product/123456?sku=789012"
+  }
+}
+```
+AI agent mijozga mahsulotni tanlashda to‘liq yordam beradi (narxi, reytingi, qoldig‘ini tekshiradi) va mijoz *"Sotib olaman"* deganda, to‘g‘ridan-to‘g‘ri Uzum ilovasidagi o‘sha tovar sahifasiga uzatadi.
+
+---
+
+### 3. Zayuno ichida "Uzum Connector" qanday ishlaydi? (Foydalanuvchi yo‘li)
+
+Sotuvchi uchun jarayon **1 daqiqalik No-code** bo‘ladi:
+
+```
+┌────────────────────────────────────────────────────────┐
+│ 1. Sotuvchi Zayuno portaliga kiradi                    │
+│    "Uzum Marketni ulash" tugmasini bosadi              │
+├────────────────────────────────────────────────────────┤
+│ 2. Uzum Seller API Tokenini joylashtiradi              │
+│    (Zayuno darhol GET /v1/shops orqali do'konni topadi)│
+├────────────────────────────────────────────────────────┤
+│ 3. "Sinxronizatsiya" bosiladi                          │
+│    Zayuno GET /v1/product/shop/{id} orqali barcha      │
+│    tovarlarni, narxlarni va rasmlarni import qiladi    │
+├────────────────────────────────────────────────────────┤
+│ 4. Tovarlar AI Agentlar (ChatGPT, Claude) tarmog'ida!  │
+└────────────────────────────────────────────────────────┘
+```
+
+#### Ma’lumotlar Zayuno standartiga qanday o‘giriladi:
+- `offering.id` = `uzum-{productId}`
+- `offering.title` = `product.title`
+- `offering.categorySlug` = `product.category`
+- `offering.media` = `[{ url: product.image, type: 'IMAGE' }]`
+- `offering.variants` = `skuList` dagi har bir element:
+  - `variant.id` = `sku-{skuId}`
+  - `variant.name` = `sku.characteristics` (masalan: *"Qora, XL"*)
+  - `variant.basePrice` = `sku.price` (so‘mda)
+  - `variant.isAvailable` = `(sku.quantityActive > 0 || sku.quantityFbs > 0)`
+
+---
+
+### 4. E’tibor berish kerak bo‘lgan texnik jihat: Rate Limiting
+Uzum API javoblarida quyidagi qat’iy limitlar bor:
+- `X-RateLimit-Remaining` (soniyalik cheklov)
+- `X-RateLimit-Limit-Per-Day` (kunlik cheklov)
+
+**Buni qanday hal qilamiz?**
+Zayuno doimiy har soniyada Uzumni so‘roq qilavermaydi.
+1. Tovarlar Zayuno bazasiga kesh qilinadi.
+2. Har kechasi yoki kuniga 2-3 marta fon rejimida qoldiqlar yangilanadi.
+3. AI agent aniq tovar bo‘yicha savol berganida, Zayuno faqat shu bitta tovarning narxi va qoldig‘ini tezkor tekshirib beradi.
+
+---
+
+### Xulosa
+Bu funksiyani Zayunoga qo‘shish — **haqiqiy "Game Changer" bo‘ladi**.
+O‘zbekistonda hozir 10,000+ ta Uzum sotuvchisi bor. Ularning birortasi dasturchi yollamaydi. Zayuno ularga *"API kalitingizni bering, tovarlaringizni ChatGPT va boshqa AI agentlarga chiqaramiz"* desa, minglab sotuvchilar birinchi haftaning o‘zidayoq platformaga ulanadi.
+
+Buning uchun Zayunoda `UzumAdapter` (yoki `UzumMarketConnector`) klassini yaratish kerak. U Zayunoning mavjud `BaseProviderAdapter`idan meros oladi va Uzum API’siga so‘rov jo‘natadi.
+
+Agar ma’qul bo‘lsa, keyingi qadam sifatida **Zayunoda `UzumConnector` arxitekturasining kod prototipini** yaratishni boshlaymizmi?
+
+---
+
 # Joriy ish — test-webhook-guardrails.ts da prisma.webhookLog.update xatosini to'g'rilash (2026-09-21)
 
 - [x] 1. test-webhook-guardrails.ts da prisma.webhookLog.update ni mock qilish va webhooks.service.ts da xavfsiz update qilish.
