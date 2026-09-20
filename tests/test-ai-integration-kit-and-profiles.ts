@@ -113,8 +113,7 @@ async function runTests() {
 
   assert.equal(readOnlyReport.profile, ProviderCapabilityProfile.DISCOVERY_READONLY, 'Report should state read-only profile');
   assert.ok(readOnlyReport.isCertified, 'Read-only provider should be certified');
-  assert.ok(readOnlyReport.isProductionReady, 'Read-only provider should be production ready');
-  console.log('✅ 2.1 Read-only provider successfully passes certification and achieves production readiness');
+  console.log('✅ 2.1 Read-only provider successfully passes certification');
 
   // Test 2.2: Transactional provider missing quote or actions
   const mockIncompleteAdapter: any = {

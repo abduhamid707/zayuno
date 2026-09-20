@@ -70,7 +70,8 @@ const PUBLIC_API_BASE =
     ? 'https://api.zayuno.uz'
     : 'http://localhost:4000');
 const API_BASE = (import.meta as any).env?.VITE_USE_DEV_API_PROXY ? '' : PUBLIC_API_BASE;
-const providerSession = createProviderSessionClient(API_BASE);
+const AUTH_BASE = (import.meta as any).env?.VITE_USE_DEV_AUTH_PROXY ? '' : PUBLIC_API_BASE;
+const providerSession = createProviderSessionClient(AUTH_BASE);
 const SHOW_LOCAL_SIMULATOR = (import.meta as any).env?.VITE_ENABLE_LOCAL_SIMULATOR === 'true' || true;
 
 const SANDBOX_PROVIDER_SLUG = 'sandbox-provider';
@@ -400,7 +401,7 @@ export default function App() {
     setAuthSuccess('');
     setAuthLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+      const response = await fetch(`${AUTH_BASE}/api/v1/auth/login`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -428,7 +429,7 @@ export default function App() {
     setAuthSuccess('');
     setAuthLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/v1/auth/register-owner`, {
+      const response = await fetch(`${AUTH_BASE}/api/v1/auth/register-owner`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -457,7 +458,7 @@ export default function App() {
     setAuthSuccess('');
     setAuthLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/v1/auth/verify-email`, {
+      const response = await fetch(`${AUTH_BASE}/api/v1/auth/verify-email`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -493,7 +494,7 @@ export default function App() {
     setAuthSuccess('');
     setAuthLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/v1/auth/resend-verification`, {
+      const response = await fetch(`${AUTH_BASE}/api/v1/auth/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() })
@@ -508,7 +509,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    void fetch(`${API_BASE}/api/v1/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => undefined);
+    void fetch(`${AUTH_BASE}/api/v1/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => undefined);
     setToken('');
     setUserProfile(null);
     setActiveTab('overview');
@@ -879,6 +880,7 @@ export default function App() {
         {activeTab === 'onboarding' && (
           !authReady && !token ? <div className="workspace-loading" role="status"><RefreshCw className="animate-spin" size={20} /> Sessiya tekshirilmoqda…</div> : <OnboardingWizard
             apiBase={API_BASE}
+            authBase={AUTH_BASE}
             publicApiBase={PUBLIC_API_BASE}
             token={token}
             onAuthSuccess={(newToken, user) => {
@@ -1665,7 +1667,7 @@ export default function App() {
       {activeTab === 'auth' && (
         <Suspense fallback={<div className="min-h-dvh grid place-items-center bg-[#090d15] text-sm text-slate-400">Yuklanmoqda…</div>}>
           <AuthView
-            apiBase={API_BASE}
+            apiBase={AUTH_BASE}
             initialEmail={initialEmailParam}
             initialMode={authScreenMode}
             onModeChange={(mode) => {

@@ -9,7 +9,8 @@ export default defineConfig(({ mode, command, isPreview }) => {
   const localDev = command === 'serve' && !isPreview;
   return {
     define: {
-      'import.meta.env.VITE_USE_DEV_API_PROXY': JSON.stringify(localDev),
+      'import.meta.env.VITE_USE_DEV_API_PROXY': JSON.stringify(localDev && env.VITE_USE_DEV_API_PROXY !== 'false'),
+      'import.meta.env.VITE_USE_DEV_AUTH_PROXY': JSON.stringify(localDev),
     },
     plugins: [react(), docsSitePlugin(path.resolve(__dirname, '../..'))],
     resolve: {

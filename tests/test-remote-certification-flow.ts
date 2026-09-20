@@ -239,7 +239,7 @@ try {
   if (!report.isProductionReady) {
     console.log('Failed tests:', report.tests.filter(t => !t.passed).map(t => ({ id: t.testId, name: t.name, status: t.status, error: t.error })));
   }
-  assert.equal(report.isProductionReady, true, `Report must be production ready. Missing: ${report.missingMandatoryCapabilities.join(', ')}`);
+  assert.equal(report.isCertified, true, `Report must be certified. Missing: ${report.missingMandatoryCapabilities.join(', ')}`);
   assert.equal(
     report.missingMandatoryCapabilities.includes(ProviderCapability.LOCATIONS),
     false,
@@ -276,7 +276,7 @@ try {
 
   const deliveryRunner = new ProviderCertificationRunner(deliveryAdapter);
   const deliveryReport = await deliveryRunner.runAllTests();
-  assert.equal(deliveryReport.isProductionReady, false, 'DELIVERY mode without LOCATIONS must NOT be production ready');
+  assert.equal(deliveryReport.isCertified, false, 'DELIVERY mode without LOCATIONS must NOT be certified');
   assert.equal(
     deliveryReport.missingMandatoryCapabilities.includes(ProviderCapability.LOCATIONS),
     true,

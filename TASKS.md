@@ -1,3 +1,92 @@
+# Joriy ish — Universal provider certification 3 ta false-PASS bo'shlig'ini yopish (2026-09-20)
+
+- [x] 1. Noto'g'ri sabab bilan rad etilgan so'rovlarni ajratish (expectRemoteRejection'da QUOTE_EXPIRED, ACTION_NOT_CONFIRMED va begona kodlarni taqiqlash, ACTION_CREATE testlarida har bir mutatsiya uchun yangi quote olish).
+- [x] 2. Webhook order processing va bazaga qo'llanilishi dalili (certification-webhook-evidence'da isProcessed: true talab qilish, providers.service'da test buyurtmasini bazaga yozish va testda haqiqiy HMAC + DB + status transition oqimini tekshirish hamda isProcessed: false bo'lganda fail bo'lishini sinash).
+- [x] 3. Portal UI'da eski va non-strict sertifikatni "tayyor" ko'rsatishni to'xtatish (isCurrentCertification guardini OnboardingWizard va CertificationView'ga tatbiq etish, eski hisobot bo'lsa qayta sertifikatlash ogohlantirishini ko'rsatish).
+- [x] 4. Regressiya va testlar: test-universal-provider-certification-strict, API va portal buildlari, git diff --check.
+
+**Holat / handoff (Yakunlandi):** 3 ta aniqlangan false-PASS muammosi to'liq yopildi va sinovdan o'tkazildi:
+1. **Noto'g'ri sabab bilan rad etish (Rejection Reason Discrimination):**
+   - `packages/provider-sdk/src/strict-certification.ts`: `expectRemoteRejection` funksiyasiga `disallowedCodes: string[]` tekshiruvi qo'shildi. Agar provider so'rovni kutilmagan/begona sabab bilan (masalan, `QUOTE_EXPIRED` yoki `ACTION_NOT_CONFIRMED`) rad etsa, test yiqiladi (`Provider rejected with disallowed error code ...`).
+   - `packages/provider-sdk/src/certification.ts`: `required-fields-ACTION_CREATE` va parametr mutatsiyasi testlarida har bir probe oldidan yangi quote olinishi ta'minlandi va `disallowedCodes: ['QUOTE_EXPIRED', 'QUOTE_NOT_FOUND', 'ACTION_NOT_CONFIRMED']` majburiy qilindi.
+2. **Webhook Order Processing & DB Status Transition Evidence:**
+   - `apps/api/src/modules/providers/certification-webhook-evidence.ts`: `log.isProcessed !== true` bo'lgan yozuvlar qat'iy chetlatildi.
+   - `apps/api/src/modules/providers/providers.service.ts`: `runStrictCertification` da test adapteri `createAction` chaqiruvidan so'ng bazaga (`prisma.action`) `isCertificationAction: true` bo'lgan haqiqiy yozuv kiritadi. `verifyWebhookDelivery` esa `isVerified: true` va `isProcessed: true` bo'lgan webhook loglarini tekshiradi.
+   - `tests/test-universal-provider-certification-strict.ts`: Yangi `SimulatedWebhookPipeline` HMAC imzolash, bazada action topilishi va status o'tishini simulyatsiya qiladi. Flaw 10 (`webhook_unprocessed`) va Flaw 11 (`unrelated_rejection_on_missing_field`) kiritildi.
+3. **Portal UI Stale Report Guard:**
+   - `packages/shared/src/provider-eligibility.ts` va `apps/provider-portal/src/onboarding-validation.ts`: `CERTIFICATION_VERSION = 2` va `isCurrentCertification(report)` funksiyasi joriy qilindi. Faqat `certificationVersion === 2`, `mode === 'STRICT'` va `isProductionReady === true` bo'lganda hisobot joriy hisoblanadi.
+   - `apps/provider-portal/src/OnboardingWizard.tsx`: Barcha 4 bosqich o'tishlari, readiness badge va Submit Review tugmasi `isCurrentCertification` bilan himoyalandi; eski hisobot bo'lsa 3-bosqichga yo'naltiriladi.
+   - `apps/provider-portal/src/CertificationView.tsx`: Eski hisobot bo'lsa "QAYTA SERTIFIKATLASH TALAB ETILADI (ESKI HISOBOT)" ogohlantirishi chiqariladi va qayta sertifikatlash taklif etiladi.
+4. **Tekshiruv natijalari:**
+   - `tests/test-universal-provider-certification-strict.ts`: 7 ta universal domain (No contact, Email-only, Date & guests, Source & dest, Variants & options, Parameter-only, Read-only) va 11 ta adversarial flaws (shu jumladan Flaw 10 `webhook_unprocessed` va Flaw 11 `unrelated_rejection_on_missing_field`) — **HAMMASI 100% PASS** (7/7 domains, 11/11 flaws).
+   - `tests/test-remote-certification-flow.ts` — PASS.
+   - `tests/test-sandbox-simulator-e2e.ts` — PASS.
+   - `@zayuno/provider-sdk` build (`tsc`) — PASS.
+   - `@zayuno/shared` build (`tsc`) — PASS.
+   - `@zayuno/api` build (`nest build`) — PASS.
+   - `@zayuno/provider-portal` build (`tsc --noEmit && vite build`) — PASS.
+   - `git diff --check` — PASS (0 whitespace/newline issues).
+
+**O‘zgargan fayllar:**
+- `packages/provider-sdk/src/strict-certification.ts`
+- `packages/provider-sdk/src/certification.ts`
+- `packages/shared/src/provider-eligibility.ts`
+- `apps/api/src/modules/providers/certification-webhook-evidence.ts`
+- `apps/api/src/modules/providers/providers.service.ts`
+- `apps/provider-portal/src/onboarding-validation.ts`
+- `apps/provider-portal/src/OnboardingWizard.tsx`
+- `apps/provider-portal/src/CertificationView.tsx`
+- `tests/test-universal-provider-certification-strict.ts`
+- `TASKS.md`
+
+# Joriy ish — Portal provider so‘rovlarini bevosita prod APIga yo‘naltirish (2026-09-20)
+
+- [x] 1. Env va Vite proxy sababini tekshirish: VITE_API_URL prod, ammo dev proxy majburan true.
+- [x] 2. Env boshqaruvini qo‘shish va biznes API so‘rovlarini prodga yo‘naltirish; auth cookie oqimini saqlash.
+- [x] 3. Portal build, runtime env va mavjud session tekshiruvlari; handoff.
+
+**Holat:** Foydalanuvchi register so‘rovi localhost emas prodga bevosita ketishini va envni o‘zgartirishni so‘radi. `.env.local`da VITE_USE_DEV_API_PROXY=false qo‘yiladi; auth alohida local cookie proxy bilan qoladi. 400 response body hali berilmagan, bu HTTP xatosi tuzatilgan deb belgilanmaydi. Boshqa agentning EVOS fayllari saqlanadi.
+
+**Yakun:** `.env.local`da VITE_API_URL=https://api.zayuno.uz, VITE_USE_DEV_API_PROXY=false. Vite env switchni hurmat qiladi; App.tsx biznes/API_BASE va auth/AUTH_BASEni ajratadi; OnboardingWizard authBase prop oladi. README yangilandi. Lokal HTTP App.tsx runtime env tekshiruvi: prod URL, biznes proxy false, auth proxy true — PASS. Portal TypeScript/Vite build, provider-session va provider-profile-query regressionlari, git diff --check — PASS. `.env.local` gitignored, commit/push/deploy bajarilmadi. Ro‘yxatdan o‘tkazish POST avtomatik takrorlanmadi. Keyingi qadam: foydalanuvchi sahifani yangilab prod Request URLni tekshiradi; 400 sababi uchun Response JSON kerak.
+
+# Joriy ish — EVOS vaqtinchalik provider serverini ishga tushirish (2026-09-20)
+
+- [x] 1. Brief talablari bo'yicha EVOS provider server skriptini yaratish (v1.0.0 contract, /provider-info, /health, /catalog, /offerings/:id, /quote, /actions, /actions/:id).
+- [x] 2. Serverni portda (3006) vaqtinchalik fonda ishga tushirish (task-230).
+- [x] 3. Cloudflare tunnel orqali public HTTPS ulanishini yaratish (`https://grew-oriented-pottery-increases.trycloudflare.com`, task-234).
+- [x] 4. Endpointlarni test orqali tekshirish (/health: 200 HEALTHY, /provider-info: 200 OK, 134 taom, 21 toifa).
+
+**Holat / handoff (2026-09-20):**
+- **Lokal server:** `http://localhost:3006` (fondagi task `task-281`).
+- **Jonli public HTTPS URL:** `https://grew-oriented-pottery-increases.trycloudflare.com` (tunnel task `task-234`).
+- **Slug mosligi:** Portal talabiga moslab `evoss` (shuningdek query/header orqali dinamik) qilib yangilandi.
+- **API kalit:** `evos_secret_key_123456789` (Header: `x-provider-api-key`).
+- **Tarkib:** 21 ta kategoriya, 134 ta haqiqiy EVOS taomi (Macho lavash, shaurmalar, burgerlar, kombolar).
+- **Tekshiruv:** `GET /health` -> 200 OK, `GET /provider-info` -> `slug: "evoss"` 200 OK, `GET /catalog` -> 200 OK.
+
+
+# Joriy ish — EVOS rasmiy API menyusini tortib olib JSON faylga saqlash (2026-09-20)
+
+- [x] 1. EVOS API endpointini va parametrlarini aniqlash (`POST https://evsapi.ectn.uz/service/get-menu`).
+- [x] 2. API response'ini o'zgartirmasdan to'liq raw holda tortib olish (ru va uz tillarida, filial parametrlari bilan).
+- [x] 3. Olingan JSON'ni loyihada fayllarga (`data/menus/evos-api-raw.json`, `data/menus/evos-api-raw-uz.json`) saqlash va tekshirish.
+- [x] 4. Natijani qayd etish va foydalanuvchiga taqdim qilish.
+
+**Holat / handoff (2026-09-20):**
+- **Aniqlangan API endpoint:** `POST https://evsapi.ectn.uz/service/get-menu`
+  - Headers: `token`, `origin: https://evos.uz`, `content-type: application/json`
+  - Payload: `{ branch_id: 2 }` (default/ru) hamda `{ branch_id: 2, lang: 'uz' }` (uzbekcha).
+- **Yaratilgan/yangilangan fayllar:**
+  - `scripts/scrapers/fetch-evos-api.js` — EVOS rasmiy backendidan menyuni raw holatda yuklab oluvchi skript.
+  - `data/menus/evos-api-raw.json` (530.7 KB, 12,502 qator) — API dan kelgan 100% asl, o‘zgartirilmagan JSON (default/ru).
+  - `data/menus/evos-api-raw-uz.json` (521.9 KB, 12,502 qator) — API dan kelgan 100% asl o‘zbekcha JSON (`lang: 'uz'`).
+  - `data/menus/evos-api-branch-6-uz.json` (541.2 KB) — Branch 6 (Parkentskiy) filiali uchun 136 ta taomli to‘liq menyu.
+- **Tekshiruv:**
+  - Status: `success`, Code: `200`, Request ID qaytgan.
+  - Jami 21 ta kategoriya va 134 taom to‘liq o‘zgartirilmagan struktura bilan saqlandi.
+  - JSON parse va structure integrity to‘liq tekshirildi (PASS).
+
+
 # Joriy ish — Barcha joriy o‘zgarishlarni push qilish (2026-09-20)
 
 - [x] 1. Foydalanuvchi barcha tracked/untracked ishlarni push qilishni tasdiqladi; Git holati va origin tekshirildi.

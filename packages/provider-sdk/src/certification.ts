@@ -19,10 +19,12 @@ import {
   PROVIDER_PROTOCOL_ENDPOINTS
 } from '@zayuno/contracts';
 import { ProviderContractValidationError } from './protocol-validation';
+import { CERTIFICATION_VERSION, assertStrictManifest, assertCertificationFixture, expectRemoteRejection,
+  requiredInputMutations, invalidParameterMutations, WebhookDeliveryEvidence } from './strict-certification';
 
 export type CertificationTestStatus = 'PASS' | 'FAIL' | 'SKIPPED';
 export type CertificationTestStage = 'CONTRACT_READINESS' | 'LIFECYCLE_E2E';
-export type CertificationMode = 'STANDARD' | 'ADVERSARIAL';
+export type CertificationMode = 'STANDARD' | 'ADVERSARIAL' | 'STRICT';
 
 /**
  * STANDARD retains the existing compatibility-oriented certification flow.
@@ -32,6 +34,7 @@ export type CertificationMode = 'STANDARD' | 'ADVERSARIAL';
  */
 export interface CertificationRunOptions {
   mode?: CertificationMode;
+  verifyWebhookDelivery?: (actionIds: string[], since: Date) => Promise<WebhookDeliveryEvidence | null>;
 }
 
 export interface CertificationIssue {
@@ -64,6 +67,10 @@ export interface CertificationTestResult {
 }
 
 export interface CertificationReport {
+  certificationVersion: number;
+  scope: 'DIAGNOSTIC' | 'AUTOMATED_INTEGRATION';
+  operationalReviewRequired: boolean;
+  operationalReviewRequirements?: string[];
   providerSlug: string;
   mode: CertificationMode;
   totalTests: number;
@@ -162,7 +169,7 @@ export class ProviderCertificationRunner {
   ): Promise<void> {
     const endpoint = this.endpointFor(testId, capability);
     const blockedBy = dependsOn.filter(dependency =>
-      results.some(result => result.testId === dependency && result.status !== 'PASS')
+      !results.some(result => result.testId === dependency && result.status === 'PASS')
     );
     if (blockedBy.length > 0) {
       results.push({
@@ -317,6 +324,11 @@ export class ProviderCertificationRunner {
   async runAllTests(runOptions: CertificationRunOptions = {}): Promise<CertificationReport> {
     const mode = runOptions.mode ?? this.defaultOptions.mode ?? 'STANDARD';
     const adversarialMode = mode === 'ADVERSARIAL';
+    const strict = mode === 'STRICT';
+    const startedAt = new Date();
+    if (strict && typeof (this.adapter as any).forCertification === 'function' && !(this.adapter as any).config?.config?.certificationRunId) {
+      this.adapter = (this.adapter as any).forCertification(crypto.randomUUID());
+    }
     const results: CertificationTestResult[] = [];
     const declaredCaps = this.adapter.getCapabilities();
     const profile = determineProviderCapabilityProfile(declaredCaps);
@@ -334,6 +346,7 @@ export class ProviderCertificationRunner {
         }
         if (!info.capabilities || info.capabilities.length === 0) throw new Error('Provider must advertise at least one capability.');
         if (!info.status) throw new Error('Provider info missing status field.');
+        if (strict) assertStrictManifest(info, declaredCaps, profile === 'TRANSACTIONAL');
         const manifest = info.manifest || info.metadata?.manifest;
         if (manifest) {
           const parsed = ProviderManifestSchema.parse(manifest);
@@ -342,6 +355,27 @@ export class ProviderCertificationRunner {
           }
         }
       }, [], 'CONTRACT_READINESS');
+    }
+
+    if (strict) {
+      const methods: Partial<Record<ProviderCapability, string[]>> = {
+        METADATA: ['getProviderInfo'], HEALTH: ['checkHealth'], CATALOG: ['getCatalog', 'getOffering'],
+        SEARCH: ['searchOfferings'], LOCATIONS: ['getLocations'], QUOTE: ['requestQuote'],
+        ACTION_CREATE: ['createAction'], ACTION_STATUS: ['getAction'], ACTION_CANCEL: ['cancelAction'],
+        PAYMENT_OPTIONS: ['getPaymentOptions'], WEBHOOK: ['verifyWebhook', 'parseWebhookEvent'],
+      };
+      for (const capability of declaredCaps) {
+        await this.runTest(results, `implementation-${capability}`, `${capability} implementation`, capability, true, async () => {
+          const required = methods[capability];
+          if (!required?.length || required.some(method => typeof (this.adapter as any)[method] !== 'function')) {
+            throw new Error(`Declared capability ${capability} has no complete testable implementation.`);
+          }
+        }, [], 'CONTRACT_READINESS');
+      }
+      for (const auth of ['missing', 'invalid'] as const) {
+        await this.runTest(results, `auth-${auth}`, `Upstream rejects ${auth} credentials`, ProviderCapability.METADATA, true,
+          () => expectRemoteRejection(this.adapter, '/provider-info', undefined, [401, 403], auth), [], 'CONTRACT_READINESS');
+      }
     }
 
     const configuredFulfillmentMode =
@@ -410,6 +444,7 @@ export class ProviderCertificationRunner {
         if (typeof health.latencyMs !== 'number') {
           throw new Error('Health check must report latencyMs.');
         }
+        if (strict && health.status !== 'HEALTHY') throw new Error('Provider must report HEALTHY before certification can proceed.');
       }, [], 'CONTRACT_READINESS');
     }
 
@@ -457,6 +492,7 @@ export class ProviderCertificationRunner {
         // If offering has variants, select the default or first available variant
         if (selectedTestOffering.variants && selectedTestOffering.variants.length > 0) {
           const availableVariants = selectedTestOffering.variants.filter(v => v.isAvailable !== false);
+          if (!availableVariants.length) throw new Error('Offering has no available variant for certification.');
           const defaultVariant = availableVariants.find(v => (v as any).isDefault) || availableVariants[0] || selectedTestOffering.variants[0];
           selectedTestVariantId = defaultVariant.id;
         }
@@ -467,14 +503,9 @@ export class ProviderCertificationRunner {
           for (const group of selectedTestOffering.optionGroups) {
             if (group.isRequired || (group.minSelections && group.minSelections > 0)) {
               const availableOpts = group.options.filter(o => o.isAvailable !== false);
-              const defaultOpt = availableOpts.find(o => (o as any).isDefault) || availableOpts[0] || group.options[0];
-              if (defaultOpt) {
-                selectedTestOptions.push({
-                  groupId: group.id,
-                  optionId: defaultOpt.id,
-                  quantity: 1
-                });
-              }
+              const minimum = Math.max(group.minSelections || 0, group.isRequired ? 1 : 0);
+              if (availableOpts.length < minimum) throw new Error(`Not enough available options in required group ${group.id}.`);
+              selectedTestOptions.push(...availableOpts.slice(0, minimum).map(option => ({ groupId: group.id, optionId: option.id, quantity: 1 })));
             }
           }
         }
@@ -520,10 +551,12 @@ export class ProviderCertificationRunner {
 
     // 6. Quote Capability (MANDATORY)
     let testQuoteId: string | undefined;
+    let testQuote: any;
+    let quoteInput: any;
     if (this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote) {
       await this.runTest(results, 'quote', 'Verified Quote Pricing & Math', ProviderCapability.QUOTE, true, async () => {
         const testOfferingId = selectedTestOffering?.id || selectedTestOffering?.offeringCode;
-        const quote = await this.adapter.requestQuote!({
+        quoteInput = {
           providerSlug: this.adapter.providerSlug,
           locationId: testLocationId,
           items: parameterOnly ? [] : [{
@@ -532,9 +565,11 @@ export class ProviderCertificationRunner {
             quantity: 1,
             selectedOptions: selectedTestOptions
           }],
-          ...(!parameterOnly ? { destination: certificationDestination } : {}),
+          ...(!strict && !parameterOnly ? { destination: certificationDestination } : {}),
           ...certificationInput
-        });
+        };
+        if (strict) assertCertificationFixture(providerInfo, quoteInput, 'QUOTE', selectedTestOffering);
+        const quote = await this.adapter.requestQuote!(quoteInput);
 
         if (quote.total < 0) throw new Error('Quote total must be nonnegative.');
         if (!Array.isArray(quote.lines) || (!parameterOnly && quote.lines.length === 0)) throw new Error('Quote must return an appropriate lines breakdown.');
@@ -565,9 +600,11 @@ export class ProviderCertificationRunner {
         }
 
         // Line math validation
-        const calculatedLinesTotal = quote.lines.reduce((sum, line) => sum + Number(line.lineTotal || (line as any).total || 0), 0);
-        if (Math.abs(calculatedLinesTotal - subtotal) > 0.01) {
-          throw new Error(`Quote lines math mismatch: sum of line totals (${calculatedLinesTotal}) does not match subtotal (${subtotal}).`);
+        if (!parameterOnly || quote.lines.length > 0) {
+          const calculatedLinesTotal = quote.lines.reduce((sum, line) => sum + Number(line.lineTotal || (line as any).total || 0), 0);
+          if (Math.abs(calculatedLinesTotal - subtotal) > 0.01) {
+            throw new Error(`Quote lines math mismatch: sum of line totals (${calculatedLinesTotal}) does not match subtotal (${subtotal}).`);
+          }
         }
 
         if (quote.expiresAt) {
@@ -578,13 +615,14 @@ export class ProviderCertificationRunner {
         }
 
         testQuoteId = quote.id;
-      }, ['catalog'], 'LIFECYCLE_E2E');
+        testQuote = quote;
+      }, [...(parameterOnly ? [] : ['catalog']), ...(strict ? ['metadata', 'health', 'auth-missing', 'auth-invalid'] : [])], 'LIFECYCLE_E2E');
     }
 
     // V2 adversarial probes are opt-in and quote-only: they cannot create a
     // provider action. Each probe is tied to QUOTE and runs only after a valid
     // quote proves the selected catalog fixture is usable.
-    if (adversarialMode && !parameterOnly && this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote) {
+    if ((strict || adversarialMode) && !parameterOnly && this.adapter.hasCapability(ProviderCapability.QUOTE) && this.adapter.requestQuote) {
       await this.runTest(
         results,
         'adversarial-invalid-selection',
@@ -632,7 +670,8 @@ export class ProviderCertificationRunner {
               providerSlug: this.adapter.providerSlug,
               locationId: testLocationId,
               items: [invalidItem],
-              destination: certificationDestination
+              ...(!strict && !parameterOnly ? { destination: certificationDestination } : {}),
+              ...certificationInput
             }),
             ['OFFERING_NOT_FOUND', 'INVALID_VARIANT', 'INVALID_OPTION', 'VALIDATION_ERROR', 'RESOURCE_NOT_FOUND'],
             'Invalid catalog selection'
@@ -662,7 +701,8 @@ export class ProviderCertificationRunner {
                 quantity: 0,
                 selectedOptions: selectedTestOptions
               }],
-              destination: certificationDestination
+              ...(!strict && !parameterOnly ? { destination: certificationDestination } : {}),
+              ...certificationInput
             }),
             ['INVALID_QUANTITY', 'VALIDATION_ERROR'],
             'Zero item quantity'
@@ -714,7 +754,8 @@ export class ProviderCertificationRunner {
                 quantity: itemQuantity,
                 selectedOptions
               }],
-              destination: certificationDestination
+              ...(!strict && !parameterOnly ? { destination: certificationDestination } : {}),
+              ...certificationInput
             });
 
             const line = quote.lines.find(candidate => candidate.offeringId === offeringId);
@@ -754,11 +795,11 @@ export class ProviderCertificationRunner {
         providerSlug: this.adapter.providerSlug,
         quoteId: testQuoteId!,
         locationId: testLocationId,
-        customer: {
+        ...(!strict ? { customer: {
           name: customerName,
           phone: '+998901234567'
-        },
-        ...(!parameterOnly ? { destination: certificationDestination } : {}),
+        } } : {}),
+        ...(!strict && !parameterOnly ? { destination: certificationDestination } : {}),
         items: parameterOnly ? [] : [{
           offeringId: offeringId!,
           variantId: selectedTestVariantId,
@@ -770,14 +811,22 @@ export class ProviderCertificationRunner {
       };
     };
 
+    let createdAction: any;
+
     if (this.adapter.hasCapability(ProviderCapability.ACTION_CREATE) && this.adapter.createAction) {
       await this.runTest(results, 'action-create', 'Action Creation & Payment Handoff', ProviderCapability.ACTION_CREATE, true, async () => {
+        if (strict) assertCertificationFixture(providerInfo, createCertificationActionInput(), 'ACTION_CREATE', selectedTestOffering, testQuote);
         const action = await this.adapter.createAction!(createCertificationActionInput());
+        createdAction = action;
 
         if (!action.id && !action.externalActionId) {
           throw new Error('Action creation must return a valid ID or externalActionId.');
         }
         createdActionId = action.id || action.externalActionId;
+        if (strict && (action.providerSlug !== this.adapter.providerSlug || action.quoteId !== testQuoteId ||
+          action.currency !== testQuote.currency || Math.abs(action.total - testQuote.total) > 0.01 || !Number.isFinite(action.total))) {
+          throw new Error('Created action must preserve the provider, quoteId, currency and verified quote total.');
+        }
 
         // Payment handoff validation: If awaiting payment, nextAction with OPEN_URL is mandatory
         if (action.status === ActionStatus.AWAITING_PAYMENT) {
@@ -850,6 +899,10 @@ export class ProviderCertificationRunner {
         if (!fetched || !fetched.status) {
           throw new Error('Failed to retrieve action by ID or status field is missing.');
         }
+        if (strict && (fetched.id !== createdAction?.id || fetched.providerSlug !== this.adapter.providerSlug ||
+          fetched.quoteId !== testQuoteId || fetched.total !== createdAction?.total || fetched.currency !== createdAction?.currency)) {
+          throw new Error('Action lookup must return the same provider, action, quote and financial amounts that were created.');
+        }
       }, ['action-create'], 'LIFECYCLE_E2E');
     }
 
@@ -919,7 +972,127 @@ export class ProviderCertificationRunner {
             throw new Error('Parsed webhook event missing eventType or providerSlug.');
           }
         }
-      }, [], 'LIFECYCLE_E2E');
+      }, [], 'CONTRACT_READINESS');
+    }
+
+    if (strict && this.adapter.hasCapability(ProviderCapability.QUOTE)) {
+      const reject = (
+        id: string,
+        endpoint: '/quote' | '/actions' | '/actions/missing-certification-action',
+        body: () => any,
+        statuses = [400, 404, 409, 410, 422],
+        deps = ['quote'],
+        disallowedCodes?: string[]
+      ) =>
+        this.runTest(results, id, id.replace(/-/g, ' '), endpoint === '/quote' ? ProviderCapability.QUOTE : ProviderCapability.ACTION_CREATE,
+          true, async () => {
+            const resolvedBody = typeof body === 'function' ? await body() : body;
+            await expectRemoteRejection(this.adapter, endpoint, resolvedBody, statuses, { auth: 'valid', disallowedCodes });
+          }, deps, 'LIFECYCLE_E2E');
+      for (const capability of ['QUOTE', 'ACTION_CREATE']) {
+        if (!this.adapter.hasCapability(capability as ProviderCapability)) continue;
+        await this.runTest(results, `required-fields-${capability}`, `${capability}: missing declared fields rejected upstream`, capability as ProviderCapability, true, async () => {
+          let input = capability === 'QUOTE' ? quoteInput : createCertificationActionInput();
+          const endpoint = capability === 'QUOTE' ? '/quote' : '/actions';
+          if (capability === 'ACTION_CREATE' && this.adapter.requestQuote) {
+            const freshQuote = await this.adapter.requestQuote(quoteInput);
+            input = { ...input, quoteId: freshQuote.id };
+          }
+          for (const mutation of requiredInputMutations(providerInfo, input, capability, selectedTestOffering, testQuote)) {
+            let probeInput = mutation.input;
+            if (capability === 'ACTION_CREATE' && this.adapter.requestQuote) {
+              const freshQuote = await this.adapter.requestQuote(quoteInput);
+              probeInput = { ...probeInput, quoteId: freshQuote.id };
+            }
+            try {
+              await expectRemoteRejection(this.adapter, endpoint, probeInput, [400, 422], {
+                auth: 'valid',
+                disallowedCodes: ['QUOTE_EXPIRED', 'QUOTE_NOT_FOUND', 'ACTION_NOT_CONFIRMED']
+              });
+            } catch (err: any) {
+              throw new Error(`Provider must reject missing required field ${mutation.path}: ${err.message}`);
+            }
+          }
+          for (const mutation of invalidParameterMutations(providerInfo, input, capability)) {
+            let probeInput = mutation;
+            if (capability === 'ACTION_CREATE' && this.adapter.requestQuote) {
+              const freshQuote = await this.adapter.requestQuote(quoteInput);
+              probeInput = { ...probeInput, quoteId: freshQuote.id };
+            }
+            await expectRemoteRejection(this.adapter, endpoint, probeInput, [400, 422], {
+              auth: 'valid',
+              disallowedCodes: ['QUOTE_EXPIRED', 'QUOTE_NOT_FOUND', 'ACTION_NOT_CONFIRMED']
+            });
+          }
+        }, capability === 'QUOTE' ? ['quote'] : ['action-create'], 'LIFECYCLE_E2E');
+      }
+      if (!parameterOnly) {
+        for (const quantity of [0, -1, 1.5]) {
+          await reject(`upstream-quantity-${quantity}`, '/quote', () => ({ ...quoteInput, items: [{ ...quoteInput.items[0], quantity }] }), [400, 422]);
+        }
+        await reject('upstream-unknown-offering', '/quote', () => ({ ...quoteInput, items: [{ ...quoteInput.items[0], offeringId: crypto.randomUUID() }] }), [400, 404, 422]);
+        if (selectedTestOffering?.variants?.length) {
+          await reject('upstream-unknown-variant', '/quote', () => ({ ...quoteInput, items: [{ ...quoteInput.items[0], variantId: crypto.randomUUID() }] }), [400, 404, 422]);
+        }
+        if (selectedTestOffering?.optionGroups?.length) {
+          await reject('upstream-unknown-option', '/quote', () => ({ ...quoteInput, items: [{ ...quoteInput.items[0], selectedOptions: [{ groupId: 'missing-group', optionId: 'missing-option', quantity: 1 }] }] }), [400, 404, 422]);
+        }
+      }
+      if (this.adapter.hasCapability(ProviderCapability.ACTION_CREATE)) {
+        const freshAction = async () => {
+          let qId = testQuote?.id;
+          if (this.adapter.requestQuote) {
+            const q = await this.adapter.requestQuote(quoteInput);
+            qId = q.id;
+          }
+          return { ...createCertificationActionInput(), idempotencyKey: crypto.randomUUID(), quoteId: qId };
+        };
+        await reject('upstream-unconfirmed-action', '/actions', async () => ({ ...(await freshAction()), userConfirmed: false }), [400, 422], ['action-create'], ['QUOTE_EXPIRED', 'QUOTE_NOT_FOUND']);
+        await reject('upstream-unknown-quote', '/actions', async () => ({ ...(await freshAction()), quoteId: crypto.randomUUID() }), [400, 404, 409, 410, 422], ['action-create'], ['QUOTE_EXPIRED', 'ACTION_NOT_CONFIRMED']);
+
+        // Idempotency collision probe: Same idempotency key with modified payload must be rejected with 409
+        const baseAction = createCertificationActionInput();
+        const mutatedIdempotencyPayload = {
+          ...baseAction,
+          idempotencyKey: testIdempKey,
+          ...(parameterOnly
+            ? { parameters: { ...(baseAction.parameters || {}), __idempotency_collision_probe: 'modified' } }
+            : { customer: { ...(baseAction.customer || {}), name: 'Idempotency Collision Probe' } })
+        };
+        await reject('upstream-idempotency-collision', '/actions', () => mutatedIdempotencyPayload, [409], ['action-idempotency'], ['QUOTE_EXPIRED']);
+
+        // Quote-to-action match probe: If items are changed without re-quoting, provider must reject
+        if (!parameterOnly && quoteInput?.items?.length) {
+          await reject('upstream-quote-action-mismatch', '/actions', async () => ({
+            ...(await freshAction()),
+            idempotencyKey: crypto.randomUUID(),
+            items: [{ ...quoteInput.items[0], quantity: 99 }]
+          }), [400, 409, 422], ['action-create'], ['QUOTE_EXPIRED']);
+        }
+
+        await this.runTest(results, 'upstream-expired-quote', 'Expired quote rejected upstream', ProviderCapability.ACTION_CREATE, true, async () => {
+          const expiring = await this.adapter.requestQuote!(quoteInput);
+          const remaining = Date.parse(expiring.expiresAt!) - Date.now();
+          if (!Number.isFinite(remaining) || remaining < 0 || remaining > 5000) {
+            throw new Error(`Certification quotes must expire within 5 seconds so expiry enforcement can be verified (got ${Math.round(remaining / 1000)}s).`);
+          }
+          await new Promise(resolve => setTimeout(resolve, remaining + 150));
+          await expectRemoteRejection(this.adapter, '/actions', { ...(await freshAction()), quoteId: expiring.id }, [400, 409, 410, 422]);
+        }, ['action-create'], 'LIFECYCLE_E2E');
+        await reject('upstream-unknown-action', '/actions/missing-certification-action', () => undefined, [404], ['action-create']);
+      }
+    }
+
+    if (strict && this.adapter.hasCapability(ProviderCapability.WEBHOOK)) {
+      await this.runTest(results, 'webhook-delivery', 'Signed provider webhook received for this test action', ProviderCapability.WEBHOOK, true, async () => {
+        const verify = runOptions.verifyWebhookDelivery || this.defaultOptions.verifyWebhookDelivery;
+        if (!verify) throw new Error('Webhook delivery has not been observed. Local HMAC validation does not prove provider delivery.');
+        const ids = [createdAction?.id, createdAction?.externalActionId, createdAction?.publicId].filter(Boolean);
+        const evidence = await verify(ids, startedAt);
+        if (!evidence?.eventId || !ids.includes(evidence.actionId) || !Object.values(ActionStatus).includes(evidence.status as ActionStatus)) {
+          throw new Error('No verified action status webhook was received for the current certification action.');
+        }
+      }, ['action-create', 'webhook'], 'LIFECYCLE_E2E');
     }
 
     const passedCount = results.filter(r => r.status === 'PASS').length;
@@ -927,7 +1100,7 @@ export class ProviderCertificationRunner {
     const skippedCount = results.filter(r => r.status === 'SKIPPED').length;
     const hasBlockingResult = results.some(r => r.status === 'FAIL' || (r.status === 'SKIPPED' && r.isMandatory));
     const isCertified = results.length > 0 && !hasBlockingResult;
-    const isProductionReady = isCertified && missingMandatoryCapabilities.length === 0;
+    const isProductionReady = strict && isCertified && missingMandatoryCapabilities.length === 0;
     const discoveryReasons: string[] = [];
     if (missingMandatoryCapabilities.includes(ProviderCapability.LOCATIONS)) {
       discoveryReasons.push('MISSING_LOCATIONS_CAPABILITY');
@@ -938,6 +1111,12 @@ export class ProviderCertificationRunner {
     }
 
     return {
+      certificationVersion: CERTIFICATION_VERSION,
+      scope: strict ? 'AUTOMATED_INTEGRATION' : 'DIAGNOSTIC',
+      operationalReviewRequired: profile === 'TRANSACTIONAL',
+      operationalReviewRequirements: profile === 'TRANSACTIONAL'
+        ? ['ACTION_VISIBLE_IN_PROVIDER_SYSTEM', 'STAFF_ORDER_ACKNOWLEDGEMENT']
+        : [],
       providerSlug: this.adapter.providerSlug,
       mode,
       totalTests: results.length,
@@ -947,12 +1126,12 @@ export class ProviderCertificationRunner {
       isCertified,
       isProductionReady,
       missingMandatoryCapabilities,
-      capabilitiesTested: declaredCaps,
+      capabilitiesTested: [...new Set(results.filter(result => result.status === 'PASS').map(result => result.capability))],
       profile,
       providerType: effectiveType,
       fulfillmentMode,
       discoveryReadiness: {
-        isReady: isProductionReady && discoveryReasons.length === 0,
+        isReady: (strict ? isProductionReady : isCertified) && discoveryReasons.length === 0,
         reasons: [...new Set(discoveryReasons)]
       },
       tests: results

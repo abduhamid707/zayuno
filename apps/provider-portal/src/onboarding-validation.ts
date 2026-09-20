@@ -46,3 +46,9 @@ export function reachableOnboardingStep(businessValid: boolean, integrationSaved
   if (!integrationSaved) return 2;
   return certified ? 4 : 3;
 }
+
+export const CERTIFICATION_VERSION = 2;
+
+export function isCurrentCertification(report: any): boolean {
+  return report?.certificationVersion === CERTIFICATION_VERSION && report?.mode === 'STRICT' && report?.isProductionReady === true;
+}

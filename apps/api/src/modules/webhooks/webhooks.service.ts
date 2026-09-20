@@ -37,14 +37,13 @@ export class WebhooksService {
 
     // 1. Verify HMAC Signature
     const rawBodyString = rawBody ?? JSON.stringify(body);
-    const signature = (headers['x-zayuno-signature'] || headers['x-provider-signature'] || '') as string;
+    const signature = (headers['x-zayuno-signature'] || headers['x-provider-signature'] || headers['x-signature'] || '') as string;
 
-    const isVerified = adapter.verifyWebhook
+    const isVerified = !!provider.webhookSecret && adapter.verifyWebhook
       ? await adapter.verifyWebhook(headers, rawBodyString, provider.webhookSecret)
-      : true;
+      : false;
 
-    const isStrict = process.env.NODE_ENV === 'production' || process.env.STRICT_WEBHOOKS === 'true';
-    if (!isVerified && isStrict) {
+    if (!isVerified) {
       this.logger.warn(`Webhook signature verification failed for provider: ${cleanSlug}`);
       await prisma.webhookLog.create({
         data: {
@@ -85,10 +84,16 @@ export class WebhooksService {
         providerId: provider.id,
         event: parsedEvent.eventType,
         headers: headers as any,
-        payload: parsedEvent.payload as any,
+        payload: {
+          ...parsedEvent.payload,
+          certificationEvidence: {
+            eventId: parsedEvent.eventId, actionId: parsedEvent.actionId,
+            externalActionId: parsedEvent.externalActionId, newStatus: parsedEvent.newStatus,
+          },
+        } as any,
         signature,
         isVerified: true,
-        isProcessed: true
+        isProcessed: false
       }
     });
 
@@ -161,6 +166,12 @@ export class WebhooksService {
         }
       });
 
+      // Mark log as processed since action and timeline were updated
+      await prisma.webhookLog.update({
+        where: { id: webhookLog.id },
+        data: { isProcessed: true }
+      });
+
       // 5. Emit Event
       await this.natsService.publish(ZayunoEventTopic.ACTION_UPDATED, {
         eventId: parsedEvent.eventId,
@@ -179,7 +190,7 @@ export class WebhooksService {
 
     return {
       success: true,
-      processed: true,
+      processed: !!action,
       eventId: parsedEvent.eventId,
       webhookLogId: webhookLog.id
     };

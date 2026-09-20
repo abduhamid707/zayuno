@@ -27,6 +27,9 @@ export const CapabilityRequirementsSchema = z.object({
 });
 export const ProviderManifestSchema = z.object({
   version: z.literal(1),
+  certification: z.object({
+    safeTestEnvironment: z.literal(true),
+  }).optional().describe('Certification traffic marked with x-zayuno-certification-run cannot charge or fulfil real orders; quotes expire within 5 seconds'),
   certificationInput: z.object({
     parameters: z.record(z.any()).optional(),
     customer: CustomerContactSchema.optional(),

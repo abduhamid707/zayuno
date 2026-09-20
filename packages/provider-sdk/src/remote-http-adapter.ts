@@ -182,12 +182,25 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
         providerSlug: this.providerSlug,
         endpoint,
         upstreamStatusCode,
-        retryable
+        retryable,
+        rawCode: providerCode,
+        rawMessage: providerMessage,
+        responseBody: parsed
       }
     );
   }
 
-  private async callRemote<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  /** Fixed endpoints only; bypass local request schemas to test the upstream itself. */
+  async certificationProbe(endpoint: '/provider-info' | '/quote' | '/actions' | '/actions/missing-certification-action', body?: unknown, auth: 'valid' | 'missing' | 'invalid' = 'valid'): Promise<void> {
+    const options: RequestInit = body === undefined ? { method: 'GET' } : { method: 'POST', body: JSON.stringify(body) };
+    await this.callRemote(endpoint, options, auth);
+  }
+
+  forCertification(runId: string): RemoteHttpProviderAdapter {
+    return new RemoteHttpProviderAdapter({ ...this.config, config: { ...this.config.config, certificationRunId: runId } });
+  }
+
+  private async callRemote<T = any>(endpoint: string, options: RequestInit = {}, auth: 'valid' | 'missing' | 'invalid' = 'valid'): Promise<T> {
     if (!this.targetUrl) {
       throw new ProviderError(
         'Provider integration is not configured.',
@@ -211,13 +224,14 @@ export class RemoteHttpProviderAdapter extends BaseProviderAdapter {
     }
 
     const authMethod = this.config.authMethod || this.config.config?.authMethod || 'API_KEY';
-    const secret = this.config.secret || '';
+    const secret = auth === 'missing' ? '' : auth === 'invalid' ? 'invalid-certification-credential' : this.config.secret || '';
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'x-provider-slug': this.providerSlug,
       ...(options.headers as any || {})
     };
+    if (this.config.config?.certificationRunId) headers['x-zayuno-certification-run'] = this.config.config.certificationRunId;
 
     if (secret) {
       if (authMethod === 'BEARER_TOKEN') {

@@ -15,6 +15,7 @@ import {
   Terminal,
   XCircle,
 } from 'lucide-react';
+import { isCurrentCertification } from './onboarding-validation';
 
 interface CertificationViewProps {
   provider: any;
@@ -138,15 +139,21 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
               )}
               <div>
                 <h3 className="text-base font-bold text-white">
-                  {certReport.isCertified
-                    ? 'Integratsiya to‘liq sertifikatlandi!'
-                    : 'Sertifikatlash testlarida kamchiliklar aniqlandi'}
+                  {isCurrentCertification(certReport)
+                    ? 'Integratsiya to‘liq sertifikatlandi (STRICT v2)!'
+                    : certReport.isProductionReady
+                      ? 'Integratsiya sertifikati yangilanishi kerak'
+                      : 'Sertifikatlash testlarida kamchiliklar aniqlandi'}
                 </h3>
                 <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
                   {certReport.passedCount} ta test muvaffaqiyatli, {certReport.failedCount} ta xato,{' '}
                   {certReport.skippedCount || 0} ta bloklangan. Ishga tushirishga tayyorlik:{' '}
-                  <strong className={certReport.isProductionReady ? 'text-emerald-400' : 'text-amber-300'}>
-                    {certReport.isProductionReady ? 'TAYYOR (READY)' : 'TUGALLANMAGAN'}
+                  <strong className={isCurrentCertification(certReport) ? 'text-emerald-400' : 'text-amber-300'}>
+                    {isCurrentCertification(certReport)
+                      ? 'TAYYOR (READY)'
+                      : certReport.isProductionReady
+                        ? 'QAYTA SERTIFIKATLASH TALAB ETILADI (ESKI HISOBOT)'
+                        : 'TUGALLANMAGAN'}
                   </strong>
                   .
                 </p>
@@ -156,15 +163,33 @@ export const CertificationView: React.FC<CertificationViewProps> = ({
             <div className="flex items-center gap-2">
               <span
                 className={`text-xs font-mono font-bold px-3 py-1 rounded-full border ${
-                  certReport.isCertified
+                  isCurrentCertification(certReport)
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                    : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                    : certReport.isProductionReady
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                      : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                 }`}
               >
-                {certReport.isCertified ? 'SERTIFIKATLANDI' : 'XATOLIKLAR BOR'}
+                {isCurrentCertification(certReport)
+                  ? 'SERTIFIKATLANDI (STRICT)'
+                  : certReport.isProductionReady
+                    ? 'ESKI HISOBOT'
+                    : 'XATOLIKLAR BOR'}
               </span>
             </div>
           </div>
+
+          {!isCurrentCertification(certReport) && certReport.isProductionReady && (
+            <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-xs text-amber-200 flex items-start gap-2.5 animate-fadeIn">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="block text-white font-semibold">Qayta sertifikatlash talab etiladi</strong>
+                <p className="text-[11px] text-amber-300/90 mt-0.5 leading-relaxed">
+                  Mavjud hisobot eski yoki noqat’iy versiyada bajarilgan. Ishlab chiqarishga (Production) ruxsat olish va tasdiqlash arizasini topshirish uchun qat’iy (STRICT v2) sertifikatlash testlarini qayta ishga tushiring.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Test Results Table */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">

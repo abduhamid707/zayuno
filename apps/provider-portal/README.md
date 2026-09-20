@@ -25,6 +25,10 @@ settings remain unchanged. After switching from direct API requests, log in once
 to establish cookies on localhost. Production builds keep the configured API URL;
 webhook instructions always use the public API URL.
 
+Set `VITE_USE_DEV_API_PROXY=false` in `.env.local` to send business API requests
+directly to `VITE_API_URL`. Login/session/refresh/logout still use the local auth
+proxy during development so HttpOnly cookies survive page reloads.
+
 Session restoration tries the refresh cookie once when the access cookie expires.
 Concurrent restores share one request so rotating refresh tokens are not reused.
 Browser testing of public pages does not require an account.

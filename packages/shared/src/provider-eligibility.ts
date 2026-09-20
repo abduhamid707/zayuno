@@ -190,3 +190,9 @@ export function getStoredProviderEligibilityPolicy(provider: any) {
     ...(policy.waiver ? { waiver: policy.waiver } : {})
   };
 }
+
+export const CERTIFICATION_VERSION = 2;
+
+export function isCurrentCertification(report: any): boolean {
+  return report?.certificationVersion === CERTIFICATION_VERSION && report?.mode === 'STRICT' && report?.isProductionReady === true;
+}

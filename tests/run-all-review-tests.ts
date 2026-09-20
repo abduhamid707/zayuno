@@ -59,6 +59,7 @@ const testSuites = [
   "tests/test-openai-plugin-mcp-contract.ts",
   "tests/test-admin-system-health.ts",
   "tests/test-remote-certification-flow.ts",
+  "tests/test-universal-provider-certification-strict.ts",
   "apps/mcp/tests/test-chat-only.ts",
 ];
 

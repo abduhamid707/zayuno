@@ -65,7 +65,8 @@ import {
   ProviderEligibilityPolicyUpdateSchema,
   WelcomeInfo
 } from '@zayuno/contracts';
-import { ProviderCertificationRunner, CertificationReport, CapabilityNotSupportedError } from '@zayuno/provider-sdk';
+import { ProviderCertificationRunner, CertificationReport, CapabilityNotSupportedError, isCurrentCertification } from '@zayuno/provider-sdk';
+import { certificationWebhookEvidence } from './certification-webhook-evidence';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID, randomBytes, timingSafeEqual } from 'crypto';
 import { lookup } from 'dns/promises';
@@ -1429,6 +1430,62 @@ export class ProvidersService {
     return this.mapToProviderInfo(updated);
   }
 
+  private async runStrictCertification(provider: { id: string }, adapter: ProviderAdapter): Promise<CertificationReport> {
+    const runId = randomUUID();
+    const testAdapter = typeof (adapter as any).forCertification === 'function'
+      ? (adapter as any).forCertification(runId) : adapter;
+
+    const originalCreateAction = testAdapter.createAction?.bind(testAdapter);
+    if (originalCreateAction) {
+      testAdapter.createAction = async (input: any) => {
+        const result = await originalCreateAction(input);
+        try {
+          const externalActionId = result.externalActionId || result.id;
+          const publicId = `ZY-CERT-${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+          await prisma.action.create({
+            data: {
+              publicId,
+              providerId: provider.id,
+              externalActionId,
+              status: DbActionStatus.SUBMITTED,
+              lines: (result.lines || []) as any,
+              subtotal: result.subtotal || 0,
+              fees: result.totalFees || 0,
+              discount: result.totalDiscount || 0,
+              total: result.total || 0,
+              currency: result.currency || 'UZS',
+              parameters: (input.parameters || {}) as any,
+              metadata: {
+                certificationRunId: runId,
+                isCertificationAction: true
+              } as any
+            }
+          });
+        } catch (dbErr: any) {
+          this.logger.warn(`Failed to track certification action in database: ${dbErr.message}`);
+        }
+        return result;
+      };
+    }
+
+    return new ProviderCertificationRunner(testAdapter).runAllTests({
+      mode: 'STRICT',
+      verifyWebhookDelivery: async (actionIds, since) => {
+        const deadline = Date.now() + 5000;
+        do {
+          const logs = await prisma.webhookLog.findMany({
+            where: { providerId: provider.id, isVerified: true, isProcessed: true, createdAt: { gte: since }, event: 'action.status_updated' },
+            orderBy: { createdAt: 'desc' }, take: 100,
+          });
+          const evidence = certificationWebhookEvidence(logs, provider.id, actionIds, since);
+          if (evidence) return evidence;
+          await new Promise(resolve => setTimeout(resolve, 250));
+        } while (Date.now() < deadline);
+        return null;
+      },
+    });
+  }
+
   async runCertification(slug: string, actor?: { id?: string; role?: UserRole; providerId?: string }): Promise<CertificationReport> {
     const cleanSlug = slug.toLowerCase().trim();
     const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
@@ -1452,9 +1509,9 @@ export class ProvidersService {
       );
     }
 
+    this.registry.invalidateAdapterCache(cleanSlug);
     const adapter = await this.registry.getAdapter(cleanSlug);
-    const runner = new ProviderCertificationRunner(adapter);
-    const report = await runner.runAllTests();
+    const report = await this.runStrictCertification(provider, adapter);
     const certifiedInfo = report.isProductionReady && adapter.getProviderInfo ? await adapter.getProviderInfo() : undefined;
     const certifiedManifest = certifiedInfo?.manifest || certifiedInfo?.metadata?.manifest;
     const certifiedBranding = certifiedInfo?.branding || certifiedInfo?.metadata?.branding;
@@ -1499,7 +1556,7 @@ export class ProvidersService {
     this.assertProviderManager(provider, actor);
 
     const meta = (provider.metadata as any) || {};
-    if (!meta.isCertified || meta.lastCertificationReport?.isProductionReady !== true) {
+    if (!meta.isCertified || !isCurrentCertification(meta.lastCertificationReport)) {
       throw new BadRequestException('Provider must pass every test and all mandatory capabilities before submitting for review.');
     }
 
@@ -1536,7 +1593,7 @@ export class ProvidersService {
     // changed DNS, or broken its contract after submitting for review.
     this.registry.invalidateAdapterCache(cleanSlug);
     const liveAdapter = await this.registry.getAdapter(cleanSlug);
-    const liveReport = await new ProviderCertificationRunner(liveAdapter).runAllTests();
+    const liveReport = await this.runStrictCertification(provider, liveAdapter);
     if (liveReport.isProductionReady) {
       await this.syncDiscoveryLocations(provider, liveAdapter);
     }

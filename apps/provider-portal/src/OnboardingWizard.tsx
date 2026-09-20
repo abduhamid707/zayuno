@@ -33,7 +33,7 @@ import {
   Webhook
 } from 'lucide-react';
 import { ProviderLogoInput } from './ProviderLogoInput';
-import { businessErrors, integrationErrors, reachableOnboardingStep } from './onboarding-validation';
+import { businessErrors, integrationErrors, reachableOnboardingStep, isCurrentCertification } from './onboarding-validation';
 import { DocsViewer } from './DocsViewer';
 import {
   createProviderOpenApiDocument,
@@ -159,6 +159,7 @@ function getHealthGuidance(status: string, checkedUrl: string): HealthGuidance {
 
 interface OnboardingWizardProps {
   apiBase: string;
+  authBase?: string;
   publicApiBase?: string;
   token: string;
   onAuthSuccess: (token: string, user: any) => void;
@@ -215,6 +216,7 @@ const InfoTooltip: React.FC<{
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   apiBase,
+  authBase = apiBase,
   publicApiBase = apiBase,
   token,
   onAuthSuccess,
@@ -267,7 +269,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [currentStep, setCurrentStep] = useState<number>(() => {
     if (urlParams.step) return urlParams.step;
     if (initialProvider?.slug) {
-      if (initialProvider.metadata?.isCertified || initialProvider.metadata?.lastCertificationReport?.isProductionReady) return 4;
+      if (isCurrentCertification(initialProvider.metadata?.lastCertificationReport)) return 4;
       return initialProvider.baseUrl ? 3 : 2;
     }
     if (savedDraft?.currentStep && savedDraft.currentStep >= 1 && savedDraft.currentStep <= 6) {
@@ -379,6 +381,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const [submittingReview, setSubmittingReview] = useState(false);
   const registeredProviderSlug = (createdCredentials?.providerSlug || slug || initialProvider?.slug || '').trim().toLowerCase();
   const requiresWebhookSigning = capabilityProfile === 'transactional';
+  const webhookEndpoint = `${publicApiBase.replace(/\/$/, '')}/api/v1/webhooks/${registeredProviderSlug}`;
 
   // Status & Errors
   const [loading, setLoading] = useState(false);
@@ -395,7 +398,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
   const fingerprint = JSON.stringify([businessName.trim(), description.trim(), supportPhone.trim(), supportTelegram.trim(), supportEmail.trim(), supportUrl.trim(), supportNote.trim(), logoUrl, slug.trim(), baseUrl.trim(), authMethod, capabilityProfile]);
   const [savedFingerprint, setSavedFingerprint] = useState(initialProvider?.id ? fingerprint : '');
   const integrationSaved = Boolean(savedFingerprint && savedFingerprint === fingerprint && !apiSecret && businessValid && integrationValid);
-  const maxStep = reachableOnboardingStep(businessValid, integrationSaved, Boolean(certReport?.isProductionReady));
+  const maxStep = reachableOnboardingStep(businessValid, integrationSaved, isCurrentCertification(certReport));
   useEffect(() => { setCurrentStep(step => step === 3 && showCertificationSettings && businessValid ? step : Math.min(step, maxStep)); }, [maxStep, showCertificationSettings, businessValid]);
   useEffect(() => { setSuccessMsg(null); setFieldErrors({}); setError(null); setAssignedProviderConflict(null); }, [fingerprint, currentStep]);
   useEffect(() => { setUrlCheckResult({ status: 'idle', message: '' }); }, [baseUrl, authMethod, apiSecret]);
@@ -531,7 +534,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
     setLoading(true);
     try {
-      const res = await fetch(`${apiBase}/api/v1/auth/register-owner`, {
+      const res = await fetch(`${authBase}/api/v1/auth/register-owner`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -568,7 +571,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
 
     setLoading(true);
     try {
-      const verifyRes = await fetch(`${apiBase}/api/v1/auth/verify-email`, {
+      const verifyRes = await fetch(`${authBase}/api/v1/auth/verify-email`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -586,7 +589,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
         onAuthSuccess(verifyData.accessToken, verifyData.user);
       } else if (password) {
         // Fallback: attempt login with password if verify didn't return token
-        const loginRes = await fetch(`${apiBase}/api/v1/auth/login`, {
+        const loginRes = await fetch(`${authBase}/api/v1/auth/login`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -611,7 +614,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({
     setError(null);
     setSuccessMsg(null);
     try {
-      const res = await fetch(`${apiBase}/api/v1/auth/resend-verification`, {
+      const res = await fetch(`${authBase}/api/v1/auth/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase() })
@@ -1176,7 +1179,7 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
         throw new Error(data?.message || 'Sertifikatlash jarayonida server xatosi yuz berdi.');
       }
       setCertReport(data);
-      if (data.isProductionReady) {
+      if (isCurrentCertification(data)) {
         setSuccessMsg('Barcha mandatory sertifikatlash testlari muvaffaqiyatli o‘tdi!');
       }
     } catch (err: any) {
@@ -1190,7 +1193,10 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
   // STEP 4: Submit for Review
   // --------------------------------------------------------------------------
   const handleSubmitReview = async () => {
-    if (!integrationSaved || !certReport?.isProductionReady) { setError('Avval sozlamalarni saqlang va sertifikatlashni yakunlang.'); return; }
+    if (!integrationSaved || !isCurrentCertification(certReport)) {
+      setError('Avval sozlamalarni saqlang va qat’iy (STRICT) sertifikatlashni yakunlang.');
+      return;
+    }
     const targetSlug = slug.trim() || createdCredentials?.providerSlug;
     if (!targetSlug) return;
     setSubmittingReview(true);
@@ -1266,7 +1272,7 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
         {/* Progress Bar & Steps Tabs */}
         <div className="grid grid-cols-4 gap-2">
           {stepsList.map(s => {
-            const isCompleted = (s.num === 1 && businessValid) || (s.num === 2 && integrationSaved) || (s.num === 3 && integrationSaved && Boolean(certReport?.isProductionReady));
+            const isCompleted = (s.num === 1 && businessValid) || (s.num === 2 && integrationSaved) || (s.num === 3 && integrationSaved && isCurrentCertification(certReport));
             const isCurrent = currentStep === s.num;
             const accessible = isStepAccessible(s.num);
             return (
@@ -1848,7 +1854,9 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
               </div>
               <div className="rounded-xl bg-slate-900/80 p-2.5">
                 <span className="text-slate-500 block">3. To‘liq contract</span>
-                <span className={certReport?.isProductionReady ? 'mt-1 block font-semibold text-emerald-300' : 'mt-1 block font-semibold text-slate-400'}>{certReport?.isProductionReady ? 'Mos' : 'Keyingi qadamda'}</span>
+                <span className={isCurrentCertification(certReport) ? 'mt-1 block font-semibold text-emerald-300' : certReport ? 'mt-1 block font-semibold text-amber-300' : 'mt-1 block font-semibold text-slate-400'}>
+                  {isCurrentCertification(certReport) ? 'Mos (STRICT)' : certReport ? 'Qayta tekshirish' : 'Keyingi qadamda'}
+                </span>
               </div>
             </div>
 
@@ -2390,9 +2398,27 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
                           Qo‘llanma →
                         </button>
                       </div>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Yangi arizada bu secretni o‘ylab topish yoki kiritish shart emas. Zayuno uni avtomatik generatsiya qiladi va 4-bosqichda (Xulosa va Handoff) sizga faqat bir marta xavfsiz taqdim etadi.
-                      </p>
+                      {createdCredentials?.sandboxWebhookSecret ? (
+                        <div className="space-y-1.5 mt-2">
+                          <p className="text-[11px] text-slate-300">
+                            Arizangiz uchun Webhook Secret generatsiya qilindi. Serveringizda webhook imzolash uchun uni sozlang:
+                          </p>
+                          <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-900 border border-slate-700 font-mono text-[11px] text-emerald-300">
+                            <span className="truncate select-all">{createdCredentials.sandboxWebhookSecret}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(createdCredentials.sandboxWebhookSecret!, 'whsec_step2')}
+                              className="text-xs text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 shrink-0"
+                            >
+                              {copiedField === 'whsec_step2' ? 'Nusxalandi!' : 'Nusxa'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          Yangi arizada bu secretni o‘ylab topish yoki kiritish shart emas. Zayuno uni avtomatik generatsiya qiladi va keyingi bosqichlarda ham xavfsiz taqdim etadi.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2461,6 +2487,34 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
               </button>
             </div>
           </div>
+
+          {requiresWebhookSigning && (
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-white flex items-center gap-1.5">
+                  <Webhook className="w-4 h-4 text-emerald-400" />
+                  Webhook sozlamasi (Certification uchun)
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">POST {webhookEndpoint}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Avtomatlashtirilgan test vaqtida Zayuno sinov harakatini yaratgach, provayderingiz Zayuno webhook endpointiga imzolangan status xabarini yuborishi shart.
+              </p>
+              {createdCredentials?.sandboxWebhookSecret && (
+                <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-900 border border-slate-700/80 font-mono text-[11px]">
+                  <span className="text-slate-400 text-[10px]">Secret:</span>
+                  <span className="text-emerald-300 truncate select-all">{createdCredentials.sandboxWebhookSecret}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(createdCredentials.sandboxWebhookSecret!, 'whsec_step3')}
+                    className="text-xs text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 shrink-0"
+                  >
+                    {copiedField === 'whsec_step3' ? 'Nusxalandi!' : 'Nusxa'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {showCertificationSettings && (
             <div className="p-4 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-4 animate-fadeIn">
@@ -2570,45 +2624,83 @@ Tuzatgandan keyin shu endpointni qayta tekshiring. Taxmin qilmang: faqat canonic
           {certReport && (
             <div className="space-y-4 animate-fadeIn">
               {/* Summary Card */}
-              <div
-                className={`p-4 rounded-2xl border flex items-center justify-between flex-wrap gap-3 ${
-                  certReport.isProductionReady
-                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                    : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {certReport.isProductionReady ? (
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                      <CheckCircle2 className="w-6 h-6" />
+              {(() => {
+                const isStrictReady = isCurrentCertification(certReport);
+                const isStaleReady = !isStrictReady && certReport.isProductionReady;
+                return (
+                  <>
+                    <div
+                      className={`p-4 rounded-2xl border flex items-center justify-between flex-wrap gap-3 ${
+                        isStrictReady
+                          ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                          : isStaleReady
+                            ? 'bg-amber-950/40 border-amber-500/40 text-amber-300'
+                            : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isStrictReady ? (
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                            <CheckCircle2 className="w-6 h-6" />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                            <AlertTriangle className="w-6 h-6" />
+                          </div>
+                        )}
+                        <div>
+                          <h4 className="font-bold text-white text-sm">
+                            {isStrictReady
+                              ? 'Qat’iy (STRICT v2) sertifikatlash muvaffaqiyatli yakunlandi!'
+                              : isStaleReady
+                                ? 'Eski / Noqat’iy sertifikat hisoboti aniqlandi'
+                                : 'Sertifikatlashda muammolar aniqlandi'}
+                          </h4>
+                          <p className="text-[11px] mt-0.5 opacity-90">
+                            {isStrictReady
+                              ? 'Barcha universal invariantlar, manifest talablari va imzolangan webhook tekshiruvdan o‘tdi. Arizani ko‘rib chiqishga yuborishingiz mumkin.'
+                              : isStaleReady
+                                ? 'Mavjud hisobot eski yoki to‘liq qat’iy (STRICT v2) emas. Platformaga tasdiqlash uchun yuborishdan oldin qayta sertifikatlashdan o‘ting.'
+                                : 'Ayrim endpointlar yoki kalitlar talablarga javob bermadi. Quyidagi hisobotni tekshiring.'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-mono font-bold block text-white">
+                          {certReport.tests ? `${certReport.tests.filter((t: any) => t.status === 'PASS' || t.passed).length} o‘tdi · ${certReport.tests.filter((t: any) => t.status === 'FAIL').length} xato · ${certReport.tests.filter((t: any) => t.status === 'SKIPPED').length} bloklandi` : ''}
+                        </span>
+                        <span className="text-[10px] opacity-75">
+                          {certReport.totalDurationMs ? `${certReport.totalDurationMs} ms` : ''}
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                      <AlertTriangle className="w-6 h-6" />
-                    </div>
-                  )}
-                  <div>
-                    <h4 className="font-bold text-white text-sm">
-                      {certReport.isProductionReady
-                        ? 'Sertifikatlash muvaffaqiyatli yakunlandi!'
-                        : 'Sertifikatlashda muammolar aniqlandi'}
-                    </h4>
-                    <p className="text-[11px] mt-0.5 opacity-90">
-                      {certReport.isProductionReady
-                        ? 'Barcha talab etiladigan endpointlar tekshiruvdan o‘tdi. Arizani ko‘rib chiqishga yuborishingiz mumkin.'
-                        : 'Ayrim endpointlar yoki kalitlar talablarga javob bermadi. Quyidagi hisobotni tekshiring.'}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-mono font-bold block text-white">
-                    {certReport.tests ? `${certReport.tests.filter((t: any) => t.status === 'PASS' || t.passed).length} o‘tdi · ${certReport.tests.filter((t: any) => t.status === 'FAIL').length} xato · ${certReport.tests.filter((t: any) => t.status === 'SKIPPED').length} bloklandi` : ''}
+
+                    {isStaleReady && (
+                      <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-xs text-amber-200 flex items-start gap-2.5 animate-fadeIn">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="block text-white font-semibold">Qayta sertifikatlash talab etiladi</strong>
+                          <p className="text-[11px] text-amber-300/90 mt-0.5 leading-relaxed">
+                            Arizani tasdiqlashga yuborish uchun provider eng so‘nggi qat’iy (STRICT v2) testlaridan muvaffaqiyatli o‘tishi shart. Iltimos, yuqoridagi “Sertifikatlashni boshlash” tugmasini bosing.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {certReport.operationalReviewRequired && isCurrentCertification(certReport) && (
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-indigo-500/30 text-xs space-y-1.5">
+                  <span className="font-semibold text-white flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                    Avtomatlashtirilgan integratsiya tasdiqlandi · Operatsion ko‘rib chiqish talab etiladi
                   </span>
-                  <span className="text-[10px] opacity-75">
-                    {certReport.totalDurationMs ? `${certReport.totalDurationMs} ms` : ''}
-                  </span>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    API, quote, idempotency va imzolangan webhook yetkazib berish sinovlari avtomatik tarzda muvaffaqiyatli yakunlandi. Arizani yuborganingizdan so‘ng moderatorlar buyurtma biznesingizning ichki tizimida (POS/CRM) ko‘rinishini yakuniy tekshiradi.
+                  </p>
                 </div>
-              </div>
+              )}
 
               {/* Detailed Test Items */}
               {certReport.tests && certReport.tests.length > 0 && (

@@ -27,7 +27,6 @@ async function main() {
   }
 
   assert.equal(report.isCertified, true, 'Sandbox adapter must pass certification');
-  assert.equal(report.isProductionReady, true, 'All mandatory capabilities must be certified');
   assert.equal(report.failedCount, 0, `Expected 0 failed tests, got ${report.failedCount}`);
   assert.ok(report.totalTests >= 7, 'Must test at least 7 capabilities');
 
