@@ -355,6 +355,15 @@ Compatibility note: new integrations emit canonical \`id/lines\` quote fields an
 
 ---
 
+## 6. Strict Certification & Invariant Rules
+1. **Manifest Declaration:** \`GET /provider-info\` must return a \`manifest\` object with \`certification: { safeTestEnvironment: true }\`.
+2. **Customer & Parameter Requirements:** Declare required fields in \`manifest.customerRequirements\` (e.g. phone, email, or empty \`{}\` for digital goods). If parameter-based (utility bills, taxes), set \`requirements.QUOTE.inputMode: 'PARAMETERS'\` and supply \`parametersSchema\`.
+3. **Rejection Discrimination:** Invariant validation probes (e.g. missing required customer field) must return HTTP 400 or 422 with a validation error code. Never reject field validation probes with unrelated errors such as \`QUOTE_EXPIRED\` or \`ACTION_NOT_CONFIRMED\`.
+4. **Idempotency Conflict:** Reusing the same \`idempotencyKey\` with altered parameters must return HTTP 409 \`IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD\`.
+5. **Webhook Dispatch:** For transactional providers, creating an action must trigger an asynchronous, signed webhook to \`POST https://api.zayuno.uz/api/v1/webhooks/{providerSlug}\` with header \`x-zayuno-signature\` (HMAC-SHA256 over raw body) and event \`action.status_updated\`.
+
+---
+
 ${implementationSection}
 
 ---

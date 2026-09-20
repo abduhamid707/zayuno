@@ -4,6 +4,7 @@
 - [x] 2. Webhook order processing va bazaga qo'llanilishi dalili (certification-webhook-evidence'da isProcessed: true talab qilish, providers.service'da test buyurtmasini bazaga yozish va testda haqiqiy HMAC + DB + status transition oqimini tekshirish hamda isProcessed: false bo'lganda fail bo'lishini sinash).
 - [x] 3. Portal UI'da eski va non-strict sertifikatni "tayyor" ko'rsatishni to'xtatish (isCurrentCertification guardini OnboardingWizard va CertificationView'ga tatbiq etish, eski hisobot bo'lsa qayta sertifikatlash ogohlantirishini ko'rsatish).
 - [x] 4. Regressiya va testlar: test-universal-provider-certification-strict, API va portal buildlari, git diff --check.
+- [x] 5. Hujjatlar va AI agent brieflarini yangilash (docs/certification.md, docs/troubleshooting-faq.md, docs/webhooks.md, docs/ai-agents.md va ai-integration-kit.ts da universal manifest, strict qoidalar, rejection sabablarini ajratish va webhook dalilini dasturchi hamda AI uchun batafsil yoritish).
 
 **Holat / handoff (Yakunlandi):** 3 ta aniqlangan false-PASS muammosi to'liq yopildi va sinovdan o'tkazildi:
 1. **Noto'g'ri sabab bilan rad etish (Rejection Reason Discrimination):**
@@ -17,14 +18,22 @@
    - `packages/shared/src/provider-eligibility.ts` va `apps/provider-portal/src/onboarding-validation.ts`: `CERTIFICATION_VERSION = 2` va `isCurrentCertification(report)` funksiyasi joriy qilindi. Faqat `certificationVersion === 2`, `mode === 'STRICT'` va `isProductionReady === true` bo'lganda hisobot joriy hisoblanadi.
    - `apps/provider-portal/src/OnboardingWizard.tsx`: Barcha 4 bosqich o'tishlari, readiness badge va Submit Review tugmasi `isCurrentCertification` bilan himoyalandi; eski hisobot bo'lsa 3-bosqichga yo'naltiriladi.
    - `apps/provider-portal/src/CertificationView.tsx`: Eski hisobot bo'lsa "QAYTA SERTIFIKATLASH TALAB ETILADI (ESKI HISOBOT)" ogohlantirishi chiqariladi va qayta sertifikatlash taklif etiladi.
-4. **Tekshiruv natijalari:**
-   - `tests/test-universal-provider-certification-strict.ts`: 7 ta universal domain (No contact, Email-only, Date & guests, Source & dest, Variants & options, Parameter-only, Read-only) va 11 ta adversarial flaws (shu jumladan Flaw 10 `webhook_unprocessed` va Flaw 11 `unrelated_rejection_on_missing_field`) — **HAMMASI 100% PASS** (7/7 domains, 11/11 flaws).
+4. **Hujjatlar va AI Agent brieflari (Hech qanday mavhumlik qolmadi):**
+   - `docs/certification.md`: Universal manifest (`safeTestEnvironment`, `customerRequirements`, `inputMode`, `parametersSchema`, `certificationInput`), v2 strict certification, rejection discrimination va webhook dalili to'liq yoritildi.
+   - `docs/troubleshooting-faq.md`: Har bir yangi strict xatolik uchun (`safeTestEnvironment`, `disallowed error code`, `webhook-delivery`, `isProcessed: false`, `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD`, `ESKI HISOBOT`) alohida sababi va aniq kodli yechimi yozildi.
+   - `docs/webhooks.md`: Transactional providerlar uchun avtomatlashtirilgan webhook yetkazish va `isProcessed: true` talabi kiritildi.
+   - `docs/ai-agents.md`: Agentlar uchun tayyor prompt (Claude, Cursor, Codex) to'liq yangilandi.
+   - `apps/provider-portal/src/ai-integration-kit.ts`: AI prompt generatsiyasiga `## 6. Strict Certification & Invariant Rules` bo'limi kiritildi.
+5. **Tekshiruv natijalari:**
+   - `tests/test-universal-provider-certification-strict.ts`: 7 ta universal domain va 11 ta adversarial flaws — **HAMMASI 100% PASS** (7/7 domains, 11/11 flaws).
    - `tests/test-remote-certification-flow.ts` — PASS.
    - `tests/test-sandbox-simulator-e2e.ts` — PASS.
+   - `tests/test-provider-portal-docs.ts` — PASS.
+   - `tests/test-ai-integration-kit-and-profiles.ts` — PASS.
    - `@zayuno/provider-sdk` build (`tsc`) — PASS.
    - `@zayuno/shared` build (`tsc`) — PASS.
    - `@zayuno/api` build (`nest build`) — PASS.
-   - `@zayuno/provider-portal` build (`tsc --noEmit && vite build`) — PASS.
+   - `@zayuno/provider-portal` build (`tsc --noEmit && vite build`) — PASS (`dist/docs`, `llms.txt`, `llms-full.txt` muvaffaqiyatli generatsiya qilindi).
    - `git diff --check` — PASS (0 whitespace/newline issues).
 
 **O‘zgargan fayllar:**
@@ -36,6 +45,11 @@
 - `apps/provider-portal/src/onboarding-validation.ts`
 - `apps/provider-portal/src/OnboardingWizard.tsx`
 - `apps/provider-portal/src/CertificationView.tsx`
+- `apps/provider-portal/src/ai-integration-kit.ts`
+- `docs/certification.md`
+- `docs/troubleshooting-faq.md`
+- `docs/webhooks.md`
+- `docs/ai-agents.md`
 - `tests/test-universal-provider-certification-strict.ts`
 - `TASKS.md`
 

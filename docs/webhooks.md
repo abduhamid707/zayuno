@@ -35,6 +35,13 @@ HTTP natijasini tekshiring. Timeout yoki vaqtinchalik server xatosida o‘sha ev
 
 Event statusi o‘zgarsa yangi eventId bering. Bir xil eventni qayta yuborish takroriy buyurtma yaratmasligi kerak. Idempotency event va action darajasida alohida ahamiyatga ega.
 
+## Certification talabi va buyurtmaga qo‘llanilishi (isProcessed)
+
+Transactional providerlar certificationdan o‘tishi uchun faqatgina lokal HMAC tekshiruvini bilishi yetarli emas. Avtomatlashtirilgan runner quyidagilarni tekshiradi:
+1. `POST /actions` orqali yaratilgan har bir test buyurtmasi uchun provider backend Zayunoga `action.status_updated` webhookini jo‘natishi kerak.
+2. Zayuno webhookni qabul qilib, imzosi to‘g‘ri ekanligini tasdiqlaydi (`isVerified: true`) va bazadagi test buyurtmasining statusini yangilaydi (`isProcessed: true`).
+3. Faqat `isProcessed: true` bo‘lgan webhooklargina certification runner tomonidan muvaffaqiyatli yetkazib berish va qayta ishlash dalili sifatida qabul qilinadi.
+
 ## Diagnostika
 
 [So‘rovlar jurnali](/?tab=inspector) va [troubleshooting](troubleshooting-faq.md) yordamida provider slug, trace ID, signature header nomi va timestamp’ni tekshiring. Raw secretlarni diagnostika xabariga qo‘shmang.

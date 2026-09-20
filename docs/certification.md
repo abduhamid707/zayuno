@@ -1,49 +1,82 @@
-# API tekshiruvi va nashr
+# API tekshiruvi va universal sertifikatlash (v2 Strict)
 
-Certification ulangan provider adapterini Provider Contract v1 bilan solishtiradi. U frontenddagi namuna oqimini bosib chiqishdan farq qiladi.
+Certification ulangan provider backendini universal Provider Contract v1 va Strict qoidalari bilan sinovdan o‘tkazadi. Bu oddiy namunaviy oqim emas, balki real xavfsizlik, narx matematikasi, invaryantlar va webhook yetib borishining avtomatlashtirilgan tekshiruvidir.
 
-## 1. Qayerda test qilasiz?
+## 1. Test turlari va qayerda tekshiriladi?
 
 | Vosita | Nima tekshiriladi | Natija nimani anglatadi |
 | --- | --- | --- |
-| Sandbox | Namunaviy providerda discovery → quote → action | Oqim qanday ishlashini tushunasiz |
-| Certification | Siz sozlagan provider API | E’lon qilingan capabilitylarning contractga mosligi |
-| Review | Ariza, certification va operatsion talablar | Nashrga ruxsat bo‘yicha qaror |
-| Inspector | Provider so‘rovlari va trace’lar | Xatoni topish uchun dalil |
+| Sandbox | Namunaviy providerda discovery → quote → action | Oqim qanday ishlashini tushunish uchun vizual simulyator |
+| Certification v2 (Strict) | Siz sozlagan haqiqiy provider API | E’lon qilingan barcha capability, manifest va invaryantlarning to‘liq mosligi |
+| Review | Ariza, v2 hisoboti va operatsion talablar | Jonli tizimga (ACTIVE) chiqarish bo‘yicha qaror |
+| Inspector | Provider so‘rovlari va trace’lar | Har bir so‘rov va javobni tahlil qilish vositasi |
 
-Transactional certification test action yaratishi mumkin. Backendda test katalog va test fulfillment tayyorlang.
+Transactional certification haqiqiy test buyurtmasi (action) yaratadi va providerdan imzolangan webhook kutadi. Backendda test katalog va xavfsiz test muhitini sozlang.
 
-## 2. Talab qilinadigan tekshiruvlar
+## 2. Universal Manifest talablari (`GET /provider-info`)
 
-DISCOVERY_READONLY profili uchun METADATA, HEALTH va CATALOG. TRANSACTIONAL uchun qo‘shimcha QUOTE, ACTION_CREATE, ACTION_STATUS va WEBHOOK.
+Zayuno har bir providerga bir xil qattiq talablarni (masalan, barchaga telefon yoki ism majburlashni) yuklamaydi. Provider o‘z talablarini `GET /provider-info` dagi `manifest` orqali e’lon qiladi:
 
-DELIVERY, PICKUP, ONSITE, HYBRID fulfillment’da faol LOCATIONS ham talab qilinadi. Ixtiyoriy capability e’lon qilinsa u ham tekshiriladi. [Capability matritsasi](capabilities.md).
+1. **Xavfsiz test muhiti (Majburiy):**
+   ```json
+   "manifest": {
+     "version": 1,
+     "certification": {
+       "safeTestEnvironment": true
+     }
+   }
+   ```
+   *Agar `manifest.certification.safeTestEnvironment: true` bo‘lmasa, strict certification xavfsizlik nuqtai nazaridan to‘xtatiladi.*
 
-Tekshiruvlar metadata, health, catalog, required schema, quote hisob-kitobi, action idempotency, status va webhook verification kabi talablarni profilga qarab bajaradi. Barcha providerlarga bir xil “7 endpoint” qoidasi yo‘q.
+2. **Mijoz talablari (`customerRequirements`):**
+   - Agar xizmat mijoz kontaktini talab qilmasa (masalan, digital API token): `"customerRequirements": {}`.
+   - Agar faqat email kerak bo‘lsa (masalan, SaaS litsenziyasi): `"customerRequirements": { "email": "REQUIRED" }`.
+   - Agar telefon va ism kerak bo‘lsa: `"customerRequirements": { "name": "REQUIRED", "phone": "REQUIRED" }`.
 
-## 3. Ish tartibi
+3. **Kirish rejimi (`requirements.QUOTE.inputMode` va `ACTION_CREATE.inputMode`):**
+   - Katalog va offering asosida bo‘lsa: `"OFFERING"`.
+   - Faqat parametrlar asosida bo‘lsa (masalan, kommunal to‘lovlar, hisob raqami): `"PARAMETERS"`. Bu holatda `"parametersSchema"` e’lon qilinishi shart.
 
-1. Mening biznesim sahifasida HTTPS base URL, auth va capabilitylarni saqlang.
-2. API tekshiruvi sahifasida provider slug va konfiguratsiyani tekshiring.
-3. Testni ishga tushiring: POST /api/v1/providers/:slug/certify.
-4. Har bir xato uchun endpoint, field path, expected/received va trace’ni o‘qing.
-5. Backendni tuzating, qayta ishga tushiring. AI Kit’ning certification vazifasiga xato konteksti ham qo‘shiladi.
-6. Muvaffaqiyatdan so‘ng review holatini dashboardda tekshiring va arizani yuboring.
+4. **Namunaviy test parametrlari (`certificationInput`):**
+   Provider certification runnerga test paytida qaysi namunaviy parametrlar (`customer`, `parameters`, `locations`) bilan so‘rov yuborish kerakligini ko‘rsatadi:
+   ```json
+   "certificationInput": {
+     "customer": { "phone": "+998901234567" },
+     "parameters": { "accountNumber": "ACC-123456" }
+   }
+   ```
 
-API manzili, auth yoki capability o‘zgarsa oldingi certification bekor bo‘lishi mumkin. O‘zgargan konfiguratsiyani qayta tekshiring.
+## 3. Qat’iy tekshiruvlar va rad etish sabablarini ajratish
 
-## 4. Statuslarni chalkashtirmang
+Certification testlari salbiy holatlarni (adversarial probes) yuborib, backendning to‘g‘ri rad etishini tekshiradi:
 
-Provider status: DRAFT, SANDBOX, ACTIVE, SUSPENDED, DISABLED.
+- **Noto‘g‘ri sabab bilan rad etish taqiqlangan (Rejection Reason Discrimination):**
+  Yetishmayotgan majburiy maydon tekshirilayotganda backend aynan shu maydon xatoligi bo‘yicha 400 yoki 422 qaytarishi shart (`errorCode: 'VALIDATION_ERROR'` yoki field path ko‘rsatilgan holda). Agar backend begona sabab bilan (masalan, `QUOTE_EXPIRED`, `QUOTE_NOT_FOUND` yoki `ACTION_NOT_CONFIRMED`) rad etsa, test yiqiladi.
+- **Idempotency kaliti to‘qnashuvi:**
+  Bir xil `idempotencyKey` bilan o‘zgargan payload yuborilganda backend HTTP 409 statusi va `errorCode: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD'` qaytarishi shart.
+- **Quote amal qilish muddati (TTL):**
+  Kotirovka kamida 5 soniya amal qilishi kerak, toki action yaratish probe'lari quote muddati o‘tib ketmasdan avval bajarilsin. Muddati o‘tgan quote bilan buyurtma berilganda 410 `QUOTE_EXPIRED` qaytishi kerak.
+- **Faqat tasdiqlangan buyurtmalar (`userConfirmed: true`):**
+  `userConfirmed: false` bo‘lgan so‘rovlar qat’iy rad etilishi shart (`ACTION_NOT_CONFIRMED`).
 
-Certification alohida metadata.isCertified maydoni; CERTIFIED degan provider status yo‘q. Review alohida metadata.reviewStatus orqali kuzatiladi: masalan PENDING_APPROVAL yoki CHANGES_REQUESTED. Certification o‘tishi avtomatik ACTIVE bo‘lish degani emas.
+## 4. Webhook va buyurtma holati o‘tishi (DB Execution Evidence)
 
-## 5. Xato chiqsa
+Transactional providerlar uchun lokal HMAC algoritmini bilish yetarli emas. Test action yaratilgach:
+1. Provider backend Zayunoning webhook endpointiga imzolangan so‘rov yuborishi shart:
+   `POST https://api.zayuno.uz/api/v1/webhooks/{providerSlug}`
+2. Headerda `x-zayuno-signature` (HMAC-SHA256 hex digest) bo‘lishi lozim.
+3. Event formati: `eventType: 'action.status_updated'`, `actionId` joriy test action ID'siga teng bo‘lishi shart.
+4. Zayuno webhookni qabul qilib, bazadagi buyurtma statusini muvaffaqiyatli yangilashi (`isProcessed: true`) shart. Agar buyurtma bazada topilmasa yoki status o‘tmasa, certification rad etiladi.
 
-- 401: [API key va HMAC](authentication.md).
-- Quote math yoki expiry: [Quote](quotes.md).
-- Schema/field path: [Provider reference](/docs/contract-reference/).
-- Timeout va networking: [Troubleshooting](troubleshooting-faq.md).
-- Review’da requiredChanges: [Provider operations](provider-operations.md).
+## 5. Sertifikat versiyasi va eskirgan hisobotlar
 
-Test bajarilmaganda yoki server javobi olinmaganda “passed” deb belgilamang. Natijani haqiqiy report bilan tasdiqlang.
+- Faqat **`certificationVersion: 2`** va **`mode: 'STRICT'`** bo‘lgan hisobotgina "TAYYOR (PRODUCTION READY)" deb hisoblanadi.
+- Eski (v1) yoki STANDARD hisobotlar Portalda `QAYTA SERTIFIKATLASH TALAB ETILADI (ESKI HISOBOT)` deb ko‘rsatiladi va moderatorga topshirish (`submit-review`) bloklanadi.
+
+## 6. Xatoliklarni diagnostika qilish
+
+Xato chiqsa, xatolik kodi va field path'ni tekshiring:
+- `safeTestEnvironment`: Manifestda `certification: { safeTestEnvironment: true }` borligini tekshiring.
+- `disallowed error code`: Majburiy maydon yetishmaganda quote expiry emas, validatsiya xatosi qaytaring.
+- `webhook-delivery`: Provider action yaratilgandan so‘ng `/api/v1/webhooks/:providerSlug` ga `action.status_updated` webhook yuborganini tekshiring.
+- Batafsil yechimlar: [Troubleshooting & FAQ](troubleshooting-faq.md).

@@ -84,15 +84,24 @@ Canonical documentation:
 - Full contract: https://partners.zayuno.uz/llms-full.txt
 - OpenAPI Schema: https://partners.zayuno.uz/openapi.json
 - Base URL & Quickstart: https://partners.zayuno.uz/docs/base-url.md
+- Strict Certification v2: https://partners.zayuno.uz/docs/certification.md
 
 Your Task:
 Expose provider endpoints under our backend prefix (e.g. /zayuno):
 1. GET /health: Health check, verifies x-provider-api-key header.
-2. GET /catalog: Returns active offerings with categories, variants, and modifiers.
-3. POST /quote: Calculates authoritative total, fees, and discounts from our database.
-4. POST /actions: Creates a confirmed order with idempotencyKey deduplication.
-5. GET /actions/:id: Returns canonical order status.
-6. Webhook: Sends signed POST requests with x-zayuno-signature (HMAC-SHA256 over rawBody) when order status updates.
+2. GET /provider-info: Returns metadata and manifest:
+   - Must include `manifest.certification.safeTestEnvironment: true`.
+   - Declare customerRequirements (e.g. `{ phone: "REQUIRED" }` or `{ email: "REQUIRED" }` or `{}`).
+   - Declare inputMode (`OFFERING` for catalog items, or `PARAMETERS` for parameter-only services).
+   - Provide `certificationInput` with valid test data.
+3. GET /catalog: Returns active offerings with categories, variants, and modifiers.
+4. POST /quote: Calculates authoritative total, fees, and discounts from our database (minimum 5s TTL).
+5. POST /actions:
+   - Validates required fields first; returns HTTP 400/422 VALIDATION_ERROR on missing fields (never QUOTE_EXPIRED).
+   - Requires `userConfirmed: true` (rejects unconfirmed with ACTION_NOT_CONFIRMED).
+   - Deduplicates with `idempotencyKey`; returns identical action on retry, or HTTP 409 IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD if payload changed.
+6. GET /actions/:id: Returns canonical order status.
+7. Webhook Dispatch: For every created test order, automatically dispatches signed POST to `https://api.zayuno.uz/api/v1/webhooks/{providerSlug}` with header `x-zayuno-signature` (HMAC-SHA256 over raw JSON) and event `action.status_updated`.
 
 Strict Rules:
 - Never guess prices or stock; calculate strictly from database records.
