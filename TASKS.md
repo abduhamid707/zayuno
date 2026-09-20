@@ -1,4 +1,14 @@
-# Joriy ish — Universal provider certification 3 ta false-PASS bo'shlig'ini yopish (2026-09-20)
+# Joriy ish — test-webhook-guardrails.ts da prisma.webhookLog.update xatosini to'g'rilash (2026-09-21)
+
+- [x] 1. test-webhook-guardrails.ts da prisma.webhookLog.update ni mock qilish va webhooks.service.ts da xavfsiz update qilish.
+- [x] 2. tests/test-webhook-guardrails.ts testini alohida ishga tushirib tekshirish.
+
+**Holat / handoff (Yakunlandi):** CI/CD da `prisma.webhookLog.update` P2025 (`No record was found for an update`) bilan yiqilgan `tests/test-webhook-guardrails.ts` xatosi to'g'rilandi:
+1. `tests/test-webhook-guardrails.ts`: Prisma obyekti ustida `(prisma.webhookLog as any).update = async () => ({})` mocki va finally blokida `original.webhookLogUpdate` qaytarilishi qo'shildi.
+2. `apps/api/src/modules/webhooks/webhooks.service.ts`: `webhookLog?.id` bo'yicha update chaqiruvi `try ... catch` bilan himoyalandi, shunda kutilmagan DB log xatolari asosiy tranzaksiyani buzmaydi.
+3. Tekshiruv: `pnpm exec tsx tests/test-webhook-guardrails.ts` alohida ishga tushirildi va to'liq **PASS** bo'ldi. Boshqa testlar foydalanuvchi talabiga binoan qayta ishga tushirilmadi.
+
+# Oldingi ish — Universal provider certification 3 ta false-PASS bo'shlig'ini yopish (2026-09-20)
 
 - [x] 1. Noto'g'ri sabab bilan rad etilgan so'rovlarni ajratish (expectRemoteRejection'da QUOTE_EXPIRED, ACTION_NOT_CONFIRMED va begona kodlarni taqiqlash, ACTION_CREATE testlarida har bir mutatsiya uchun yangi quote olish).
 - [x] 2. Webhook order processing va bazaga qo'llanilishi dalili (certification-webhook-evidence'da isProcessed: true talab qilish, providers.service'da test buyurtmasini bazaga yozish va testda haqiqiy HMAC + DB + status transition oqimini tekshirish hamda isProcessed: false bo'lganda fail bo'lishini sinash).

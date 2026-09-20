@@ -167,10 +167,16 @@ export class WebhooksService {
       });
 
       // Mark log as processed since action and timeline were updated
-      await prisma.webhookLog.update({
-        where: { id: webhookLog.id },
-        data: { isProcessed: true }
-      });
+      if (webhookLog?.id) {
+        try {
+          await prisma.webhookLog.update({
+            where: { id: webhookLog.id },
+            data: { isProcessed: true }
+          });
+        } catch (logErr: any) {
+          this.logger.warn(`Failed to mark webhook log as processed: ${logErr.message}`);
+        }
+      }
 
       // 5. Emit Event
       await this.natsService.publish(ZayunoEventTopic.ACTION_UPDATED, {

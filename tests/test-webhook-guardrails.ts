@@ -6,6 +6,7 @@ async function main() {
   const original = {
     providerFindUnique: prisma.provider.findUnique,
     webhookLogCreate: prisma.webhookLog.create,
+    webhookLogUpdate: prisma.webhookLog.update,
     actionFindFirst: prisma.action.findFirst,
     actionUpdate: prisma.action.update,
     actionEventCreate: prisma.actionEvent.create
@@ -20,6 +21,7 @@ async function main() {
   try {
     (prisma.provider as any).findUnique = async () => provider;
     (prisma.webhookLog as any).create = async () => ({ id: `log-${++webhookLogCount}` });
+    (prisma.webhookLog as any).update = async () => ({});
     (prisma.action as any).findFirst = async ({ where }: any) => {
       actionQueries.push(where);
       return { id: 'action-a', publicId: 'ZY-MOCK-1', status: 'AWAITING_PAYMENT' };
@@ -64,6 +66,7 @@ async function main() {
   } finally {
     (prisma.provider as any).findUnique = original.providerFindUnique;
     (prisma.webhookLog as any).create = original.webhookLogCreate;
+    (prisma.webhookLog as any).update = original.webhookLogUpdate;
     (prisma.action as any).findFirst = original.actionFindFirst;
     (prisma.action as any).update = original.actionUpdate;
     (prisma.actionEvent as any).create = original.actionEventCreate;
