@@ -1,3 +1,49 @@
+# Reja / Strategiya — 1-Click Connectors (YCLIENTS, iiko, Billz) va AI-Ready Badge (2026-09-21)
+
+Haqiqatan ham, "1-click integratsiya" (Connectors) strategiyasi loyihani portlatib yuboradigan yondashuv. Bizneslarga *"Biz uchun API yozing"* deyish o'rniga, *"Siz ishlatayotgan tayyor tizimni Zayunoga ulab qo'ying, biz sizga AI'dan mijoz olib kelamiz"* desangiz, ular darhol rozi bo'lishadi.
+
+Tezkor "traction" (o'sish va mijozlar oqimi) qilib beradigan, O'zbekiston va MDH bozorida eng ko'p ishlatiladigan yana 3 ta yirik yo'nalish va g'oyalarni taklif qilaman:
+
+### 1. Go'zallik va Xizmat ko'rsatish (YCLIENTS / Dikidi)
+
+O'zbekistondagi deyarli barcha yaxshi sartaroshxonalar, go'zallik salonlari, stomatologiya va xususiy klinikalar bandlikni boshqarish uchun **YCLIENTS** yoki **Dikidi** tizimlaridan foydalanadi. Ularning juda zo'r ochiq API'lari bor.
+
+* **Qanday ishlaydi:** Salon egasi Zayunoga YCLIENTS tokenini kiritadi.
+* **AI chatdagi jarayon:** Mijoz yozadi: *"Ertaga soat 14:00 larda Yunusobodda qaysi sartarosh bo'sh? Soch-soqol qildirmoqchiman."*
+* **Natija:** AI Zayuno orqali YCLIENTS'ga ulanib, bo'sh ustalar va narxlarni ko'radi. *"Chopar Barbershop'da usta Azamat 14:30 da bo'sh, xizmat narxi 100,000 so'm."* Mijoz tasdiqlasa, unga to'g'ridan-to'g'ri band qilish havolasi (checkout) beriladi.
+* **Traction siri:** Odamlar har oy soch oldiradi yoki salonga boradi. Bu orqali Zayuno doimiy (qaytib keluvchi) mijozlar oqimiga ega bo'ladi.
+
+### 2. Restoranlar va Kafelar (iiko / Jowi / R-Keeper)
+
+Ovqatlanish sohasi eng ko'p tranzaksiya bo'ladigan joy. Toshkentdagi aksariyat restoranlar **iiko** yoki **Jowi** kabi tizimlarda ishlaydi.
+
+* **Qanday ishlaydi:** Restoran menejeri o'z tizimi API kalitini beradi. Zayuno menyu, narxlar va "stop-list" (tugagan taomlar) ni o'qiy boshlaydi.
+* **AI chatdagi jarayon:** *"Ofisga 5 kishiga manti buyurtma qilmoqchimiz, yetkazib berish bilan qayerdan olsa bo'ladi?"*
+* **Natija:** AI eng yaxshi baholangan restoranlarning mantisi narxini, dostavka pulini hisoblab beradi (Quote) va mijozni restoran saytiga yoki Telegram botidagi to'lov sahifasiga yo'naltiradi.
+* **Traction siri:** Restoranlarga bu bepul marketing. Ular o'zlarining Instagram sahifalarida *"Endi bizni ChatGPT orqali ham izlab topishingiz mumkin"* deb reklama qilishadi va bu Zayuno uchun tekin PR bo'ladi.
+
+### 3. Mahalliy Chakana Savdo (Billz)
+
+**Billz** — bu O'zbekistonda yaratilgan va hozirda kiyim-kechak, kosmetika va elektronika do'konlari tomonidan juda keng ishlatiladigan POS (savdo va ombor hisobi) tizimi.
+
+* **Qanday ishlaydi:** Siz Billz jamoasi bilan hamkorlik qilasiz yoki ochiq API orqali Billz connector'ini yaratasiz. Butik egalari tizimni bir marta ulaydi.
+* **AI chatdagi jarayon:** *"Toshkentda qayerda original Nike Air Force krossovkasining 42-razmeri qolgan?"*
+* **Natija:** AI shahardagi barcha Billz ulangan do'konlar omborini (jonli tarzda) tekshiradi va aniq manzillarni ko'rsatadi: *"Urban Store do'konining Samarqand Darvoza filialida 1 ta qolgan, narxi 1,200,000 so'm."*
+* **Traction siri:** Odamlar ko'p hollarda biror narsani topish uchun soatlab qidirishadi yoki do'konlarga telefon qilib chiqishadi. Zayuno AI agentlarga aynan "jonli ombor" ma'lumotlarini bera olsa, foydalanuvchilar qidiruv uchun faqat AI'dan foydalanishni boshlaydi.
+
+---
+
+### Tezkor o'sish uchun Marketing Hack (Growth Hacking)
+
+Shunchaki platformalarni ulashning o'zi yetarli emas, uni ommalashtirish kerak. Zayunoda **"AI-Ready Badge" (Nishon)** tizimini joriy qiling.
+
+Uzum, YCLIENTS yoki iiko orqali tizimga ulangan har bir biznesga Zayuno chiroyli raqamli stiker/nishon beradi:
+**"Available on ChatGPT & Claude via Zayuno"** (Zayuno orqali ChatGPT'da mavjud).
+
+Bizneslar bu nishonni o'z saytiga, vitrinasiga yoki ijtimoiy tarmoqlariga qo'yishadi (chunki bu ularni innovatsion qilib ko'rsatadi). Odamlar bu nishonni ko'rib, *"Iye, ChatGPT orqali ham ovqat zakaz qilsa/soch oldirsa bo'larkan-ku"* deydi va Zayunoning ommalashuvi geometrik progressiyada o'sadi.
+
+---
+
 # Reja / Tadqiqot — Uzum Market Seller OpenAPI tahlili va Zayuno UzumConnector integratsiyasi (2026-09-21)
 
 Used tool: read_url_content
