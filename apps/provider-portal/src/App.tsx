@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { WorkspaceShell } from './WorkspaceShell';
 import { WorkspaceOverview } from './WorkspaceOverview';
+import { IntegrationsView } from './IntegrationsView';
 import { getIntegrationState, WorkspaceTab } from './workspace-model';
 import { DOCS_MENU, normalizeDocId } from './docs-catalog';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -75,7 +76,7 @@ const providerSession = createProviderSessionClient(AUTH_BASE);
 const SHOW_LOCAL_SIMULATOR = (import.meta as any).env?.VITE_ENABLE_LOCAL_SIMULATOR === 'true' || true;
 
 const SANDBOX_PROVIDER_SLUG = 'sandbox-provider';
-const PROTECTED_PROVIDER_TABS = new Set<WorkspaceTab>(['apps', 'sandbox', 'certification', 'inspector', 'onboarding']);
+const PROTECTED_PROVIDER_TABS = new Set<WorkspaceTab>(['apps', 'sandbox', 'certification', 'inspector', 'onboarding', 'integrations']);
 
 const PROVIDER_CAPABILITIES = [
   'METADATA', 'HEALTH', 'LOCATIONS', 'CATALOG', 'SEARCH', 'QUOTE',
@@ -134,14 +135,14 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
 
   // Active Tab & Deep-link sync
-  const [activeTab, setActiveTab] = useState<'overview' | 'docs' | 'apps' | 'sandbox' | 'certification' | 'inspector' | 'onboarding' | 'auth'>(() => {
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
     if (typeof window === 'undefined') return 'overview';
     const params = new URLSearchParams(window.location.search);
     if (params.has('doc')) return 'docs';
     if (params.has('token') || params.has('verifyToken')) return 'onboarding';
     const tabParam = params.get('tab');
-    if (tabParam === 'docs' || tabParam === 'apps' || tabParam === 'sandbox' || tabParam === 'certification' || tabParam === 'inspector' || tabParam === 'onboarding' || tabParam === 'auth' || tabParam === 'login') {
-      return (tabParam === 'login' ? 'auth' : tabParam) as any;
+    if (tabParam === 'docs' || tabParam === 'apps' || tabParam === 'sandbox' || tabParam === 'certification' || tabParam === 'inspector' || tabParam === 'onboarding' || tabParam === 'auth' || tabParam === 'login' || tabParam === 'integrations') {
+      return (tabParam === 'login' ? 'auth' : tabParam) as WorkspaceTab;
     }
     return 'overview';
   });
@@ -181,7 +182,7 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       const doc = normalizeDocId(params.get('doc') || 'getting-started', window.location.hash);
       const rawTab = params.get('tab') || 'overview';
-      const allowed: WorkspaceTab[] = ['overview', 'apps', 'docs', 'sandbox', 'certification', 'inspector', 'onboarding', 'auth'];
+      const allowed: WorkspaceTab[] = ['overview', 'apps', 'docs', 'sandbox', 'certification', 'inspector', 'onboarding', 'auth', 'integrations'];
       const tab = params.has('doc') ? 'docs' : allowed.includes(rawTab as WorkspaceTab) ? rawTab as WorkspaceTab : rawTab === 'login' ? 'auth' : 'overview';
       routeKey.current = tab + ':' + doc;
       setSelectedDoc(doc);
@@ -335,7 +336,13 @@ export default function App() {
       window.history.replaceState({}, '', url);
     }
     routeKey.current = key;
-    document.title = (activeTab === 'auth' ? (authScreenMode === 'signup' ? 'Provider hisobini yaratish' : 'Kirish') : activeTab === 'docs' ? DOCS_MENU.find(doc => doc.id === selectedDoc)?.title || 'Hujjatlar' : activeTab === 'apps' ? 'Biznesim' : 'Provider workspace') + ' · Zayuno Partners';
+    document.title = (
+      activeTab === 'auth' ? (authScreenMode === 'signup' ? 'Provider hisobini yaratish' : 'Kirish') :
+      activeTab === 'docs' ? DOCS_MENU.find(doc => doc.id === selectedDoc)?.title || 'Hujjatlar' :
+      activeTab === 'apps' ? 'Biznesim' :
+      activeTab === 'integrations' ? 'Integratsiyalar' :
+      'Provider workspace'
+    ) + ' · Zayuno Partners';
   }, [activeTab, authScreenMode, selectedDoc]);
 
   const apiFetch = async (path: string, init: RequestInit = {}) => {
@@ -876,6 +883,13 @@ export default function App() {
             onNavigate={(tab, step) => { if (step) setInitialOnboardingStep(step); if (tab === 'apps' && providerData?.status !== 'ACTIVE') setDashboardSection('integration'); navigateTo(tab); }}
             onDoc={id => { setSelectedDoc(id); setActiveTab('docs'); }}
             onAiKit={() => setAiKitOpen(true)} />
+        )}
+        {activeTab === 'integrations' && (
+          <IntegrationsView
+            providerSlug={providerData?.slug}
+            token={token}
+            apiBaseUrl={API_BASE}
+          />
         )}
         {activeTab === 'onboarding' && (
           !authReady && !token ? <div className="workspace-loading" role="status"><RefreshCw className="animate-spin" size={20} /> Sessiya tekshirilmoqda…</div> : <OnboardingWizard

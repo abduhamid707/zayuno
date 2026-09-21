@@ -1,6 +1,6 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { ProviderAdapter, ProviderCapability } from '@zayuno/contracts';
-import { ProviderAdapterConfig, CapabilityNotSupportedError, RemoteHttpProviderAdapter } from '@zayuno/provider-sdk';
+import { ProviderAdapterConfig, CapabilityNotSupportedError, RemoteHttpProviderAdapter, ManagedConnectorAdapter } from '@zayuno/provider-sdk';
 import { prisma } from '@zayuno/database';
 import { decryptSecret, NotFoundError, Logger } from '@zayuno/shared';
 import { SandboxProviderAdapter } from '@zayuno/sandbox-provider';
@@ -18,7 +18,29 @@ export class ProviderRegistryService implements OnModuleInit {
     this.registerFactory('sandbox', (config) => new SandboxProviderAdapter(config));
     // Register generic remote HTTP adapter factory for external providers
     this.registerFactory('remote-http', (config) => new RemoteHttpProviderAdapter(config));
-    this.logger.info('Registered default "sandbox" and "remote-http" adapter factories.');
+    // Register generic managed-connector adapter factory
+    this.registerFactory('managed-connector', (config) => {
+      const loader = async () => {
+        const provider = await prisma.provider.findUnique({
+          where: { slug: config.slug },
+          include: { connectorInstances: true }
+        });
+        if (!provider) return [];
+        const activeInstances = provider.connectorInstances.filter(i => i.status !== 'DISCONNECTED');
+        if (provider.connectorInstances.length > 0 && activeInstances.length === 0) {
+          throw new BadRequestException('Ushbu provider uchun barcha ulanishlar to‘xtatilgan (DISCONNECTED).');
+        }
+        return prisma.syncedProduct.findMany({
+          where: {
+            providerId: provider.id,
+            isVisible: true,
+            ...(activeInstances.length > 0 ? { instanceId: { in: activeInstances.map(i => i.id) } } : {})
+          }
+        });
+      };
+      return new ManagedConnectorAdapter(config, loader);
+    });
+    this.logger.info('Registered "sandbox", "remote-http", and "managed-connector" adapter factories.');
   }
 
   registerFactory(adapterType: string, factory: AdapterFactory): void {

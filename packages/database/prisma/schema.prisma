@@ -120,6 +120,9 @@ model Provider {
   webhookLogs     WebhookLog[]
   integrationLogs IntegrationLog[]
   users           User[]
+  connectorInstances   ConnectorInstance[]
+  connectorCredentials ConnectorCredential[]
+  syncedProducts       SyncedProduct[]
 
   @@index([environment, status, category])
 }
@@ -512,4 +515,135 @@ model UnmetDemandRequester {
   @@index([intentKey, lastRequestedAt])
   @@index([category, lastRequestedAt])
   @@index([notifyWhenAvailable, notificationStatus])
+}
+
+enum ConnectorInstanceStatus {
+  CONNECTED
+  SYNCING
+  PAUSED
+  ERROR
+  DISCONNECTED
+}
+
+model ConnectorDefinition {
+  id           String               @id // e.g. "uzum", "synthetic-test"
+  name         String               // e.g. "Uzum Market"
+  version      String               @default("1.0.0")
+  description  String?
+  logoUrl      String?
+  authType     String               @default("API_KEY") // "API_KEY", "OAUTH2", "BEARER"
+  capabilities ProviderCapability[] @default([METADATA, CATALOG, SEARCH])
+  configSchema Json                 @default("{}")
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  credentials  ConnectorCredential[]
+  instances    ConnectorInstance[]
+}
+
+model ConnectorCredential {
+  id                    String              @id @default(uuid())
+  providerId            String
+  connectorDefinitionId String
+  name                  String              @default("Default Credential")
+  encryptedSecret       String              // AES-256-GCM encrypted
+  maskedSecret          String              // e.g. "3foS...XLKQ="
+  metadata              Json                @default("{}")
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  provider              Provider            @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  definition            ConnectorDefinition @relation(fields: [connectorDefinitionId], references: [id], onDelete: Cascade)
+  instances             ConnectorInstance[]
+
+  @@index([providerId, connectorDefinitionId])
+}
+
+model ConnectorInstance {
+  id                    String                  @id @default(uuid())
+  providerId            String
+  connectorDefinitionId String
+  credentialId          String
+  name                  String                  @default("Primary Connection")
+  status                ConnectorInstanceStatus @default(CONNECTED)
+  selectedShopId        String?
+  selectedShopName      String?
+  autoSyncEnabled       Boolean                 @default(true)
+  syncIntervalHours     Int                     @default(8)
+  lastSyncAt            DateTime?
+  lastSyncStatus        String?                 // "SUCCESS", "PARTIAL", "FAILED"
+  lastSyncError         String?
+  nextSyncAt            DateTime?
+  syncLockUntil         DateTime?
+  syncRunId             String?
+  totalProducts         Int                     @default(0)
+  activeProducts        Int                     @default(0)
+  config                Json                    @default("{}")
+  metadata              Json                    @default("{}")
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  provider              Provider                @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  definition            ConnectorDefinition     @relation(fields: [connectorDefinitionId], references: [id], onDelete: Cascade)
+  credential            ConnectorCredential     @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  syncRuns              ConnectorSyncRun[]
+  syncedProducts        SyncedProduct[]
+
+  @@index([providerId, status])
+  @@index([connectorDefinitionId, status])
+}
+
+model ConnectorSyncRun {
+  id            String            @id @default(uuid())
+  instanceId    String
+  providerId    String
+  status        String            // "RUNNING", "SUCCESS", "FAILED"
+  trigger       String            @default("MANUAL") // "MANUAL", "SCHEDULED"
+  startedAt     DateTime          @default(now())
+  finishedAt    DateTime?
+  importedCount Int               @default(0)
+  activeCount   Int               @default(0)
+  hiddenCount   Int               @default(0)
+  errorMessage  String?
+  metadata      Json              @default("{}")
+
+  instance      ConnectorInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId, startedAt])
+  @@index([providerId, startedAt])
+}
+
+model SyncedProduct {
+  id                String            @id @default(uuid())
+  providerId        String
+  instanceId        String
+  externalShopId    String
+  externalProductId String
+  title             String
+  description       String?           @db.Text
+  brand             String?
+  categorySlug      String?
+  categoryTitle     String?
+  imageUrl          String?
+  media             Json              @default("[]")
+  basePrice         Decimal           @db.Decimal(12, 2)
+  currency          String            @default("UZS")
+  productUrl        String
+  variants          Json              @default("[]")
+  attributes        Json              @default("{}")
+  sourceStatus      String            @default("ACTIVE")
+  isAvailable       Boolean           @default(true)
+  isVisible         Boolean           @default(true)
+  lastSeenRunId     String?
+  lastSyncedAt      DateTime          @default(now())
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  provider          Provider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  instance          ConnectorInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([instanceId, externalShopId, externalProductId])
+  @@index([providerId, isVisible, isAvailable])
+  @@index([instanceId, isVisible])
+  @@index([categorySlug])
 }

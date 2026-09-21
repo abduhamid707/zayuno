@@ -1,7 +1,8 @@
-export type WorkspaceTab = 'overview' | 'apps' | 'docs' | 'sandbox' | 'certification' | 'inspector' | 'onboarding' | 'auth';
+export type WorkspaceTab = 'overview' | 'integrations' | 'apps' | 'docs' | 'sandbox' | 'certification' | 'inspector' | 'onboarding' | 'auth';
 
 export const WORKSPACE_NAV: { id: WorkspaceTab; title: string; detail: string; group: string }[] = [
   { id: 'overview', title: 'Boshlash', detail: 'Integratsiya yo‘li', group: 'Workspace' },
+  { id: 'integrations', title: 'Integratsiyalar', detail: 'Uzum va tizimlarni ulash', group: 'Workspace' },
   { id: 'apps', title: 'Biznesim', detail: 'Buyurtmalar va API', group: 'Workspace' },
   { id: 'docs', title: 'Hujjatlar', detail: 'Qo‘llanma va API reference', group: 'Dasturchi uchun' },
   { id: 'sandbox', title: 'Sinov muhiti', detail: 'Namunaviy buyurtma oqimi', group: 'Dasturchi uchun' },

@@ -95,6 +95,35 @@ export class CatalogController {
     return this.catalogService.checkAvailability(body, effectiveEnv);
   }
 
+  @Post('catalog/compare')
+  @ApiOperation({ summary: 'Compare 2 to 4 offerings side-by-side with prices, attributes, and official product links' })
+  async compareOfferingsPost(
+    @Body() body: { offeringIds: string[] },
+    @Query('environment') environment?: string,
+    @Req() req?: any
+  ) {
+    if (!body?.offeringIds || !Array.isArray(body.offeringIds)) {
+      throw new BadRequestException('offeringIds array is required.');
+    }
+    const effectiveEnv = environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
+    return this.catalogService.compareOfferings(body.offeringIds, effectiveEnv);
+  }
+
+  @Get('catalog/compare')
+  @ApiOperation({ summary: 'Compare 2 to 4 offerings via query parameter (comma-separated ids)' })
+  async compareOfferingsGet(
+    @Query('ids') ids: string,
+    @Query('environment') environment?: string,
+    @Req() req?: any
+  ) {
+    if (!ids) {
+      throw new BadRequestException('Query parameter "ids" (comma-separated offering ids) is required.');
+    }
+    const offeringIds = ids.split(',').map(s => s.trim()).filter(Boolean);
+    const effectiveEnv = environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
+    return this.catalogService.compareOfferings(offeringIds, effectiveEnv);
+  }
+
 
   private projection(input: any) {
     const parsed = CatalogProjectionSchema.safeParse({ responseProfile: input?.responseProfile,

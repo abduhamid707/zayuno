@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowUpRight, BookOpen, FlaskConical, LayoutDashboard, Compass, Activity, ShieldCheck, Sparkles, Search, LogOut, LogIn, Menu, X, ArrowRight, PlugZap } from 'lucide-react';
+import { ArrowUpRight, BookOpen, FlaskConical, LayoutDashboard, Compass, Activity, ShieldCheck, Sparkles, Search, LogOut, LogIn, Menu, X, ArrowRight, PlugZap, Store } from 'lucide-react';
 import { WORKSPACE_NAV, WorkspaceTab } from './workspace-model';
 
-const icons = { overview: Compass, apps: LayoutDashboard, docs: BookOpen, sandbox: FlaskConical, certification: ShieldCheck, inspector: Activity, onboarding: PlugZap, auth: LogIn };
+const icons = { overview: Compass, integrations: Store, apps: LayoutDashboard, docs: BookOpen, sandbox: FlaskConical, certification: ShieldCheck, inspector: Activity, onboarding: PlugZap, auth: LogIn };
 
 export function WorkspaceShell({ activeTab, onNavigate, onSearch, onAiKit, signedIn, account, onLogout, children }: {
   activeTab: WorkspaceTab; onNavigate: (tab: WorkspaceTab) => void; onSearch: () => void;

@@ -4,3 +4,7 @@ export * from './certification';
 export * from './strict-certification';
 export * from './errors';
 export * from './protocol-validation';
+export * from './managed-connector';
+export * from './connectors/uzum-connector';
+export * from './connectors/synthetic-connector';
+export * from './managed-connector-adapter';

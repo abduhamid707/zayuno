@@ -1,6 +1,7 @@
 import { manifestOf } from '@zayuno/shared';
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { prisma } from '@zayuno/database';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
 import { ProvidersService } from '../providers/providers.service';
 import { RedisService } from '../../common/services/redis.service';
@@ -11,7 +12,10 @@ import {
   AvailabilityResultSchema,
   AvailabilityStatus,
   CheckAvailabilityInput,
-  ProviderCapability
+  ProviderCapability,
+  CompareOfferingsResult,
+  ComparisonItem,
+  ComparisonAttribute
 } from '@zayuno/contracts';
 import { CapabilityNotSupportedError } from '@zayuno/provider-sdk';
 import { findForbiddenParameterKey } from '../../common/sensitive-parameters';
@@ -517,5 +521,95 @@ export class CatalogService {
     if (forbiddenKey) {
       throw new BadRequestException(`Sensitive identity or payment field "${forbiddenKey}" is not allowed in dynamic parameters. Use the provider-owned secure handoff.`);
     }
+  }
+
+  async compareOfferings(offeringIds: string[], environment?: string): Promise<CompareOfferingsResult> {
+    if (!Array.isArray(offeringIds) || offeringIds.length < 2 || offeringIds.length > 4) {
+      throw new BadRequestException('Solishtirish uchun kamida 2 ta va ko‘pi bilan 4 ta mahsulot tanlanishi kerak.');
+    }
+
+    const items: ComparisonItem[] = [];
+    const rawAttributes = new Map<string, Record<string, string | null>>();
+
+    for (const rawId of offeringIds) {
+      const cleanId = String(rawId || '').trim();
+      if (!cleanId) continue;
+
+      const actualId = cleanId.startsWith('offering_') ? cleanId.slice('offering_'.length) : cleanId;
+
+      const synced = await prisma.syncedProduct.findUnique({
+        where: { id: actualId },
+        include: { provider: true }
+      });
+
+      if (!synced || !synced.isVisible) {
+        throw new NotFoundException(`Mahsulot topilmadi yoki faol emas: ${cleanId}`);
+      }
+
+      if (synced.provider.status !== 'ACTIVE') {
+        throw new BadRequestException(`Ushbu mahsulot provayderi faol emas: ${synced.provider.slug}`);
+      }
+
+      await this.providersService.assertProviderPublished(synced.provider.slug, environment);
+
+      const variants = Array.isArray(synced.variants) ? synced.variants : [];
+      const variantsSummary = variants.length > 0
+        ? variants.map((v: any) => v.name).filter(Boolean).slice(0, 5).join(', ')
+        : undefined;
+
+      const compItem: ComparisonItem = {
+        offeringId: synced.id,
+        title: synced.title,
+        providerSlug: synced.provider.slug,
+        providerName: synced.provider.name,
+        imageUrl: synced.imageUrl || null,
+        basePrice: Number(synced.basePrice),
+        currency: synced.currency,
+        productUrl: synced.productUrl,
+        rating: (synced.attributes as any)?.rating ?? null,
+        isAvailable: synced.isAvailable,
+        lastUpdated: synced.lastSyncedAt.toISOString(),
+        variantsSummary
+      };
+      items.push(compItem);
+
+      const setAttr = (name: string, val: string | null) => {
+        if (!rawAttributes.has(name)) rawAttributes.set(name, {});
+        rawAttributes.get(name)![compItem.offeringId] = val || null;
+      };
+
+      setAttr('Kategoriya', synced.categoryTitle || null);
+      setAttr('Brend', synced.brand || null);
+      setAttr('Mavjudlik', synced.isAvailable ? 'Sotuvda mavjud' : 'Qolmagan');
+      if (variantsSummary) {
+        setAttr('Variantlar', variantsSummary);
+      }
+      if (synced.attributes && typeof synced.attributes === 'object' && !Array.isArray(synced.attributes)) {
+        for (const [key, val] of Object.entries(synced.attributes as Record<string, any>)) {
+          if (key !== 'rating' && val !== null && val !== undefined) {
+            setAttr(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
+          }
+        }
+      }
+    }
+
+    if (items.length < 2) {
+      throw new NotFoundException('Solishtirish uchun tanlangan mahsulotlardan kamida 2 tasi topilmadi.');
+    }
+
+    const attributes: ComparisonAttribute[] = [];
+    for (const [attrName, valuesMap] of rawAttributes.entries()) {
+      const values: Record<string, string | null> = {};
+      for (const item of items) {
+        values[item.offeringId] = valuesMap[item.offeringId] || 'Ma’lumot yo‘q';
+      }
+      attributes.push({ name: attrName, values });
+    }
+
+    return {
+      items,
+      attributes,
+      notice: 'Narxlar oxirgi sinxronizatsiya vaqtiga tegishli. Yakuniy shartlar rasmiy do‘konda belgilanadi.'
+    };
   }
 }

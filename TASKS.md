@@ -1,3 +1,147 @@
+# Joriy topshiriq — Barcha o‘zgarishlarni GitHub ga push qilish (2026-09-21)
+
+- [x] 1. Ishchi daraxt holati va fayllar xavfsizligini tekshirish (.env yoki maxfiy kalitlar yo‘qligini tasdiqlash).
+- [ ] 2. Barcha o‘zgarishlarni stage qilish va `git diff --cached --check` orqali formatni tekshirish.
+- [ ] 3. Aniq va standart xabar bilan commit yaratish (`feat: managed connectors framework, uzum market integration and audit hardening`).
+- [ ] 4. `origin/main` ga push qilish va remote holatini tasdiqlash.
+
+Holat: Foydalanuvchi push qilishni so‘radi. Staging va commit jarayoni boshlanmoqda.
+O‘zgargan fayllar: TASKS.md
+Tekshiruv: Oldingi barcha 13/13 testlar va 4 ta paket buildlari o‘tgan.
+Keyingi qadam: Stage qilish, commit va push.
+
+---
+
+# Oldingi topshiriq — Sync egasi (runToken), restart tiklash va mavjud provider himoyasi (2026-09-21)
+
+- [x] 1. [P1] Har syncga unikal runToken berish (`syncRunId = runToken`): qulf olishda token belgilash; DB snapshot commit va xatolikda qulfni bo‘shatishda tokenni tekshirish (boshqa yangi run qulfini buzmaslik).
+- [x] 2. [P1] Restartdan keyingi va muddati o‘tgan `SYNCING`larni davriy tiklash: har bir `runScheduledSyncCycle` boshlanishida `await this.recoverStuckSyncInstances()` chaqirish orqali muddati o‘tgan `SYNCING` instanslarni avtomatik `CONNECTED`ga o‘tkazib, shu siklning o‘zida qayta sinxronlash.
+- [x] 3. [P1] Transactional providerni qat’iy himoyalash: agar provayder faol tranzaksion buyurtma imkoniyatlariga ega bo‘lsa (`ACTION_CREATE`, `QUOTE` va h.k.), unga katalog ulagichi (Managed Connector) ulanishini `BadRequestException` bilan qat’iy rad etish; mavjud adapterni (`remote-http`) va buyurtma oqimini 100% buzilmasdan saqlash.
+- [x] 4. Testlar va buildlar: 13 ta acceptance & audit testlari (parallel runToken usurpation, scheduler cycle expired recovery, transactional provider rejection va non-transactional provider ulanishi), paket buildlari va `git diff --check`.
+
+Qorajoy 128831 istisnosi to‘liq saqlanmoqda: bloklangan mahsulotlar o‘z holatida import qilinadi (`BLOCKED`), `isAvailable: false` bilan belgilanadi, `testCatalog` xabari biriktiriladi.
+Holat: Barcha 3 ta audit talabi to‘liq bajarildi va testlar bilan isbotlandi.
+O‘zgargan fayllar:
+- `apps/api/src/modules/connectors/connectors.service.ts`
+- `tests/test-managed-connectors-and-uzum.ts`
+- `TASKS.md`
+Tekshiruv natijalari:
+- `pnpm exec tsx tests/test-managed-connectors-and-uzum.ts` (13/13 test PASS)
+- `pnpm --filter @zayuno/contracts build` (Exit 0)
+- `pnpm --filter @zayuno/provider-sdk build` (Exit 0)
+- `pnpm --filter @zayuno/api build` (Exit 0)
+- `pnpm --filter @zayuno/provider-portal build` (Exit 0)
+- `git diff --check` (0 xatolik, 0 trailing whitespace)
+Qolgan ish: Yo‘q. Foydalanuvchining barcha talablari to‘liq yopildi.
+Keyingi qadam: Foydalanuvchiga bajarilgan 3 ta tuzatish va tekshiruv natijalarini hisobot qilish.
+
+---
+
+# Joriy topshiriq — Qorajoy test katalogi va Managed Connectors Auditi (2026-09-21)
+
+- [x] Foydalanuvchidan Uzum shopId olindi: 128831 (seller/shop/128831/main).
+- [x] 1. Qorajoy (shopId: 128831) test istisnosi: API kalit egaligini tekshirish, `filter=ALL`, asl statusni saqlash, `testCatalog` belgisi va env orqali o‘chirish imkoniyati (`process.env.UZUM_TEST_CATALOG_SHOP_IDS`).
+- [x] 2. [P1] Status mapper: `status.value` ni to‘g‘ri o‘qish, `BLOCKED` va `ARCHIVED` mahsulotlarni sun’iy `ACTIVE`ga aylantirmaslik, `isAvailable: false` kafolati.
+- [x] 3. [P1] Noto‘g‘ri javob nazorati: `productList` bo‘lmagan 200 javobni xatolik deb hisoblash va eski katalogni saqlab qolish.
+- [x] 4. [P1] Scheduler chidamliligi: xatolikdan keyin qayta urinish (`nextSyncAt`, `CONNECTED` va `ERROR`), server qayta ishga tushganda qolib ketgan `SYNCING`ni tiklash (`recoverStuckSyncInstances`).
+- [x] 5. [P1] Disconnect poygasi va qulf nazorati: tranzaksiya ichida qulf (`syncLockUntil`) va disconnect tekshiruvi, uzilgan ulanishni qayta faollashtirmaslik.
+- [x] 6. [P1] Tranzaksion provayderlarni himoyalash: `createInstance` da eski `ACTION_CREATE` kabi imkoniyatlarni olib tashlash, faqat connector capabilities qoldirish, eski konfiguratsiyani `metadata`da zaxiralash.
+- [x] 7. [P2] Platformalar vitrinasi: backend `getDefinitions` da `status: 'ACTIVE'` qaytarish, UI da qotirilgan Uzum tugmasini dinamik ulashga almashtirish (`Yangi do‘kon ulash`).
+- [x] 8. Testlar va buildlar: real `status.value` (BLOCKED, ARCHIVED), Qorajoy istisnosi, scheduler va tranzaksion capabilities regressiya testlari (13/13 test muvaffaqiyatli).
+
+Doira: Qorajoy (128831) test do‘koni uchun maxsus nazoratli istisno va foydalanuvchi auditida ko‘rsatilgan barcha 6 ta P1/P2 arxitektura muammolarini to‘liq bartaraf etish.
+Holat: Barcha 8 ta band to‘liq ishlab chiqildi, sinovdan o‘tkazildi va yopildi.
+O‘zgargan fayllar:
+- `packages/provider-sdk/src/connectors/uzum-connector.ts`
+- `packages/contracts/src/managed-connector.ts`
+- `apps/api/src/modules/connectors/connectors.service.ts`
+- `apps/provider-portal/src/IntegrationsView.tsx`
+- `tests/test-managed-connectors-and-uzum.ts`
+- `TASKS.md`
+Tekshiruv natijalari:
+- `pnpm exec tsx tests/test-managed-connectors-and-uzum.ts` (13/13 acceptance va audit testlari PASS)
+- `pnpm --filter @zayuno/contracts build` (Exit code: 0)
+- `pnpm --filter @zayuno/provider-sdk build` (Exit code: 0)
+- `pnpm --filter @zayuno/api build` (Exit code: 0)
+- `pnpm --filter @zayuno/provider-portal build` (Exit code: 0)
+- `git diff --check` (0 xatolik, 0 trailing whitespace)
+Qolgan ish: Yo‘q. Foydalanuvchi talabidagi barcha audit kamchiliklari bartaraf etildi.
+Keyingi qadam: Foydalanuvchiga bajarilgan ishlar va tekshiruv natijalari haqida hisobot berish.
+
+---
+
+# Joriy topshiriq — Uzum Integratsiyasi va Managed Connectors Tuzatishlari (P1 & P2 Audit) (2026-09-21)
+
+- [x] 1. Do‘konlar ro‘yxati mapperini rasmiy API'ga moslash (`GET /v1/shops` to‘g‘ridan-to‘g‘ri `[{id, name}]` va nested org formatlarni qo‘llab-quvvatlash)
+- [x] 2. Mahsulot mapperini to‘g‘rilash: Uzum status obyekti (`status.name`) va matnli `category` xaritalash, tovar maydonlarini himoyalash
+- [x] 3. Avtomatik sinxronizatsiya scheduleri / workerini yaratish (`nextSyncAt <= now` bo‘lgan ulanishlarni muntazam yangilash)
+- [x] 4. Redis keshini to‘g‘ri tozalash: `delByPattern("provider-data:v1:${cleanSlug}:*")` orqali bloklangan/yashirilgan tovarlarni tozalash
+- [x] 5. Parallel sync poygasi va ma’lumotlar yaxlitligini ta’minlash: atomik `updateMany` qulfi va `prisma.$transaction`
+- [x] 6. Solishtirish (compare) xavfsizligi: faqat nashr qilingan (`assertProviderPublished`) va unikal ID bo‘yicha izolyatsiyalash
+- [x] 7. Provider Portal UX tuzatishlari: `data.success === false` xatoliklarini to‘g‘ri ko‘rsatish, dynamic definition shakli va avtomatik APPROVED'ni olib tashlash
+- [x] 8. Testlar va yakuniy tekshiruv: real Uzum formatidagi testlar, buildlar va `git diff --check`
+
+Holat: Foydalanuvchi tekshiruvida ko‘rsatilgan barcha 7 ta P1/P2 xatolar to‘liq bartaraf etildi.
+1. `uzum-connector.ts`: `GET /v1/shops` rasmiy formati (`[{ id, name, status }]`) va nested tashkilot shakllari to‘g‘ri o‘qiladi. Mahsulot mapperida status obyektidan (`status.name` / `status.title`) matn olinadi, matnli `category` esa `categoryTitle` maydoniga xatosiz yoziladi.
+2. `connectors.service.ts`: Avtomatik fon scheduler workeri (`runScheduledSyncCycle`) ishga tushirildi (`nextSyncAt <= now` bo‘lgan barcha ulanishlar davriy tekshiriladi). Atomik `updateMany` concurrency lease lock joriy etildi. Mahsulotlar snapshot yozish va eski tovarlarni yashirish `prisma.$transaction` ichiga olindi.
+3. Redis keshini tozalash `this.redisService.delByPattern("provider-data:v1:${cleanSlug}:*")` ga o‘tkazildi (Redis `DEL` wildcard qo‘llab-quvvatlamasligi tuzatildi).
+4. `catalog.service.ts` & `catalog.controller.ts`: `compareOfferings` da mahsulotlar unikal primary key (`syncedProduct.id`) orqali topiladi va `assertProviderPublished(synced.provider.slug, environment)` orqali tekshiriladi.
+5. `IntegrationsView.tsx`: `handleSyncNow` da `data.success === false` xatoliklari to‘g‘ri qizil xabar sifatida ko‘rsatiladi; platformalar vitrinasi va ulash modali `GET /api/v1/connectors/definitions` orqali dinamik ishlaydi; provayder ma’lumotlariga sun’iy APPROVED yozilmaydi.
+6. `tests/test-managed-connectors-and-uzum.ts`: Real Uzum status obyekti, toifa matni, parallel atomik lock, scheduled sync worker va publish nazoratini o‘z ichiga olgan 11 ta test 100% muvaffaqiyatli o‘tdi.
+
+O‘zgargan fayllar:
+- `packages/provider-sdk/src/connectors/uzum-connector.ts`
+- `apps/api/src/modules/connectors/connectors.service.ts`
+- `apps/api/src/modules/connectors/connectors.controller.ts`
+- `apps/api/src/modules/catalog/catalog.service.ts`
+- `apps/api/src/modules/catalog/catalog.controller.ts`
+- `apps/provider-portal/src/IntegrationsView.tsx`
+- `tests/test-managed-connectors-and-uzum.ts`
+- `TASKS.md`
+
+Bajarilgan tekshiruvlar:
+- `pnpm exec tsx tests/test-managed-connectors-and-uzum.ts` (11/11 acceptance tests muvaffaqiyatli)
+- `pnpm --filter @zayuno/contracts build` (Exit code: 0)
+- `pnpm --filter @zayuno/provider-sdk build` (Exit code: 0)
+- `pnpm --filter @zayuno/api build` (Exit code: 0)
+- `pnpm --filter @zayuno/provider-portal build` (Exit code: 0)
+- `git diff --check` (0 xatolik, 0 trailing whitespace)
+
+Qolgan ish: Yo‘q. Barcha 7 ta band to‘liq yopildi.
+Keyingi qadam: Foydalanuvchiga bajarilgan ishlar va tekshiruv natijalarini taqdim etish.
+
+---
+
+# Oldingi topshiriq — Universal Managed Connectors va Uzum Market Integratsiyasi (2026-09-21)
+
+- [x] 1. Arxitektura auditi va Uzum Seller OpenAPI maydonlari/capability xaritasini shakllantirish
+- [x] 2. Database qatlami: ConnectorDefinition, ConnectorCredential, ConnectorInstance, ConnectorSyncRun, SyncedProduct jadvallari va migratsiya
+- [x] 3. Shartnomalar va SDK: ManagedConnector interfeysi, UzumConnector mapper/transport, SyntheticConnector va ManagedConnectorAdapter
+- [x] 4. Backend moduli: ConnectorsService (shifrlash, lock, sync staging), ConnectorsController, va 2–4 mahsulotni solishtirish (POST /api/v1/catalog/compare)
+- [x] 5. Provider Portali UX: Integratsiyalar bo‘limi, Uzum ulash (API kalit, do‘kon tanlash, import, preview, boshqaruv, solishtirish)
+- [x] 6. Avtomatlashtirilgan testlar: acceptance test suite (11 ta talab va chekka holatlar)
+- [x] 7. Yakuniy tekshiruv, regressiya nazorati va hujjatlashtirish
+
+Holat: Universal Managed Connectors framework va Uzum Market reference integratsiyasi to‘liq ishlab chiqildi, barcha 11 ta acceptance testlari (multi-tenant izolyatsiya, sahifalab olish, aktiv->noaktiv yashirish, 500 error xatolikka bardoshlilik, concurrency lock, o‘zbekcha normalizatsiya, 2-4 mahsulot solishtirish, mahsulot havolasi, AES-256-GCM shifrlash, universallik, regressiyasizlik) 100% muvaffaqiyatli o‘tdi. Loyihaning barcha paketlari (`@zayuno/contracts`, `@zayuno/provider-sdk`, `@zayuno/api`, `@zayuno/provider-portal`) xatosiz build qilindi. Texnik hujjatlar `docs/managed-connectors.md` va `docs/uzum-capability-mapping.md` ga kiritildi.
+O‘zgargan fayllar: packages/database/prisma/schema.prisma, packages/database/prisma/migrations/20260921000000_managed_connectors_and_synced_products/migration.sql, packages/contracts/src/managed-connector.ts, packages/contracts/src/index.ts, packages/provider-sdk/src/managed-connector.ts, packages/provider-sdk/src/connectors/uzum-connector.ts, packages/provider-sdk/src/connectors/synthetic-connector.ts, packages/provider-sdk/src/managed-connector-adapter.ts, packages/provider-sdk/src/index.ts, apps/api/src/modules/connectors/connectors.service.ts, apps/api/src/modules/connectors/connectors.controller.ts, apps/api/src/modules/connectors/connectors.module.ts, apps/api/src/modules/providers/provider-registry.service.ts, apps/api/src/modules/catalog/catalog.service.ts, apps/api/src/modules/catalog/catalog.controller.ts, apps/api/src/app.module.ts, apps/provider-portal/src/workspace-model.ts, apps/provider-portal/src/WorkspaceShell.tsx, apps/provider-portal/src/IntegrationsView.tsx, apps/provider-portal/src/App.tsx, tests/test-managed-connectors-and-uzum.ts, docs/uzum-capability-mapping.md, docs/managed-connectors.md, TASKS.md.
+Tekshiruv: `pnpm exec tsx tests/test-managed-connectors-and-uzum.ts` (11/11 acceptance tests muvaffaqiyatli); `@zayuno/contracts`, `@zayuno/provider-sdk`, `@zayuno/api`, `@zayuno/provider-portal` buildlari muvaffaqiyatli o'tdi; `git diff --check` xatosiz (0 whitespace warning).
+Keyingi qadam: Foydalanuvchi tasdig'i va xohishiga ko'ra o'zgarishlarni commit/push qilish yoki navbatdagi transactional connector (masalan, Billz yoki iiko / YCLIENTS) integratsiyasini rejalashtirish.
+
+---
+
+# Joriy topshiriq — Managed Connectors agent prompti (2026-09-21)
+
+- [x] Suhbatdagi kelishuvlarni yig‘ish: Uzum katalogi, qidiruv, solishtirish, mahsulot havolasi; universal connector arxitekturasi.
+- [x] Boshqa agent uchun mustaqil bajariladigan prompt faylini yaratish.
+- [x] Prompt doirasi, tekshirish mezonlari va maxfiy ma’lumotlar yo‘qligini tekshirish.
+
+Holat: foydalanuvchi oldingi ishlar push qilinganini tasdiqladi; ularni qayta boshlash so‘ralmagan. Joriy topshiriq faqat topshirish hujjati, implementation emas.
+O‘zgargan fayllar: TASKS.md, AI_AGENT_MANAGED_CONNECTORS_UZUM_PROMPT.md.
+Tekshiruv: prompt talablari ko‘rib chiqildi; maxfiy qiymatlar kiritilmadi; git diff --check xatosiz. Ilova kodi o‘zgarmadi, build/test/deploy bajarilmadi.
+Keyingi qadam: boshqa agent AI_AGENT_MANAGED_CONNECTORS_UZUM_PROMPT.md asosida alohida implementation checklist ochib ish boshlaydi. Prompt tayyorlash topshirig‘i tugadi; connector hali shu topshiriqda implement qilinmagan.
+
+---
+
 # Arxitektura va Bosqichlar — Managed Connectors Framework va Uzum Reference Connector (2026-09-21)
 
 Men hozir **1-variantdan boshlardim**, lekin shunchaki `UzumMarketAdapter` yozib qo‘ymasdim. Uni **birinchi “Managed Connector” sifatida universal framework ustiga** qurardim.
