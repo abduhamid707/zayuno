@@ -268,14 +268,15 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
     const provider = await this.resolveAndAuthorizeProvider(actor, input.providerSlug);
     const connector = this.getConnector(input.connectorDefinitionId);
 
-    // Guard: strictly protect transactional providers from having their order capabilities stripped
+    // Info: catalog connector is supplementary — it does NOT change the provider's
+    // existing adapter or transactional capabilities (ACTION_CREATE, QUOTE, etc.).
     const hasTransactional = provider.adapterType !== 'managed-connector' &&
       provider.capabilities.some((c: ProviderCapability) => TRANSACTIONAL_CAPABILITIES.has(c));
 
     if (hasTransactional) {
-      throw new BadRequestException(
-        `Ushbu provayderda (${provider.slug}) faol tranzaksion buyurtma integratsiyasi mavjud (adapter: ${provider.adapterType}, imkoniyatlar: ${provider.capabilities.join(', ')}). ` +
-        `Katalog ulagichini (Managed Connector) ulash mavjud buyurtma qabul qilish jarayonini to‘xtatib qo‘ymasligi uchun uni alohida provayder hisobi orqali ulashingiz lozim.`
+      this.logger.log(
+        `Provider ${provider.slug} has transactional capabilities (${provider.capabilities.join(', ')}). ` +
+        `Adding catalog connector as supplementary data source; existing adapter (${provider.adapterType}) is preserved.`
       );
     }
 
@@ -338,34 +339,60 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
       ProviderCapability.SEARCH
     ];
 
-    // Save previous provider adapter & capabilities in metadata so they are not permanently lost
-    const backupAdapterConfig = provider.adapterType !== 'managed-connector' ? {
-      previousAdapterType: provider.adapterType,
-      previousCapabilities: provider.capabilities,
-      previousConfig: provider.config
-    } : {};
+    // If provider has transactional capabilities, preserve its existing adapter and
+    // capabilities — catalog connector is supplementary. Otherwise, switch fully to
+    // managed-connector adapter.
+    if (hasTransactional) {
+      // Merge catalog capabilities alongside existing transactional ones
+      const mergedCapabilities = Array.from(new Set([
+        ...provider.capabilities as ProviderCapability[],
+        ...connectorCapabilities.filter(c => !TRANSACTIONAL_CAPABILITIES.has(c))
+      ]));
 
-    // Filter out transactional capabilities: only keep connector-supported capabilities
-    const newCapabilities = Array.from(new Set(
-      connectorCapabilities.filter(c => !TRANSACTIONAL_CAPABILITIES.has(c))
-    ));
-
-    await prisma.provider.update({
-      where: { id: provider.id },
-      data: {
-        adapterType: 'managed-connector',
-        capabilities: newCapabilities,
-        metadata: {
-          ...currentMeta,
-          ...backupAdapterConfig,
-          managedConnector: {
-            definitionId: input.connectorDefinitionId,
-            instanceId: instance.id,
-            connectedAt: new Date().toISOString()
+      await prisma.provider.update({
+        where: { id: provider.id },
+        data: {
+          capabilities: mergedCapabilities,
+          metadata: {
+            ...currentMeta,
+            managedConnector: {
+              definitionId: input.connectorDefinitionId,
+              instanceId: instance.id,
+              connectedAt: new Date().toISOString()
+            }
           }
         }
-      }
-    });
+      });
+    } else {
+      // Save previous provider adapter & capabilities in metadata so they are not permanently lost
+      const backupAdapterConfig = provider.adapterType !== 'managed-connector' ? {
+        previousAdapterType: provider.adapterType,
+        previousCapabilities: provider.capabilities,
+        previousConfig: provider.config
+      } : {};
+
+      // Filter out transactional capabilities: only keep connector-supported capabilities
+      const newCapabilities = Array.from(new Set(
+        connectorCapabilities.filter(c => !TRANSACTIONAL_CAPABILITIES.has(c))
+      ));
+
+      await prisma.provider.update({
+        where: { id: provider.id },
+        data: {
+          adapterType: 'managed-connector',
+          capabilities: newCapabilities,
+          metadata: {
+            ...currentMeta,
+            ...backupAdapterConfig,
+            managedConnector: {
+              definitionId: input.connectorDefinitionId,
+              instanceId: instance.id,
+              connectedAt: new Date().toISOString()
+            }
+          }
+        }
+      });
+    }
 
     this.registryService.invalidateAdapterCache(provider.slug);
 

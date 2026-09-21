@@ -363,16 +363,16 @@ export function IntegrationsView({
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
       {/* Header Banner */}
-      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 24, marginBottom: 28 }}>
+      <div style={{ background: 'var(--ws-surface)', border: '1px solid var(--ws-border)', borderRadius: 12, padding: 24, marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <div style={{ background: '#0284c7', color: '#fff', padding: 8, borderRadius: 8, display: 'flex' }}>
+          <div style={{ background: 'var(--ws-brand)', color: '#fff', padding: 8, borderRadius: 8, display: 'flex' }}>
             <Store size={22} />
           </div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#0f172a' }}>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--ws-text-primary)' }}>
             Tayyor Tizimlarni Ulash (Managed Connectors)
           </h2>
         </div>
-        <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
+        <p style={{ margin: 0, fontSize: 14, color: 'var(--ws-text-secondary)', lineHeight: 1.6 }}>
           Dasturchi yollamasdan yoki API kod yozmasdan, o‘zingiz ishlatayotgan savdo platformasini Zayunoga ulang.
           Zayuno katalogingizni doimiy yangilab boradi va ChatGPT, Claude hamda mobil ilova foydalanuvchilariga do‘koningizdan tovar xarid qilish imkonini yaratadi.
         </p>
@@ -380,13 +380,13 @@ export function IntegrationsView({
 
       {/* Alerts */}
       {errorMessage && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: 14, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, color: '#b91c1c' }}>
+        <div style={{ background: 'var(--ws-danger-bg)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: 14, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, color: 'var(--ws-danger)' }}>
           <AlertCircle size={18} />
           <span>{errorMessage}</span>
         </div>
       )}
       {successMessage && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 14, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, color: '#15803d' }}>
+        <div style={{ background: 'var(--ws-success-bg)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, padding: 14, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, color: 'var(--ws-success)' }}>
           <CheckCircle2 size={18} />
           <span>{successMessage}</span>
         </div>
@@ -395,14 +395,14 @@ export function IntegrationsView({
       {/* Active Connectors List */}
       <div style={{ marginBottom: 32 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#1e293b' }}>Ulangan do‘konlaringiz</h3>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Ulangan do'konlaringiz</h3>
           <button
             onClick={() => {
               const defaultDef = definitions.find(d => d.id === 'uzum') || definitions[0] || null;
               handleOpenConnect(defaultDef);
             }}
             style={{
-              background: '#0284c7',
+              background: 'var(--ws-brand)',
               color: '#fff',
               border: 'none',
               padding: '9px 16px',
@@ -420,12 +420,12 @@ export function IntegrationsView({
         </div>
 
         {loading ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>Yuklanmoqda...</div>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--ws-text-muted)' }}>Yuklanmoqda...</div>
         ) : instances.length === 0 ? (
-          <div style={{ background: '#fff', border: '1px dashed #cbd5e1', borderRadius: 12, padding: 40, textAlign: 'center' }}>
-            <Store size={40} style={{ color: '#94a3b8', marginBottom: 12 }} />
-            <h4 style={{ margin: '0 0 6px 0', fontSize: 16, color: '#334155' }}>Hozircha hech qanday do‘kon ulanmagan</h4>
-            <p style={{ margin: '0 0 16px 0', fontSize: 14, color: '#64748b' }}>
+          <div style={{ background: 'var(--ws-surface)', border: '1px dashed var(--ws-border)', borderRadius: 12, padding: 40, textAlign: 'center' }}>
+            <Store size={40} style={{ color: 'var(--ws-text-muted)', marginBottom: 12 }} />
+            <h4 style={{ margin: '0 0 6px 0', fontSize: 16, color: 'var(--ws-text-primary)' }}>Hozircha hech qanday do'kon ulanmagan</h4>
+            <p style={{ margin: '0 0 16px 0', fontSize: 14, color: 'var(--ws-text-secondary)' }}>
               Tayyor platforma (masalan Uzum Market) sotuvchilar hisobingizni ulab, tovarlaringizni AI xaridorlariga oching.
             </p>
             <button
@@ -433,7 +433,7 @@ export function IntegrationsView({
                 const defaultDef = definitions.find(d => d.id === 'uzum') || definitions[0] || null;
                 handleOpenConnect(defaultDef);
               }}
-              style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+              style={{ background: 'var(--ws-brand)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
             >
               Yangi do‘kon ulash
             </button>
@@ -444,8 +444,8 @@ export function IntegrationsView({
               <div
                 key={inst.id}
                 style={{
-                  background: '#fff',
-                  border: '1px solid #e2e8f0',
+                  background: 'var(--ws-surface)',
+                  border: '1px solid var(--ws-border)',
                   borderRadius: 12,
                   padding: 20,
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
@@ -454,7 +454,7 @@ export function IntegrationsView({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <h4 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#0f172a' }}>
+                      <h4 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--ws-text-primary)' }}>
                         {inst.selectedShopName || inst.name}
                       </h4>
                       <span style={{
@@ -462,13 +462,13 @@ export function IntegrationsView({
                         padding: '2px 8px',
                         borderRadius: 12,
                         fontWeight: 600,
-                        background: inst.status === 'CONNECTED' ? '#dcfce7' : inst.status === 'SYNCING' ? '#e0f2fe' : '#fee2e2',
-                        color: inst.status === 'CONNECTED' ? '#166534' : inst.status === 'SYNCING' ? '#0369a1' : '#991b1b'
+                        background: inst.status === 'CONNECTED' ? 'var(--ws-success-bg)' : inst.status === 'SYNCING' ? 'var(--ws-info-bg)' : 'var(--ws-danger-bg)',
+                        color: inst.status === 'CONNECTED' ? 'var(--ws-success)' : inst.status === 'SYNCING' ? 'var(--ws-info)' : 'var(--ws-danger)'
                       }}>
                         {inst.status === 'CONNECTED' ? 'Faol' : inst.status === 'SYNCING' ? 'Sinxronlanmoqda...' : inst.status}
                       </span>
                     </div>
-                    <div style={{ fontSize: 13, color: '#64748b', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 13, color: 'var(--ws-text-muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                       <span>Platforma: <strong>Uzum Market</strong></span>
                       <span>Do‘kon ID: <code>{inst.selectedShopId || 'N/A'}</code></span>
                       <span>API Kalit: <code>{inst.maskedSecret || '••••••••'}</code></span>
@@ -479,13 +479,14 @@ export function IntegrationsView({
                     <button
                       onClick={() => handleOpenPreview(inst.id)}
                       style={{
-                        background: '#f1f5f9',
-                        border: '1px solid #cbd5e1',
+                        background: 'var(--ws-surface-elevated)',
+                        border: '1px solid var(--ws-border)',
                         padding: '7px 12px',
                         borderRadius: 6,
                         fontSize: 13,
                         fontWeight: 500,
                         cursor: 'pointer',
+                        color: 'var(--ws-text-secondary)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 6
@@ -497,7 +498,7 @@ export function IntegrationsView({
                       onClick={() => handleSyncNow(inst.id)}
                       disabled={actionLoading === inst.id}
                       style={{
-                        background: '#0284c7',
+                        background: 'var(--ws-brand)',
                         color: '#fff',
                         border: 'none',
                         padding: '7px 12px',
@@ -516,23 +517,23 @@ export function IntegrationsView({
                     <button
                       onClick={() => handleDisconnect(inst.id)}
                       style={{
-                        background: '#fff',
-                        border: '1px solid #fecaca',
-                        color: '#dc2626',
+                        background: 'var(--ws-surface-elevated)',
+                        border: '1px solid rgba(239,68,68,0.3)',
+                        color: 'var(--ws-danger)',
                         padding: '7px 10px',
                         borderRadius: 6,
                         cursor: 'pointer'
                       }}
-                      title="Ulanishni to‘xtatish"
+                      title="Ulanishni to'xtatish"
                     >
                       <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 24, marginTop: 16, paddingTop: 14, borderTop: '1px solid #f1f5f9', fontSize: 13, color: '#64748b' }}>
-                  <div>Jami tovarlar: <strong style={{ color: '#0f172a' }}>{inst.totalProducts}</strong></div>
-                  <div>Faol tovarlar: <strong style={{ color: '#16a34a' }}>{inst.activeProducts}</strong></div>
+                <div style={{ display: 'flex', gap: 24, marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--ws-border)', fontSize: 13, color: 'var(--ws-text-muted)' }}>
+                  <div>Jami tovarlar: <strong style={{ color: 'var(--ws-text-primary)' }}>{inst.totalProducts}</strong></div>
+                  <div>Faol tovarlar: <strong style={{ color: 'var(--ws-success)' }}>{inst.activeProducts}</strong></div>
                   <div>Oxirgi yangilanish: <strong>{inst.lastSyncAt ? new Date(inst.lastSyncAt).toLocaleString() : 'Hali bajarilmagan'}</strong></div>
                 </div>
               </div>
@@ -543,7 +544,7 @@ export function IntegrationsView({
 
       {/* Available Platforms Showcase */}
       <div style={{ marginBottom: 36 }}>
-        <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600, color: '#1e293b' }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600, color: 'var(--ws-text-primary)' }}>
           Qo‘llab-quvvatlanadigan platformalar
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
@@ -594,10 +595,10 @@ export function IntegrationsView({
                 <div
                   key={def.id}
                   style={{
-                    border: isActive ? '2px solid #0284c7' : '1px solid #e2e8f0',
+                    border: isActive ? '2px solid var(--ws-brand)' : '1px solid var(--ws-border)',
                     borderRadius: 10,
                     padding: 16,
-                    background: isActive ? '#fff' : '#fafafa',
+                    background: isActive ? 'var(--ws-surface-elevated)' : 'var(--ws-surface)',
                     opacity: isActive ? 1 : 0.85,
                     display: 'flex',
                     flexDirection: 'column',
@@ -606,11 +607,11 @@ export function IntegrationsView({
                 >
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <span style={{ fontWeight: 700, fontSize: 16, color: isActive ? '#0f172a' : '#475569' }}>{def.name}</span>
+                      <span style={{ fontWeight: 700, fontSize: 16, color: isActive ? 'var(--ws-text-primary)' : 'var(--ws-text-secondary)' }}>{def.name}</span>
                       <span
                         style={{
-                          background: isActive ? '#dcfce7' : '#f1f5f9',
-                          color: isActive ? '#166534' : '#64748b',
+                          background: isActive ? 'var(--ws-success-bg)' : 'var(--ws-surface-hover)',
+                          color: isActive ? 'var(--ws-success)' : 'var(--ws-text-muted)',
                           fontSize: 11,
                           fontWeight: 700,
                           padding: '2px 6px',
@@ -620,7 +621,7 @@ export function IntegrationsView({
                         {isActive ? 'FAOL' : def.status === 'BETA' ? 'BETA' : 'REJADA'}
                       </span>
                     </div>
-                    <p style={{ margin: '0 0 14px 0', fontSize: 13, color: isActive ? '#64748b' : '#94a3b8', lineHeight: 1.5 }}>
+                    <p style={{ margin: '0 0 14px 0', fontSize: 13, color: isActive ? 'var(--ws-text-secondary)' : 'var(--ws-text-muted)', lineHeight: 1.5 }}>
                       {def.description}
                     </p>
                   </div>
@@ -629,7 +630,7 @@ export function IntegrationsView({
                       onClick={() => handleOpenConnect(def as any)}
                       style={{
                         width: '100%',
-                        background: '#0284c7',
+                        background: 'var(--ws-brand)',
                         color: '#fff',
                         border: 'none',
                         padding: '7px 0',
@@ -642,8 +643,8 @@ export function IntegrationsView({
                       Ulash
                     </button>
                   ) : (
-                    <div style={{ textAlign: 'center', fontSize: 12, color: '#94a3b8', padding: '6px 0', background: '#f8fafc', borderRadius: 6, fontWeight: 500 }}>
-                      Tez kunda qo‘shiladi
+                    <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--ws-text-muted)', padding: '6px 0', background: 'var(--ws-surface)', borderRadius: 6, fontWeight: 500 }}>
+                      Tez kunda qo'shiladi
                     </div>
                   )}
                 </div>
@@ -656,32 +657,32 @@ export function IntegrationsView({
       {/* Catalog Preview Modal */}
       {previewInstanceId && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#fff', borderRadius: 12, width: '90%', maxWidth: 850, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Import qilingan tovarlar (Preview)</h3>
-              <button onClick={() => setPreviewInstanceId(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>×</button>
+          <div style={{ background: 'var(--ws-surface-elevated)', borderRadius: 12, width: '90%', maxWidth: 850, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ws-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Import qilingan tovarlar (Preview)</h3>
+              <button onClick={() => setPreviewInstanceId(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ws-text-secondary)' }}>×</button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
               {previewLoading ? (
-                <div style={{ textAlign: 'center', padding: 40 }}>Tovarlar yuklanmoqda...</div>
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--ws-text-secondary)' }}>Tovarlar yuklanmoqda...</div>
               ) : previewProducts.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>Ushbu do‘konda tovarlar mavjud emas yoki hali import qilinmagan.</div>
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--ws-text-muted)' }}>Ushbu do'konda tovarlar mavjud emas yoki hali import qilinmagan.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {previewProducts.map(p => (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #f1f5f9', padding: 12, borderRadius: 8 }}>
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--ws-border)', padding: 12, borderRadius: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         {p.imageUrl ? (
                           <img src={p.imageUrl} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6 }} />
                         ) : (
-                          <div style={{ width: 48, height: 48, background: '#f1f5f9', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                          <div style={{ width: 48, height: 48, background: 'var(--ws-surface-hover)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ws-text-muted)' }}>
                             <Store size={20} />
                           </div>
                         )}
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>{p.title}</div>
-                          <div style={{ fontSize: 13, color: '#64748b' }}>
+                          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--ws-text-primary)' }}>{p.title}</div>
+                          <div style={{ fontSize: 13, color: 'var(--ws-text-muted)' }}>
                             Kategoriya: {p.categoryTitle || 'Boshqa'} · Narxi: <strong>{p.basePrice.toLocaleString()} {p.currency}</strong>
                           </div>
                         </div>
@@ -691,8 +692,8 @@ export function IntegrationsView({
                         <button
                           onClick={() => handleToggleCompareItem(p.id)}
                           style={{
-                            background: selectedForCompare.includes(p.id) ? '#0284c7' : '#f1f5f9',
-                            color: selectedForCompare.includes(p.id) ? '#fff' : '#0f172a',
+                            background: selectedForCompare.includes(p.id) ? 'var(--ws-brand)' : 'var(--ws-surface-hover)',
+                            color: selectedForCompare.includes(p.id) ? '#fff' : 'var(--ws-text-secondary)',
                             border: 'none',
                             padding: '6px 10px',
                             borderRadius: 6,
@@ -720,7 +721,7 @@ export function IntegrationsView({
                             fontWeight: 600
                           }}
                         >
-                          Uzumda ko‘rish <ExternalLink size={12} />
+                          Uzumda ko'rish <ExternalLink size={12} />
                         </a>
                       </div>
                     </div>
@@ -730,14 +731,14 @@ export function IntegrationsView({
             </div>
 
             {selectedForCompare.length >= 2 && (
-              <div style={{ padding: 12, background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: '#0f172a' }}>
+              <div style={{ padding: 12, background: 'var(--ws-surface)', borderTop: '1px solid var(--ws-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'var(--ws-text-primary)' }}>
                   <strong>{selectedForCompare.length} ta</strong> mahsulot solishtirish uchun tanlandi
                 </span>
                 <button
                   onClick={handleRunCompare}
                   disabled={compareLoading}
-                  style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  style={{ background: 'var(--ws-brand)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
                 >
                   {compareLoading ? 'Solishtirilmoqda...' : 'Solishtirish matritsasini ochish'}
                 </button>
@@ -750,22 +751,22 @@ export function IntegrationsView({
       {/* Comparison Modal */}
       {comparisonData && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-          <div style={{ background: '#fff', borderRadius: 12, width: '90%', maxWidth: 850, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Mahsulotlarni Solishtirish (Compare)</h3>
-              <button onClick={() => setComparisonData(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>×</button>
+          <div style={{ background: 'var(--ws-surface-elevated)', borderRadius: 12, width: '90%', maxWidth: 850, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ws-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Mahsulotlarni Solishtirish (Compare)</h3>
+              <button onClick={() => setComparisonData(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ws-text-secondary)' }}>×</button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                    <th style={{ padding: 10, textAlign: 'left', width: '25%' }}>Xususiyat</th>
+                  <tr style={{ borderBottom: '2px solid var(--ws-border)' }}>
+                    <th style={{ padding: 10, textAlign: 'left', width: '25%', color: 'var(--ws-text-secondary)' }}>Xususiyat</th>
                     {comparisonData.items.map((it: any) => (
                       <th key={it.offeringId} style={{ padding: 10, textAlign: 'left', width: `${75 / comparisonData.items.length}%` }}>
                         {it.imageUrl && <img src={it.imageUrl} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 6, marginBottom: 6 }} />}
-                        <div style={{ fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>{it.title}</div>
-                        <div style={{ color: '#0284c7', fontWeight: 700, fontSize: 14 }}>{it.basePrice.toLocaleString()} {it.currency}</div>
+                        <div style={{ fontWeight: 600, color: 'var(--ws-text-primary)', marginBottom: 4 }}>{it.title}</div>
+                        <div style={{ color: 'var(--ws-brand-light)', fontWeight: 700, fontSize: 14 }}>{it.basePrice.toLocaleString()} {it.currency}</div>
                         <a href={it.productUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#7000ff', fontSize: 12, marginTop: 4, fontWeight: 600, textDecoration: 'none' }}>
                           Uzumda ochish <ExternalLink size={11} />
                         </a>
@@ -775,11 +776,11 @@ export function IntegrationsView({
                 </thead>
                 <tbody>
                   {comparisonData.attributes.map((attr: any) => (
-                    <tr key={attr.name} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: 10, fontWeight: 600, color: '#475569' }}>{attr.name}</td>
+                    <tr key={attr.name} style={{ borderBottom: '1px solid var(--ws-border)' }}>
+                      <td style={{ padding: 10, fontWeight: 600, color: 'var(--ws-text-secondary)' }}>{attr.name}</td>
                       {comparisonData.items.map((it: any) => (
-                        <td key={it.offeringId} style={{ padding: 10, color: attr.values[it.offeringId] === 'Ma’lumot yo‘q' ? '#94a3b8' : '#0f172a' }}>
-                          {attr.values[it.offeringId] || 'Ma’lumot yo‘q'}
+                        <td key={it.offeringId} style={{ padding: 10, color: attr.values[it.offeringId] === 'Ma\'lumot yo\'q' ? 'var(--ws-text-muted)' : 'var(--ws-text-primary)' }}>
+                          {attr.values[it.offeringId] || 'Ma\'lumot yo\'q'}
                         </td>
                       ))}
                     </tr>
@@ -787,7 +788,7 @@ export function IntegrationsView({
                 </tbody>
               </table>
 
-              <div style={{ marginTop: 20, padding: 12, background: '#f8fafc', borderRadius: 8, fontSize: 12, color: '#64748b' }}>
+              <div style={{ marginTop: 20, padding: 12, background: 'var(--ws-surface)', borderRadius: 8, fontSize: 12, color: 'var(--ws-text-muted)' }}>
                 {comparisonData.notice}
               </div>
             </div>
@@ -798,18 +799,18 @@ export function IntegrationsView({
       {/* Connect Modal */}
       {isModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: '#fff', borderRadius: 12, width: '90%', maxWidth: 500, overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
+          <div style={{ background: 'var(--ws-surface-elevated)', borderRadius: 12, width: '90%', maxWidth: 500, overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ws-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--ws-text-primary)' }}>
                 {selectedDefinition ? `${selectedDefinition.name}'ni ulash` : 'Platformani ulash'}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>×</button>
+              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ws-text-secondary)' }}>×</button>
             </div>
 
             <div style={{ padding: 20 }}>
               {modalStep === 'KEY' && (
                 <div>
-                  <label style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBottom: 6, color: '#1e293b' }}>
+                  <label style={{ display: 'block', fontWeight: 600, fontSize: 14, marginBottom: 6, color: 'var(--ws-text-primary)' }}>
                     {selectedDefinition ? `${selectedDefinition.name} Maxfiy Kaliti (API Key)` : 'Maxfiy Kalit (API Key)'}
                   </label>
                   <input
@@ -817,36 +818,36 @@ export function IntegrationsView({
                     placeholder="Masalan: 3foSyaevUybDp+t1tu..."
                     value={apiKey}
                     onChange={e => setApiKey(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 14, marginBottom: 10, boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--ws-border)', borderRadius: 6, fontSize: 14, marginBottom: 10, boxSizing: 'border-box', background: 'var(--ws-surface)', color: 'var(--ws-text-primary)' }}
                   />
                   {selectedDefinition?.docsUrl ? (
-                    <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, background: '#f8fafc', padding: 10, borderRadius: 6, marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, color: 'var(--ws-text-muted)', lineHeight: 1.5, background: 'var(--ws-surface)', padding: 10, borderRadius: 6, marginBottom: 16 }}>
                       API kalitni qayerdan olasiz? {selectedDefinition.name} kabinetingizga kiring:{' '}
-                      <a href={selectedDefinition.docsUrl} target="_blank" rel="noreferrer" style={{ color: '#0284c7', fontWeight: 600 }}>
+                      <a href={selectedDefinition.docsUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--ws-brand-light)', fontWeight: 600 }}>
                         {selectedDefinition.docsUrl.replace(/^https?:\/\//, '')}
                       </a>{' '}
                       va "Kalitni yaratish" orqali nusxalang.
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, background: '#f8fafc', padding: 10, borderRadius: 6, marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, color: 'var(--ws-text-muted)', lineHeight: 1.5, background: 'var(--ws-surface)', padding: 10, borderRadius: 6, marginBottom: 16 }}>
                       {selectedDefinition?.name || 'Platforma'} tizimidagi API kaliti yoki integratsiya tokenini kiriting.
                     </div>
                   )}
 
                   {testAuthError && (
-                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: 10, marginBottom: 14, fontSize: 13, color: '#dc2626' }}>
+                    <div style={{ background: 'var(--ws-danger-bg)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: 10, marginBottom: 14, fontSize: 13, color: 'var(--ws-danger)' }}>
                       {testAuthError}
                     </div>
                   )}
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                    <button onClick={() => setIsModalOpen(false)} style={{ background: '#f1f5f9', border: 'none', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: 500 }}>
+                    <button onClick={() => setIsModalOpen(false)} style={{ background: 'var(--ws-surface-hover)', border: 'none', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: 500, color: 'var(--ws-text-secondary)' }}>
                       Bekor qilish
                     </button>
                     <button
                       onClick={handleTestKeyAndLoadShops}
                       disabled={testAuthLoading}
-                      style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: testAuthLoading ? 'not-allowed' : 'pointer', fontWeight: 600 }}
+                      style={{ background: 'var(--ws-brand)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: testAuthLoading ? 'not-allowed' : 'pointer', fontWeight: 600 }}
                     >
                       {testAuthLoading ? 'Tekshirilmoqda...' : 'Davom etish →'}
                     </button>
@@ -856,7 +857,7 @@ export function IntegrationsView({
 
               {modalStep === 'SHOPS' && (
                 <div>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: 15, color: '#0f172a' }}>Ulanadigan do‘konni tanlang:</h4>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: 15, color: 'var(--ws-text-primary)' }}>Ulanadigan do'konni tanlang:</h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                     {availableShops.map(shop => (
                       <label
@@ -866,10 +867,10 @@ export function IntegrationsView({
                           alignItems: 'center',
                           gap: 10,
                           padding: 12,
-                          border: selectedShop?.id === shop.id ? '2px solid #0284c7' : '1px solid #e2e8f0',
+                          border: selectedShop?.id === shop.id ? '2px solid var(--ws-brand)' : '1px solid var(--ws-border)',
                           borderRadius: 8,
                           cursor: 'pointer',
-                          background: selectedShop?.id === shop.id ? '#f0f9ff' : '#fff'
+                          background: selectedShop?.id === shop.id ? 'var(--ws-brand-glow)' : 'var(--ws-surface)'
                         }}
                       >
                         <input
@@ -879,29 +880,29 @@ export function IntegrationsView({
                           onChange={() => setSelectedShop(shop)}
                         />
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{shop.name}</div>
-                          <div style={{ fontSize: 12, color: '#64748b' }}>Do‘kon ID: {shop.id}</div>
+                          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--ws-text-primary)' }}>{shop.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--ws-text-muted)' }}>Do'kon ID: {shop.id}</div>
                         </div>
                       </label>
                     ))}
                   </div>
 
                   {testAuthError && (
-                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: 10, marginBottom: 14, fontSize: 13, color: '#dc2626' }}>
+                    <div style={{ background: 'var(--ws-danger-bg)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: 10, marginBottom: 14, fontSize: 13, color: 'var(--ws-danger)' }}>
                       {testAuthError}
                     </div>
                   )}
 
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <button onClick={() => setModalStep('KEY')} style={{ background: '#f1f5f9', border: 'none', padding: '8px 14px', borderRadius: 6, cursor: 'pointer' }}>
+                    <button onClick={() => setModalStep('KEY')} style={{ background: 'var(--ws-surface-hover)', border: 'none', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', color: 'var(--ws-text-secondary)' }}>
                       ← Orqaga
                     </button>
                     <button
                       onClick={handleCreateInstanceAndImport}
                       disabled={testAuthLoading || !selectedShop}
-                      style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+                      style={{ background: 'var(--ws-brand)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
                     >
-                      {testAuthLoading ? 'Ulanmoqda...' : 'Do‘konni ulash va Import qilish'}
+                      {testAuthLoading ? 'Ulanmoqda...' : 'Do\u2018konni ulash va Import qilish'}
                     </button>
                   </div>
                 </div>
@@ -909,9 +910,9 @@ export function IntegrationsView({
 
               {modalStep === 'SYNCING' && (
                 <div style={{ textAlign: 'center', padding: '30px 10px' }}>
-                  <RefreshCw size={36} className="animate-spin" style={{ color: '#0284c7', marginBottom: 14 }} />
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: 16 }}>Do‘kon ulanmoqda va katalog import qilinmoqda</h4>
-                  <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
+                  <RefreshCw size={36} className="animate-spin" style={{ color: 'var(--ws-brand)', marginBottom: 14 }} />
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: 16, color: 'var(--ws-text-primary)' }}>Do'kon ulanmoqda va katalog import qilinmoqda</h4>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--ws-text-muted)' }}>
                     Bu jarayon bir necha soniya vaqt oladi. Barcha faol mahsulotlar avtomatik tarzda Zayunoga yuklanadi.
                   </p>
                 </div>

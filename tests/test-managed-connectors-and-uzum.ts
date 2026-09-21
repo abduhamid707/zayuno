@@ -1022,7 +1022,7 @@ async function main() {
     // =========================================================================
     // Test 12: Transactional provider protection on managed connector connect
     // =========================================================================
-    console.log('\n[12/13] Transactional provider protection: ACTION_CREATE stripped & config backed up...');
+    console.log('\n[12/13] Transactional provider: catalog connector as supplementary, adapter preserved...');
 
     const transactionalProviderSlug = `trans-provider-${Date.now()}`;
     const transactionalProvider = await prisma.provider.create({
@@ -1061,31 +1061,28 @@ async function main() {
 
     const transActor = { providerId: transactionalProvider.id, providerSlug: transactionalProvider.slug, role: 'PROVIDER_OWNER' };
 
-    // Attempting to attach managed connector to a transactional provider MUST be strictly rejected!
-    await assert.rejects(
-      async () => {
-        await connectorsService.createInstance(transActor, {
-          providerSlug: transactionalProvider.slug,
-          connectorDefinitionId: 'uzum',
-          apiKey: 'uzum-key-trans-8888',
-          shopId: '8888',
-          shopName: 'Dining Shop'
-        });
-      },
-      (err: any) => {
-        return (err instanceof BadRequestException || err.status === 400) &&
-          err.message.includes('tranzaksion buyurtma');
-      },
-      'Transactional provider with ACTION_CREATE/QUOTE must NOT be converted to managed connector'
-    );
+    // Attaching managed connector to transactional provider should SUCCEED,
+    // preserving existing adapter type and transactional capabilities
+    const transInstance = await connectorsService.createInstance(transActor, {
+      providerSlug: transactionalProvider.slug,
+      connectorDefinitionId: 'uzum',
+      apiKey: 'uzum-key-trans-8888',
+      shopId: '8888',
+      shopName: 'Dining Shop'
+    });
+    assert.ok(transInstance, 'Transactional provider must be able to connect catalog');
 
-    // Verify transactional provider's adapter and capabilities remain 100% intact
+    // Verify transactional provider's adapter is PRESERVED (not changed to managed-connector)
     const intactTransProvider = await prisma.provider.findUnique({ where: { id: transactionalProvider.id } });
-    assert.equal(intactTransProvider?.adapterType, 'remote-http');
+    assert.equal(intactTransProvider?.adapterType, 'remote-http', 'adapterType must stay remote-http');
     assert.ok(intactTransProvider?.capabilities.includes(ProviderCapability.ACTION_CREATE), 'ACTION_CREATE must be preserved');
     assert.ok(intactTransProvider?.capabilities.includes(ProviderCapability.QUOTE), 'QUOTE must be preserved');
+    assert.ok(intactTransProvider?.capabilities.includes(ProviderCapability.CATALOG), 'CATALOG must be present');
+    // Verify managed connector metadata is added
+    const transMeta = intactTransProvider?.metadata as any;
+    assert.ok(transMeta?.managedConnector?.instanceId, 'managedConnector metadata must be set');
 
-    // And verify a catalog-only / non-transactional provider CAN connect without error:
+    // And verify a catalog-only / non-transactional provider CAN connect and gets full adapter switch:
     const catalogProvider = await prisma.provider.create({
       data: {
         slug: `cat-provider-${Date.now()}`,
@@ -1117,7 +1114,7 @@ async function main() {
     assert.equal(updatedCatProvider?.adapterType, 'managed-connector');
     assert.ok(updatedCatProvider?.capabilities.includes(ProviderCapability.CATALOG));
 
-    console.log('  ✓ Transactional provider capabilities cleanly protected from corruption.');
+    console.log('  ✓ Transactional provider: adapter preserved, catalog merged as supplementary.');
 
     // =========================================================================
     // Test 13: Uzum status.value parsing & Qorajoy (shopId: 128831) test exception
