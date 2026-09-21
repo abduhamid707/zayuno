@@ -1,14 +1,15 @@
 # Joriy topshiriq — Barcha o‘zgarishlarni GitHub ga push qilish (2026-09-21)
 
 - [x] 1. Ishchi daraxt holati va fayllar xavfsizligini tekshirish (.env yoki maxfiy kalitlar yo‘qligini tasdiqlash).
-- [ ] 2. Barcha o‘zgarishlarni stage qilish va `git diff --cached --check` orqali formatni tekshirish.
-- [ ] 3. Aniq va standart xabar bilan commit yaratish (`feat: managed connectors framework, uzum market integration and audit hardening`).
-- [ ] 4. `origin/main` ga push qilish va remote holatini tasdiqlash.
+- [x] 2. Barcha o‘zgarishlarni stage qilish va `git diff --cached --check` orqali formatni tekshirish (0 trailing whitespace).
+- [x] 3. Aniq va standart xabar bilan commit yaratish (`b9ca90a`: `feat: implement managed connectors framework, uzum market integration, and audit hardening`).
+- [x] 4. `origin/main` ga push qilish va remote holatini tasdiqlash (`d2ab38c..b9ca90a main -> main`).
 
-Holat: Foydalanuvchi push qilishni so‘radi. Staging va commit jarayoni boshlanmoqda.
-O‘zgargan fayllar: TASKS.md
-Tekshiruv: Oldingi barcha 13/13 testlar va 4 ta paket buildlari o‘tgan.
-Keyingi qadam: Stage qilish, commit va push.
+Holat: Foydalanuvchi so‘rovi bo‘yicha barcha o‘zgarishlar (25 ta fayl, Universal Managed Connectors, Uzum Market integratsiyasi, Qorajoy test istisnosi, runToken qulf egaligi, restart davriy tiklanishi va tranzaksion provayder himoyasi) GitHub dagi `origin/main` ga to‘liq push qilindi. Working tree clean.
+O‘zgargan fayllar: 25 ta fayl (commit `b9ca90a`).
+Tekshiruv: 13/13 acceptance testlari, 4 ta monorepo paket buildlari va `git diff --check` 100% muvaffaqiyatli o‘tdi.
+Qolgan ish: Yo‘q.
+Keyingi qadam: Foydalanuvchiga muvaffaqiyatli push qilingani haqida hisobot berish.
 
 ---
 
