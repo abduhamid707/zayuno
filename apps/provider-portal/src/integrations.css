@@ -1,0 +1,252 @@
+/* This stylesheet is scoped to the integrations content. */
+.integrations-view {
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.integrations-view *,
+.ig-modal * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.integrations-view button,
+.ig-modal button,
+.ig-modal a {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.ig-provider-context {
+  margin: 10px 0 0;
+  color: var(--ws-text-muted);
+  font-size: 13px;
+}
+
+.ig-instance-info {
+  flex: 1 1 260px;
+}
+
+.ig-instance-title h4 {
+  overflow-wrap: anywhere;
+}
+
+.ig-actions {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.ig-actions button {
+  justify-content: center;
+  white-space: normal;
+}
+
+.ig-stats {
+  display: grid !important;
+  grid-template-columns: minmax(110px, 1fr) minmax(110px, 1fr) minmax(220px, 2fr);
+}
+
+.ig-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ig-stats span {
+  color: var(--ws-text-muted);
+  font-size: 12px;
+}
+
+.ig-state-note,
+.ig-preview-count {
+  margin: 12px 0 0;
+  color: var(--ws-text-muted);
+  font-size: 13px;
+}
+
+.ig-state-error {
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, .3);
+  border-radius: 8px;
+  background: var(--ws-danger-bg);
+  color: var(--ws-danger);
+}
+
+.ig-modal-backdrop {
+  padding: 12px;
+}
+
+.ig-modal {
+  max-height: calc(100dvh - 24px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+.ig-modal input[type='password'] {
+  font-size: 16px !important;
+}
+
+.ig-product,
+.ig-product-info,
+.ig-product-actions,
+.ig-compare-bar,
+.ig-form-actions {
+  min-width: 0;
+}
+
+.ig-product-info > div {
+  min-width: 0;
+}
+
+.ig-product-info img {
+  flex: 0 0 48px;
+}
+
+.ig-product-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ig-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.ig-table-scroll table {
+  min-width: 600px;
+}
+
+@media (max-width: 768px) {
+  .integrations-view {
+    padding: 16px 8px !important;
+  }
+
+  .ig-intro {
+    padding: 18px !important;
+  }
+
+  .ig-platform-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)) !important;
+  }
+
+  .ig-instance-top {
+    flex-direction: column;
+  }
+
+  .ig-instance-info {
+    flex: 0 1 auto;
+    width: 100%;
+  }
+
+  .ig-actions {
+    width: 100%;
+  }
+
+  .ig-actions button {
+    flex: 1 1 145px;
+  }
+}
+
+@media (max-width: 600px) {
+  .integrations-view {
+    padding: 12px 0 !important;
+  }
+
+  .ig-intro {
+    padding: 14px !important;
+  }
+
+  .ig-intro h2 {
+    font-size: 20px !important;
+  }
+
+  .ig-section-heading {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .ig-section-heading button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ig-instance {
+    padding: 14px !important;
+  }
+
+  .ig-instance-title {
+    align-items: flex-start !important;
+    flex-wrap: wrap;
+  }
+
+  .ig-metadata {
+    flex-direction: column;
+    gap: 5px !important;
+  }
+
+  .ig-actions {
+    display: grid !important;
+    grid-template-columns: 1fr;
+  }
+
+  .ig-stats {
+    grid-template-columns: 1fr;
+    gap: 12px !important;
+  }
+
+  .ig-stats > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .ig-stats strong {
+    text-align: right;
+  }
+
+  .ig-stats > div:last-child {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .ig-stats > div:last-child strong {
+    text-align: left;
+  }
+
+  .ig-platform-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ig-modal-backdrop {
+    align-items: flex-start !important;
+    overflow-y: auto;
+  }
+
+  .ig-modal {
+    width: 100% !important;
+    max-height: calc(100dvh - 24px) !important;
+  }
+
+  .ig-product {
+    align-items: stretch !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .ig-product-actions,
+  .ig-compare-bar,
+  .ig-form-actions {
+    align-items: stretch !important;
+    flex-direction: column;
+    gap: 8px !important;
+  }
+
+  .ig-product-actions > *,
+  .ig-compare-bar button,
+  .ig-form-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+}

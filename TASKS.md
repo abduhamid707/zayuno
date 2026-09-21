@@ -1,9 +1,39 @@
-# Joriy topshiriq — Solishtirish (Compare) modalidagi 401 "Bu amal uchun ruxsat kerak" xatosini tuzatish (2026-09-21)
+# Joriy topshiriq — Developer panelni 4001-portda ishga tushirish (2026-09-21)
 
-- [ ] 1. **[P1] IntegrationsView.tsx da solishtirish so'rovini to'g'rilash** — `handleRunCompare` va `handleSearchTest` da qotirilgan `'api-key': 'test'` o'rniga joriy provayder sessiyasining `Authorization: Bearer ${token}` sarlavhasini yuborish.
-- [ ] 2. **[P1] ConnectorsController ga compare endpointini qo'shish yoki ApiKeyGuard da JWT ni qo'llab-quvvatlash** — Portalda tizimga kirgan provayder foydalanuvchilari uchun `POST /api/v1/connectors/compare` endpointini ochish yoki `ApiKeyGuard` orqali JWT tokenlarni qabul qilish.
-- [ ] 3. **[P1] Test va buildlar** — API va Portal buildlarini tekshirish, test suite ishga tushirish.
-- [ ] 4. **[P1] Git commit & push** — O'zgarishlarni GitHub ga yuborish.
+- [x] 1. **[P1] Port 4001 da dev serverni ishga tushirish** — `apps/provider-portal` da `pnpm --filter @zayuno/provider-portal exec vite --port 4001 --host 0.0.0.0` orqali `IsDaemon: true` bilan fonda (task-3741) muvaffaqiyatli ishga tushirildi.
+- [x] 2. **[P1] Server ulanishini tekshirish** — `http://localhost:4001` ga HTTP so'rov yuborildi va `200 OK` javobi olindi.
+
+---
+
+# Oldingi topshiriq — Integratsiyalar kontenti: mobil UX va ulash mantiqi (2026-09-21)
+
+- [x] Kod, routing va API javoblarini o‘rganish; tasdiqlangan xatolar va cheklovlarni yozish.
+- [x] Sahifa kontenti va modal oqimlarini mobilga moslash; nomlar va holatlarni tuzatish.
+- [x] Ulash, katalog, sync, disconnect va URL mantiqini tuzatish.
+- [x] Funksional testlar, build va 320/375/390/430/768 hamda desktop renderlarini tekshirish.
+
+Holat: Bajarildi. Tasdiqlangan muammolar: production API ichki `synthetic-test` ulagichini ACTIVE ko‘rsatgan; do‘kon kartasida platforma Uzum deb qotirilgan; API kalit maskasi keraksiz ko‘rsatilgan; katalog xatosi yutilgan va eski preview qolishi mumkin bo‘lgan; ikki marta bosish UI darajasida bloklanmagan; `step/flow` onboarding parametrlari integratsiya sahifasida qolgan; intro xarid qilish imkoniyatini asossiz va’da qilgan. Backend sync muvaffaqiyatidan keyingina `lastSyncAt`ni yozishi va xarid API’si yo‘qligi tasdiqlandi.
+O‘zgargan fayllar: `apps/provider-portal/src/IntegrationsView.tsx`, `apps/provider-portal/src/integrations.css`, `apps/provider-portal/src/integrations-model.ts`, `apps/api/src/modules/connectors/connectors.service.ts`, `tests/test-integrations-view-model.ts`, `TASKS.md`. Oldingi EVOS server o‘zgarishlariga tegilmadi.
+Tekshiruv: Provider Portal build PASS; API build PASS; integrations model test PASS; Managed Connectors acceptance/audit 13/13 PASS; `git diff --check` PASS. Lokal haqiqiy render 320/375/390/430/768/1280 px da tekshirildi: gorizontal overflow yo‘q, minimal tugma balandligi 44 px, platforma grid mobil/desktopda mos. 320 px da katalog va API kalit modal oynalari tekshirildi; input 16 px va 46 px balandlikda, modal viewport ichida.
+Qolgan cheklov: Managed connector backend faqat katalog/qidiruvni qo‘llaydi; xarid Zayunoda bajarilmaydi, UI platformadagi mahsulot sahifasiga yo‘naltiradi. Production deploy ushbu lokal topshiriq doirasiga kirmadi.
+Keyingi qadam: Foydalanuvchi lokal `http://localhost:4001/?tab=integrations` sahifasida ko‘rishi mumkin.
+
+---
+# Joriy topshiriq — EVOS provider serveri va tunnelini doimiy (o'chmaydigan) rejimga sozlash (2026-09-21)
+
+- [x] 1. **[P1] Server crash guard himoyasi** — `scripts/evos-provider-server.mjs` ga `uncaughtException` va `unhandledRejection` handlerlari qo'shildi, har qanday xato so'rovda server yiqilib o'chib qolishi oldi olindi.
+- [x] 2. **[P1] Daemon fon vazifalari holati** — Server (`task-698`, port 3006) va Cloudflare tunnel (`task-363`) `IsDaemon: true` bilan fonda to'xtovsiz ishlab turishi tasdiqlandi.
+- [x] 3. **[P1] Avtomatik qayta tiklanuvchi Windows starter skripti** — Mustaqil ishlashi uchun `scripts/run-evos-forever.bat` yaratildi (o'chib qolsa avtomatik qayta ishga tushadi).
+
+---
+
+# Oldingi topshiriq — Solishtirish (Compare) modalidagi 401 "Bu amal uchun ruxsat kerak" xatosini tuzatish (2026-09-21)
+
+- [x] 1. **[P1] IntegrationsView.tsx da solishtirish so'rovini to'g'rilash** — `handleRunCompare` va `handleSearchTest` da qotirilgan `'api-key': 'test'` o'rniga joriy provayder sessiyasining `Authorization: Bearer ${token}` sarlavhasi yuborildi.
+- [x] 2. **[P1] ApiKeyGuard da JWT Bearer tokenlarni qo'llab-quvvatlash** — Portalda tizimga kirgan provayder foydalanuvchilarining JWT tokenlari `ApiKeyGuard` tomonidan tekshirilib, katalog va qidiruv endpointlariga ruxsat berildi.
+- [x] 3. **[P1] compareOfferings da ichki preview ruxsati** — Yangi ulangan va hali draft/sandbox holatidagi do'konlar tovarlarini ham portal egasi darhol solishtira olishi uchun `allowUnpublished = isInternalPreview` kiritildi.
+- [x] 4. **[P1] Test va buildlar** — 13/13 acceptance testlari, API va Portal buildlari 100% muvaffaqiyatli o'tdi.
+- [x] 5. **[P1] Git commit & push** — Commit `337fc1b`, `origin/main` ga push qilindi.
 
 ---
 

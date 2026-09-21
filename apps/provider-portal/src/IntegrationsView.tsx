@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Store,
   RefreshCw,
@@ -16,9 +16,12 @@ import {
   ShieldCheck,
   ArrowRight
 } from 'lucide-react';
+import { connectorStatus, createRequestGate, formatSyncTime, integrationsUrl } from './integrations-model';
+import './integrations.css';
 
 interface ConnectorInstanceDto {
   id: string;
+  connectorDefinitionId: string;
   name: string;
   status: string;
   selectedShopId: string | null;
@@ -30,6 +33,8 @@ interface ConnectorInstanceDto {
   lastSyncStatus: string | null;
   lastSyncError: string | null;
   nextSyncAt: string | null;
+  autoSyncEnabled?: boolean;
+  syncIntervalHours?: number;
 }
 
 interface ShopDto {
@@ -66,6 +71,12 @@ interface PreviewProduct {
   lastSyncedAt: string;
 }
 
+const PLANNED_DEFINITIONS = [
+  { id: 'billz', name: 'Billz POS', description: 'Do‘kon tovarlari va qoldiqlarini ulash.' },
+  { id: 'iiko', name: 'iiko / Jowi', description: 'Restoran menyusi va narxlarini ulash.' },
+  { id: 'yclients', name: 'YCLIENTS / Dikidi', description: 'Xizmatlar va bo‘sh vaqtlarni ulash.' }
+];
+
 export function IntegrationsView({
   providerSlug,
   token,
@@ -77,6 +88,8 @@ export function IntegrationsView({
 }) {
   const [instances, setInstances] = useState<ConnectorInstanceDto[]>([]);
   const [definitions, setDefinitions] = useState<ConnectorDefinitionDto[]>([]);
+  const [definitionsLoading, setDefinitionsLoading] = useState(true);
+  const [definitionsError, setDefinitionsError] = useState<string | null>(null);
   const [selectedDefinition, setSelectedDefinition] = useState<ConnectorDefinitionDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -96,6 +109,8 @@ export function IntegrationsView({
   const [previewInstanceId, setPreviewInstanceId] = useState<string | null>(null);
   const [previewProducts, setPreviewProducts] = useState<PreviewProduct[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewTotal, setPreviewTotal] = useState(0);
 
   // Search & Compare test state
   const [testSearchQuery, setTestSearchQuery] = useState('');
@@ -103,18 +118,35 @@ export function IntegrationsView({
   const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
   const [comparisonData, setComparisonData] = useState<any | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
+  const requestGate = useRef(createRequestGate()).current;
 
-  const fetchInstances = async () => {
-    if (!token) return;
+  const activeDefinitions = definitions.filter(def => def.status === 'ACTIVE' && def.id !== 'synthetic-test');
+  const platformName = (definitionId: string) =>
+    definitions.find(def => def.id === definitionId)?.name ||
+    (definitionId === 'uzum' ? 'Uzum Market' : definitionId === 'synthetic-test' ? 'Ichki sinov do‘koni' : definitionId);
+
+  const readError = async (res: Response, fallback: string) => {
+    const data = await res.json().catch(() => null);
+    if (res.status === 409) return 'Bu amal allaqachon bajarilmoqda. Natijani kuting.';
+    if (res.status === 401) return 'Sessiya tugagan. Qayta kiring.';
+    return data?.message || fallback;
+  };
+
+  const fetchInstances = async (silent = false) => {
+    if (!token || !providerSlug) {
+      setLoading(false);
+      setInstances([]);
+      return;
+    }
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await fetch(`${apiBaseUrl}/api/v1/connectors/instances?providerSlug=${providerSlug || ''}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setInstances(Array.isArray(data) ? data : []);
-      }
+      if (!res.ok) throw new Error('Ulanishlarni yuklab bo‘lmadi.');
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error('Ulanishlar javobi noto‘g‘ri.');
+      setInstances(data);
     } catch {
       setErrorMessage('Ulanishlarni yuklashda xatolik yuz berdi.');
     } finally {
@@ -123,16 +155,19 @@ export function IntegrationsView({
   };
 
   const fetchDefinitions = async () => {
+    setDefinitionsLoading(true);
+    setDefinitionsError(null);
     try {
       const res = await fetch(`${apiBaseUrl}/api/v1/connectors/definitions`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setDefinitions(data);
-        }
-      }
+      if (!res.ok) throw new Error('Platformalarni yuklab bo‘lmadi.');
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error('Platformalar javobi noto‘g‘ri.');
+      setDefinitions(data);
     } catch {
-      // Non-fatal
+      setDefinitions([]);
+      setDefinitionsError('Platformalar yuklanmadi. Qayta urinib ko‘ring.');
+    } finally {
+      setDefinitionsLoading(false);
     }
   };
 
@@ -141,7 +176,26 @@ export function IntegrationsView({
     fetchDefinitions();
   }, [providerSlug, token]);
 
-  const handleOpenConnect = (def: ConnectorDefinitionDto) => {
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void fetchInstances(true);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [providerSlug, token, apiBaseUrl]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const normalized = integrationsUrl(window.location.href, providerSlug);
+    if (normalized.href !== window.location.href) {
+      window.history.replaceState(window.history.state, '', normalized.href);
+    }
+  }, [providerSlug]);
+
+  const handleOpenConnect = (def: ConnectorDefinitionDto | null) => {
+    if (!def) {
+      setErrorMessage('Hozircha ulash mumkin bo‘lgan platforma topilmadi.');
+      return;
+    }
     setSelectedDefinition(def);
     setApiKey('');
     setTestAuthError(null);
@@ -158,6 +212,7 @@ export function IntegrationsView({
       setTestAuthError(`Iltimos, ${defName} API kalitini kiriting.`);
       return;
     }
+    if (!requestGate.enter('connect')) return;
     setTestAuthLoading(true);
     setTestAuthError(null);
 
@@ -174,12 +229,12 @@ export function IntegrationsView({
         })
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        setTestAuthError(data.message || `API kalit tekshiruvdan o‘tmadi. ${defName} kabinetingizdan faol kalitni tekshiring.`);
+        setTestAuthError(await readError(res, `API kalit tekshiruvdan o‘tmadi. ${defName} kabinetingizdan faol kalitni tekshiring.`));
         return;
       }
+
+      const data = await res.json();
 
       if (!Array.isArray(data) || data.length === 0) {
         setTestAuthError('Ushbu API kalitga biriktirilgan do‘konlar topilmadi.');
@@ -187,17 +242,23 @@ export function IntegrationsView({
       }
 
       setAvailableShops(data);
-      setSelectedShop(data[0]);
+      setSelectedShop(data.find((shop: ShopDto) => !instances.some(inst =>
+        inst.connectorDefinitionId === defId &&
+        inst.selectedShopId === shop.id &&
+        inst.status !== 'DISCONNECTED'
+      )) || null);
       setModalStep('SHOPS');
     } catch (err: any) {
       setTestAuthError(`${defName} API serveri bilan bog‘lanishda xatolik: ${err.message}`);
     } finally {
+      requestGate.leave('connect');
       setTestAuthLoading(false);
     }
   };
 
   const handleCreateInstanceAndImport = async () => {
     if (!selectedShop || !providerSlug) return;
+    if (!requestGate.enter('connect')) return;
     const defId = selectedDefinition?.id || 'uzum';
     const defName = selectedDefinition?.name || 'Platforma';
     setTestAuthLoading(true);
@@ -221,9 +282,15 @@ export function IntegrationsView({
         })
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        setTestAuthError(data.message || 'Ulanishni yaratishda xatolik.');
+        setTestAuthError(await readError(res, 'Ulanishni yaratishda xatolik.'));
+        setModalStep('SHOPS');
+        return;
+      }
+
+      const data = await res.json();
+      if (!data?.id) {
+        setTestAuthError('Ulanish server tomonidan tasdiqlanmadi. Qayta urinib ko‘ring.');
         setModalStep('SHOPS');
         return;
       }
@@ -236,11 +303,13 @@ export function IntegrationsView({
       setTestAuthError(`Xatolik: ${err.message}`);
       setModalStep('SHOPS');
     } finally {
+      requestGate.leave('connect');
       setTestAuthLoading(false);
     }
   };
 
   const handleSyncNow = async (instanceId: string) => {
+    if (!requestGate.enter(instanceId)) return;
     setActionLoading(instanceId);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -249,16 +318,21 @@ export function IntegrationsView({
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
-      const data = await res.json();
-      if (!res.ok || data.success === false) {
-        setErrorMessage(data.message || 'Sinxronlashda xatolik yuz berdi.');
+      if (!res.ok) {
+        setErrorMessage(await readError(res, 'Yangilashda xatolik yuz berdi.'));
       } else {
+        const data = await res.json();
+        if (data.success !== true || !Number.isFinite(data.importedCount)) {
+          setErrorMessage('Yangilash natijasi tasdiqlanmadi. Ro‘yxatni qayta yuklab tekshiring.');
+          return;
+        }
         setSuccessMessage(`Sinxronlash yakunlandi! Jami ${data.importedCount} ta mahsulot yangilandi.`);
         await fetchInstances();
       }
     } catch (err: any) {
       setErrorMessage(`Sinxronlash xatosi: ${err.message}`);
     } finally {
+      requestGate.leave(instanceId);
       setActionLoading(null);
     }
   };
@@ -268,7 +342,9 @@ export function IntegrationsView({
     if (!window.confirm('Haqiqatan ham ushbu do‘kon ulanishini to‘xtatmoqchimisiz? Tovar katalogi AI qidiruvidan yashiriladi.')) {
       return;
     }
+    if (!requestGate.enter(instanceId)) return;
     setActionLoading(instanceId);
+    setErrorMessage(null);
     try {
       const res = await fetch(`${apiBaseUrl}/api/v1/connectors/instances/${instanceId}`, {
         method: 'DELETE',
@@ -277,16 +353,24 @@ export function IntegrationsView({
       if (res.ok) {
         setSuccessMessage('Do‘kon ulanishi to‘xtatildi.');
         await fetchInstances();
+      } else {
+        setErrorMessage(await readError(res, 'Ulanishni uzib bo‘lmadi.'));
       }
     } catch (err: any) {
       setErrorMessage(`Xatolik: ${err.message}`);
     } finally {
+      requestGate.leave(instanceId);
       setActionLoading(null);
     }
   };
 
   const handleOpenPreview = async (instanceId: string) => {
     setPreviewInstanceId(instanceId);
+    setPreviewProducts([]);
+    setPreviewTotal(0);
+    setPreviewError(null);
+    setSelectedForCompare([]);
+    setComparisonData(null);
     setPreviewLoading(true);
     try {
       const res = await fetch(`${apiBaseUrl}/api/v1/connectors/instances/${instanceId}/preview`, {
@@ -294,10 +378,17 @@ export function IntegrationsView({
       });
       if (res.ok) {
         const data = await res.json();
-        setPreviewProducts(data.products || []);
+        if (!Array.isArray(data.products) || !Number.isFinite(data.totalCount)) {
+          setPreviewError('Katalog serverdan noto‘g‘ri formatda qaytdi.');
+        } else {
+          setPreviewProducts(data.products);
+          setPreviewTotal(data.totalCount);
+        }
+      } else {
+        setPreviewError(await readError(res, 'Katalogni yuklab bo‘lmadi.'));
       }
     } catch {
-      // ignore
+      setPreviewError('Katalogni yuklab bo‘lmadi. Qayta urinib ko‘ring.');
     } finally {
       setPreviewLoading(false);
     }
@@ -339,6 +430,7 @@ export function IntegrationsView({
       alert('Solishtirish uchun kamida 2 ta mahsulot tanlang.');
       return;
     }
+    if (!requestGate.enter('compare')) return;
     setCompareLoading(true);
     setComparisonData(null);
     try {
@@ -363,26 +455,27 @@ export function IntegrationsView({
     } catch (e: any) {
       alert(`Xatolik: ${e.message}`);
     } finally {
+      requestGate.leave('compare');
       setCompareLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
+    <div className="integrations-view" style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
       {/* Header Banner */}
-      <div style={{ background: 'var(--ws-surface)', border: '1px solid var(--ws-border)', borderRadius: 12, padding: 24, marginBottom: 28 }}>
+      <div className="ig-intro" style={{ background: 'var(--ws-surface)', border: '1px solid var(--ws-border)', borderRadius: 12, padding: 24, marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
           <div style={{ background: 'var(--ws-brand)', color: '#fff', padding: 8, borderRadius: 8, display: 'flex' }}>
             <Store size={22} />
           </div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--ws-text-primary)' }}>
-            Tayyor Tizimlarni Ulash (Managed Connectors)
+            Savdo platformangizni ulang
           </h2>
         </div>
         <p style={{ margin: 0, fontSize: 14, color: 'var(--ws-text-secondary)', lineHeight: 1.6 }}>
-          Dasturchi yollamasdan yoki API kod yozmasdan, o‘zingiz ishlatayotgan savdo platformasini Zayunoga ulang.
-          Zayuno katalogingizni doimiy yangilab boradi va ChatGPT, Claude hamda mobil ilova foydalanuvchilariga do‘koningizdan tovar xarid qilish imkonini yaratadi.
+          Do‘koningiz katalogi va narxlarini Zayunoga yuklang. Xaridorlar tovarning platformadagi sahifasiga o‘tishi mumkin.
         </p>
+        {providerSlug && <p className="ig-provider-context">Boshqarilayotgan hisob: <strong>{providerSlug}</strong></p>}
       </div>
 
       {/* Alerts */}
@@ -401,11 +494,12 @@ export function IntegrationsView({
 
       {/* Active Connectors List */}
       <div style={{ marginBottom: 32 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div className="ig-section-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Ulangan do'konlaringiz</h3>
           <button
+            disabled={!token || !providerSlug || activeDefinitions.length === 0}
             onClick={() => {
-              const defaultDef = definitions.find(d => d.id === 'uzum') || definitions[0] || null;
+              const defaultDef = activeDefinitions.find(d => d.id === 'uzum') || activeDefinitions[0] || null;
               handleOpenConnect(defaultDef);
             }}
             style={{
@@ -436,8 +530,9 @@ export function IntegrationsView({
               Tayyor platforma (masalan Uzum Market) sotuvchilar hisobingizni ulab, tovarlaringizni AI xaridorlariga oching.
             </p>
             <button
+              disabled={!token || !providerSlug || activeDefinitions.length === 0}
               onClick={() => {
-                const defaultDef = definitions.find(d => d.id === 'uzum') || definitions[0] || null;
+              const defaultDef = activeDefinitions.find(d => d.id === 'uzum') || activeDefinitions[0] || null;
                 handleOpenConnect(defaultDef);
               }}
               style={{ background: 'var(--ws-brand)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
@@ -450,6 +545,7 @@ export function IntegrationsView({
             {instances.map(inst => (
               <div
                 key={inst.id}
+                className="ig-instance"
                 style={{
                   background: 'var(--ws-surface)',
                   border: '1px solid var(--ws-border)',
@@ -458,9 +554,9 @@ export function IntegrationsView({
                   boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <div className="ig-instance-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                  <div className="ig-instance-info">
+                    <div className="ig-instance-title" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <h4 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--ws-text-primary)' }}>
                         {inst.selectedShopName || inst.name}
                       </h4>
@@ -472,19 +568,19 @@ export function IntegrationsView({
                         background: inst.status === 'CONNECTED' ? 'var(--ws-success-bg)' : inst.status === 'SYNCING' ? 'var(--ws-info-bg)' : 'var(--ws-danger-bg)',
                         color: inst.status === 'CONNECTED' ? 'var(--ws-success)' : inst.status === 'SYNCING' ? 'var(--ws-info)' : 'var(--ws-danger)'
                       }}>
-                        {inst.status === 'CONNECTED' ? 'Faol' : inst.status === 'SYNCING' ? 'Sinxronlanmoqda...' : inst.status}
+                        {connectorStatus(inst.status)}
                       </span>
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--ws-text-muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                      <span>Platforma: <strong>Uzum Market</strong></span>
+                    <div className="ig-metadata" style={{ fontSize: 13, color: 'var(--ws-text-muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                      <span>Platforma: <strong>{platformName(inst.connectorDefinitionId)}</strong></span>
                       <span>Do‘kon ID: <code>{inst.selectedShopId || 'N/A'}</code></span>
-                      <span>API Kalit: <code>{inst.maskedSecret || '••••••••'}</code></span>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div className="ig-actions" style={{ display: 'flex', gap: 8 }}>
                     <button
                       onClick={() => handleOpenPreview(inst.id)}
+                      disabled={inst.status === 'DISCONNECTED'}
                       style={{
                         background: 'var(--ws-surface-elevated)',
                         border: '1px solid var(--ws-border)',
@@ -499,11 +595,11 @@ export function IntegrationsView({
                         gap: 6
                       }}
                     >
-                      <Eye size={14} /> Katalog ({inst.totalProducts})
+                      <Eye size={14} /> {inst.lastSyncAt ? `Katalog (${inst.totalProducts})` : 'Katalog'}
                     </button>
                     <button
                       onClick={() => handleSyncNow(inst.id)}
-                      disabled={actionLoading === inst.id}
+                      disabled={actionLoading === inst.id || inst.status === 'SYNCING' || inst.status === 'DISCONNECTED'}
                       style={{
                         background: 'var(--ws-brand)',
                         color: '#fff',
@@ -531,18 +627,22 @@ export function IntegrationsView({
                         borderRadius: 6,
                         cursor: 'pointer'
                       }}
-                      title="Ulanishni to'xtatish"
+                      title="Ulanishni uzish"
+                      aria-label={`${inst.selectedShopName || inst.name} ulanishini uzish`}
+                      disabled={actionLoading === inst.id || inst.status === 'DISCONNECTED'}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={14} /><span>Ulanishni uzish</span>
                     </button>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 24, marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--ws-border)', fontSize: 13, color: 'var(--ws-text-muted)' }}>
-                  <div>Jami tovarlar: <strong style={{ color: 'var(--ws-text-primary)' }}>{inst.totalProducts}</strong></div>
-                  <div>Faol tovarlar: <strong style={{ color: 'var(--ws-success)' }}>{inst.activeProducts}</strong></div>
-                  <div>Oxirgi yangilanish: <strong>{inst.lastSyncAt ? new Date(inst.lastSyncAt).toLocaleString() : 'Hali bajarilmagan'}</strong></div>
+                <div className="ig-stats" style={{ display: 'flex', gap: 24, marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--ws-border)', fontSize: 13, color: 'var(--ws-text-muted)' }}>
+                  <div><span>Jami tovarlar</span><strong style={{ color: 'var(--ws-text-primary)' }}>{inst.lastSyncAt ? inst.totalProducts : 'Kutilmoqda'}</strong></div>
+                  <div><span>Sotuvda mavjud</span><strong style={{ color: 'var(--ws-success)' }}>{inst.lastSyncAt ? inst.activeProducts : 'Kutilmoqda'}</strong></div>
+                  <div><span>Oxirgi muvaffaqiyatli yangilanish</span><strong>{formatSyncTime(inst.lastSyncAt)}</strong></div>
                 </div>
+                {!inst.lastSyncAt && inst.status !== 'ERROR' && inst.status !== 'DISCONNECTED' && <p className="ig-state-note">Katalog birinchi marta yuklanmoqda. Natija avtomatik ko‘rinadi.</p>}
+                {(inst.status === 'ERROR' || inst.lastSyncStatus === 'FAILED') && <p className="ig-state-note ig-state-error">Oxirgi yangilash bajarilmadi. {inst.lastSyncAt ? 'Oldingi katalog saqlangan.' : 'Katalog hali yuklanmagan.'}</p>}
               </div>
             ))}
           </div>
@@ -554,59 +654,18 @@ export function IntegrationsView({
         <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600, color: 'var(--ws-text-primary)' }}>
           Qo‘llab-quvvatlanadigan platformalar
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-          {(() => {
-            const plannedDefinitions = [
-              {
-                id: 'billz',
-                name: 'Billz POS',
-                description: 'Kiyim-kechak, elektronika va butiklar uchun jonli shahar do‘konlari ombor qoldiqlari qidiruvi.',
-                status: 'PLANNED'
-              },
-              {
-                id: 'iiko',
-                name: 'iiko / Jowi',
-                description: 'Restoranlar va kafelar uchun jonli taomlar menyusi, narxlar va stop-list sinxronizatsiyasi.',
-                status: 'PLANNED'
-              },
-              {
-                id: 'yclients',
-                name: 'YCLIENTS / Dikidi',
-                description: 'Go‘zallik salonlari, sartaroshxonalar va klinikalar uchun jonli usta va bandlik (booking) integratsiyasi.',
-                status: 'PLANNED'
-              }
-            ];
-            const baseDefinitions = definitions.length > 0 ? definitions : [
-              {
-                id: 'uzum',
-                name: 'Uzum Market',
-                description: 'Marketpleys sotuvchilari uchun API kalit orqali tovarlar, narxlar va qoldiqlarni avtomatik sinxronlash.',
-                status: 'ACTIVE',
-                docsUrl: 'https://seller.uzum.uz/seller/api-keys'
-              },
-              {
-                id: 'synthetic-test',
-                name: 'Synthetic Retail',
-                description: 'Universal connector sinovi va lokal katalog simulatsiyasi uchun sinov ulagichi.',
-                status: 'ACTIVE'
-              }
-            ];
-            const allDefs = [
-              ...baseDefinitions,
-              ...plannedDefinitions.filter(p => !baseDefinitions.some(d => d.id === p.id))
-            ];
-
-            return allDefs.map(def => {
-              const isActive = def.status === 'ACTIVE' || (!def.status && (def.id === 'uzum' || def.id === 'synthetic-test'));
-              return (
+        {definitionsLoading && <p className="ig-state-note" role="status">Platformalar yuklanmoqda…</p>}
+        {definitionsError && <p className="ig-state-note ig-state-error" role="alert">{definitionsError}</p>}
+        {!definitionsLoading && !definitionsError && activeDefinitions.length === 0 && <p className="ig-state-note">Hozircha ulash mumkin bo‘lgan platforma yo‘q.</p>}
+        <div className="ig-platform-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+          {activeDefinitions.map(def => (
                 <div
                   key={def.id}
                   style={{
-                    border: isActive ? '2px solid var(--ws-brand)' : '1px solid var(--ws-border)',
+                    border: '2px solid var(--ws-brand)',
                     borderRadius: 10,
                     padding: 16,
-                    background: isActive ? 'var(--ws-surface-elevated)' : 'var(--ws-surface)',
-                    opacity: isActive ? 1 : 0.85,
+                    background: 'var(--ws-surface-elevated)',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between'
@@ -614,26 +673,26 @@ export function IntegrationsView({
                 >
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <span style={{ fontWeight: 700, fontSize: 16, color: isActive ? 'var(--ws-text-primary)' : 'var(--ws-text-secondary)' }}>{def.name}</span>
+                      <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--ws-text-primary)' }}>{def.name}</span>
                       <span
                         style={{
-                          background: isActive ? 'var(--ws-success-bg)' : 'var(--ws-surface-hover)',
-                          color: isActive ? 'var(--ws-success)' : 'var(--ws-text-muted)',
+                          background: 'var(--ws-success-bg)',
+                          color: 'var(--ws-success)',
                           fontSize: 11,
                           fontWeight: 700,
                           padding: '2px 6px',
                           borderRadius: 4
                         }}
                       >
-                        {isActive ? 'FAOL' : def.status === 'BETA' ? 'BETA' : 'REJADA'}
+                        ULASH MUMKIN
                       </span>
                     </div>
-                    <p style={{ margin: '0 0 14px 0', fontSize: 13, color: isActive ? 'var(--ws-text-secondary)' : 'var(--ws-text-muted)', lineHeight: 1.5 }}>
-                      {def.description}
+                    <p style={{ margin: '0 0 14px 0', fontSize: 13, color: 'var(--ws-text-secondary)', lineHeight: 1.5 }}>
+                      {def.id === 'uzum' ? 'Uzum do‘konidagi tovarlar va narxlarni API kaliti orqali yuklang.' : def.description}
                     </p>
                   </div>
-                  {isActive ? (
-                    <button
+                  <button
+                      disabled={!token || !providerSlug}
                       onClick={() => handleOpenConnect(def as any)}
                       style={{
                         width: '100%',
@@ -649,37 +708,44 @@ export function IntegrationsView({
                     >
                       Ulash
                     </button>
-                  ) : (
-                    <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--ws-text-muted)', padding: '6px 0', background: 'var(--ws-surface)', borderRadius: 6, fontWeight: 500 }}>
-                      Tez kunda qo'shiladi
-                    </div>
-                  )}
                 </div>
-              );
-            });
-          })()}
+          ))}
+        </div>
+        <h3 className="ig-planned-heading" style={{ margin: '28px 0 16px', fontSize: 18, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Rejadagi platformalar</h3>
+        <div className="ig-platform-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+          {PLANNED_DEFINITIONS.filter(planned => !activeDefinitions.some(def => def.id === planned.id)).map(def => (
+            <div key={def.id} style={{ border: '1px solid var(--ws-border)', borderRadius: 10, padding: 16, background: 'var(--ws-surface)', opacity: .85 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--ws-text-secondary)' }}>{def.name}</span>
+                <span style={{ background: 'var(--ws-surface-hover)', color: 'var(--ws-text-muted)', fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>REJADA</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--ws-text-muted)', lineHeight: 1.5 }}>{def.description}</p>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Catalog Preview Modal */}
       {previewInstanceId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: 'var(--ws-surface-elevated)', borderRadius: 12, width: '90%', maxWidth: 850, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="ig-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="ig-modal ig-modal-wide" style={{ background: 'var(--ws-surface-elevated)', borderRadius: 12, width: '90%', maxWidth: 850, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ws-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Import qilingan tovarlar (Preview)</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Do‘kon katalogi</h3>
               <button onClick={() => setPreviewInstanceId(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ws-text-secondary)' }}>×</button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
               {previewLoading ? (
                 <div style={{ textAlign: 'center', padding: 40, color: 'var(--ws-text-secondary)' }}>Tovarlar yuklanmoqda...</div>
+              ) : previewError ? (
+                <div className="ig-state-note ig-state-error" role="alert">{previewError}</div>
               ) : previewProducts.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 40, color: 'var(--ws-text-muted)' }}>Ushbu do'konda tovarlar mavjud emas yoki hali import qilinmagan.</div>
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--ws-text-muted)' }}>Katalog bo‘sh yoki birinchi yuklanish hali tugamagan.</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <><p className="ig-preview-count">{previewProducts.length} / {previewTotal} ta tovar ko‘rsatilmoqda{previewTotal > previewProducts.length ? ' (dastlabki 50 ta)' : ''}.</p><div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {previewProducts.map(p => (
-                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--ws-border)', padding: 12, borderRadius: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="ig-product" key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--ws-border)', padding: 12, borderRadius: 8 }}>
+                      <div className="ig-product-info" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         {p.imageUrl ? (
                           <img src={p.imageUrl} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6 }} />
                         ) : (
@@ -695,7 +761,7 @@ export function IntegrationsView({
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="ig-product-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <button
                           onClick={() => handleToggleCompareItem(p.id)}
                           style={{
@@ -728,17 +794,17 @@ export function IntegrationsView({
                             fontWeight: 600
                           }}
                         >
-                          Uzumda ko'rish <ExternalLink size={12} />
+                          Platformada ko‘rish <ExternalLink size={12} />
                         </a>
                       </div>
                     </div>
                   ))}
-                </div>
+                </div></>
               )}
             </div>
 
             {selectedForCompare.length >= 2 && (
-              <div style={{ padding: 12, background: 'var(--ws-surface)', borderTop: '1px solid var(--ws-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="ig-compare-bar" style={{ padding: 12, background: 'var(--ws-surface)', borderTop: '1px solid var(--ws-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, color: 'var(--ws-text-primary)' }}>
                   <strong>{selectedForCompare.length} ta</strong> mahsulot solishtirish uchun tanlandi
                 </span>
@@ -757,15 +823,15 @@ export function IntegrationsView({
 
       {/* Comparison Modal */}
       {comparisonData && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-          <div style={{ background: 'var(--ws-surface-elevated)', borderRadius: 12, width: '90%', maxWidth: 850, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="ig-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
+          <div className="ig-modal ig-modal-wide" style={{ background: 'var(--ws-surface-elevated)', borderRadius: 12, width: '90%', maxWidth: 850, maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ws-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Mahsulotlarni Solishtirish (Compare)</h3>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Tovarlarni solishtirish</h3>
               <button onClick={() => setComparisonData(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ws-text-secondary)' }}>×</button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <div className="ig-table-scroll"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--ws-border)' }}>
                     <th style={{ padding: 10, textAlign: 'left', width: '25%', color: 'var(--ws-text-secondary)' }}>Xususiyat</th>
@@ -793,7 +859,7 @@ export function IntegrationsView({
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
 
               <div style={{ marginTop: 20, padding: 12, background: 'var(--ws-surface)', borderRadius: 8, fontSize: 12, color: 'var(--ws-text-muted)' }}>
                 {comparisonData.notice}
@@ -805,13 +871,13 @@ export function IntegrationsView({
 
       {/* Connect Modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: 'var(--ws-surface-elevated)', borderRadius: 12, width: '90%', maxWidth: 500, overflow: 'hidden' }}>
+        <div className="ig-modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="ig-modal" style={{ background: 'var(--ws-surface-elevated)', borderRadius: 12, width: '90%', maxWidth: 500, overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--ws-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--ws-text-primary)' }}>
                 {selectedDefinition ? `${selectedDefinition.name}'ni ulash` : 'Platformani ulash'}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ws-text-secondary)' }}>×</button>
+              <button aria-label="Yopish" disabled={testAuthLoading} onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--ws-text-secondary)' }}>×</button>
             </div>
 
             <div style={{ padding: 20 }}>
@@ -822,6 +888,9 @@ export function IntegrationsView({
                   </label>
                   <input
                     type="password"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     placeholder="Masalan: 3foSyaevUybDp+t1tu..."
                     value={apiKey}
                     onChange={e => setApiKey(e.target.value)}
@@ -847,7 +916,7 @@ export function IntegrationsView({
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                  <div className="ig-form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                     <button onClick={() => setIsModalOpen(false)} style={{ background: 'var(--ws-surface-hover)', border: 'none', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: 500, color: 'var(--ws-text-secondary)' }}>
                       Bekor qilish
                     </button>
@@ -884,11 +953,12 @@ export function IntegrationsView({
                           type="radio"
                           name="shop"
                           checked={selectedShop?.id === shop.id}
+                          disabled={instances.some(inst => inst.connectorDefinitionId === selectedDefinition?.id && inst.selectedShopId === shop.id && inst.status !== 'DISCONNECTED')}
                           onChange={() => setSelectedShop(shop)}
                         />
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--ws-text-primary)' }}>{shop.name}</div>
-                          <div style={{ fontSize: 12, color: 'var(--ws-text-muted)' }}>Do'kon ID: {shop.id}</div>
+                          <div style={{ fontSize: 12, color: 'var(--ws-text-muted)' }}>Do'kon ID: {shop.id}{instances.some(inst => inst.connectorDefinitionId === selectedDefinition?.id && inst.selectedShopId === shop.id && inst.status !== 'DISCONNECTED') ? ' · Allaqachon ulangan' : ''}</div>
                         </div>
                       </label>
                     ))}
@@ -900,7 +970,7 @@ export function IntegrationsView({
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div className="ig-form-actions" style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <button onClick={() => setModalStep('KEY')} style={{ background: 'var(--ws-surface-hover)', border: 'none', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', color: 'var(--ws-text-secondary)' }}>
                       ← Orqaga
                     </button>

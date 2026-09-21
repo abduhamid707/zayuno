@@ -17,6 +17,13 @@ const quotesDb = new Map();
 const actionsDb = new Map();
 const idempotencyDb = new Map();
 
+process.on('uncaughtException', (err) => {
+  console.error('[EVOS-Server Uncaught Exception]', err.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[EVOS-Server Unhandled Rejection]', reason);
+});
+
 function slugify(text) {
   return String(text || '')
     .toLowerCase()

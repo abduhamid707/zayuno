@@ -236,6 +236,9 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
 
   async getDefinitions(): Promise<ConnectorDefinition[]> {
     const records = await prisma.connectorDefinition.findMany({
+      where: process.env.NODE_ENV === 'production' && process.env.ENABLE_SYNTHETIC_CONNECTOR !== 'true'
+        ? { id: { not: 'synthetic-test' } }
+        : undefined,
       orderBy: { name: 'asc' }
     });
 
@@ -267,6 +270,19 @@ export class ConnectorsService implements OnModuleInit, OnModuleDestroy {
   async createInstance(actor: any, input: CreateConnectorInstanceInput) {
     const provider = await this.resolveAndAuthorizeProvider(actor, input.providerSlug);
     const connector = this.getConnector(input.connectorDefinitionId);
+
+    const existingInstance = await prisma.connectorInstance.findFirst({
+      where: {
+        providerId: provider.id,
+        connectorDefinitionId: input.connectorDefinitionId,
+        selectedShopId: input.shopId,
+        status: { not: 'DISCONNECTED' }
+      },
+      select: { id: true }
+    });
+    if (existingInstance) {
+      throw new ConflictException('Ushbu do‘kon allaqachon ulangan. Yangi ulanish yaratilmadi.');
+    }
 
     // Info: catalog connector is supplementary — it does NOT change the provider's
     // existing adapter or transactional capabilities (ACTION_CREATE, QUOTE, etc.).
