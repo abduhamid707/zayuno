@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   UnauthorizedException
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { prisma } from '@zayuno/database';
 import { hashApiKey } from '@zayuno/shared';
 
@@ -14,6 +15,37 @@ export class ApiKeyGuard implements CanActivate {
 
     const authHeader = request.headers['authorization'];
     const apiKeyHeader = request.headers['x-api-key'] || request.headers['x-zayuno-api-key'];
+
+    // 1. Check if Bearer token is a JWT token (e.g. from Provider Portal session)
+    if (authHeader && authHeader.startsWith('Bearer ') && !authHeader.startsWith('Bearer zy_')) {
+      const rawToken = authHeader.replace('Bearer ', '').trim();
+      const jwtSecret = process.env.JWT_SECRET?.trim();
+      if (jwtSecret) {
+        try {
+          const jwtService = new JwtService({ secret: jwtSecret });
+          const payload = await jwtService.verifyAsync(rawToken);
+          if (payload && payload.sub) {
+            const user = await prisma.user.findUnique({
+              where: { id: payload.sub },
+              include: { provider: true }
+            });
+            if (user && user.isActive) {
+              request.user = {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                providerId: user.providerId,
+                providerSlug: user.provider?.slug
+              };
+              return true;
+            }
+          }
+        } catch {
+          // Token invalid/expired; fall through to standard API key check
+        }
+      }
+    }
 
     let apiKey = apiKeyHeader;
     if (!apiKey && authHeader && authHeader.startsWith('Bearer zy_')) {

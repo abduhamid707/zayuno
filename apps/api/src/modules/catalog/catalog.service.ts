@@ -523,7 +523,7 @@ export class CatalogService {
     }
   }
 
-  async compareOfferings(offeringIds: string[], environment?: string): Promise<CompareOfferingsResult> {
+  async compareOfferings(offeringIds: string[], environment?: string, allowUnpublished = false): Promise<CompareOfferingsResult> {
     if (!Array.isArray(offeringIds) || offeringIds.length < 2 || offeringIds.length > 4) {
       throw new BadRequestException('Solishtirish uchun kamida 2 ta va ko‘pi bilan 4 ta mahsulot tanlanishi kerak.');
     }
@@ -546,11 +546,13 @@ export class CatalogService {
         throw new NotFoundException(`Mahsulot topilmadi yoki faol emas: ${cleanId}`);
       }
 
-      if (synced.provider.status !== 'ACTIVE') {
+      if (synced.provider.status !== 'ACTIVE' && !allowUnpublished) {
         throw new BadRequestException(`Ushbu mahsulot provayderi faol emas: ${synced.provider.slug}`);
       }
 
-      await this.providersService.assertProviderPublished(synced.provider.slug, environment);
+      if (!allowUnpublished) {
+        await this.providersService.assertProviderPublished(synced.provider.slug, environment);
+      }
 
       const variants = Array.isArray(synced.variants) ? synced.variants : [];
       const variantsSummary = variants.length > 0

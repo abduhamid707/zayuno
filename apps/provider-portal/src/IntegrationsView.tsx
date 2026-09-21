@@ -306,8 +306,12 @@ export function IntegrationsView({
   const handleSearchTest = async () => {
     if (!providerSlug) return;
     try {
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const res = await fetch(`${apiBaseUrl}/api/v1/search?provider=${providerSlug}&q=${encodeURIComponent(testSearchQuery)}`, {
-        headers: { 'api-key': 'anonymous_or_user' }
+        headers
       });
       if (res.ok) {
         const data = await res.json();
@@ -338,12 +342,15 @@ export function IntegrationsView({
     setCompareLoading(true);
     setComparisonData(null);
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const res = await fetch(`${apiBaseUrl}/api/v1/catalog/compare`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'api-key': 'test'
-        },
+        headers,
         body: JSON.stringify({ offeringIds: selectedForCompare })
       });
       if (res.ok) {

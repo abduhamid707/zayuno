@@ -106,7 +106,8 @@ export class CatalogController {
       throw new BadRequestException('offeringIds array is required.');
     }
     const effectiveEnv = environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
-    return this.catalogService.compareOfferings(body.offeringIds, effectiveEnv);
+    const isInternalPreview = !!req?.user && req?.user?.role !== 'API_CONSUMER';
+    return this.catalogService.compareOfferings(body.offeringIds, effectiveEnv, isInternalPreview);
   }
 
   @Get('catalog/compare')
@@ -121,7 +122,8 @@ export class CatalogController {
     }
     const offeringIds = ids.split(',').map(s => s.trim()).filter(Boolean);
     const effectiveEnv = environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
-    return this.catalogService.compareOfferings(offeringIds, effectiveEnv);
+    const isInternalPreview = !!req?.user && req?.user?.role !== 'API_CONSUMER';
+    return this.catalogService.compareOfferings(offeringIds, effectiveEnv, isInternalPreview);
   }
 
 

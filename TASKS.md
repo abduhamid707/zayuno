@@ -1,4 +1,50 @@
-# Joriy topshiriq — Barcha o‘zgarishlarni GitHub ga push qilish (2026-09-21)
+# Joriy topshiriq — Solishtirish (Compare) modalidagi 401 "Bu amal uchun ruxsat kerak" xatosini tuzatish (2026-09-21)
+
+- [ ] 1. **[P1] IntegrationsView.tsx da solishtirish so'rovini to'g'rilash** — `handleRunCompare` va `handleSearchTest` da qotirilgan `'api-key': 'test'` o'rniga joriy provayder sessiyasining `Authorization: Bearer ${token}` sarlavhasini yuborish.
+- [ ] 2. **[P1] ConnectorsController ga compare endpointini qo'shish yoki ApiKeyGuard da JWT ni qo'llab-quvvatlash** — Portalda tizimga kirgan provayder foydalanuvchilari uchun `POST /api/v1/connectors/compare` endpointini ochish yoki `ApiKeyGuard` orqali JWT tokenlarni qabul qilish.
+- [ ] 3. **[P1] Test va buildlar** — API va Portal buildlarini tekshirish, test suite ishga tushirish.
+- [ ] 4. **[P1] Git commit & push** — O'zgarishlarni GitHub ga yuborish.
+
+---
+
+# Oldingi topshiriq — EVOS providerini Zayuno Strict Certification v2 ga to'liq moslash (2026-09-21)
+
+- [x] 1. **[P1] Provider slug dinamikligi** — `x-provider-slug` headeri va query parametr orqali portalda `evos` yoki `evoss` ro'yxatdan o'tkazilgan bo'lsa ham unga 100% mos keladigan slug qaytarilishi ta'minlandi.
+- [x] 2. **[P1] Manifest inputMode to'g'rilash** — `requirements.QUOTE.inputMode` va `requirements.ACTION_CREATE.inputMode` qiymatlari Provider Contract v1 Zod enumiga moslab `'ITEMS_ONLY'` dan `'OFFERING'` ga o'zgartirildi.
+- [x] 3. **[P1] Catalog Search formati** — `GET /search` javobi obyekt emas, shartnoma talab qilganidek to'g'ridan-to'g'ri `Offering[]` massivi ko'rinishida qaytarilishi ta'minlandi.
+- [x] 4. **[P1] Cancel Action natija strukturasi** — `POST /actions/:id/cancel` endpointi `CancelActionResultSchema` ga to'liq moslandi (`success`, `actionId`, `previousStatus`, `newStatus`, `message`, `refundInitiated`).
+- [x] 5. **[P1] Fulfillment mode va Locations** — `fulfillmentMode` fast-food/xizmat uchun `'REMOTE'` ga moslandi, shuningdek `GET /locations` endpointi ham qo'shildi (`loc_evos_main`).
+- [x] 6. **[P1] 39 ta Strict Certification testlarini o'tkazish** — Lokal testda 38/39 PASS (1 ta narxsiz option-quantity testi standart bo'yicha SKIPPED), 0 ta xato, `isCertified: true`, `isProductionReady: true`.
+- [x] 7. **[P1] Server va Cloudflare tunnelni yangilash** — Server (port 3006, task-600) va HTTPS Cloudflare tunnel (`https://sonic-tries-repository-plant.trycloudflare.com`) jonli rejimda to'liq tekshirildi.
+- [x] 8. **[P1] 11 ta to'liq capability moslashuvi (LOCATIONS va PAYMENT_OPTIONS qo'shildi)** — Portal bazasidagi barcha 11 ta imkoniyat (`METADATA`, `HEALTH`, `LOCATIONS`, `CATALOG`, `SEARCH`, `QUOTE`, `ACTION_CREATE`, `ACTION_STATUS`, `PAYMENT_OPTIONS`, `ACTION_CANCEL`, `WEBHOOK`) to'liq e'lon qilindi va implement qilindi. `/locations` da `latitude/longitude` formatlandi, `/actions/:id/payment-options` qo'shildi. 42 ta test PASS, 0 ta FAIL, 1 ta SKIPPED.
+- [x] 9. **[P1] DISCOVERY rejimi moslashuvi (Faqat topish va ko'rsatish)** — Foydalanuvchi portalda yangi DISCOVERY profilini tanlagani sababli (`requirements` faqat `GET /provider-info`, `GET /health`, `GET /catalog`, `GET /offerings/:id`), server standart holatda aynan DISCOVERY capabilities (`METADATA`, `HEALTH`, `CATALOG`) qaytarishi ta'minlandi. 9/9 test PASS, 0 ta FAIL, 0 ta SKIPPED.
+
+O'zgargan fayllar:
+- `scripts/evos-provider-server.mjs` — DISCOVERY profili moslashuvi (`['METADATA', 'HEALTH', 'CATALOG']`), tranzaksion so'rovlar uchun avtomatik fallback.
+- `TASKS.md` — Checklist va holat qaydnomasi.
+Tekshiruv: DISCOVERY test suite: 9/9 PASS, 100% muvaffaqiyatli. Cloudflare HTTPS tunnel jonli.
+Qolgan ish: Foydalanuvchiga portalda tekshiruvni ishga tushirish uchun tayyor ma'lumotlarni berish.
+
+---
+
+# Oldingi topshiriq — UI qorong'u tema va 400 xato tuzatish (2026-09-21)
+
+- [x] 1. **[P1] IntegrationsView.tsx qorong'u temaga o'tkazish** — Barcha `#fff`, `#f8fafc`, `#fafafa` kabi oq ranglar `var(--ws-surface)`, `var(--ws-surface-elevated)` va boshqa mavjud CSS o'zgaruvchilariga almashtirildi. Hero banner, connector kartalar, platformalar vitrinalari, barcha modal oynalar (preview, compare, connect) to'liq dark temaga o'tkazildi.
+- [x] 2. **[P1] 400 VALIDATION_ERROR tuzatish** — `createInstance`dagi transactional guard blokirovkadan olib tashlandi. Endi tranzaksion provayder (evoss kabi ACTION_CREATE/QUOTE bor) katalog ulagichini qo'sha oladi: mavjud `adapterType` va capabilities saqlanadi, faqat CATALOG/SEARCH kabi connector capabilitylari qo'shiladi. Guard `BadRequestException` o'rniga informatsion `logger.log` chiqaradi.
+- [x] 3. Portal va API buildlarini tekshirish — ikkala build PASS (exit 0). `git diff --check` — 0 xato.
+- [x] 4. `git commit && git push origin main` — Commit `6b4621b`, push `b79487a..6b4621b main -> main`.
+
+O'zgargan fayllar:
+- `apps/provider-portal/src/IntegrationsView.tsx` — To'liq dark tema (barcha inline ranglar CSS variablelarga almashtirildi)
+- `apps/api/src/modules/connectors/connectors.service.ts` — Transactional guard: blokirovka → informatsion log; provider update: agar tranzaksion bo'lsa adapter saqlanadi
+- `tests/test-managed-connectors-and-uzum.ts` — Test 12 yangilandi: reject → accept, adapter saqlanishi va metadata tekshiruvi
+Tekshiruv: 13/13 acceptance testlari, 4 ta monorepo paket buildlari va `git diff --check` 100% muvaffaqiyatli o‘tdi.
+Qolgan ish: Yo‘q.
+Keyingi qadam: Foydalanuvchiga muvaffaqiyatli push qilingani haqida hisobot berish.
+
+---
+
+# Oldingi topshiriq — Barcha o‘zgarishlarni GitHub ga push qilish (2026-09-21)
 
 - [x] 1. Ishchi daraxt holati va fayllar xavfsizligini tekshirish (.env yoki maxfiy kalitlar yo‘qligini tasdiqlash).
 - [x] 2. Barcha o‘zgarishlarni stage qilish va `git diff --cached --check` orqali formatni tekshirish (0 trailing whitespace).
