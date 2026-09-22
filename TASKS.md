@@ -1,4 +1,123 @@
-# Joriy topshiriq — Developer panelni 4001-portda ishga tushirish (2026-09-21)
+# Strategik Arxitektura va Yo'l Xaritasi — AI Commerce OS va Gibrid Ijro Qatlami (2026-09-22)
+
+> **Asosiy Konseptsiya:** Zayuno shunchaki "API router / o'rtakash tarjimon" emas. Zayuno — **"AI davrining Shopify'i (Local Commerce OS for AI Agents) + Gibrid Ijro Dvigateli (API + Browser Automation)"**.
+
+## 1. Strategik Mudofaa Devorlari (Moats)
+
+1. **Multi-Agent Taqsimot Qatlami (Distribution Hub):**
+   - Sotuvchi (masalan Terra Pro, Vicco yoki mahalliy do'kon) barcha AI gigantlari (OpenAI, Google, Anthropic) bilan alohida 5 ta integratsiya qilolmaydi.
+   - Do'kon Zayunoga bir marta ulanadi (Billz, Uzum, 1C yoki Zayuno Portali orqali).
+   - Zayuno bitta tugma bilan sotuvchini tarqatadi:
+     - `Publish to OpenAI` (OpenAI Agentic Commerce Protocol - ACP adapteri)
+     - `Publish to Claude` (Anthropic Model Context Protocol - MCP serveri)
+     - `Publish to Google Gemini` (Google Actions / Function Calling)
+     - `Publish to Telegram` (Telegram Mini App va botlar)
+   - Gigantlar yangi protokollar chiqargani sari Zayunoning qiymati oshadi, chunki sotuvchiga ularni birlashtiruvchi yagona markaz kerak.
+
+2. **AI Talab va Qidiruv Analitikasi (AI Demand & Intent Intelligence):**
+   - Do'kon egasiga boshqa hech kim bera olmaydigan qimmatli tahlil:
+   - *"Ushbu hafta ChatGPT va Claude orqali Toshkentda 450 kishi sizning 'L o'lchamli oq ko'ylak'ingizni so'radi, lekin omborda tugagani sababli xaridorlar raqobatchiga ketdi. Zudlik bilan L o'lcham chiqaring!"*
+   - Bu ma'lumot na OpenAI'da, na POS tizimlarda bor. Bu faqat Zayunoning qo'lida to'planadigan eng qimmatli bozor aktividir.
+
+3. **Lokal Hisob-kitob va Fiskalizatsiya (Local Settlement & OFD):**
+   - OpenAI hech qachon O'zbekistondagi do'konga kelib soliq OFD QR-kodli fiskal chekini urib bermaydi yoki Click, Payme, Uzum Nasiya orqali tushgan pulni so'mda do'kon hisobiga o'tkazib bermaydi.
+   - Barcha mahalliy to'lovlar, qonuniy fiskalizatsiya va xavfsiz hisob-kitob Zayuno lokal qatlami orqali kafolatlanadi.
+
+---
+
+## 2. Gibrid Ijro Dvigateli (Hybrid Execution Engine — Meta Muse Modeli)
+
+> **"API mavjud bo'lsa — API orqali, API bo'lmasa — Brauzer avtomatizatsiyasi orqali!"**
+> (*API when available, browser automation when necessary*)
+
+### "Tovuq va Tuxum" (Cold Start) muammosini hal qilish:
+- **Muammo:** Do'kon/klinika ulanmaguncha xaridorga xizmat ko'rsatib bo'lmaydi; xaridor bo'lmaguncha do'kon API ulashga qiziqmaydi.
+- **Yechim (Gibrid Ijro):**
+  - **1-bosqich (1-kundan 100% qamrov):** Tizimda API'si yo'q klinika, restoran yoki xizmat bo'lsa ham, Zayuno xavfsiz Browser Worker (Playwright/Puppeteer) orqali ularning veb-saytidan yoki formasidan foydalanuvchi nomidan navbat oladi yoki buyurtma beradi.
+  - **2-bosqich (Flywheel):** Bir oyda o'sha biznesga 200 ta buyurtma o'tkazilgach, ularga borib: *"Biz sizga oyiga yuzlab mijoz olib kelyapmiz, keling, brauzer o'rniga to'g'ridan-to'g'ri Billz/Zayuno API kalitingizni ulab qo'yaylik!"* deb taklif beriladi. Biznes darhol rasmiy API'ga ulanadi.
+
+### Ijro sxemasi:
+```plaintext
+Foydalanuvchi Istagi (ChatGPT / Claude / App)
+         │
+         ▼
+   Agent Planner (Zayuno Gateway)
+         │
+         ├──► Provayderda toza API / Connector bormi?
+         │         │
+         │         ├── HA ──► Provider API (`remote-http`, `managed-connector`)
+         │         │          (99.9% ishonchlilik, 100ms tezlik, to'g'ridan-to'g'ri)
+         │         │
+         │         └── YO'Q ─► Secure Browser Worker (`browser-worker`)
+         │                     (Dedicated VM/Sandbox, web form to'ldirish, bron)
+         │
+         ├──► Nozik operatsiyami? (To'lov, SMS tasdiqlash, yakuniy summa)
+         │         │
+         │         └── HA ──► User Approval Gate (Foydalanuvchiga tasdiq so'rovi)
+         │
+         ▼
+   Natija va Status (Strukturalangan Zayuno javobi)
+```
+
+---
+
+## 3. Amalga Oshirish Bosqichlari (Actionable Checklist)
+
+- [ ] 1. **[P1] Gibrid Ijro Shartnomasi va Adapter Turi (`packages/contracts` & `provider-sdk`)**
+  - `AdapterType` enumiga `BROWSER_WORKER` turini qo'shish (`REMOTE_HTTP`, `MANAGED_CONNECTOR`, `SANDBOX`, `BROWSER_WORKER`).
+  - Browser Worker vazifalari sxemasi (`BrowserTaskInput`: targetUrl, formFields, navigationSteps, waitSelectors).
+- [ ] 2. **[P1] Secure Browser Worker Pool (`apps/api` yoki alohida microservice)**
+  - Playwright/Puppeteer asosida xavfsiz izolyatsiyalangan fon brauzer xizmati.
+  - Veb-formani to'ldirish, tugmani bosish, selektorlarni o'qish va xatoliklarni qayd etish mexanizmi.
+- [ ] 3. **[P1] Foydalanuvchi Tasdiqlash Shlyuzi (Approval Gates)**
+  - Nozik amallar (karta to'lovi, bronni tasdiqlash, pul yechish) uchun `ActionStatus.APPROVAL_REQUIRED` statusi.
+  - Foydalanuvchiga aniq parametrlar (summa, qayerga, qachon) ko'rsatilib, "Tasdiqlash / Bekor qilish" havolasi berilishi.
+- [ ] 4. **[P1] AI Demand Intelligence (Talab Tahlili Dvigateli)**
+  - Barcha AI qidiruv so'rovlarini (topilgan va topilmagan) anonim qayd qilish.
+  - Provider Portalda "AI Qidiruv Tahlili" sahifasi: do'kon o'z mahsulotlariga bo'lgan real AI talabini va omborda yetishmayotgan tovarlarni ko'rishi.
+- [ ] 5. **[P1] OpenAI ACP (Agentic Commerce Protocol) Adapteri**
+  - OpenAI e-commerce standarti e'lon qilinganda Zayunoning barcha ulangan do'konlarini unga avtomatik expose qilish.
+
+---
+
+# Oldingi topshiriq — BILLZ POS Managed Connector: Shahar do'konlari, jonli qoldiqlar va AI-bron tizimi (2026-09-21)
+
+- [ ] 1. **[P1] Shartnoma va SDK turlari (`packages/contracts` & `packages/provider-sdk`)**
+  - `BillzCredentialSchema`: `secret_token` (doimiy integratsiya kaliti), `access_token` (15 kunlik JWT), `refresh_token` (30 kunlik), `expires_at`.
+  - `BillzShopDto` & `BillzCashboxDto`: Do'kon UUID, nomi, manzili, kassa identifikatorlari.
+  - `BillzProductDto`: Mahsulot nomi, SKU, shtrix-kod, `shop_measurement_values` (filial kesimidagi faol qoldiq), `shop_prices` (filial kesimidagi narx va aksiya).
+  - `BillzOrderInputSchema`: Tovar qo'shish, mijoz biriktirish, chegirmani hisoblash va zaxiralash (`create_postpone`) / to'lov parametrlari.
+- [ ] 2. **[P1] `BillzConnector` adapterini yaratish (`packages/provider-sdk/src/connectors/billz-connector.ts`)**
+  - `authenticate({ secretToken })`: `POST https://api-admin.billz.ai/v1/auth/login` orqali `access_token` olish va `GET /v1/company` orqali kompaniya nomini tekshirish.
+  - `getShops({ accessToken })`: `GET /v1/shop` orqali sotuvchining barcha filiallari ro'yxatini yuklash (koordinata va manzillar bilan).
+  - `fetchCatalog({ accessToken, shopId, page, limit })`: `GET /v2/products` orqali tovarlar katalogini o'qish; har bir tovardan tanlangan `shopId` ga tegishli `active_measurement_value` (mavjud qoldiq) va `retail_price` / `promo_price` ni ajratib olish.
+  - `mapToZayunoOfferings()`: Tovar variatsiyalari (o'lcham, rang), brend, kategoriya va atributlarini Zayuno `Offering` va `SyncedProduct` standartiga to'liq xaritalash.
+  - `recalculateQuote()`: `POST /v1/recalculate-order-bill/:order_id` yordamida chek summasi, chegirmalar va keshbekni sinxron tekshirish (`QUOTE`).
+  - `createReservationAction()`: `POST /v2/order` -> `POST /v2/order-product` -> `POST /v2/order/create_postpone` orqali tovarlarni mijoz uchun do'konda zaxiralab (bron qilib) qo'yish (`ACTION_CREATE`).
+- [ ] 3. **[P1] Token lifecycle va avtomatik yangilash (`connectors.service.ts`)**
+  - Merchant `secret_token` bazada xavfsiz AES-256 bilan shifrlanadi (`ConnectorCredential`).
+  - `access_token` muddati tugashiga 24 soat qolganda yoki 401 xatoligida `POST /v2/auth/refresh` orqali yangi juftlik olinadi.
+  - Sinxronlash davriyligi: Har bir necha soatda fonda do'kon qoldiqlari avtomatik delta yangilanadi.
+- [ ] 4. **[P1] Provider Portal UI integratsiyasi (`apps/provider-portal`)**
+  - `IntegrationsView.tsx` da "Billz POS" kartasini "REJADA" dan "FAOL" holatiga o'tkazish.
+  - Ulash modali (Connect Modal): Sotuvchiga `secret_token` kiritish maydoni va Billz kabinetidan kalit olish qo'llanmasi (`https://docs.billz.io/uz/start/integration-key/`).
+  - Filial (Shop) tanlash: Bir nechta filiali bo'lsa, qaysi do'kon/kassa ulanishini tanlash imkoniyati.
+  - Tovar qoldiqlari indikatori: Filial kesimidagi qoldiqlar (`active_measurement_value > 0`) statusini ko'rsatish.
+- [ ] 5. **[P1] Mock Server va Acceptance Testlar (`tests/test-billz-connector.ts`)**
+  - Mock Billz API serveri (`scripts/mock-billz-server.mjs`): Auth, Shop, Products, Recalculate, Postpone endpointlari.
+  - To'liq test ssenariysi: Auth login -> Do'konlar ro'yxati -> Mahsulotlar va qoldiqlar sinxroni -> Narx hisoblash -> Bron qilish -> Qidiruv va solishtirish.
+- [ ] 6. **[P1] Build va regressiya tekshiruvi**
+  - `@zayuno/contracts`, `@zayuno/provider-sdk`, `@zayuno/api`, `@zayuno/provider-portal` buildlari.
+  - Uzum Market ulagichi bilan parallel ishlashini va hech qanday regressiya yo'qligini tasdiqlash.
+
+Holat: Rejalashtirildi. Billz rasmiy hujjatlari (docs.billz.io/uz) asosida API arxitekturasi va ulanish oqimi to'liq loyihalashtirildi.
+O'zgargan fayllar: `TASKS.md` (ushbu batafsil reja).
+Tekshiruv: Rasmiy Billz 2.0 API spetsifikatsiyasi (auth, products, shop_measurement_values, postpone, recalculate) to'liq tasdiqlandi.
+Navbatdagi qadam: 1-bosqich — SDK shartnomalari va `BillzConnector` adapterini yaratish.
+
+---
+
+# Oldingi topshiriq — Developer panelni 4001-portda ishga tushirish (2026-09-21)
 
 - [x] 1. **[P1] Port 4001 da dev serverni ishga tushirish** — `apps/provider-portal` da `pnpm --filter @zayuno/provider-portal exec vite --port 4001 --host 0.0.0.0` orqali `IsDaemon: true` bilan fonda (task-3741) muvaffaqiyatli ishga tushirildi.
 - [x] 2. **[P1] Server ulanishini tekshirish** — `http://localhost:4001` ga HTTP so'rov yuborildi va `200 OK` javobi olindi.
