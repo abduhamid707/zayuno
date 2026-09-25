@@ -423,6 +423,16 @@ Bu versiya hali ham katta ambitsiyani saqlaydi, lekin investor, hamkor yoki texn
     - `graphify-out/graph.json` — AI agent uchun deterministik xotira bazasi.
     - Antigravity integratsiyasi o'rnatildi (`.agents/rules/graphify.md`, `.agents/workflows/graphify.md`, `~/.gemini/config/skills/graphify/SKILL.md`).
 
+- [x] 26. **Zayuno.uz Landing Page Redesign (WOW UI/UX & Live Transparency Showcase):**
+  - [x] A. Zamonaviy Hero, 192ms jonli metrika vidjeti va neon vizual uslub (Stripe/Linear/Vercel standard).
+  - [x] B. Interaktiv Jonli Agent Simulyatori (Donarchi, EVOS Lavash va Terra Pro real stsenariylari, 0.19s hisob-kitob va Approval Gate interaktiv kartochkasi).
+  - [x] C. Ekosistema va POS integratsiyalari (iiko Cloud, BILLZ POS, Uzum Market, Yandex Delivery arxitektura bloklari).
+  - [x] D. TASKS.md asosidagi jonli statuslar va yo'l xaritasi doskasi (Live Transparency Roadmap: EVOS & Feed Up 192ms isboti, Uzum Operational, iiko #380770690 sertifikatsiyasi, Yandex & BILLZ quvuri).
+  - [x] E. Provider Onboarding (5 daqiqada kodsiz POS kalit bilan ulanish + interaktiv tushum kalkulyatori).
+  - [x] F. Developer & MCP playground (Claude Desktop / ChatGPT bitta qatorda ulanish, copy-paste config).
+  - [x] G. Bilingual (UZ / EN) mukammal qo'llab-quvvatlash va sinovdan o'tkazish.
+  - [x] H. `landing-page.template.ts` orqali to'liq modulli arxitekturaga ajratildi, `nest build` 100% muvaffaqiyatli yakunlandi, `landing-preview.html` brauzerda ochildi.
+
 ---
 
 # Strategik Arxitektura va Yo'l Xaritasi — AI Commerce OS va Gibrid Ijro Qatlami (2026-09-22)
