@@ -1,0 +1,1 @@
+{"nodes": [{"id": "pkg_zayuno_provider", "label": "zayuno-provider", "file_type": "code", "type": "package", "ecosystem": "go", "source_file": "packages/cli/templates/go/go.mod", "source_location": "L1"}], "edges": []}
