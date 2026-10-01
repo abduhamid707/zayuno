@@ -171,6 +171,7 @@ model User {
   memoryJobs       ConsumerMemoryJob[]
   suggestionEvents ConsumerSuggestionEvent[]
   unmetDemandRequests UnmetDemandRequester[]
+  demandEvents ConsumerDemandEvent[]
 }
 
 model ConsumerSession {
@@ -468,6 +469,33 @@ model EmailVerificationToken {
 
   @@index([email])
   @@index([tokenHash])
+}
+
+// One classified discovery request per authenticated consumer message.
+// No transcript, address, email, or phone is copied into this table.
+model ConsumerDemandEvent {
+  id          String   @id @default(uuid())
+  userId      String
+  messageKey  String
+  category    String
+  topic       String?
+  intent      String
+  brands      String[]
+  city        String?
+  budgetMax   Int?
+  currency    String?
+  highIntent  Boolean
+  outcome     String
+  reason      String?
+  environment String   @default("LIVE")
+  source      String   @default("CONSUMER_CHAT")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageKey])
+  @@index([createdAt, category])
+  @@index([outcome, createdAt])
 }
 
 model UnmetDemandRecord {

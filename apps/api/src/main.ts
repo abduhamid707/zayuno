@@ -1,9 +1,12 @@
+import 'dotenv/config';
 import { NestFactory } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
 import cors from "cors";
+
+
 
 async function bootstrap() {
   // Preserve the original bytes for signed provider webhooks. JSON parsing

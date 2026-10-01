@@ -16,3 +16,5 @@ coverage
 artifacts/
 openai-apps-sdk-examples-main/
 *.apk
+.pm2-logs/
+.agent-memory/

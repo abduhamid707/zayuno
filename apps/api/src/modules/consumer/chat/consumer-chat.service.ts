@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { prisma } from '@zayuno/database';
 import { ConversationState, ConversationField, emptyConversationState, ProviderCapability, CustomerContactSchema } from '@zayuno/contracts';
 import { conversationRequirements, manifestOf, writeField, validateSlot,
   formatCustomerQuote, formatCustomerActionConfirmation, formatCustomerActionStatus,
@@ -11,10 +12,12 @@ import { ActionsService } from '../../actions/actions.service';
 import { RedisService } from '../../../common/services/redis.service';
 import { ConsumerMemoryService } from '../memory/consumer-memory.service';
 import { UnmetDemandService } from '../../analytics/unmet-demand.service';
+import { ConsumerDemandService, DemandOutcome } from '../../analytics/consumer-demand.service';
+import { classifyDemand } from '../../analytics/demand-classification';
 import { ConversationStore } from './conversation-store';
 import { SemanticIntentResolver, SemanticTurn } from './semantic-intent';
 
-type ChatRequest = { prompt: string; userId: string; userEmail?: string; conversationId?: string;
+type ChatRequest = { prompt: string; userId: string; userEmail?: string; conversationId?: string; messageId?: string;
   messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
   selections?: Array<{ id?: string; kind?: string; providerSlug?: string; offeringId?: string; variantId?: string;
     quantity?: number; groupId?: string; title?: string; fieldPath?: string; value?: unknown }> };
@@ -27,7 +30,8 @@ export class ConsumerChatService {
   constructor(private readonly providersService: ProvidersService, private readonly catalogService: CatalogService,
     private readonly quotesService: QuotesService, private readonly actionsService: ActionsService,
     redisService: RedisService, private readonly memoryService?: ConsumerMemoryService,
-    private readonly unmetDemandService?: UnmetDemandService) {
+    private readonly unmetDemandService?: UnmetDemandService,
+    private readonly demandService?: ConsumerDemandService) {
     this.store = new ConversationStore(redisService);
   }
 
@@ -38,6 +42,7 @@ export class ConsumerChatService {
   }
   async processMessage(input: ChatRequest): Promise<ChatResult> {
     if (typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 1200) throw new BadRequestException('Xabar 1–1200 belgi bo‘lishi kerak.');
+    if (input.messageId !== undefined && (typeof input.messageId !== 'string' || !/^[a-zA-Z0-9:_-]{1,128}$/.test(input.messageId))) throw new BadRequestException('Invalid message ID.');
     if ((input.selections?.filter(selection => selection.kind === 'offering').length || 0) > 1) throw new BadRequestException('Bir vaqtda bitta taklif tanlang.');
     return this.store.run(input.userId, input.conversationId, (state, save) => this.turn(input, state, save));
   }
@@ -68,8 +73,16 @@ export class ConsumerChatService {
   }
   private async turn(input: ChatRequest, state: ConversationState, save: () => Promise<void>): Promise<ChatResult> {
     const providers = await this.visibleProviders();
+    // Old cached sandbox sessions must never execute through the mobile API.
+    if (state.environment !== 'LIVE' || isDemoOrSandboxProvider({ slug: state.providerSlug })) {
+      this.reset(state);
+      await save();
+    }
     // Retry uncertain dispatch with the exact persisted key/payload, never reinterpret it as a new action.
-    if (state.action?.status === 'SUBMITTING') return this.submit(state, input.userId, save);
+    if (state.action?.status === 'SUBMITTING') {
+      if (!providers.some(p => p.slug === state.providerSlug)) throw new BadRequestException('Provider unavailable; existing action is preserved for reconciliation.');
+      return this.submit(state, input.userId, save);
+    }
     let turn = await this.resolver.resolve(input.prompt, state, providers);
     const selection = input.selections?.[0];
     if (selection) {
@@ -81,6 +94,20 @@ export class ConsumerChatService {
       else if (selection.fieldPath) turn = { intent: 'PROVIDE_FIELD', fields: { [selection.fieldPath]: selection.value } };
     }
     state.intent = turn.intent;
+    if (turn.intent === 'SEARCH' && !input.selections?.length) {
+      const facts = classifyDemand(input.prompt, providers);
+      const normalize = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+      const unavailableBrand = facts?.brands.some(brand => !providers.some(p =>
+        normalize(p.name) === normalize(brand) || normalize(p.slug) === normalize(brand)
+        || classifyDemand(p.name)?.brands.includes(brand)));
+      const currentProvider = providers.find(p => p.slug === state.providerSlug);
+      const currentCategory = currentProvider ? classifyDemand(`${currentProvider.name} ${currentProvider.description || ''}`)?.category : undefined;
+      if (!turn.providerSlug && facts?.category && facts.category !== 'other' && currentCategory && currentCategory !== 'other' && currentCategory !== facts.category) turn.unsupported = true;
+      if (turn.unsupported || unavailableBrand) {
+        this.reset(state);
+        return this.unavailable(input, providers, 'NO_PROVIDER');
+      }
+    }
     if (turn.intent === 'CANCEL') {
       if (state.action?.actionId) {
         await this.actionsService.cancelAction({ actionId: state.action.actionId, environment: state.environment, reason: 'Customer requested cancellation' }, { id: input.userId });
@@ -99,7 +126,7 @@ export class ConsumerChatService {
     }
     if (turn.providerSlug && turn.providerSlug !== state.providerSlug) {
       const provider = providers.find(item => item.slug === turn.providerSlug);
-      if (!provider) return this.providerChoices(providers);
+      if (!provider) return this.unavailable(input, providers, 'NO_PROVIDER');
       const query = turn.query || state.query;
       this.reset(state);
       state.providerSlug = provider.slug;
@@ -109,6 +136,7 @@ export class ConsumerChatService {
     let provider = providers.find(item => item.slug === state.providerSlug);
     if (!provider) {
       state.query = turn.query || input.prompt;
+      if (classifyDemand(input.prompt, providers)) return this.unavailable(input, providers, 'NO_PROVIDER');
       return this.providerChoices(providers);
     }
     state.manifest = manifestOf(provider);
@@ -130,21 +158,31 @@ export class ConsumerChatService {
       state.query = turn.query ?? state.query ?? input.prompt;
       state.capability = provider.capabilities.includes(ProviderCapability.SEARCH) ? 'SEARCH' : 'CATALOG';
       const missing = conversationRequirements(state, state.capability);
-      if (missing.length) return this.ask(state, missing);
+      if (missing.length) {
+        await this.captureDemand(input, providers, 'AVAILABLE');
+        return this.ask(state, missing);
+      }
+      try {
       if (provider.capabilities.includes(ProviderCapability.SEARCH)) {
         state.offerings = await this.catalogService.searchOfferings(provider.slug, state.query || '', undefined, state.locationId, 30, state.parameters, state.environment);
       } else if (provider.capabilities.includes(ProviderCapability.CATALOG)) {
         const catalog = await this.catalogService.getCatalog(provider.slug, state.locationId, undefined, state.parameters, state.environment);
         state.offerings = catalog.offerings;
         state.parametersSchema = catalog.parametersSchema;
-      } else if (state.manifest?.requirements?.QUOTE?.inputMode !== 'PARAMETERS') return { content: 'Bu hamkor katalog yoki qidiruv imkoniyatini e’lon qilmagan.' };
+      } else if (state.manifest?.requirements?.QUOTE?.inputMode !== 'PARAMETERS') return this.unavailable(input, providers, 'CAPABILITY_UNSUPPORTED');
+      } catch (error) {
+        await this.captureDemand(input, providers, 'ERROR', 'PROVIDER_ERROR');
+        throw error;
+      }
       state.offerings = state.offerings.filter(offering => offering.isAvailable !== false);
-      if (!state.offerings.length && state.manifest?.requirements?.QUOTE?.inputMode !== 'PARAMETERS') return { content: 'Mos taklif topilmadi. So‘rovni aniqlashtiring.' };
+      if (!state.offerings.length && state.manifest?.requirements?.QUOTE?.inputMode !== 'PARAMETERS') return this.unavailable(input, providers, 'NO_MATCHING_OFFER');
+      await this.captureDemand(input, providers, 'AVAILABLE');
       // Resolve the original selection against fresh canonical data, not guessed IDs.
       const grounded = await this.resolver.resolve(input.prompt, state, [provider]);
       if (grounded.offeringId || grounded.cheapest) this.applyTurn(state, grounded);
       if (!state.selectedOffering) return this.offeringChoices(state);
     }
+    if (turn.intent === 'SEARCH') await this.captureDemand(input, providers, 'AVAILABLE');
     if (!state.selectedOffering && state.manifest?.requirements?.QUOTE?.inputMode !== 'PARAMETERS' && state.manifest?.requirements?.QUOTE?.inputMode !== 'EITHER') return this.offeringChoices(state);
     if (!provider.capabilities.includes(ProviderCapability.QUOTE) || !provider.capabilities.includes(ProviderCapability.ACTION_CREATE)) {
       return { content: state.selectedOffering ? [state.selectedOffering.title, state.selectedOffering.description].filter(Boolean).join('\n') : 'Hamkor faqat ma’lumot taqdim etadi.',
@@ -245,6 +283,13 @@ export class ConsumerChatService {
       parameters: state.parameters, customer: state.customer, locations: state.locations, fulfillmentType: state.fulfillment, paymentMethod: state.paymentMethod };
   }
   private async submit(state: ConversationState, userId: string, save: () => Promise<void>): Promise<ChatResult> {
+    const reviewEmail = process.env.PLAY_REVIEW_EMAIL?.trim().toLowerCase();
+    if (reviewEmail) {
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+      if (user?.email.toLowerCase() === reviewEmail) {
+        throw new BadRequestException('Review account cannot submit a live order or payment.');
+      }
+    }
     if (!state.quote || !state.confirmation?.accepted || state.confirmation.quoteId !== state.quote.id) throw new BadRequestException('A reviewed quote and explicit confirmation are required.');
     state.action ??= { idempotencyKey: randomUUID(), quoteId: state.quote.id, status: 'SUBMITTING' };
     await save(); // Failure before dispatch is safe; after dispatch the same key survives restart.
@@ -274,10 +319,24 @@ export class ConsumerChatService {
       { type: 'QuoteSummary', quote: state.quote }, { type: 'ConfirmationCard', quoteId: state.quote!.id }]) };
   }
   private providerChoices(providers: any[]): ChatResult {
-    return { content: providers.length ? 'Qaysi hamkorni tanlaymiz?' : 'Hozir mos faol hamkor topilmadi.',
+    return { content: providers.length ? 'Sizga yordam berishga tayyormiz. Hozir quyidagi hamkorlar bilan ishlay olamiz — qaysi birini tanlaymiz?' : 'Xush kelibsiz! Hozir xizmatlarimizni ulash ustida ishlayapmiz. Biz bilan qoling, iltimos — sizga ko‘proq yordam berishni xohlaymiz 💙 Qanday xizmat kerakligini yozishingiz mumkin.',
       interaction: { version: 1, kind: 'provider_list', providers: providers.map(provider => ({ id: provider.slug, slug: provider.slug,
         name: provider.branding?.displayName || provider.name, logoUrl: provider.branding?.logoUrl || provider.logoUrl,
         ...provider.branding, cuisine: provider.description, prompt: provider.name })) } };
+  }
+  private async captureDemand(input: ChatRequest, providers: any[], outcome: DemandOutcome, reason?: string) {
+    if (input.selections?.length) return false;
+    return await this.demandService?.record({ ...input, providers, outcome, reason }) || false;
+  }
+  private async unavailable(input: ChatRequest, providers: any[], reason: string): Promise<ChatResult> {
+    const recorded = await this.captureDemand(input, providers, 'UNFULFILLED', reason);
+    const opening = reason === 'NO_MATCHING_OFFER' ? 'Hozir sizga mos taklif topilmadi.'
+      : reason === 'CAPABILITY_UNSUPPORTED' ? 'Bu hamkor orqali hozir ushbu amalni bajara olmaymiz.'
+      : 'Bu xizmat hozircha Zayunoga ulanmagan.';
+    const message = process.env.CONSUMER_UNAVAILABLE_MESSAGE?.trim().slice(0, 800)
+      || 'Biz bilan qoling, iltimos. Sizga kelajakda ko‘proq yordam berishni juda xohlaymiz.';
+    return { content: `${opening} ${message}${recorded ? ' So‘rovingizni saqladik — uni unutmaymiz.' : ''} Sizning biz bilan qolishingiz biz uchun muhim 💙${providers.length ? '\n\nBizda hozir quyidagi xizmatlar mavjud:' : ''}`,
+      interaction: providers.length ? this.providerChoices(providers).interaction : undefined };
   }
   private offeringChoices(state: ConversationState): ChatResult {
     return { content: state.offerings.length ? 'Mos taklifni tanlang yoki qanday variant kerakligini yozing.' : 'So‘rovni aniqlashtiring.',

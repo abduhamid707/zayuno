@@ -23,7 +23,7 @@ import { ConnectorsModule } from './modules/connectors/connectors.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env', '../.env'] }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     CommonModule,
     AnalyticsModule,

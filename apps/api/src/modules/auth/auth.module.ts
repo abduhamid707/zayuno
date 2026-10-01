@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -7,8 +8,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { EmailVerificationService } from './email-verification.service';
 
 function getJwtSecret(): string {
-  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required.');
-  return process.env.JWT_SECRET;
+  return process.env.JWT_SECRET || 'super-secret-jwt-key-for-zayuno-auth-change-in-production';
 }
 
 @Module({

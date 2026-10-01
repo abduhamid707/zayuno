@@ -73,7 +73,7 @@ assert.match(chatStore, /queueRemote\(id,[\s\S]*method: "DELETE"/);
 assert.match(accountSheet, /Hisobdan chiqasizmi\?/);
 assert.match(accountSheet, /Chatlaringiz hisobingizda saqlanadi/);
 assert.match(accountSheet, /Bu oddiy logout emas/);
-assert.match(accountSheet, /Keyingi sahifada yana tasdiqlaysiz/);
+assert.match(accountSheet, /Keyingi oynada yana tasdiqlaysiz/);
 assert.match(accountSheet, /Barcha qurilmalardan chiqish/);
 
 console.log("Consumer auth persistence and account safety contracts passed.");

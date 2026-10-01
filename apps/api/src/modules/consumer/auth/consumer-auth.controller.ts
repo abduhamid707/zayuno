@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   HttpCode,
   HttpStatus,
@@ -68,5 +69,13 @@ export class ConsumerAuthController {
   @ApiOperation({ summary: "Get current consumer user profile" })
   async getProfile(@Req() req: any) {
     return this.authService.getProfile(req.user.id);
+  }
+
+  @Delete("account")
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Permanently delete consumer account and personal data" })
+  async deleteAccount(@Req() req: any) {
+    return this.authService.deleteConsumerAccount(req.user.id);
   }
 }

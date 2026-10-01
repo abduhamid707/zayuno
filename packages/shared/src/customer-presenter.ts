@@ -74,12 +74,18 @@ export function isDemoOrSandboxProvider(provider: any): boolean {
   if (!provider) return false;
   const metadata = (provider.metadata as Record<string, any>) || {};
   const config = (provider.config as Record<string, any>) || {};
+  const slug = typeof provider.slug === 'string' ? provider.slug.toLowerCase() : '';
 
   return (
     provider.environment === 'SANDBOX' ||
     provider.environment === 'STAGING' ||
     provider.status === 'SANDBOX' ||
     provider.adapterType === 'sandbox' ||
+    slug.startsWith('sandbox-') ||
+    slug.startsWith('mock-') ||
+    slug.startsWith('demo-') ||
+    slug === 'sandbox' ||
+    slug === 'demo' ||
     metadata.sandbox === true ||
     metadata.isDemo === true ||
     metadata.environment === 'SANDBOX' ||

@@ -40,6 +40,7 @@ type ChatSelection = {
 
 type ChatBody = {
   prompt: string;
+  messageId?: string;
   messages?: ConversationMessage[];
   conversationId?: string;
   selections?: ChatSelection[];
@@ -70,6 +71,7 @@ export class ConsumerChatController {
     try {
       return await this.chatService.processMessage({
         prompt: body.prompt,
+        messageId: body.messageId,
         messages: body.messages,
         conversationId: body.conversationId,
         selections: body.selections,
@@ -107,6 +109,7 @@ export class ConsumerChatController {
       await this.chatService.streamMessage(
         {
           prompt: body.prompt,
+          messageId: body.messageId,
           messages: body.messages,
           conversationId: body.conversationId,
           selections: body.selections,

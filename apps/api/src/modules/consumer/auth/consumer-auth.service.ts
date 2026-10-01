@@ -3,6 +3,7 @@ import {
   BadRequestException,
   HttpException,
   UnauthorizedException,
+  NotFoundException,
   ServiceUnavailableException,
   Logger,
 } from "@nestjs/common";
@@ -132,7 +133,13 @@ export class ConsumerAuthService {
 
   private async deliverEmailOtp(email: string, code: string): Promise<void> {
     const apiKey = process.env.RESEND_API_KEY?.trim();
-    if (!apiKey) throw new ServiceUnavailableException('Email orqali kirish vaqtincha ishlamayapti.');
+    if (!apiKey) {
+      if (process.env.NODE_ENV !== 'production') {
+        this.logger.log(`\n=======================================================\n🔑 [LOCAL DEV OTP] Email: ${email} | Kod: ${code}\n=======================================================\n`);
+        return;
+      }
+      throw new ServiceUnavailableException('Email orqali kirish vaqtincha ishlamayapti.');
+    }
     // Resend's REST response must be accepted before we announce success.
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -152,11 +159,21 @@ export class ConsumerAuthService {
 
   async sendEmailOtp(email: string) {
     const cleanEmail = this.normalizeOtpEmail(email);
+    const reviewEmail = process.env.PLAY_REVIEW_EMAIL?.trim().toLowerCase();
+    const isReviewAccount = Boolean(reviewEmail && cleanEmail === reviewEmail);
+    const configuredOtp = process.env.PLAY_REVIEW_OTP?.trim();
+
+    if (isReviewAccount && !/^\d{5}$/.test(configuredOtp || "")) {
+      throw new ServiceUnavailableException('Reviewer login is not configured.');
+    }
+
     return this.withEmailOtpLock(cleanEmail, async client => {
       const retryAfterSeconds = await client.ttl(`consumer:otp:sent:${cleanEmail}`);
       if (retryAfterSeconds > 0) throw new HttpException({ message: 'Qayta yuborishdan oldin bir daqiqa kuting.', retryAfterSeconds }, 429);
-      const code = randomInt(10000, 100000).toString();
-      await this.deliverEmailOtp(cleanEmail, code);
+      const code = isReviewAccount ? configuredOtp! : randomInt(10000, 100000).toString();
+      if (!isReviewAccount) {
+        await this.deliverEmailOtp(cleanEmail, code);
+      }
       // Strict Redis operations: do not report success if the challenge cannot be stored.
       const saved = await client.multi()
         .set(`consumer:otp:code:${cleanEmail}`, this.otpDigest(cleanEmail, code), 'EX', 300)
@@ -164,7 +181,14 @@ export class ConsumerAuthService {
         .del(`consumer:otp:attempts:${cleanEmail}`)
         .exec();
       if (!saved || saved.some(([error]) => error)) throw new Error('OTP persistence failed');
-      return { success: true, message: 'Kod yuborildi.', codeLength: 5, expiresIn: 300, retryAfterSeconds: 60 };
+      return {
+        success: true,
+        message: process.env.NODE_ENV !== 'production' ? `Kod: ${code}` : 'Kod yuborildi.',
+        devCode: process.env.NODE_ENV !== 'production' ? code : undefined,
+        codeLength: 5,
+        expiresIn: 300,
+        retryAfterSeconds: 60,
+      };
     });
   }
 
@@ -475,5 +499,123 @@ export class ConsumerAuthService {
         "Consumer refresh sessions are not configured.",
       );
     return secret;
+  }
+
+  async deleteConsumerAccount(userId: string) {
+    if (!userId) throw new BadRequestException("Foydalanuvchi identifikatori talab qilinadi.");
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException("Foydalanuvchi topilmadi.");
+
+    // Invalidate cached Redis tokens and conversation state for this account.
+    const client = this.redis.getClient();
+    if (client) {
+      try {
+        const activeSessions = await prisma.consumerSession.findMany({
+          where: { userId },
+          select: { id: true },
+        });
+        const chatSessions = await prisma.consumerChatSession.findMany({
+          where: { userId },
+          select: { id: true },
+        });
+        for (const s of activeSessions) {
+          await client.del(`consumer:refresh:${s.id}`).catch(() => undefined);
+        }
+        for (const conversationId of ['default', ...chatSessions.map((s) => s.id)]) {
+          const scope = createHash('sha256').update(JSON.stringify([userId, conversationId])).digest('hex');
+          await client.del(`conversation:v1:${scope}`);
+        }
+      } catch (err) {
+        this.logger.warn('Failed to clear cached consumer data during account deletion.');
+      }
+    }
+
+    // Cascade deletion of all consumer data within a transaction
+    await prisma.$transaction(async (tx) => {
+      // 1. Consumer sessions
+      await tx.consumerSession.deleteMany({ where: { userId } });
+
+      // 2. Chat messages and chat sessions
+      const chatSessions = await tx.consumerChatSession.findMany({
+        where: { userId },
+        select: { id: true },
+      });
+      const sessionIds = chatSessions.map((s) => s.id);
+      if (sessionIds.length > 0) {
+        await tx.consumerChatMessage.deleteMany({
+          where: { sessionId: { in: sessionIds } },
+        });
+      }
+      await tx.consumerChatSession.deleteMany({ where: { userId } });
+
+      // 3. Memory signals, jobs, events, and profile
+      await tx.consumerMemorySignal.deleteMany({ where: { userId } });
+      await tx.consumerMemoryJob.deleteMany({ where: { userId } });
+      await tx.consumerSuggestionEvent.deleteMany({ where: { userId } });
+      await tx.consumerMemoryProfile.deleteMany({ where: { userId } });
+
+      // 4. Unmet demand requests
+      await tx.unmetDemandRequester.deleteMany({ where: { userId } });
+
+      // 5. User reports: scrub personal data and transcript
+      await tx.userReport.updateMany({
+        where: { userId },
+        data: {
+          userId: null,
+          description: "[ANONYMIZED_UPON_ACCOUNT_DELETION]",
+          screenshotDataUrl: null,
+          transcript: [],
+          transcriptMarkdown: "[CHAT_HISTORY_PURGED_UPON_ACCOUNT_DELETION]",
+          metadata: {},
+        },
+      });
+
+      // Keep financial transaction records for reconciliation, but remove the
+      // customer's contact and delivery details before unlinking the account.
+      const actions = await tx.action.findMany({
+        where: { userId },
+        select: { id: true, quoteId: true },
+      });
+      const actionIds = actions.map((action) => action.id);
+      const quoteIds = actions.map((action) => action.quoteId).filter((id): id is string => Boolean(id));
+      if (actionIds.length) {
+        await tx.actionEvent.updateMany({
+          where: { actionId: { in: actionIds } },
+          data: { description: '[ACCOUNT_DELETED]', payload: {} },
+        });
+        await tx.action.updateMany({
+          where: { id: { in: actionIds } },
+          data: {
+            userId: null,
+            customerName: null,
+            customerPhone: null,
+            customerEmail: null,
+            locations: {},
+            destination: null,
+            latitude: null,
+            longitude: null,
+            parameters: {},
+            metadata: {},
+            paymentUrl: null,
+          },
+        });
+      }
+      if (quoteIds.length) {
+        await tx.quote.updateMany({
+          where: { id: { in: quoteIds } },
+          data: { requestInput: {}, destination: null, parameters: {} },
+        });
+      }
+
+      // 6. Delete user record
+      await tx.user.delete({ where: { id: userId } });
+    });
+
+    return {
+      success: true,
+      message: "Hisob o‘chirildi. Moliyaviy tranzaksiya yozuvlari shaxssizlantirilgan holda saqlanishi mumkin.",
+      deletedAt: new Date().toISOString(),
+    };
   }
 }
