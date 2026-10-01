@@ -41,6 +41,7 @@
 - `apps/api/src/main.ts`
 - `apps/api/test/test-http-roles-live.ts`
 - `packages/shared/src/customer-presenter.ts`
+- `tests/test-consumer-auth-persistence.ts` (CI moslashuvi: in-app modal va web confirmation matnlarining har ikkalasini qo'llab-quvvatlash)
 - `TASKS.md`
 
 ---
