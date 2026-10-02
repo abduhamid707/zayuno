@@ -1491,6 +1491,9 @@ export class ProvidersService {
     const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
     if (!provider) throw new NotFoundError('Provider', cleanSlug);
     this.assertProviderManager(provider, actor);
+    if (provider.adapterType === 'iiko') {
+      throw new BadRequestException('iiko transactional certification test buyurtmalar yaratadi. Kassir terminalida test buyurtmasini bekor qilish ishlamaguncha sertifikatlash yopiq.');
+    }
 
     // If sandbox URL is selected, ensure server has configured test credentials
     if (provider.baseUrl && this.registry.isOfficialSandboxUrl(provider.baseUrl)) {
@@ -1584,6 +1587,9 @@ export class ProvidersService {
     const cleanSlug = slug.toLowerCase().trim();
     const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
     if (!provider) throw new NotFoundError('Provider', cleanSlug);
+    if (provider.adapterType === 'iiko') {
+      throw new BadRequestException('iiko order cancellation va transactional certification tasdiqlanmaguncha public publication yopiq.');
+    }
     const metadata = (provider.metadata as Record<string, any>) || {};
     if (!metadata.isCertified || metadata.reviewStatus !== 'PENDING_APPROVAL') {
       throw new BadRequestException('Only a certified provider submitted for approval can be published.');

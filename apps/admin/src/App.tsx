@@ -45,6 +45,7 @@ import {
   Radio,
   Info,
 } from 'lucide-react';
+import { IikoAdminConnection } from './IikoAdminConnection';
 import { adminAnalytics } from './lib/analytics';
 
 const API_BASE =
@@ -146,6 +147,7 @@ export default function App() {
   const [providerScope, setProviderScope] = useState<
     'EXTERNAL' | 'INTERNAL' | 'ALL'
   >('EXTERNAL');
+  const [iikoChecks, setIikoChecks] = useState<Record<string, { loading?: boolean; result?: any; error?: string }>>({});
   const [reviewTarget, setReviewTarget] = useState<{
     slug: string;
     name: string;
@@ -214,6 +216,17 @@ export default function App() {
         (await response.json().catch(() => null))?.message || 'Request failed',
       );
     return response;
+  };
+
+  const checkIikoConnection = async (slug: string) => {
+    setIikoChecks(previous => ({ ...previous, [slug]: { loading: true } }));
+    try {
+      const response = await apiFetch(`/api/v1/iiko-connections/${encodeURIComponent(slug)}/check`, { method: 'POST' });
+      const result = await response.json();
+      setIikoChecks(previous => ({ ...previous, [slug]: { result } }));
+    } catch (cause) {
+      setIikoChecks(previous => ({ ...previous, [slug]: { error: cause instanceof Error ? cause.message : 'Tekshiruv bajarilmadi.' } }));
+    }
   };
 
   const login = async (event: React.FormEvent) => {
@@ -1383,6 +1396,8 @@ export default function App() {
           {/* 3. PROVIDERS TAB */}
           {activeTab === 'providers' && (
             <div className="space-y-6">
+              <IikoAdminConnection apiBase={API_BASE} token={token}
+                onConnected={() => { void queryClient.invalidateQueries({ queryKey: ['admin-providers'] }); }} />
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-bold text-white">
@@ -2149,6 +2164,22 @@ export default function App() {
                             )}
                           </div>
 
+                          {p.adapterType === 'iiko' && (
+                            <div className="rounded-xl border border-amber-500/25 bg-amber-950/15 p-3 text-xs space-y-2">
+                              <div className="font-bold text-amber-100">iiko Cloud ulanishi</div>
+                              <div className="text-slate-300">Restoran: {p.metadata?.iiko?.organizationName || '—'} · Menyu: {p.metadata?.iiko?.menuName || '—'} · {p.metadata?.iiko?.productCount ?? 0} mahsulot</div>
+                              <div className="text-slate-400">Organization: {p.config?.organizationId || '—'} · POS group: {p.config?.terminalGroupId || '—'}</div>
+                              <button type="button" onClick={() => checkIikoConnection(p.slug)} disabled={iikoChecks[p.slug]?.loading}
+                                className="rounded border border-amber-400/40 px-2 py-1 font-semibold text-amber-100 disabled:opacity-50">
+                                {iikoChecks[p.slug]?.loading ? 'Tekshirilmoqda…' : 'Menyu va terminalni tekshirish'}
+                              </button>
+                              {iikoChecks[p.slug]?.result && <p className={iikoChecks[p.slug].result.connected && iikoChecks[p.slug].result.terminalOnline && iikoChecks[p.slug].result.productCount > 0 ? 'text-emerald-300' : 'text-amber-300'}>
+                                {iikoChecks[p.slug].result.connected ? `${iikoChecks[p.slug].result.productCount} mahsulot · POS ${iikoChecks[p.slug].result.terminalOnline ? 'online' : 'offline'}` : 'Ulanishning bir qismi topilmadi.'}
+                              </p>}
+                              {iikoChecks[p.slug]?.error && <p role="alert" className="text-rose-300">{iikoChecks[p.slug].error}</p>}
+                            </div>
+                          )}
+
                           {(p.supportContact?.phone || p.supportContact?.telegram || p.supportContact?.email || p.supportContact?.supportUrl || p.supportContact?.supportNote) && (
                             <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-3 text-xs space-y-2">
                               <div className="font-semibold text-indigo-100">Mijozga ko‘rinadigan yordam</div>
@@ -2238,7 +2269,10 @@ export default function App() {
 
                           <div className="pt-3 border-t border-slate-800 flex items-center justify-between flex-wrap gap-2">
                             <div className="flex flex-wrap gap-2">
-                              <button
+                              {p.adapterType === 'iiko' && <p className="text-xs text-amber-300">
+                                Buyurtmani kassir terminalida bekor qilish tasdiqlanmaguncha avtomatik certification va publication yopiq.
+                              </p>}
+                              {p.adapterType !== 'iiko' && <button
                                 onClick={() => certifyMutation.mutate(p.slug)}
                                 disabled={certifyMutation.isPending}
                                 aria-busy={
@@ -2259,8 +2293,8 @@ export default function App() {
                                     ? 'Tekshirilmoqda...'
                                     : 'Run Capability Certification'}
                                 </span>
-                              </button>
-                              {(p.isCertified || p.metadata?.isCertified) &&
+                              </button>}
+                              {p.adapterType !== 'iiko' && (p.isCertified || p.metadata?.isCertified) &&
                                 (p.reviewStatus === 'PENDING_APPROVAL' ||
                                   p.metadata?.reviewStatus ===
                                     'PENDING_APPROVAL') && (

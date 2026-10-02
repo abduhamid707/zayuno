@@ -8,3 +8,7 @@ export * from './managed-connector';
 export * from './connectors/uzum-connector';
 export * from './connectors/synthetic-connector';
 export * from './managed-connector-adapter';
+export * from './connectors/iiko/iiko-types';
+export * from './connectors/iiko/iiko-token-manager';
+export * from './connectors/iiko/iiko-client';
+export * from './connectors/iiko/iiko-adapter';

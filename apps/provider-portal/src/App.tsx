@@ -889,6 +889,7 @@ export default function App() {
             providerSlug={providerData?.slug}
             token={token}
             apiBaseUrl={API_BASE}
+            onProviderConnected={() => { void refetchProvider(); }}
           />
         )}
         {activeTab === 'onboarding' && (

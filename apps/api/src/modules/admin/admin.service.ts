@@ -225,6 +225,12 @@ export class AdminService {
         capabilities: p.capabilities,
         adapterType: p.adapterType,
         baseUrl: p.baseUrl,
+        config: p.adapterType === 'iiko' ? {
+          organizationId: (p.config as any)?.organizationId,
+          terminalGroupId: (p.config as any)?.terminalGroupId,
+          externalMenuId: (p.config as any)?.externalMenuId,
+          currency: (p.config as any)?.currency,
+        } : undefined,
         supportContact,
         isCertified: Boolean(meta.isCertified),
         reviewStatus: meta.reviewStatus || 'DRAFT',

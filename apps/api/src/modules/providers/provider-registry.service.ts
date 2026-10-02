@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { ProviderAdapter, ProviderCapability } from '@zayuno/contracts';
-import { ProviderAdapterConfig, CapabilityNotSupportedError, RemoteHttpProviderAdapter, ManagedConnectorAdapter } from '@zayuno/provider-sdk';
+import { ProviderAdapterConfig, CapabilityNotSupportedError, RemoteHttpProviderAdapter, ManagedConnectorAdapter, IikoProviderAdapter } from '@zayuno/provider-sdk';
 import { prisma } from '@zayuno/database';
 import { decryptSecret, NotFoundError, Logger } from '@zayuno/shared';
 import { SandboxProviderAdapter } from '@zayuno/sandbox-provider';
@@ -18,6 +18,8 @@ export class ProviderRegistryService implements OnModuleInit {
     this.registerFactory('sandbox', (config) => new SandboxProviderAdapter(config));
     // Register generic remote HTTP adapter factory for external providers
     this.registerFactory('remote-http', (config) => new RemoteHttpProviderAdapter(config));
+    // Register official iikoCloud adapter factory
+    this.registerFactory('iiko', (config) => new IikoProviderAdapter(config));
     // Register generic managed-connector adapter factory
     this.registerFactory('managed-connector', (config) => {
       const loader = async () => {
@@ -40,7 +42,7 @@ export class ProviderRegistryService implements OnModuleInit {
       };
       return new ManagedConnectorAdapter(config, loader);
     });
-    this.logger.info('Registered "sandbox", "remote-http", and "managed-connector" adapter factories.');
+    this.logger.info('Registered "sandbox", "remote-http", "iiko", and "managed-connector" adapter factories.');
   }
 
   registerFactory(adapterType: string, factory: AdapterFactory): void {

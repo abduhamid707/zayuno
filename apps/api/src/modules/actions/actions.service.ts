@@ -515,35 +515,60 @@ export class ActionsService {
       reason: input.reason
     });
 
-    await prisma.action.update({
-      where: { id: action.id },
-      data: { status: DbActionStatus.CANCELLED }
-    });
+    const isConfirmedCancelled = cancelResult.success && cancelResult.newStatus === ActionStatus.CANCELLED;
 
-    await prisma.actionEvent.create({
-      data: {
-        actionId: action.id,
-        status: DbActionStatus.CANCELLED,
-        description: `Action cancelled (${input.reasonCode || 'CUSTOMER_CANCELLED'}): ${input.reason || 'Customer requested cancellation'}`,
-        source: 'AI_AGENT',
-        payload: {
-          reasonCode: input.reasonCode || 'CUSTOMER_CANCELLED',
-          reason: input.reason
+    if (isConfirmedCancelled) {
+      await prisma.action.update({
+        where: { id: action.id },
+        data: { status: DbActionStatus.CANCELLED }
+      });
+
+      await prisma.actionEvent.create({
+        data: {
+          actionId: action.id,
+          status: DbActionStatus.CANCELLED,
+          description: `Action cancelled (${input.reasonCode || 'CUSTOMER_CANCELLED'}): ${input.reason || 'Customer requested cancellation'}`,
+          source: 'AI_AGENT',
+          payload: {
+            reasonCode: input.reasonCode || 'CUSTOMER_CANCELLED',
+            reason: input.reason
+          }
         }
-      }
-    });
+      });
 
-    await this.natsService.publish(ZayunoEventTopic.ACTION_CANCELLED, {
-      eventId: `evt_${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      actionId: action.id,
-      publicId: action.publicId,
-      providerSlug: action.provider.slug,
-      previousStatus: this.mapDbStatusToContract(action.status),
-      newStatus: ActionStatus.CANCELLED,
-      source: 'AI_AGENT',
-      reason: input.reason
-    });
+      await this.natsService.publish(ZayunoEventTopic.ACTION_CANCELLED, {
+        eventId: `evt_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        actionId: action.id,
+        publicId: action.publicId,
+        providerSlug: action.provider.slug,
+        previousStatus: this.mapDbStatusToContract(action.status),
+        newStatus: ActionStatus.CANCELLED,
+        source: 'AI_AGENT',
+        reason: input.reason
+      });
+    } else {
+      // Cancellation was not confirmed by provider (e.g. InProgress or verification error).
+      // Do NOT set action status to CANCELLED in DB and do NOT publish ACTION_CANCELLED event.
+      await prisma.actionEvent.create({
+        data: {
+          actionId: action.id,
+          status: action.status,
+          description: `Action cancellation requested (${input.reasonCode || 'CUSTOMER_CANCELLED'}), but provider status is ${cancelResult.newStatus} (success: ${cancelResult.success}): ${cancelResult.message}`,
+          source: 'AI_AGENT',
+          payload: {
+            reasonCode: input.reasonCode || 'CUSTOMER_CANCELLED',
+            reason: input.reason,
+            providerResult: {
+              success: cancelResult.success,
+              previousStatus: cancelResult.previousStatus,
+              newStatus: cancelResult.newStatus,
+              message: cancelResult.message
+            }
+          }
+        }
+      });
+    }
 
     // Provider cancel endpoints may return their own external/public ID. The
     // Zayuno action reference must remain stable across initial and repeated

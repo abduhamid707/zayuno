@@ -17,6 +17,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { connectorStatus, createRequestGate, formatSyncTime, integrationsUrl } from './integrations-model';
+import { IikoConnection } from './IikoConnection';
 import './integrations.css';
 
 interface ConnectorInstanceDto {
@@ -73,18 +74,19 @@ interface PreviewProduct {
 
 const PLANNED_DEFINITIONS = [
   { id: 'billz', name: 'Billz POS', description: 'Do‘kon tovarlari va qoldiqlarini ulash.' },
-  { id: 'iiko', name: 'iiko / Jowi', description: 'Restoran menyusi va narxlarini ulash.' },
   { id: 'yclients', name: 'YCLIENTS / Dikidi', description: 'Xizmatlar va bo‘sh vaqtlarni ulash.' }
 ];
 
 export function IntegrationsView({
   providerSlug,
   token,
-  apiBaseUrl = ''
+  apiBaseUrl = '',
+  onProviderConnected
 }: {
   providerSlug?: string;
   token?: string;
   apiBaseUrl?: string;
+  onProviderConnected?: () => void;
 }) {
   const [instances, setInstances] = useState<ConnectorInstanceDto[]>([]);
   const [definitions, setDefinitions] = useState<ConnectorDefinitionDto[]>([]);
@@ -491,6 +493,8 @@ export function IntegrationsView({
           <span>{successMessage}</span>
         </div>
       )}
+
+      <IikoConnection token={token} apiBaseUrl={apiBaseUrl} providerSlug={providerSlug} onConnected={onProviderConnected} />
 
       {/* Active Connectors List */}
       <div style={{ marginBottom: 32 }}>

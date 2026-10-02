@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CurrencySchema = z.enum(['UZS', 'USD', 'EUR']).default('UZS');
+export const CurrencySchema = z.enum(['UZS', 'USD', 'EUR', 'RUB']).default('UZS');
 export type Currency = z.infer<typeof CurrencySchema>;
 
 /**

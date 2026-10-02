@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["test-iiko-live-e2e.ts", "test-iiko-live-e2e-guardrails.ts"]
+}
