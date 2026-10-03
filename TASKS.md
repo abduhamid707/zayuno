@@ -4948,10 +4948,10 @@ To‘liq keyingi-agent prompt: `docs/AI_AGENT_DEMAND_MOBILE_HANDOFF.md`.
 **Tekshiruv:** node --env-file=.env.iiko-demo.local --import tsx tests/test-iiko-live-e2e.ts (read-only va order rejimlari). Maxfiy konfiguratsiya logga chiqarilmadi. Kod yoki deploy o‘zgartirilmadi. **Qolgan:** certification/publication guard dalilini provider darajasida to‘g‘ri saqlash va admin ko‘rinishini yangilash; demo provider hozircha DRAFT. **Keyingi qadam:** mavjud guard implementationini tekshirib, tasdiqlangan demo provider uchun audit/certification oqimini moslashtirish.
 
 ## iiko sertifikatsiya va ACTIVE oqimi — 2026-10-03
-- [ ] Native iiko uchun xavfsiz admin test fixture va create/status/cancel sertifikatsiyasini qo‘shish; generic HTTP STRICT tekshiruvni native adapterga qo‘llamaslik.
-- [ ] Admin panelda test, reviewga yuborish va ACTIVE qadamlarini ochish; boshqa adapterlar qoidalarini saqlash.
-- [ ] Negative regression testlar, API/admin build, foydalanuvchi qo‘llanmasi.
-- [ ] Tegishli fayllarni commit/push qilish va deployni tasdiqlash.
+- [x] Native iiko uchun xavfsiz admin test fixture va create/status/cancel sertifikatsiyasini qo‘shish; generic HTTP STRICT tekshiruvni native adapterga qo‘llamaslik.
+- [x] Admin panelda test, reviewga yuborish va ACTIVE qadamlarini ochish; boshqa adapterlar qoidalarini saqlash.
+- [x] Negative regression testlar, API/admin build, foydalanuvchi qo‘llanmasi.
+- [x] Tegishli fayllarni commit/push qilish va deployni tasdiqlash.
 **Holat:** tekshiruv boshlandi. iiko blanket bloklari providers.service.ts va admin App.tsxda. Generic STRICT native iiko uchun transport probe talab qiladi. Keyingi qadam: alohida native sertifikatsiya runner, operator ruxsat bergan test fixture va tasdiqlangan cancellation.
 
 ### Native iiko oqimi bajarildi
@@ -4960,3 +4960,17 @@ To‘liq keyingi-agent prompt: `docs/AI_AGENT_DEMAND_MOBILE_HANDOFF.md`.
 - [x] Jonli native sinov 9/9 PASS: 8a0f8d45-0ef7-4ce4-9aac-b97f68bd0227, 100 RUB, avtomatik Cancelled. Eski generic STRICT oqim o‘zgarmadi; 7 domain va 11 adversarial test PASS.
 - [x] Native negative tests, iiko 23/23, live harness guardrails 16/16, provider certification guards PASS. shared/provider-sdk/API/admin buildlari PASS. docs/iiko-activation.md yo‘riqnomasi qo‘shildi.
 **O‘zgargan fayllar:** native iiko SDK runner va exports/report mode, shared certification validator, API providers/admin/actions, admin IikoCertificationPanel va App, tests/test-iiko-native-certification.ts, docs/iiko-activation.md. **Qolgan:** oxirgi qo‘shimcha guard buildi, selective commit/push, deploy va production API sinovi. **Keyingi qadam:** faqat shu fayllarni stage qilish; boshqa mobile/DemandDashboard/deploy o‘zgarishlarini saqlash.
+
+### Push/deploy holati
+- [x] Native oqim commit 36ba74d1af50f7024113f78afd6e73d84a03ed62 push qilindi; CI va barcha image buildlar PASS.
+- [x] ACTIVE xatosini kartada ko‘rsatish follow-up 42a6c5d7e980aae492238dc7449b1bf5f7098aec push qilindi; CI va barcha image buildlar PASS.
+- [x] Production deploy 37106017877 (native API/admin), keyingi 37106144517 (admin error UI) tugashi va runtime verifikatsiya.
+**Holat:** barcha kod/testlar tayyor; server image pull bosqichida. api.zayuno.uz/health OK. Keyingi qadam: workflow tugashini tasdiqlash, production admin API certify/publish orqali aynan koolo demo targetni tekshirish va ACTIVE qilish. Temporary .tmp-production-iiko.cjs local fixture/HTTP verify uchun, commit qilinmaydi va sinovdan so‘ng o‘chiriladi.
+
+### Production yakuniy tasdiq — 2026-10-03
+- [x] 37106017877 va 37106144517 deploylari SUCCESS; ikkala runtime commit CI/image buildlari SUCCESS.
+- [x] Production admin HTTP certify endpointi orqali koolo 9/9 NATIVE_IIKO PASS; order 71c44005-5127-4b13-ac58-4b56d2da4472, 100 RUB, yakuniy Cancelled tasdiqlandi. Hisobot provider metadata ichida saqlandi.
+- [x] Production admin HTTP publish endpointi orqali koolo ACTIVE / APPROVED / isPublished true / COMPLIANT / VISIBLE bo‘ldi. DBda statusni qo‘lda almashtirish ishlatilmadi.
+- [x] MCPning mavjud server API credentiali bilan production discovery Мой ресторанni qaytardi; catalog 1 ta Zayuno DEMO taom 100 RUB; core quotes endpointi 100 RUB verified quote berdi (buyurtma yaratilmagan).
+- [x] admin.zayuno.uz bundle index-DPEv0zBN.js yangi native formani va ACTIVE xato ko‘rinishini saqlaydi; eski blanket warning yo‘q.
+**Yakun:** foydalanuvchi so‘ragan oqim tayyor va demo restoran aktiv. Faqat TASKS.md so‘nggi status commit qilinadi; boshqa agentlar/mobile/DemandDashboard/deploy fayllari o‘zgarishlari saqlangan. Lokal vaqtinchalik production verifikatsiya skripti o‘chirildi. **Amaliy limit:** native holat API orqali so‘ralganda yangilanadi; online Click/Payme integratsiyasi bu ish doirasida qo‘shilmadi; demo valyutasi RUB. **Keyingi qadam:** foydalanuvchi Zayuno appda Мой ресторан / Zayuno DEMO taomni qidirib sinaydi; test tugagach demo Suspend qilinishi mumkin. Boshqa restoran uchun docs/iiko-activation.md qadamlaridan foydalaniladi.
