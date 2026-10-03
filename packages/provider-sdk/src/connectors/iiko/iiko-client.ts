@@ -485,6 +485,21 @@ export class IikoClient {
     return this.callApi<IikoCreateDeliveryResponse>('/api/1/deliveries/create', request);
   }
 
+  async getAllowedDeliveryRestrictions(request: {
+    organizationIds: string[]; isCourierDelivery: boolean; deliveryAddress: { line1: string; city?: string | null };
+    orderLocation?: { latitude: number; longitude: number }; deliverySum: number;
+  }): Promise<{ isAllowed: boolean; location?: { latitude: number; longitude: number }; allowedItems: Array<{
+    organizationId: string; terminalGroupId: string; deliveryDurationInMinutes: number; zone?: string | null;
+  }>; rejectedItems?: unknown[] }> {
+    return this.callApi('/api/1/delivery_restrictions/allowed', request);
+  }
+
+  async getDeliveryRestrictions(organizationIds: string[]): Promise<{ deliveryRestrictions: Array<{
+    organizationId: string; restrictions: unknown[]; deliveryZones: unknown[];
+  }> }> {
+    return this.callApi('/api/1/delivery_restrictions', { organizationIds });
+  }
+
   /**
    * Retrieves order details by order IDs.
    */

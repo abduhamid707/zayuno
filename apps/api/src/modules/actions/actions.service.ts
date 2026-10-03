@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { ProviderRegistryService } from '../providers/provider-registry.service';
 import { ProvidersService } from '../providers/providers.service';
 import { NatsService } from '../../common/services/nats.service';
@@ -64,8 +64,10 @@ export class ActionsService {
     const cleanSlug = input.providerSlug.toLowerCase().trim();
     input.items ??= [];
 
-    // Idempotency key: use client-provided key or generate a unique random UUID
-    const idempotencyKey = input.idempotencyKey || randomUUID();
+    // An authenticated caller's retry of the same quote uses the same key.
+    // Anonymous retries still require a secret client key; quote IDs are not credentials.
+    const idempotencyKey = input.idempotencyKey || (userId && input.quoteId
+      ? `quote:${createHash('sha256').update(`${userId}:${cleanSlug}:${input.quoteId}`).digest('hex')}` : randomUUID());
     input.idempotencyKey = idempotencyKey;
 
     // Explicit confirmation guardrail check
@@ -100,7 +102,7 @@ export class ActionsService {
     // guessed/reused a key could receive the first consumer's action.
     const scopedIdempotencyKey = `${userId || 'anonymous'}:${input.idempotencyKey}`;
     const idempotencyLockKey = `action:${scopedIdempotencyKey}`;
-    const lockAcquired = await this.redisService.acquireLock(idempotencyLockKey, 30);
+    const lockAcquired = await this.redisService.acquireLock(idempotencyLockKey, 120);
     if (!lockAcquired) {
       const concurrentAction = await prisma.action.findUnique({
         where: { idempotencyKey: scopedIdempotencyKey },
@@ -117,6 +119,12 @@ export class ActionsService {
       throw new IdempotencyError();
     }
 
+    // Serialize the quote even when two clients supply different keys.
+    const quoteLockKey = `action-quote:${cleanSlug}:${input.quoteId}`;
+    if (!await this.redisService.acquireLock(quoteLockKey, 120)) {
+      await this.redisService.releaseLock(idempotencyLockKey);
+      throw new IdempotencyError();
+    }
     try {
       // 1. Idempotency Check in Database
       const existingAction = await prisma.action.findUnique({
@@ -285,7 +293,8 @@ export class ActionsService {
         discount: dbQuote.discount !== null && dbQuote.discount !== undefined ? Number(dbQuote.discount) : 0,
         total: Number(dbQuote.total),
         currency: (dbQuote.currency as 'UZS' | 'USD' | 'EUR') || 'UZS',
-        lines: Array.isArray(dbQuote.lines) ? (dbQuote.lines as any) : []
+        lines: Array.isArray(dbQuote.lines) ? (dbQuote.lines as any) : [],
+        parameters: (dbQuote.parameters as Record<string, any>) || {}
       };
 
       const providerAction = await adapter.createAction({
@@ -359,13 +368,13 @@ export class ActionsService {
           longitude: input.destination?.coordinates?.longitude,
           fulfillmentType: input.fulfillmentType || 'STANDARD',
           externalActionId: providerAction.externalActionId,
-          paymentMethod: input.paymentMethod || 'PAYME',
+          paymentMethod: input.paymentMethod || providerAction.paymentMethod || undefined,
           paymentStatus: (providerAction.paymentStatus || PaymentStatus.PENDING) as DbPaymentStatus,
           paymentUrl: providerPaymentUrl,
           idempotencyKey: scopedIdempotencyKey,
           idempotencyHash: idempotencyPayloadHash,
           parameters: (input.parameters as any) || {},
-          metadata: input.locationId ? { providerLocationId: input.locationId } : {}
+          metadata: { ...(provider.adapterType === 'iiko' ? providerAction.metadata || {} : {}), ...(input.locationId ? { providerLocationId: input.locationId } : {}) }
         },
         include: { provider: true, location: true, timeline: true }
       });
@@ -404,6 +413,7 @@ export class ActionsService {
 
       return this.mapDbActionToNormalized(dbAction);
     } finally {
+      await this.redisService.releaseLock(quoteLockKey);
       await this.redisService.releaseLock(idempotencyLockKey);
     }
   }
@@ -600,6 +610,10 @@ export class ActionsService {
     if (action.provider && action.provider.environment !== targetEnv) {
       throw new EnvironmentNotAllowedError(action.provider.slug, action.provider.environment, targetEnv);
     }
+    if (action.provider.adapterType === 'iiko' && !action.paymentUrl) {
+      return toPublicPaymentOptions([{ id: 'cash', name: 'Yetkazilganda naqd to‘lash', type: 'CASH_ON_DELIVERY', isOnline: false,
+        instructions: 'Buyurtma yetkazilganda kuryerga naqd to‘laysiz.', supportedCurrencies: [action.currency] }] as any);
+    }
     const adapter = await this.registry.assertAndGetCapability(action.provider.slug, ProviderCapability.PAYMENT_OPTIONS);
     if (this.providersService) {
       await this.providersService.assertProviderCapabilityEligible(action.provider.slug, ProviderCapability.PAYMENT_OPTIONS, targetEnv);
@@ -724,7 +738,7 @@ export class ActionsService {
       },
       destination: dbAction.destination ? { raw: dbAction.destination } : undefined,
       fulfillmentType: dbAction.fulfillmentType,
-      paymentMethod: dbAction.paymentMethod || undefined,
+      paymentMethod: dbAction.provider?.adapterType === 'iiko' && !dbAction.paymentUrl ? 'CASH' : dbAction.paymentMethod || undefined,
       paymentStatus: dbAction.paymentStatus as PaymentStatus,
       paymentUrl: dbAction.paymentUrl || undefined,
       idempotencyKey: dbAction.idempotencyKey || undefined,

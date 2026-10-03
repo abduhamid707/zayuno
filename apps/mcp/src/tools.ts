@@ -1274,7 +1274,7 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
             ]
           };
         } catch (err: any) {
-          const presentation = buildAgentErrorEnvelope(err);
+          const presentation = buildAgentErrorEnvelope(err, tool.name);
           const errorPayload = { ...presentation, message: presentation.customerMessage };
           return {
             isError: true,

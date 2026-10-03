@@ -220,7 +220,7 @@ export class ConsumerChatService {
     if (!state.quote || Date.parse(state.quote.expiresAt) <= Date.now()) {
       delete state.confirmation;
       await save();
-      state.quote = await this.quotesService.requestQuote(this.actionInput(state) as any);
+      state.quote = await this.quotesService.requestQuote(this.actionInput(state) as any, { userId: input.userId });
       await save();
       const missingAction = conversationRequirements(state, 'ACTION_CREATE');
       if (missingAction.length) return this.ask(state, missingAction, formatCustomerQuote(state.quote, provider));
@@ -306,7 +306,9 @@ export class ConsumerChatService {
   private actionInput(state: ConversationState): any {
     return { providerSlug: state.providerSlug!, environment: state.environment, locationId: state.locationId,
       items: state.selectedOffering ? [{ offeringId: state.selectedOffering.id, variantId: state.selectedVariant, quantity: state.quantity, selectedOptions: state.selectedOptions }] : [],
-      parameters: state.parameters, customer: state.customer, locations: state.locations, fulfillmentType: state.fulfillment, paymentMethod: state.paymentMethod };
+      parameters: state.parameters, customer: state.customer, locations: state.locations,
+      destination: state.locations.find(location => location.role === 'DESTINATION')?.address,
+      fulfillmentType: state.fulfillment, paymentMethod: state.paymentMethod };
   }
   private async submit(state: ConversationState, userId: string, save: () => Promise<void>): Promise<ChatResult> {
     const reviewEmail = process.env.PLAY_REVIEW_EMAIL?.trim().toLowerCase();

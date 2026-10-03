@@ -97,6 +97,10 @@ export enum ProviderCategory {
 
 const PROVIDER_CATEGORY_ALIASES: Record<string, ProviderCategory> = {
   food: ProviderCategory.FOOD_AND_DRINK,
+  meal: ProviderCategory.FOOD_AND_DRINK,
+  ovqat: ProviderCategory.FOOD_AND_DRINK,
+  taom: ProviderCategory.FOOD_AND_DRINK,
+  osh: ProviderCategory.FOOD_AND_DRINK,
   food_and_drink: ProviderCategory.FOOD_AND_DRINK,
   food_delivery: ProviderCategory.FOOD_AND_DRINK,
   food_dining: ProviderCategory.FOOD_AND_DRINK,

@@ -16,7 +16,7 @@ export const LocationSchema = z.object({
   address: z.string().min(1),
   coordinates: optionalNullable(CoordinatesSchema),
   operatingHours: optionalNullable(LocationOperatingHoursSchema),
-  serviceRadiusKm: optionalNullable(z.number().nonnegative(), 10.0),
+  serviceRadiusKm: optionalNullable(z.number().nonnegative()),
   isActive: z.boolean().default(true),
   metadata: optionalNullable(z.record(z.any()), {})
 });

@@ -42,6 +42,8 @@ import { ResourceUnavailableError, QuoteExpiredError, ProviderError } from '../.
 import { NotFoundError } from '@zayuno/shared';
 import crypto from 'node:crypto';
 import { IikoClient } from './iiko-client';
+import { searchIikoCatalog } from './catalog-search';
+import { IIKO_DELIVERY_MANIFEST } from '@zayuno/contracts';
 import {
   IikoCredentials,
   IikoProduct,
@@ -139,6 +141,7 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
       complianceStatus: ProviderComplianceStatus.COMPLIANT,
       profile: ProviderOperatingProfile.TRANSACTIONAL,
       discoveryVisibility: ProviderDiscoveryVisibility.VISIBLE,
+      manifest: IIKO_DELIVERY_MANIFEST,
       metadata: {},
       supportContact: this.config.metadata?.supportContact || {
         phone: '+998712000000',
@@ -198,13 +201,16 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
         providerId: this.providerSlug,
         providerLocationId: tg.id,
         name: org ? `${org.name} (${tg.name})` : tg.name,
-        address: tg.address || org?.name || 'Tashkent, Uzbekistan',
+        address: tg.address || org?.restaurantAddress || 'Manzil iiko tomonidan berilmagan',
+        coordinates: typeof org?.latitude === 'number' && typeof org?.longitude === 'number' ? { latitude: org.latitude, longitude: org.longitude } : undefined,
         isActive: true,
-        serviceRadiusKm: 10.0,
+        serviceRadiusKm: undefined,
         metadata: {
           organizationId: tg.organizationId,
           terminalGroupId: tg.id,
-          timeZone: tg.timeZone
+          timeZone: tg.timeZone,
+          addressVerified: !!(tg.address || org?.restaurantAddress),
+          deliveryCoverage: 'CHECK_AT_QUOTE'
         }
       });
     }
@@ -582,14 +588,7 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
       locationId: input.locationId,
       categorySlug: input.categorySlug
     });
-    const q = (input.query || '').toLowerCase().trim();
-
-    return catalog.offerings.filter((o) => {
-      const matchTitle = o.title.toLowerCase().includes(q);
-      const matchDesc = (o.description || '').toLowerCase().includes(q);
-      const matchTag = (o.tags || []).some((t) => t.toLowerCase().includes(q));
-      return matchTitle || matchDesc || matchTag;
-    });
+    return searchIikoCatalog(catalog.offerings, input.query || '', input.limit);
   }
 
   async requestQuote(input: RequestQuoteInput): Promise<NormalizedQuote> {
@@ -674,13 +673,28 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
       });
     }
 
-    // Calculate delivery fee: strictly default to 0 if not provided or configured
-    const deliveryFee = Number(canonicalInput.parameters?.deliveryFee ?? this.config.config?.deliveryFee ?? 0);
+    const destination = canonicalInput.destination || canonicalInput.locations?.find(location => location.role === 'DESTINATION')?.address;
+    if (!destination?.raw?.trim()) throw new ProviderError('Delivery destination is required before quote.', 400, 'VALIDATION_ERROR', { missingFields: ['destination'], requiredBeforeQuote: ['destination'] });
+    const terminalGroupId = await this.resolveTerminalGroupId(orgId, canonicalInput.locationId);
+    const restrictions = await this.client.getAllowedDeliveryRestrictions({
+      organizationIds: [orgId], isCourierDelivery: true,
+      deliveryAddress: { line1: destination.raw, city: destination.city },
+      orderLocation: destination.coordinates || undefined, deliverySum: subtotal,
+    });
+    const allowed = restrictions.allowedItems?.find(item => item.terminalGroupId === terminalGroupId && item.organizationId === orgId);
+    if (!allowed && !restrictions.rejectedItems?.length) {
+      const settings = (await this.client.getDeliveryRestrictions([orgId])).deliveryRestrictions.find(item => item.organizationId === orgId);
+      if (!settings || !settings.restrictions?.length && !settings.deliveryZones?.length) throw new ProviderError('Delivery coverage is not configured in iiko.', 400, 'VALIDATION_ERROR', { reason: 'DELIVERY_COVERAGE_NOT_CONFIGURED' });
+    }
+    if (!restrictions.isAllowed || !allowed) throw new ResourceUnavailableError('This destination or basket is outside the selected branch delivery conditions.', { deliveryCoverage: 'REJECTED', rejectedItems: restrictions.rejectedItems });
+    // Provider settings own fees; a caller must not lower the agreed delivery fee.
+    const deliveryFee = Number(this.config.config?.deliveryFee ?? 0);
     const fees = deliveryFee > 0 ? [{ name: 'Delivery Fee', amount: deliveryFee }] : [];
     const totalFees = fees.reduce((sum, f) => sum + f.amount, 0);
     const total = subtotal + totalFees;
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const terminal = (await this.client.getTerminalGroups([orgId])).find(group => group.id === terminalGroupId);
 
     return {
       id: `ZY-QT-IIKO-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`,
@@ -695,10 +709,16 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
       total,
       currency,
       expiresAt,
-      estimatedDurationMinutes: 40,
+      estimatedDurationMinutes: allowed.deliveryDurationInMinutes > 0 ? allowed.deliveryDurationInMinutes : undefined,
       parameters: {
         organizationId: orgId,
-        fulfillmentType: canonicalInput.fulfillmentType || 'STANDARD'
+        terminalGroupId,
+        fulfillmentType: canonicalInput.fulfillmentType || 'STANDARD',
+        paymentMethod: 'CASH', paymentInstructions: 'Naqd — buyurtma yetkazilganda kuryerga to‘laysiz.',
+        deliveryCoverage: 'VERIFIED', deliveryZone: allowed.zone,
+        deliveryCoordinates: restrictions.location || destination.coordinates,
+        etaSource: 'IIKO_DELIVERY_RESTRICTIONS',
+        deliveryDurationMinutes: allowed.deliveryDurationInMinutes, terminalTimeZone: terminal?.timeZone
       }
     };
   }
@@ -723,6 +743,7 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
 
     const orgId = await this.resolveOrganizationId(canonicalInput.locationId);
     const tgId = await this.resolveTerminalGroupId(orgId, canonicalInput.locationId);
+    if (quote.parameters?.terminalGroupId && quote.parameters.terminalGroupId !== tgId) throw new ProviderError('Branch changed after quote. Request a fresh quote.', 409, 'QUOTE_MISMATCH');
 
     // Build iiko OrderItems
     const items: IikoOrderItem[] = quote.lines.map((line) => {
@@ -754,7 +775,8 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
       );
     }
 
-    const destination = canonicalInput.destination;
+    if (canonicalInput.paymentMethod && canonicalInput.paymentMethod.toUpperCase() !== 'CASH') throw new ProviderError('This connection supports cash on delivery only.', 400, 'VALIDATION_ERROR');
+    const destination = canonicalInput.destination || canonicalInput.locations?.find(location => location.role === 'DESTINATION')?.address;
     const destAny = ((input as any).destination || destination) as any;
     const rawDestination = destination?.raw?.trim() || destAny?.street?.trim() || destination?.city?.trim();
     if (!destination || !rawDestination) {
@@ -798,7 +820,7 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
       organizationId: orgId,
       terminalGroupId: tgId,
       order: {
-        id: crypto.randomUUID(),
+        id: this.deliveryOrderId(canonicalInput.quoteId),
         phone: customerPhone,
         orderServiceType: 'DeliveryByCourier',
         deliveryPoint: {
@@ -816,12 +838,28 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
           comment: 'Zayuno Delivery Order'
         },
         items,
-        comment: `Zayuno Order ${canonicalInput.quoteId}`
+        comment: `Zayuno #${this.deliveryOrderId(canonicalInput.quoteId).slice(0, 8).toUpperCase()}`
       }
     };
+    const duration = quote.parameters?.deliveryDurationMinutes;
+    const offset = String(quote.parameters?.terminalTimeZone || '').match(/^([+-]?)(\d{1,2}):(\d{2})/);
+    if (Number.isInteger(duration) && duration > 0 && offset) {
+      const offsetMinutes = (Number(offset[2]) * 60 + Number(offset[3])) * (offset[1] === '-' ? -1 : 1);
+      createRequest.order.completeBefore = new Date(Date.now() + (duration + offsetMinutes) * 60000).toISOString().replace('T', ' ').slice(0, 23);
+    }
 
-    const response = await this.client.createDeliveryOrder(createRequest);
-    const orderInfo = response.orderInfo;
+    // Stable provider order ID survives retries, including a crash before Core persists.
+    let orderInfo: IikoOrderInfo | undefined;
+    try { orderInfo = (await this.client.getOrderById(orgId, [createRequest.order.id!])).orders?.find(order => order.id === createRequest.order.id); }
+    catch (error: any) { if (error.statusCode !== 404 && error.status !== 404) throw error; }
+    if (!orderInfo) {
+      try { orderInfo = (await this.client.createDeliveryOrder(createRequest)).orderInfo; }
+      catch (error) {
+        // Timeout can mean iiko already accepted the request. Reconcile before any retry.
+        try { orderInfo = (await this.client.getOrderById(orgId, [createRequest.order.id!])).orders?.find(order => order.id === createRequest.order.id); } catch {}
+        if (!orderInfo) throw error;
+      }
+    }
 
     const status = mapIikoDeliveryStatusToActionStatus(orderInfo.order?.status, orderInfo.creationStatus);
     const currency = quote.currency || (await this.resolveCurrency(orgId));
@@ -856,7 +894,7 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
         terminalGroupId: tgId,
         creationStatus: orderInfo.creationStatus
       },
-      metadata: {},
+      metadata: { fulfillmentStatus: orderInfo.order?.status || 'SUBMITTING', estimatedArrivalAt: orderInfo.order?.completeBefore, paymentInstructions: 'Naqd — buyurtma yetkazilganda kuryerga to‘laysiz.', paymentStatusVerified: false },
       timeline: [
         {
           id: crypto.randomUUID(),
@@ -989,7 +1027,7 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
         creationStatus: orderInfo.creationStatus,
         iikoStatus: orderInfo.order?.status
       },
-      metadata: {},
+      metadata: { fulfillmentStatus: orderInfo.order?.status || 'SUBMITTING', estimatedArrivalAt: orderInfo.order?.completeBefore, paymentInstructions: 'Naqd — buyurtma yetkazilganda kuryerga to‘laysiz.', paymentStatusVerified: isPaymentConfirmed },
       timeline: [
         {
           id: crypto.randomUUID(),
@@ -1003,6 +1041,13 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
       createdAt: nowIso,
       updatedAt: nowIso
     };
+  }
+
+  private deliveryOrderId(key: string): string {
+    const bytes = crypto.createHash('sha256').update(`${this.providerSlug}:${key}`).digest().subarray(0, 16);
+    bytes[6] = (bytes[6] & 0x0f) | 0x50; bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = bytes.toString('hex');
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
   }
 
   async cancelAction(input: CancelActionInput): Promise<CancelActionResult> {

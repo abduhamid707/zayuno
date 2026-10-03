@@ -99,6 +99,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       customerMessage: presentation.customerMessage,
       agentMessage: presentation.agentMessage,
       recommendedAction: presentation.recommendedAction,
+      ...(presentation.reason ? { reason: presentation.reason } : {}),
+      ...(presentation.missingFields ? { missingFields: presentation.missingFields, requiredBeforeQuote: presentation.requiredBeforeQuote } : {}),
       retryable,
       traceId,
       timestamp: new Date().toISOString()

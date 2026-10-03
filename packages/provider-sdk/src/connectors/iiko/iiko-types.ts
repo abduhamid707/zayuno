@@ -210,6 +210,7 @@ export interface IikoCreateOrderRequest {
   };
   order: {
     id?: string;
+    completeBefore?: string;
     phone: string;
     orderServiceType: IikoOrderServiceType;
     deliveryPoint?: {

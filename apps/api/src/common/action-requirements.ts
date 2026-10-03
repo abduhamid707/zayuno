@@ -34,5 +34,5 @@ export function assertActionRequirements(provider: any, input: any, capability: 
   if (input.paymentMethod && manifest?.supportedPaymentMethods && !manifest.supportedPaymentMethods.includes(input.paymentMethod)) fail('Unsupported payment method.');
 }
 function fail(message: string, missingFields?: string[]): never {
-  throw new ZayunoError(message, 400, 'VALIDATION_ERROR', { missingFields });
+  throw new ZayunoError(message, 400, 'VALIDATION_ERROR', { missingFields, requiredBeforeQuote: missingFields });
 }

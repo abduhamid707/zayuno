@@ -72,6 +72,11 @@ async function run() {
         // ignore
       }
 
+      if (url === '/api/1/delivery_restrictions/allowed') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ isAllowed: true, allowedItems: [{ organizationId: parsedBody.organizationIds[0], terminalGroupId: 'tg_uuid_201', deliveryDurationInMinutes: 60, zone: 'Test zone' }], rejectedItems: [] }));
+        return;
+      }
       // 1. Auth v2
       if (url === '/api/v2/access_token') {
         mockAuthAttempts++;
@@ -357,6 +362,7 @@ async function run() {
           return;
         }
 
+        if (requestedId !== 'iiko_order_uuid_999') { res.end(JSON.stringify({ orders: [] })); return; }
         const isOrderCancelled = mockCancelledOrders.has(requestedId);
         res.end(JSON.stringify({
           correlationId: 'corr_deliv_by_id_1',
@@ -676,6 +682,7 @@ async function run() {
 
       // 2. Request valid item with large size variant + extra cheese modifier
       const quote = await adapter.requestQuote({
+        destination: { raw: 'Tashkent City, Furqat 2' },
         providerSlug: 'iiko-quote-test',
         items: [
           {
@@ -884,6 +891,7 @@ async function run() {
       });
 
       const quote = await moscowAdapter.requestQuote({
+        destination: { raw: 'Moscow, Test street 1' },
         providerSlug: 'iiko-moscow-stand',
         items: [
           {
@@ -1531,7 +1539,7 @@ async function run() {
   // -------------------------------------------------------------
   // Test 11: Live handshake test against https://api-ru.iiko.services
   // -------------------------------------------------------------
-  await test('Live handshake test against api-ru.iiko.services (and credential verification)', async () => {
+  if (process.env.IIKO_LIVE_HANDSHAKE === '1') await test('Live handshake test against api-ru.iiko.services (and credential verification)', async () => {
     const liveClient = new IikoClient({
       baseUrl: 'https://api-ru.iiko.services',
       providerSlug: 'iiko-live-handshake',

@@ -23,7 +23,7 @@ export class QuotesService {
 
   async requestQuote(
     input: RequestQuoteInput,
-    options?: { allowSandboxSimulator?: boolean }
+    options?: { allowSandboxSimulator?: boolean; userId?: string }
   ): Promise<NormalizedQuote> {
     if (!input.providerSlug) {
       throw new BadRequestException('providerSlug is required.');
@@ -80,6 +80,26 @@ export class QuotesService {
     });
 
     const quote = await adapter.requestQuote!(input);
+
+    // Only this authenticated caller and this customer phone participate.
+    // Never disclose another customer's active orders to a shared API-key client.
+    if (provider.adapterType === 'iiko' && options?.userId && input.customer?.phone && adapter.getAction) {
+      const recent = await prisma.action.findMany({ where: {
+        providerId: provider.id, userId: options.userId, customerPhone: input.customer.phone,
+        status: { in: ['SUBMITTED', 'ACCEPTED', 'IN_PROGRESS', 'READY', 'FULFILLING', 'AWAITING_PAYMENT'] },
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      }, orderBy: { createdAt: 'desc' }, take: 5 });
+      const warnings: string[] = [];
+      for (const action of recent) {
+        try {
+          const live = await adapter.getAction({ providerSlug: cleanSlug, actionId: action.externalActionId || action.id });
+          if (['COMPLETED', 'CANCELLED', 'FAILED'].includes(live.status)) continue;
+          const overlap = (Array.isArray(action.lines) ? action.lines as any[] : []).filter(line => input.items.some(item => item.offeringId === line.offeringId));
+          if (overlap.length) warnings.push(`Faol buyurtma ${action.publicId}: ${overlap.map(line => `${line.offeringTitle} × ${line.quantity}`).join(', ')}. Yangi buyurtmada bu mahsulotlar yana qo‘shiladi. Tasdiqlasangiz, alohida buyurtma yaratiladi.`);
+        } catch { /* Unverified order state must never be presented as fact. */ }
+      }
+      quote.parameters = { ...quote.parameters, activeOrderWarnings: warnings };
+    }
 
     // Persist Quote in database with expiration
     if (provider) {

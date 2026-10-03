@@ -52,6 +52,8 @@ const testSuites = [
   "tests/test-production-health-and-lease-real-e2e.ts",
   "tests/test-provider-cache-and-consumer-chat.ts",
   "tests/test-consumer-discovery-regression.ts",
+  "tests/test-iiko-reliability.ts",
+  "tests/test-iiko-cloud-adapter.ts",
   "tests/test-consumer-auth-persistence.ts",
   "tests/test-consumer-refresh-recovery.ts",
   "tests/test-mobile-auth-runtime.ts",

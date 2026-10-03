@@ -8,7 +8,9 @@ export class ZayunoApiError extends Error {
     public readonly retryable?: boolean,
     public readonly customerMessage?: string,
     public readonly agentMessage?: string,
-    public readonly recommendedAction?: string
+    public readonly recommendedAction?: string,
+    public readonly missingFields?: string[],
+    public readonly reason?: string
   ) {
     super(`Zayuno API [${statusCode}]: ${message}`);
     this.name = 'ZayunoApiError';
@@ -69,7 +71,9 @@ export class ZayunoApiClient {
         retryable,
         customerMessage,
         agentMessage,
-        recommendedAction
+        recommendedAction,
+        parsedBody?.missingFields,
+        parsedBody?.reason
       );
     }
 

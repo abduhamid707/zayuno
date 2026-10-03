@@ -55,6 +55,9 @@ export interface AgentErrorPresentation {
   customerMessage: string;
   agentMessage: string;
   recommendedAction: AgentRecommendedAction;
+  missingFields?: string[];
+  requiredBeforeQuote?: string[];
+  reason?: string;
 }
 
 export interface AgentErrorEnvelope extends AgentErrorPresentation {
@@ -409,7 +412,7 @@ export function normalizeZayunoErrorCode(
 }
 
 /** Returns a safe customer/agent presentation without exposing raw provider errors. */
-export function getAgentErrorPresentation(error?: unknown): AgentErrorPresentation {
+export function getAgentErrorPresentation(error?: unknown, operation?: string): AgentErrorPresentation {
   const candidate = asRecord(error);
   const details = asRecord(candidate?.details);
   const errorCode = normalizeZayunoErrorCode(
@@ -417,24 +420,35 @@ export function getAgentErrorPresentation(error?: unknown): AgentErrorPresentati
     candidate?.statusCode || candidate?.status,
     candidate?.message
   );
-  const base = ERROR_PRESENTATIONS[errorCode];
+  let base = ERROR_PRESENTATIONS[errorCode];
+  const coverageNotConfigured = (details?.reason || candidate?.reason) === 'DELIVERY_COVERAGE_NOT_CONFIGURED';
+  if (coverageNotConfigured) base = { ...base, customerMessage: 'Restoranning yetkazib berish hududi hali sozlanmagan. Buyurtmani tasdiqlash uchun restoran bu sozlamani yakunlashi kerak.', agentMessage: 'Configure iiko delivery zones/restrictions before requesting another delivery quote. Do not invent coverage or create an order.', recommendedAction: 'CONTACT_SUPPORT', retryable: false };
+  if (errorCode === 'CAPABILITY_NOT_SUPPORTED') {
+    const capability = String(details?.capability || operation || '').toUpperCase();
+    if (capability.includes('PAYMENT')) base = { ...base, customerMessage: 'Bu hamkor online to‘lov usulini taqdim etmadi. Buyurtmadagi to‘lov ko‘rsatmasini tekshiring.', agentMessage: 'Payment options are unavailable. Use the existing action payment method/instructions; do not invent an online checkout or fall back to catalog.', recommendedAction: 'STOP' };
+    else if (capability.includes('LOCATION')) base = { ...base, customerMessage: 'Bu hamkor filial ma’lumotini taqdim etmaydi. Yetkazish hududi hali tekshirilmagan.', agentMessage: 'Locations are unavailable. Do not invent a branch or delivery coverage.', recommendedAction: 'STOP' };
+    else if (capability.includes('CANCEL')) base = { ...base, customerMessage: 'Bu buyurtmani shu yerda bekor qilish imkoni yo‘q. Hamkor bilan bog‘laning.', agentMessage: 'Cancellation unsupported; use provider support and do not claim cancellation.', recommendedAction: 'CONTACT_SUPPORT' };
+  }
   const explicitRetryable = typeof candidate?.retryable === 'boolean'
     ? candidate.retryable
     : typeof details?.retryable === 'boolean'
       ? details.retryable
       : undefined;
+  const missingFields = (details?.missingFields || candidate?.missingFields)?.filter?.((path: unknown) => typeof path === 'string' && /^[a-zA-Z][\w.]{0,159}$/.test(path)).slice(0, 100);
 
   return {
     errorCode,
     retryable: explicitRetryable ?? base.retryable,
     customerMessage: base.customerMessage,
     agentMessage: base.agentMessage,
-    recommendedAction: base.recommendedAction
+    recommendedAction: base.recommendedAction,
+    ...(coverageNotConfigured ? { reason: 'DELIVERY_COVERAGE_NOT_CONFIGURED' } : {}),
+    ...(missingFields?.length ? { missingFields, requiredBeforeQuote: missingFields } : {})
   };
 }
 
-export function buildAgentErrorEnvelope(error?: unknown): AgentErrorEnvelope {
-  return { isError: true, ...getAgentErrorPresentation(error) };
+export function buildAgentErrorEnvelope(error?: unknown, operation?: string): AgentErrorEnvelope {
+  return { isError: true, ...getAgentErrorPresentation(error, operation) };
 }
 
 export class ZayunoError extends Error {

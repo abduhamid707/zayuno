@@ -212,7 +212,9 @@ export function formatCustomerStatus(status: string, paymentStatus?: string): st
   if (normStatus === 'CONFIRMED') {
     return 'Buyurtmangiz tasdiqlandi';
   }
-  if (normStatus === 'AWAITING_PAYMENT' || normStatus === 'PENDING_CONFIRMATION' || normPayment === 'PENDING') {
+  if (normStatus === 'CREATED') return 'Buyurtma restoranga yuborildi';
+  if (normStatus === 'PROCESSING') return 'Buyurtma jarayonda';
+  if (normStatus === 'AWAITING_PAYMENT' || normStatus === 'PENDING_CONFIRMATION') {
     return 'To‘lov hali qilinmagan';
   }
   if (normStatus === 'ACCEPTED' || normStatus === 'IN_PROGRESS' || normStatus === 'READY' || normStatus === 'FULFILLING') {
@@ -268,6 +270,9 @@ export function formatCustomerQuote(quote: any, providerInfo?: any): string {
   if (quote.estimatedDurationMinutes) {
     lines.push(`Taxminiy bajarilish vaqti: ${quote.estimatedDurationMinutes} daqiqa`);
   }
+  if (quote.parameters?.paymentInstructions) lines.push(quote.parameters.paymentInstructions);
+  if (quote.parameters?.deliveryCoverage === 'VERIFIED') lines.push('Manzil ushbu filialning yetkazib berish shartlariga mos.');
+  for (const warning of quote.parameters?.activeOrderWarnings || []) lines.push(warning);
 
   lines.push('');
   lines.push('Buyurtmani tasdiqlaysizmi?');
@@ -295,7 +300,20 @@ export function formatCustomerActionStatus(action: any, providerInfo?: any): str
   if (action.paymentStatus === 'PAID' && !hasVerifiedPaymentStatus(action, providerInfo)) {
     return 'Provider to‘lov holatini qaytardi, lekin Zayuno hali uni ishonchli tasdiqlamagan.';
   }
-  return [formatCustomerStatus(action.status, action.paymentStatus), ...presentationDetails(action, providerInfo)].join('\n');
+  const stages: Record<string, string> = {
+    SUBMITTING: 'Buyurtma restoranga yuborilmoqda', Unconfirmed: 'Restoran tasdig‘i kutilmoqda',
+    WaitCooking: 'Buyurtma qabul qilindi, tayyorlash navbatida', ReadyForCooking: 'Buyurtma tayyorlash navbatida',
+    CookingStarted: 'Buyurtma tayyorlanmoqda', CookingCompleted: 'Buyurtma tayyor',
+    Waiting: 'Buyurtma tayyor, kuryer kutilmoqda', OnWay: 'Buyurtma yo‘lda', Delivered: 'Buyurtma yetkazildi', Closed: 'Buyurtma yakunlandi',
+  };
+  const stage = action.metadata?.fulfillmentStatus;
+  const cash = ['CASH', 'CASH_ON_DELIVERY'].includes(String(action.paymentMethod).toUpperCase());
+  const arrival = action.metadata?.estimatedArrivalAt;
+  const time = typeof arrival === 'string' ? arrival.match(/(?:T|\s)(\d{2}:\d{2})/)?.[1] : undefined;
+  return [stages[stage] || formatCustomerStatus(action.status, action.paymentStatus),
+    stage && action.publicId && !/SANDBOX|DEMO|MOCK/i.test(action.publicId) ? `Buyurtma: ${action.publicId}` : '',
+    cash && action.paymentStatus !== 'PAID' ? 'Naqd — buyurtma yetkazilganda kuryerga to‘laysiz.' : '',
+    time ? `Restoran belgilagan yetkazish vaqti: ${time}` : '', ...presentationDetails(action, providerInfo)].filter(Boolean).join('\n');
 }
 
 export function formatCustomerActionCancellation(result: any, providerInfo?: any): string {
@@ -412,6 +430,7 @@ export function formatCustomerPaymentOptions(options: any[], action?: any, provi
       ? `Bu sinov checkout sahifasi. Haqiqiy to‘lov amalga oshirilmaydi.\n\n[Sinov sahifasini ochish](${url})`
       : `To‘lov sahifasi tayyor:\n\n[To‘lov sahifasini ochish](${url})`;
   }
+  if (!isDemo && options?.some(option => option.type === 'CASH_ON_DELIVERY' && option.isOnline === false)) return 'Buyurtma yetkazilganda kuryerga naqd to‘laysiz.';
   return isDemo
     ? 'Bu sinov buyurtmasi. Haqiqiy to‘lov usuli yo‘q.'
     : 'To‘lov usullari checkout sahifasida taqdim etiladi.';

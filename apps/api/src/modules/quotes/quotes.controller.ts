@@ -18,6 +18,6 @@ export class QuotesController {
     return this.quotesService.requestQuote({
       ...body,
       environment: effectiveEnv
-    });
+    }, { userId: req?.user?.id });
   }
 }

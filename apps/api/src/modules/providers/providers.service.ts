@@ -26,7 +26,8 @@ import {
   getDynamicServiceMessage,
   getWelcomeMessage,
   redactForLogs,
-  sanitizeHeaders
+  sanitizeHeaders,
+  manifestOf
 } from '@zayuno/shared';
 import {
   ProviderInfo,
@@ -233,13 +234,6 @@ export class ProvidersService {
       environment: targetEnvironment as any
     };
 
-    if (filter.query) {
-      where.OR = [
-        { name: { contains: filter.query, mode: 'insensitive' } },
-        { slug: { contains: filter.query, mode: 'insensitive' } }
-      ];
-    }
-
     if (filter.capability) {
       where.capabilities = { has: filter.capability };
     }
@@ -274,9 +268,39 @@ export class ProvidersService {
     }
 
     if (filter.geography) {
-      results = results.filter(p => p.geography?.some(g => g.toLowerCase().includes(filter.geography!.toLowerCase())));
+      const normalize = (value: string) => value.toLowerCase().replace(/toshkent/g, 'tashkent').replace(/o[‘’']?zbekiston|uzbekistan/g, 'uz');
+      const requested = normalize(filter.geography);
+      results = results.filter(p => {
+        const row = providers.find(record => record.slug === p.slug);
+        const declared = [...(p.geography || []), ...((row?.metadata as any)?.deliveryCities || []), ...(row?.locations || []).map(location => location.address || '')];
+        if (declared.some(value => normalize(value).includes(requested))) return true;
+        // Country-level discovery is a candidate list, not a coverage promise.
+        // Cities without declared coverage must be verified by the quote endpoint.
+        if (requested === 'tashkent' && p.geography?.includes('UZ')) {
+          p.metadata = { ...p.metadata, discoveryGeographyVerified: false, deliveryCoverage: 'CHECK_AT_QUOTE' };
+          return true;
+        }
+        return false;
+      });
     }
 
+    if (filter.query?.trim()) {
+      const query = filter.query.trim();
+      const category = normalizeProviderCategory(query);
+      const matches = await Promise.all(results.map(async provider => {
+        const text = [provider.name, provider.slug, provider.description].join(' ').toLowerCase();
+        const genericCategory = /^(food|food_delivery|restaurant|restaurants|meal|ovqat|taom|food_and_drink|jobs|recruitment|retail|transport|logistics)$/i.test(query);
+        if (text.includes(query.toLowerCase()) || genericCategory && category && provider.category === category) return provider;
+        if (!provider.capabilities.includes(ProviderCapability.SEARCH)) return undefined;
+        try {
+          const adapter = await this.registry.getAdapter(provider.slug);
+          if (!adapter.searchOfferings) return undefined;
+          const offerings = await adapter.searchOfferings({ providerSlug: provider.slug, query, limit: 5 });
+          return offerings.some(offering => offering.isAvailable !== false) ? provider : undefined;
+        } catch { return undefined; }
+      }));
+      results = matches.filter((provider): provider is ProviderInfo => !!provider);
+    }
     const total = results.length;
     const offset = filter.offset || 0;
 
@@ -1983,7 +2007,7 @@ export class ProvidersService {
       description: meta.description || undefined,
       logoUrl: p.logoUrl || undefined,
       branding: ProviderBrandingSchema.safeParse(meta.branding || meta.manifest?.branding).data,
-      manifest: ProviderManifestSchema.safeParse(meta.manifest).data,
+      manifest: ProviderManifestSchema.safeParse(manifestOf(p)).data,
       status: p.status as any,
       type: p.type as any,
       environment,

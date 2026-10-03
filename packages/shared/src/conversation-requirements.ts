@@ -1,4 +1,4 @@
-import { ConversationField, ConversationState, ProviderManifest, validateParametersAgainstDeclaration } from '@zayuno/contracts';
+import { ConversationField, ConversationState, ProviderManifest, validateParametersAgainstDeclaration, IIKO_DELIVERY_MANIFEST } from '@zayuno/contracts';
 
 const unsafe = new Set(['__proto__', 'prototype', 'constructor']);
 export function readField(value: any, path: string): any {
@@ -14,6 +14,10 @@ export function writeField(value: any, path: string, supplied: unknown): void {
 const absent = (value: unknown) => value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length);
 
 export function manifestOf(provider: any): ProviderManifest | undefined {
+  if (provider?.adapterType === 'iiko') {
+    const declared = provider?.manifest || provider?.metadata?.manifest;
+    return { ...declared, ...IIKO_DELIVERY_MANIFEST, requirements: { ...declared?.requirements, ...IIKO_DELIVERY_MANIFEST.requirements } };
+  }
   return provider?.manifest || provider?.metadata?.manifest;
 }
 
@@ -53,8 +57,8 @@ export function conversationRequirements(state: ConversationState, capability = 
     for (const [key, required] of Object.entries(source || {})) if (required === 'REQUIRED') add(`customer.${key}`,
       { title: key, type: 'string', ...(key === 'email' ? { format: 'email' } : {}) });
   }
-  for (const location of manifest?.supportedLocationRoles || []) {
-    if (location.required && !state.locations.some(item => item.role === location.role && (item.address?.raw || item.locationId))) {
+  for (const location of ['QUOTE', 'ACTION_CREATE'].includes(capability) ? manifest?.supportedLocationRoles || [] : []) {
+    if (location.required && !(location.role === 'DESTINATION' && (state as any).destination?.raw) && !state.locations.some(item => item.role === location.role && (item.address?.raw || item.locationId))) {
       result.set(`locations.${location.role}`, { path: `locations.${location.role}`, title: location.title || location.role, type: 'location' });
     }
   }

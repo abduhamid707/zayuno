@@ -75,7 +75,8 @@ export const CreateActionInputSchema = z.object({
       discount: z.number().nonnegative().default(0),
       total: z.number().nonnegative(),
       currency: CurrencySchema.default('UZS'),
-      lines: z.array(QuoteLineSchema).default([])
+      lines: z.array(QuoteLineSchema).default([]),
+      parameters: z.record(z.any()).optional().describe('Provider-derived quote data retained by Core; never trust caller quote overrides')
     })
   ).describe('Canonical verified quote snapshot passed down to provider adapter'),
   userConfirmed: z.literal(true).describe('Must be true after the user explicitly confirms the reviewed quote')
