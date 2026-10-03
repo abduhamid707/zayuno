@@ -2378,6 +2378,9 @@ export default function App() {
                             )}
                           </div>
 
+                          {publishMutation.error && publishMutation.variables === p.slug && (
+                            <p role="alert" className="mt-3 text-xs text-rose-300">ACTIVE qilish bajarilmadi: {(publishMutation.error as Error).message}</p>
+                          )}
                           {certifyMutation.data &&
                             certifyMutation.data.providerSlug === p.slug && (
                               <div
