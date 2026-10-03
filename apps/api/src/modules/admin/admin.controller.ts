@@ -268,10 +268,10 @@ export class AdminController {
 
   @Post('providers/:slug/certify')
   @ApiOperation({ summary: 'Run automated provider certification test suite' })
-  async certifyProvider(@Param('slug') slug: string) {
+  async certifyProvider(@Param('slug') slug: string, @Body() body: unknown) {
     return this.providersService.runCertification(slug, {
       role: UserRole.SUPER_ADMIN,
-    });
+    }, body);
   }
 
   @Post('providers/:slug/compatibility-audit')

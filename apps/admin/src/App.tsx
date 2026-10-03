@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { IikoCertificationPanel } from './IikoCertificationPanel';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -2266,9 +2267,8 @@ export default function App() {
 
                           <div className="pt-3 border-t border-slate-800 flex items-center justify-between flex-wrap gap-2">
                             <div className="flex flex-wrap gap-2">
-                              {p.adapterType === 'iiko' && <p className="text-xs text-amber-300">
-                                Buyurtmani kassir terminalida bekor qilish tasdiqlanmaguncha avtomatik certification va publication yopiq.
-                              </p>}
+                              {p.adapterType === 'iiko' && <IikoCertificationPanel provider={p} apiFetch={apiFetch}
+                                onUpdated={() => queryClient.invalidateQueries({ queryKey: ['admin-providers'] })} />}
                               {p.adapterType !== 'iiko' && <button
                                 onClick={() => certifyMutation.mutate(p.slug)}
                                 disabled={certifyMutation.isPending}
@@ -2291,7 +2291,7 @@ export default function App() {
                                     : 'Run Capability Certification'}
                                 </span>
                               </button>}
-                              {p.adapterType !== 'iiko' && (p.isCertified || p.metadata?.isCertified) &&
+                              {(p.isCertified || p.metadata?.isCertified) &&
                                 (p.reviewStatus === 'PENDING_APPROVAL' ||
                                   p.metadata?.reviewStatus ===
                                     'PENDING_APPROVAL') && (

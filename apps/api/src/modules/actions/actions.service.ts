@@ -418,6 +418,11 @@ export class ActionsService {
     if (action.provider && action.provider.environment !== targetEnv) {
       throw new EnvironmentNotAllowedError(action.provider.slug, action.provider.environment, targetEnv);
     }
+    // Native iiko does not emit Zayuno's remote-provider webhook protocol.
+    // Refresh status on reads rather than returning a permanently stale DB status.
+    if (action.provider?.adapterType === 'iiko') {
+      return (await this.getLiveAction(input, access)).action;
+    }
     return this.mapDbActionToNormalized(action);
   }
 

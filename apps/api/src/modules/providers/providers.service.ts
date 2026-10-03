@@ -65,16 +65,20 @@ import {
   ProviderEligibilityPolicyUpdateSchema,
   WelcomeInfo
 } from '@zayuno/contracts';
-import { ProviderCertificationRunner, CertificationReport, CapabilityNotSupportedError, isCurrentCertification } from '@zayuno/provider-sdk';
+import { ProviderCertificationRunner, CertificationReport, CapabilityNotSupportedError, isCurrentCertification, certifyIiko, IikoCertificationInputSchema, IikoProviderAdapter } from '@zayuno/provider-sdk';
 import { certificationWebhookEvidence } from './certification-webhook-evidence';
 import * as bcrypt from 'bcryptjs';
-import { randomUUID, randomBytes, timingSafeEqual } from 'crypto';
+import { randomUUID, randomBytes, timingSafeEqual, createHash } from 'crypto';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 
 import { executeSsrfSafeGet, SsrfSecurityError } from './ssrf-checker';
 
 const preflightRateLimiter = new Map<string, { count: number; resetAt: number }>();
+const iikoCertificationLocks = new Set<string>();
+function iikoCertificationTarget(provider: any): string {
+  return createHash('sha256').update(JSON.stringify([provider.config, provider.encryptedSecret, provider.capabilities])).digest('hex');
+}
 
 const REVIEW_REASON_CODES = new Set([
   'API_UNREACHABLE', 'CERTIFICATION_FAILED', 'CONTRACT_MISMATCH', 'OWNERSHIP_UNVERIFIED',
@@ -1486,13 +1490,51 @@ export class ProvidersService {
     });
   }
 
-  async runCertification(slug: string, actor?: { id?: string; role?: UserRole; providerId?: string }): Promise<CertificationReport> {
+  async runCertification(slug: string, actor?: { id?: string; role?: UserRole; providerId?: string }, input?: unknown): Promise<CertificationReport> {
     const cleanSlug = slug.toLowerCase().trim();
     const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
     if (!provider) throw new NotFoundError('Provider', cleanSlug);
     this.assertProviderManager(provider, actor);
     if (provider.adapterType === 'iiko') {
-      throw new BadRequestException('iiko transactional certification test buyurtmalar yaratadi. Kassir terminalida test buyurtmasini bekor qilish ishlamaguncha sertifikatlash yopiq.');
+      if (![UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(actor?.role as any)) throw new ForbiddenException('iiko sinov buyurtmasini faqat administrator boshlaydi.');
+      const fixture = IikoCertificationInputSchema.safeParse(input);
+      if (!fixture.success) throw new BadRequestException('Sinov uchun ism, telefon, shahar, manzil, valyuta, maksimal summa va buyurtma yaratishga tasdiq kiriting.');
+      if (iikoCertificationLocks.has(cleanSlug)) throw new BadRequestException('Bu restoran uchun tekshiruv davom etmoqda. Natijani kuting.');
+      iikoCertificationLocks.add(cleanSlug);
+      try {
+        this.registry.invalidateAdapterCache(cleanSlug);
+        const nativeAdapter = await this.registry.getAdapter(cleanSlug);
+        if (!(nativeAdapter instanceof IikoProviderAdapter)) throw new BadRequestException('iiko adapter topilmadi.');
+        const previous = (provider.metadata as any)?.lastCertificationReport;
+        if (previous?.mode === 'NATIVE_IIKO' && previous.nativeEvidence?.orderId &&
+          previous.tests?.some((test: any) => test.testId === 'action_cancel' && !test.passed)) {
+          const config = provider.config as Record<string, string>;
+          const previousOrders = await nativeAdapter.getClient().getOrderById(config.organizationId, [previous.nativeEvidence.orderId]);
+          if (!previousOrders.orders.some(order => order.id === previous.nativeEvidence.orderId && order.organizationId === config.organizationId && order.order?.status === 'Cancelled')) {
+            throw new BadRequestException(`Oldingi sinov buyurtmasini avval kassada bekor qiling: ${previous.nativeEvidence.orderId}`);
+          }
+        }
+        const nativeReport = await certifyIiko(nativeAdapter, fixture.data);
+        if (provider.capabilities.some(cap => !nativeReport.capabilitiesTested.includes(cap as ProviderCapability))) {
+          nativeReport.isProductionReady = false;
+          nativeReport.isCertified = false;
+        }
+        if (nativeReport.isProductionReady) await this.syncDiscoveryLocations(provider, nativeAdapter);
+        const fresh = await prisma.provider.findUniqueOrThrow({ where: { id: provider.id } });
+        if (iikoCertificationTarget(fresh) !== iikoCertificationTarget(provider)) throw new BadRequestException('Ulanish tekshiruv davomida o‘zgardi. Qayta tekshiring.');
+        await prisma.provider.update({ where: { id: provider.id }, data: { metadata: {
+          ...((fresh.metadata as Record<string, any>) || {}), isCertified: nativeReport.isProductionReady,
+          lastCertificationReport: nativeReport as any, lastCertifiedAt: new Date().toISOString(),
+          iikoCertificationTarget: iikoCertificationTarget(provider),
+          reviewStatus: nativeReport.isProductionReady ? 'PENDING_APPROVAL' : 'DRAFT',
+          eligibility: { ...getStoredProviderEligibilityPolicy(provider), contractVersion: 'native iiko v2',
+            complianceStatus: nativeReport.isProductionReady ? ProviderComplianceStatus.COMPLIANT : ProviderComplianceStatus.FAILED,
+            profile: ProviderOperatingProfile.TRANSACTIONAL, discoveryVisibility: ProviderDiscoveryVisibility.HIDDEN,
+            certifiedCapabilities: nativeReport.isProductionReady ? nativeReport.capabilitiesTested : [], waiver: undefined }
+        } as any } });
+        this.registry.invalidateAdapterCache(cleanSlug);
+        return nativeReport;
+      } finally { iikoCertificationLocks.delete(cleanSlug); }
     }
 
     // If sandbox URL is selected, ensure server has configured test credentials
@@ -1587,9 +1629,6 @@ export class ProvidersService {
     const cleanSlug = slug.toLowerCase().trim();
     const provider = await prisma.provider.findUnique({ where: { slug: cleanSlug } });
     if (!provider) throw new NotFoundError('Provider', cleanSlug);
-    if (provider.adapterType === 'iiko') {
-      throw new BadRequestException('iiko order cancellation va transactional certification tasdiqlanmaguncha public publication yopiq.');
-    }
     const metadata = (provider.metadata as Record<string, any>) || {};
     if (!metadata.isCertified || metadata.reviewStatus !== 'PENDING_APPROVAL') {
       throw new BadRequestException('Only a certified provider submitted for approval can be published.');
@@ -1599,7 +1638,28 @@ export class ProvidersService {
     // changed DNS, or broken its contract after submitting for review.
     this.registry.invalidateAdapterCache(cleanSlug);
     const liveAdapter = await this.registry.getAdapter(cleanSlug);
-    const liveReport = await this.runStrictCertification(provider, liveAdapter);
+    let liveReport: CertificationReport;
+    if (provider.adapterType === 'iiko') {
+      const stored = metadata.lastCertificationReport as CertificationReport;
+      const checked = Date.parse(stored?.nativeEvidence?.checkedAt || '');
+      if (!isCurrentCertification(stored) || stored.mode !== 'NATIVE_IIKO' || stored.providerSlug !== cleanSlug ||
+        metadata.iikoCertificationTarget !== iikoCertificationTarget(provider) || !Number.isFinite(checked) || checked > Date.now() || Date.now() - checked > 86400000) {
+        throw new BadRequestException('iiko sinovi yo‘q, eskirgan yoki ulanish o‘zgargan. Sinov buyurtmasini qayta tekshiring.');
+      }
+      if (!(liveAdapter instanceof IikoProviderAdapter)) throw new BadRequestException('iiko adapter topilmadi.');
+      const config = provider.config as Record<string, string>;
+      const alive = await liveAdapter.getClient().checkTerminalGroupsAlive([config.terminalGroupId], [config.organizationId]);
+      const catalog = await liveAdapter.getCatalog({ providerSlug: cleanSlug, locationId: config.terminalGroupId });
+      const orders = await liveAdapter.getClient().getOrderById(config.organizationId, [stored.nativeEvidence!.orderId]);
+      if (!alive.some(group => group.terminalGroupId === config.terminalGroupId && group.organizationId === config.organizationId && group.isAlive) ||
+        !catalog.offerings.some(item => item.isAvailable && item.basePrice > 0) ||
+        !orders.orders.some(order => order.id === stored.nativeEvidence!.orderId && order.organizationId === config.organizationId && order.order?.status === 'Cancelled')) {
+        throw new BadRequestException('POS, menyu yoki sinov buyurtmasi holati ACTIVE qilishga mos emas.');
+      }
+      liveReport = stored;
+    } else {
+      liveReport = await this.runStrictCertification(provider, liveAdapter);
+    }
     if (liveReport.isProductionReady) {
       await this.syncDiscoveryLocations(provider, liveAdapter);
     }
@@ -1638,7 +1698,7 @@ export class ProvidersService {
               ? ProviderOperatingProfile.TRANSACTIONAL
               : ProviderOperatingProfile.READ_ONLY,
             discoveryVisibility: ProviderDiscoveryVisibility.VISIBLE,
-            certifiedCapabilities: provider.capabilities,
+            certifiedCapabilities: provider.adapterType === 'iiko' ? liveReport.capabilitiesTested : provider.capabilities,
             waiver: undefined
           }
         }

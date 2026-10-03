@@ -4927,3 +4927,36 @@ To‘liq keyingi-agent prompt: `docs/AI_AGENT_DEMAND_MOBILE_HANDOFF.md`.
 **Qolgan:** promptdagi code review/edge caselar, browser QA, Redis 16379 bilan orchestrator regression testi, OTA/EAS haqiqiy project ID va native/signing tekshiruvi, env/release/privacy hujjatlari, migratsiya va deploy. Hech qanday production deploy yoki store relizi bajarilmadi.
 **Runtime:** Prisma DLL lock uchun eski Nest watch vaqtincha to‘xtatildi. Qayta ishga tushirilgan watch 0 compile error bilan tugadi, ammo 4000 port allaqachon band (EADDRINUSE); dublikat watch to‘xtatildi. Mavjud 4000 servisiga tegilmagan; health keyingi agent tekshiradi.
 **Navbatdagi aniq qadam:** handoff promptni o‘qib, hali tekshirilmagan LIVE boundary va admin invalid-date holatini tuzatish, so‘ng regressiya/OTA tekshiruvlari. Hozir ish foydalanuvchi talabi bilan topshirildi.
+
+
+## iiko demo buyurtmani kassir terminalida bekor qilish — 2026-10-03
+- [x] Foydalanuvchi DESKTOP-SV0EA86 kompyuterida Demo kassa 1 virtual kassasini yaratib, Demo POSga bog‘ladi.
+- [x] Foydalanuvchi mavjud demo buyurtmani iikoFront orqali bekor qildi.
+- [x] Cloud API deliveries/by_id orqali yakuniy holat tekshirildi: 86b47311-ffd1-4360-8b6e-53f55318e921, creationStatus Success, status Cancelled, isDeleted false.
+**Natija:** mavjud sinov buyurtmasi bekor qilingani API bilan tasdiqlandi. Kod/deploy o‘zgarmadi; faqat TASKS.md yangilandi. Avtomatik API cancellation qayta sinovdan o‘tkazilmadi. Keyingi qadam: provider certification/publication guardlarini ushbu dalil va avtomatik cancellation tekshiruviga muvofiq ko‘rib chiqish; yangi buyurtma bu bosqichda yaratilmagan.
+
+## iiko avtomatik cancel sinovi — 2026-10-03
+- [ ] Onlayn demo terminal, menyu va quote tekshirilsin.
+- [ ] Bitta demo buyurtma adapter orqali yaratilib avtomatik bekor qilinsin.
+- [ ] Yakuniy API holati qayd qilinsin; natijaga qarab certification guard ko‘rib chiqilsin.
+**Holat:** foydalanuvchi go deb sinovni tasdiqladi. Oldingi buyurtma Cancelled. Keyingi qadam: mavjud live E2E harnessni demo konfiguratsiya bilan ishga tushirish.
+
+### Avtomatik cancel sinovi natijasi
+- [x] Read-only: POS online, 1 mahsulot, stop-list 0, quote 100 RUB — READ_ONLY_PASSED.
+- [x] Live harness orqali bitta buyurtma yaratildi: de46ca14-2190-4b0c-a3c8-cbd7cf7d1d74; iiko summa/status va adapter mapping tasdiqlandi.
+- [x] Adapter cancelAction orqali avtomatik bekor qilindi; iiko va adapter yakuniy Cancelled holatini tasdiqladi. E2E_PASSED, exit 0.
+**Tekshiruv:** node --env-file=.env.iiko-demo.local --import tsx tests/test-iiko-live-e2e.ts (read-only va order rejimlari). Maxfiy konfiguratsiya logga chiqarilmadi. Kod yoki deploy o‘zgartirilmadi. **Qolgan:** certification/publication guard dalilini provider darajasida to‘g‘ri saqlash va admin ko‘rinishini yangilash; demo provider hozircha DRAFT. **Keyingi qadam:** mavjud guard implementationini tekshirib, tasdiqlangan demo provider uchun audit/certification oqimini moslashtirish.
+
+## iiko sertifikatsiya va ACTIVE oqimi — 2026-10-03
+- [ ] Native iiko uchun xavfsiz admin test fixture va create/status/cancel sertifikatsiyasini qo‘shish; generic HTTP STRICT tekshiruvni native adapterga qo‘llamaslik.
+- [ ] Admin panelda test, reviewga yuborish va ACTIVE qadamlarini ochish; boshqa adapterlar qoidalarini saqlash.
+- [ ] Negative regression testlar, API/admin build, foydalanuvchi qo‘llanmasi.
+- [ ] Tegishli fayllarni commit/push qilish va deployni tasdiqlash.
+**Holat:** tekshiruv boshlandi. iiko blanket bloklari providers.service.ts va admin App.tsxda. Generic STRICT native iiko uchun transport probe talab qiladi. Keyingi qadam: alohida native sertifikatsiya runner, operator ruxsat bergan test fixture va tasdiqlangan cancellation.
+
+### Native iiko oqimi bajarildi
+- [x] Native admin fixture va 9 bosqichli metadata/health/locations/catalog/search/quote/create/status/cancel tekshiruvi qo‘shildi. Tasdiqsiz yoki summa/valyuta oshsa order yaratilmaydi. Hisobotda PII/kalit yo‘q.
+- [x] Admin panelda iiko sinov formasi, natija va ACTIVE ochildi. Muvaffaqiyatli native sinov PENDING_APPROVAL beradi; publish faqat 24 soat ichidagi, o‘zgarmagan ulanish va live POS/menu/Cancelled qayta tekshiruvi bilan. Status o‘qishda native iiko API yangilanadi.
+- [x] Jonli native sinov 9/9 PASS: 8a0f8d45-0ef7-4ce4-9aac-b97f68bd0227, 100 RUB, avtomatik Cancelled. Eski generic STRICT oqim o‘zgarmadi; 7 domain va 11 adversarial test PASS.
+- [x] Native negative tests, iiko 23/23, live harness guardrails 16/16, provider certification guards PASS. shared/provider-sdk/API/admin buildlari PASS. docs/iiko-activation.md yo‘riqnomasi qo‘shildi.
+**O‘zgargan fayllar:** native iiko SDK runner va exports/report mode, shared certification validator, API providers/admin/actions, admin IikoCertificationPanel va App, tests/test-iiko-native-certification.ts, docs/iiko-activation.md. **Qolgan:** oxirgi qo‘shimcha guard buildi, selective commit/push, deploy va production API sinovi. **Keyingi qadam:** faqat shu fayllarni stage qilish; boshqa mobile/DemandDashboard/deploy o‘zgarishlarini saqlash.

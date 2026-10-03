@@ -194,5 +194,14 @@ export function getStoredProviderEligibilityPolicy(provider: any) {
 export const CERTIFICATION_VERSION = 2;
 
 export function isCurrentCertification(report: any): boolean {
-  return report?.certificationVersion === CERTIFICATION_VERSION && report?.mode === 'STRICT' && report?.isProductionReady === true;
+  if (report?.certificationVersion !== CERTIFICATION_VERSION || report?.isProductionReady !== true) return false;
+  if (report.mode === 'STRICT') return true;
+  if (report.mode !== 'NATIVE_IIKO' || report.nativeEvidence?.adapterType !== 'iiko' ||
+    report.nativeEvidence?.statusTransport !== 'POLLING' || !/^[0-9a-f-]{36}$/i.test(report.nativeEvidence?.orderId || '')) return false;
+  const ids = ['metadata', 'health', 'locations', 'catalog', 'search', 'quote', 'action_create', 'action_status', 'action_cancel'];
+  const checkedAt = Date.parse(report.nativeEvidence.checkedAt || '');
+  if (!Number.isFinite(checkedAt) || checkedAt > Date.now()) return false;
+  return report.scope === 'AUTOMATED_INTEGRATION' && report.failedCount === 0 && report.skippedCount === 0 &&
+    report.totalTests === ids.length && report.passedCount === ids.length && Array.isArray(report.tests) &&
+    report.tests.length === ids.length && ids.every(id => report.tests.some((test: any) => test.testId === id && test.capability === id.toUpperCase() && test.passed === true && test.status === 'PASS'));
 }

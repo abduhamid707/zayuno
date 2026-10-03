@@ -12,3 +12,4 @@ export * from './connectors/iiko/iiko-types';
 export * from './connectors/iiko/iiko-token-manager';
 export * from './connectors/iiko/iiko-client';
 export * from './connectors/iiko/iiko-adapter';
+export * from './connectors/iiko/iiko-certification';

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { emptyConversationState, ProviderManifestSchema, validateParametersAgainstDeclaration } from '@zayuno/contracts';
-import { conversationRequirements, manifestOf, readField } from '@zayuno/shared';
+import { conversationRequirements, manifestOf, readField, isCurrentCertification as validateCurrentCertification } from '@zayuno/shared';
 
 export const CERTIFICATION_VERSION = 2;
 export type ProbeEndpoint = '/provider-info' | '/quote' | '/actions' | '/actions/missing-certification-action';
@@ -223,5 +223,5 @@ export function invalidParameterMutations(info: any, input: any, capability: str
 }
 
 export function isCurrentCertification(report: any): boolean {
-  return report?.certificationVersion === CERTIFICATION_VERSION && report?.mode === 'STRICT' && report?.isProductionReady === true;
+  return validateCurrentCertification(report);
 }

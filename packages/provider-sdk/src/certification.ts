@@ -67,12 +67,13 @@ export interface CertificationTestResult {
 }
 
 export interface CertificationReport {
+  nativeEvidence?: { adapterType: 'iiko'; statusTransport: 'POLLING'; orderId: string; checkedAt: string };
   certificationVersion: number;
   scope: 'DIAGNOSTIC' | 'AUTOMATED_INTEGRATION';
   operationalReviewRequired: boolean;
   operationalReviewRequirements?: string[];
   providerSlug: string;
-  mode: CertificationMode;
+  mode: CertificationMode | 'NATIVE_IIKO';
   totalTests: number;
   passedCount: number;
   failedCount: number;
