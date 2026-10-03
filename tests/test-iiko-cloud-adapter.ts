@@ -72,6 +72,11 @@ async function run() {
         // ignore
       }
 
+      if (url === '/api/1/delivery_restrictions') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ deliveryRestrictions: [{ organizationId: parsedBody.organizationIds[0], restrictions: [{ terminalGroupId: 'tg_uuid_201', zone: 'Test zone' }], deliveryZones: [] }] }));
+        return;
+      }
       if (url === '/api/1/delivery_restrictions/allowed') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ isAllowed: true, allowedItems: [{ organizationId: parsedBody.organizationIds[0], terminalGroupId: 'tg_uuid_201', deliveryDurationInMinutes: 60, zone: 'Test zone' }], rejectedItems: [] }));

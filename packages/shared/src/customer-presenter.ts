@@ -270,9 +270,10 @@ export function formatCustomerQuote(quote: any, providerInfo?: any): string {
   if (quote.estimatedDurationMinutes) {
     lines.push(`Taxminiy bajarilish vaqti: ${quote.estimatedDurationMinutes} daqiqa`);
   }
-  if (quote.parameters?.paymentInstructions) lines.push(quote.parameters.paymentInstructions);
-  if (quote.parameters?.deliveryCoverage === 'VERIFIED') lines.push('Manzil ushbu filialning yetkazib berish shartlariga mos.');
-  for (const warning of quote.parameters?.activeOrderWarnings || []) lines.push(warning);
+  const paymentInstructions = quote.paymentInstructions ?? quote.parameters?.paymentInstructions;
+  if (paymentInstructions) lines.push(paymentInstructions);
+  if ((quote.deliveryCoverage ?? quote.parameters?.deliveryCoverage) === 'VERIFIED') lines.push('Manzil ushbu filialning yetkazib berish shartlariga mos.');
+  for (const warning of quote.activeOrderWarnings ?? quote.parameters?.activeOrderWarnings ?? []) lines.push(warning);
 
   lines.push('');
   lines.push('Buyurtmani tasdiqlaysizmi?');

@@ -20,7 +20,10 @@ import {
   getDynamicServiceMessage,
   stripSensitiveSecrets,
   toPublicAction,
-  toPublicPaymentOptions
+  toPublicPaymentOptions,
+  toPublicQuote,
+  toPublicOffering,
+  toPublicCatalog
 } from '@zayuno/shared';
 
 // Discovery should return enough to select a provider, never its embedded catalog/config.
@@ -39,7 +42,7 @@ function normalizeCustomerContact(customer: any) {
 }
 
 function catalogOffering(offering: any) {
-  return { ...offering, name: offering.name ?? offering.title, price: offering.price ?? offering.basePrice };
+  return { ...toPublicOffering(offering), name: offering.name ?? offering.title, price: offering.price ?? offering.basePrice };
 }
 
 function formatNativeCatalog(offerings: any[], providerName?: string): string {
@@ -66,7 +69,6 @@ const catalogMediaItemOutputProperties = {
 // Preserve catalog data for agents even though customer replies are text-only.
 const catalogOfferingOutputProperties = {
   id: { type: 'string' },
-  providerId: { type: 'string' },
   offeringCode: { type: 'string' },
   title: { type: 'string' },
   name: { type: 'string' },
@@ -82,8 +84,7 @@ const catalogOfferingOutputProperties = {
   variants: { type: 'array', items: { type: 'object' } },
   optionGroups: { type: 'array', items: { type: 'object' } },
   tags: { type: 'array', items: { type: 'string' } },
-  parametersSchema: { type: ['object', 'null'] },
-  metadata: { type: 'object' }
+  parametersSchema: { type: ['object', 'null'] }
 };
 
 const catalogOfferingOutputSchema = {
@@ -541,7 +542,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['customerMessage', 'offerings']
     },
     handler: async (args, client) => {
-      const catalog = await client.getCatalog(args.providerSlug, args.locationId, args.category, args.parameters, args.environment);
+      const catalog = toPublicCatalog(await client.getCatalog(args.providerSlug, args.locationId, args.category, args.parameters, args.environment));
       const offerings = catalog?.offerings || (Array.isArray(catalog) ? catalog : []);
       const customerMessage = formatNativeCatalog(offerings, args.providerSlug);
       return {
@@ -611,7 +612,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['customerMessage', 'offerings']
     },
     handler: async (args, client) => {
-      const result = await client.searchCatalog(args.providerSlug, args.query || '', args.category, args.locationId, args.limit, args.parameters, args.environment);
+      const result = toPublicCatalog(await client.searchCatalog(args.providerSlug, args.query || '', args.category, args.locationId, args.limit, args.parameters, args.environment));
       const offerings = Array.isArray(result) ? result : result?.offerings || [];
       const customerMessage = formatCustomerOfferings(offerings, args.providerSlug);
       return {
@@ -670,7 +671,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       required: ['customerMessage']
     },
     handler: async (args, client) => {
-      const offering = await client.getOffering(args.providerSlug, args.offeringId, args.locationId, args.parameters, args.environment);
+      const offering = toPublicOffering(await client.getOffering(args.providerSlug, args.offeringId, args.locationId, args.parameters, args.environment));
       const customerMessage = formatCustomerOffering(offering);
       return {
         customerMessage,
@@ -771,7 +772,15 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       type: 'object',
       properties: {
         locations: universalLocationInput(),
-        customer: { type: 'object', properties: { name: { type: 'string' }, phone: { type: 'string' }, email: { type: 'string' } } },
+        customer: {
+          type: 'object',
+          description: 'Customer contact. Send customer.phone when the provider QUOTE manifest requires a phone (including iiko delivery).',
+          properties: {
+            name: { type: 'string' },
+            phone: { type: 'string', description: 'Customer phone in international format, for example +998901234567.' },
+            email: { type: 'string' }
+          }
+        },
         paymentMethod: { type: 'string' },
         providerSlug: {
           type: 'string',
@@ -819,6 +828,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           type: 'object',
           description: 'Destination or fulfillment address.',
           properties: {
+            ...addressInputProperties(),
             raw: { type: 'string', description: 'Full address string or notes' }
           },
           required: ['raw']
@@ -864,7 +874,13 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         total: { type: 'number', description: 'Final verified payable amount' },
         currency: { type: 'string' },
         expiresAt: { type: 'string' },
-        estimatedDurationMinutes: { type: 'number' }
+        estimatedDurationMinutes: { type: 'number' },
+        estimatedArrivalAt: { type: 'string' },
+        paymentMethod: { type: 'string' },
+        paymentInstructions: { type: 'string' },
+        activeOrderWarnings: { type: 'array', items: { type: 'string' } },
+        deliveryCoverage: { type: 'string', enum: ['VERIFIED'] },
+        requirements: { type: 'object' }
       },
       required: ['customerMessage', 'id', 'total', 'currency', 'expiresAt']
     },
@@ -878,10 +894,11 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
         customer: normalizeCustomerContact(args.customer),
         ...(destination ? { destination } : {})
       });
-      const customerMessage = formatCustomerQuote(quote);
+      const publicQuote = toPublicQuote(quote);
+      const customerMessage = formatCustomerQuote(publicQuote);
       return {
         customerMessage,
-        ...quote
+        ...publicQuote
       };
     }
   },
@@ -954,6 +971,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
           type: 'object',
           description: 'Optional destination address or fulfillment location.',
           properties: {
+            ...addressInputProperties(),
             raw: { type: 'string', description: 'Full address or delivery instructions' }
           },
           required: ['raw']
@@ -1233,9 +1251,11 @@ function jsonSchemaToZodShape(properties: Record<string, any> = {}, requiredList
     } else if (prop.type === 'boolean') {
       zodField = z.boolean();
     } else if (prop.type === 'array') {
-      zodField = z.array(z.any());
+      zodField = z.array(jsonSchemaToZodShape({ item: prop.items || {} }, ['item']).item);
     } else if (prop.type === 'object') {
-      zodField = z.record(z.any());
+      zodField = prop.properties
+        ? z.object(jsonSchemaToZodShape(prop.properties, prop.required || [])).passthrough()
+        : z.record(z.any());
     } else {
       zodField = z.any();
     }
@@ -1299,7 +1319,12 @@ export function registerZayunoTools(server: any, client: ZayunoApiClient) {
   }
 }
 import { projectOffering } from '@zayuno/shared';
+function addressInputProperties() { return {
+  raw: { type: 'string' }, city: { type: 'string' }, region: { type: 'string' },
+  country: { type: 'string' }, postalCode: { type: 'string' },
+  coordinates: { type: 'object', properties: { latitude: { type: 'number' }, longitude: { type: 'number' } }, required: ['latitude', 'longitude'] },
+}; }
 function universalLocationInput() { return { type: 'array', items: { type: 'object', properties: {
   role: { type: 'string' }, locationId: { type: 'string' },
-  address: { type: 'object', properties: { raw: { type: 'string' }, coordinates: { type: 'object', properties: { latitude: { type: 'number' }, longitude: { type: 'number' } }, required: ['latitude', 'longitude'] } }, required: ['raw'] },
+  address: { type: 'object', properties: addressInputProperties(), required: ['raw'] },
 }, required: ['role'] } }; }

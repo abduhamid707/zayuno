@@ -676,17 +676,7 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
     const destination = canonicalInput.destination || canonicalInput.locations?.find(location => location.role === 'DESTINATION')?.address;
     if (!destination?.raw?.trim()) throw new ProviderError('Delivery destination is required before quote.', 400, 'VALIDATION_ERROR', { missingFields: ['destination'], requiredBeforeQuote: ['destination'] });
     const terminalGroupId = await this.resolveTerminalGroupId(orgId, canonicalInput.locationId);
-    const restrictions = await this.client.getAllowedDeliveryRestrictions({
-      organizationIds: [orgId], isCourierDelivery: true,
-      deliveryAddress: { line1: destination.raw, city: destination.city },
-      orderLocation: destination.coordinates || undefined, deliverySum: subtotal,
-    });
-    const allowed = restrictions.allowedItems?.find(item => item.terminalGroupId === terminalGroupId && item.organizationId === orgId);
-    if (!allowed && !restrictions.rejectedItems?.length) {
-      const settings = (await this.client.getDeliveryRestrictions([orgId])).deliveryRestrictions.find(item => item.organizationId === orgId);
-      if (!settings || !settings.restrictions?.length && !settings.deliveryZones?.length) throw new ProviderError('Delivery coverage is not configured in iiko.', 400, 'VALIDATION_ERROR', { reason: 'DELIVERY_COVERAGE_NOT_CONFIGURED' });
-    }
-    if (!restrictions.isAllowed || !allowed) throw new ResourceUnavailableError('This destination or basket is outside the selected branch delivery conditions.', { deliveryCoverage: 'REJECTED', rejectedItems: restrictions.rejectedItems });
+    const { restrictions, allowed } = await this.verifyDeliveryCoverage(orgId, terminalGroupId, destination, subtotal);
     // Provider settings own fees; a caller must not lower the agreed delivery fee.
     const deliveryFee = Number(this.config.config?.deliveryFee ?? 0);
     const fees = deliveryFee > 0 ? [{ name: 'Delivery Fee', amount: deliveryFee }] : [];
@@ -721,6 +711,75 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
         deliveryDurationMinutes: allowed.deliveryDurationInMinutes, terminalTimeZone: terminal?.timeZone
       }
     };
+  }
+
+  private async verifyDeliveryCoverage(
+    orgId: string, terminalGroupId: string,
+    destination: { raw: string; city?: string | null; coordinates?: { latitude: number; longitude: number } | null },
+    subtotal: number,
+  ) {
+    // iiko may return an allowed terminal and default duration for any geocoded
+    // address when cartography is empty. That is not delivery coverage evidence.
+    const settings = (await this.client.getDeliveryRestrictions([orgId])).deliveryRestrictions?.find(item => item.organizationId === orgId);
+    const rules = (settings?.restrictions || []).filter(rule =>
+      (!rule.organizationId || rule.organizationId === orgId) &&
+      (!rule.terminalGroupId || rule.terminalGroupId === terminalGroupId));
+    const zones = (settings?.deliveryZones || [])
+      .filter(zone => (zone.coordinates && zone.coordinates.length >= 3) || zone.addresses?.length);
+    const zoneNames = new Set(zones
+      .map(zone => zone.name).filter(Boolean));
+    const ruleZones = new Set(rules.map(rule => rule.zone).filter(Boolean));
+    if (!zoneNames.size && !ruleZones.size) {
+      throw new ProviderError('Delivery coverage is not configured in iiko.', 400, 'VALIDATION_ERROR', { reason: 'DELIVERY_COVERAGE_NOT_CONFIGURED' });
+    }
+    const restrictions = await this.client.getAllowedDeliveryRestrictions({
+      organizationIds: [orgId], isCourierDelivery: true,
+      deliveryAddress: { line1: destination.raw, city: destination.city },
+      orderLocation: destination.coordinates || undefined, deliverySum: subtotal,
+    });
+    const allowed = restrictions.allowedItems?.find(item =>
+      item.terminalGroupId === terminalGroupId && item.organizationId === orgId &&
+      !!item.zone && (zoneNames.has(item.zone) || ruleZones.has(item.zone)) &&
+      (!settings?.restrictions?.length || rules.some(rule => !rule.zone || rule.zone === item.zone)));
+    if (restrictions.isAllowed !== true || !allowed) {
+      throw new ResourceUnavailableError('This destination or basket is outside the selected branch delivery conditions.', { deliveryCoverage: 'REJECTED' });
+    }
+    const zone = zones.find(item => item.name === allowed.zone);
+    if (zone?.coordinates && zone.coordinates.length >= 3) {
+      const point = destination.coordinates || restrictions.location;
+      if (!point || !this.isInsideDeliveryPolygon(point, zone.coordinates)) {
+        throw new ResourceUnavailableError('This destination is outside the verified delivery zone.', { deliveryCoverage: 'REJECTED' });
+      }
+    }
+    return { restrictions, allowed };
+  }
+
+  private isInsideDeliveryPolygon(
+    point: { latitude: number; longitude: number },
+    polygon: Array<{ latitude: number; longitude: number }>,
+  ): boolean {
+    const valid = (p: { latitude: number; longitude: number }) => Number.isFinite(p.latitude) &&
+      Number.isFinite(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180;
+    if (!valid(point) || polygon.some(p => !valid(p))) return false;
+    // Degenerate polygons do not establish a delivery area, even on an edge.
+    const area = polygon.reduce((sum, p, i) => {
+      const next = polygon[(i + 1) % polygon.length];
+      return sum + p.longitude * next.latitude - next.longitude * p.latitude;
+    }, 0);
+    if (Math.abs(area) < 1e-10) return false;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const a = polygon[j], b = polygon[i];
+      const cross = (point.longitude - a.longitude) * (b.latitude - a.latitude) -
+        (point.latitude - a.latitude) * (b.longitude - a.longitude);
+      // A point on a real edge belongs to the zone; repeated vertices are safe.
+      if (Math.abs(cross) < 1e-10 && point.longitude >= Math.min(a.longitude, b.longitude) &&
+          point.longitude <= Math.max(a.longitude, b.longitude) && point.latitude >= Math.min(a.latitude, b.latitude) &&
+          point.latitude <= Math.max(a.latitude, b.latitude)) return true;
+      if ((a.latitude > point.latitude) !== (b.latitude > point.latitude) &&
+          point.longitude < (b.longitude - a.longitude) * (point.latitude - a.latitude) / (b.latitude - a.latitude) + a.longitude) inside = !inside;
+    }
+    return inside;
   }
 
   async createAction(input: CreateActionInput): Promise<NormalizedAction> {
@@ -853,6 +912,10 @@ export class IikoProviderAdapter extends BaseProviderAdapter {
     try { orderInfo = (await this.client.getOrderById(orgId, [createRequest.order.id!])).orders?.find(order => order.id === createRequest.order.id); }
     catch (error: any) { if (error.statusCode !== 404 && error.status !== 404) throw error; }
     if (!orderInfo) {
+      // Recheck even for quotes issued before this guard or a coverage change.
+      // Existing accepted orders are reconciled above without a second create.
+      const coverage = await this.verifyDeliveryCoverage(orgId, tgId, destination, quote.subtotal);
+      createRequest.order.deliveryPoint!.coordinates = destination.coordinates || coverage.restrictions.location || undefined;
       try { orderInfo = (await this.client.createDeliveryOrder(createRequest)).orderInfo; }
       catch (error) {
         // Timeout can mean iiko already accepted the request. Reconcile before any retry.

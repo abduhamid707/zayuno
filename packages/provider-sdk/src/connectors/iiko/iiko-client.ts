@@ -495,7 +495,9 @@ export class IikoClient {
   }
 
   async getDeliveryRestrictions(organizationIds: string[]): Promise<{ deliveryRestrictions: Array<{
-    organizationId: string; restrictions: unknown[]; deliveryZones: unknown[];
+    organizationId: string;
+    restrictions: Array<{ organizationId?: string | null; terminalGroupId?: string | null; zone?: string | null }>;
+    deliveryZones: Array<{ name: string; coordinates?: Array<{ latitude: number; longitude: number }>; addresses?: unknown[] }>;
   }> }> {
     return this.callApi('/api/1/delivery_restrictions', { organizationIds });
   }

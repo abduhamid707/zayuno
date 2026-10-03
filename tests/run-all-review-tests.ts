@@ -53,6 +53,7 @@ const testSuites = [
   "tests/test-provider-cache-and-consumer-chat.ts",
   "tests/test-consumer-discovery-regression.ts",
   "tests/test-iiko-reliability.ts",
+  "tests/test-iiko-delivery-public-boundary.ts",
   "tests/test-iiko-cloud-adapter.ts",
   "tests/test-consumer-auth-persistence.ts",
   "tests/test-consumer-refresh-recovery.ts",

@@ -37,7 +37,7 @@ async function main() {
     getTerminalGroups: async () => [{ id: 'branch', organizationId: 'org', name: 'Filial', timeZone: '05:00:00' }],
     getNomenclature: async () => ({ groups: [], products: [{ id: 'osh', name: 'Osh', sizePrices: [{ price: { currentPrice: 35000 } }] }] }),
     getStopLists: async () => ({}),
-    getDeliveryRestrictions: async () => ({ deliveryRestrictions: [{ organizationId: 'org', restrictions: coverageConfigured ? [1] : [], deliveryZones: coverageConfigured ? [1] : [] }] }),
+    getDeliveryRestrictions: async () => ({ deliveryRestrictions: [{ organizationId: 'org', restrictions: coverageConfigured ? [{ terminalGroupId: 'branch', zone: 'Markaz' }] : [], deliveryZones: coverageConfigured ? [{ name: 'Markaz', coordinates: [{ latitude: 41, longitude: 69 }, { latitude: 42, longitude: 69 }, { latitude: 42, longitude: 70 }, { latitude: 41, longitude: 70 }] }] : [] }] }),
     getAllowedDeliveryRestrictions: async () => ({ isAllowed: allowed, location: { latitude: 41.3, longitude: 69.2 }, allowedItems: allowed ? [{ organizationId: 'org', terminalGroupId: 'branch', deliveryDurationInMinutes: 60, zone: 'Markaz' }] : [] }),
     getOrderById: async (_org: string, ids: string[]) => ({ orders: ids.map(id => orders.get(id)).filter(Boolean) }),
     createDeliveryOrder: async (request: any) => {
@@ -55,6 +55,7 @@ async function main() {
   allowed = false;
   await assert.rejects(adapter.requestQuote(quoteInput), (e: any) => e.code === 'RESOURCE_UNAVAILABLE');
   coverageConfigured = false;
+  allowed = true; // iiko geocodes any address despite empty coverage configuration.
   await assert.rejects(adapter.requestQuote(quoteInput), (e: any) => {
     const presentation = getAgentErrorPresentation(e);
     assert.equal(presentation.reason, 'DELIVERY_COVERAGE_NOT_CONFIGURED');

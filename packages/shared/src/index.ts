@@ -16,3 +16,4 @@ export * from './trusted-internal-targets';
 export * from './catalog-projection';
 export * from './conversation-requirements';
 export * from './quote-input';
+export * from './public-commerce';

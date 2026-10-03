@@ -3,7 +3,7 @@ import { CheckAvailabilityInput, SearchCatalogInput } from '@zayuno/contracts';
 import { ApiTags, ApiOperation, ApiSecurity } from '@nestjs/swagger';
 import { CatalogService } from './catalog.service';
 import { CatalogProjectionSchema } from '@zayuno/contracts';
-import { projectCatalog, projectOffering } from '@zayuno/shared';
+import { projectCatalog, projectOffering, toPublicCatalog, toPublicOffering } from '@zayuno/shared';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 
 @ApiTags('Catalog & Offerings')
@@ -25,7 +25,7 @@ export class CatalogController {
   ) {
     const effectiveEnv = environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
     const projection = this.projection(req?.query);
-    return projectCatalog(await this.catalogService.getCatalog(slug, locationId, categorySlug, this.parseContext(context), effectiveEnv), projection);
+    return projectCatalog(toPublicCatalog(await this.catalogService.getCatalog(slug, locationId, categorySlug, this.parseContext(context), effectiveEnv)), projection);
   }
 
   @Get('providers/:slug/offerings/:offeringId')
@@ -40,7 +40,7 @@ export class CatalogController {
   ) {
     const effectiveEnv = environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
     const projection = this.projection(req?.query);
-    return projectOffering(await this.catalogService.getOffering(slug, offeringId, locationId, this.parseContext(context), effectiveEnv), projection);
+    return projectOffering(toPublicOffering(await this.catalogService.getOffering(slug, offeringId, locationId, this.parseContext(context), effectiveEnv)), projection);
   }
 
   @Get('search')
@@ -60,7 +60,7 @@ export class CatalogController {
     }
     const effectiveEnv = environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
     const projection = this.projection(req?.query);
-    return projectCatalog(await this.catalogService.searchOfferings(
+    return projectCatalog(toPublicCatalog(await this.catalogService.searchOfferings(
       providerSlug,
       query,
       categorySlug,
@@ -68,7 +68,7 @@ export class CatalogController {
       limit ? parseInt(limit, 10) : 20,
       this.parseContext(context),
       effectiveEnv
-    ), projection);
+    )), projection);
   }
 
   @Post('search')
@@ -77,7 +77,7 @@ export class CatalogController {
     if (!body?.providerSlug) throw new BadRequestException('providerSlug is required.');
     const effectiveEnv = (body as any)?.environment || (req?.headers ? req.headers['x-zayuno-environment'] || req.headers['x-execution-context'] : undefined);
     const projection = this.projection(body);
-    return projectCatalog(await this.catalogService.searchOfferings(
+    return projectCatalog(toPublicCatalog(await this.catalogService.searchOfferings(
       body.providerSlug,
       body.query || '',
       body.categorySlug,
@@ -85,7 +85,7 @@ export class CatalogController {
       body.limit || 20,
       body.parameters,
       effectiveEnv
-    ), projection);
+    )), projection);
   }
 
   @Post('availability')
