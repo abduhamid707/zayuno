@@ -29,6 +29,15 @@ function providerSummary(provider: any) {
   return Object.fromEntries(keys.filter(key => provider[key] !== undefined).map(key => [key, provider[key]]));
 }
 
+function normalizeCustomerContact(customer: any) {
+  if (!customer) return undefined;
+  let phone = String(customer.phone || '').trim();
+  if (!phone) return customer;
+  if (/^\d{9}$/.test(phone)) phone = `+998${phone}`;
+  else if (/^998\d{9}$/.test(phone)) phone = `+${phone}`;
+  return { ...customer, name: customer.name?.trim() || 'Mijoz', phone };
+}
+
 function catalogOffering(offering: any) {
   return { ...offering, name: offering.name ?? offering.title, price: offering.price ?? offering.basePrice };
 }
@@ -82,6 +91,14 @@ const catalogOfferingOutputSchema = {
   properties: catalogOfferingOutputProperties,
   // Projection may deliberately omit any offering field.
   required: []
+};
+
+const actionPresentationOutputProperties = {
+  paymentMethod: { type: ['string', 'null'] },
+  paymentInstructions: { type: ['string', 'null'] },
+  paymentStatusVerified: { type: 'boolean' },
+  fulfillmentStatus: { type: ['string', 'null'] },
+  estimatedArrivalAt: { type: ['string', 'null'] },
 };
 
 export interface McpToolDefinition {
@@ -858,6 +875,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       }
       const quote = await client.requestQuote({
         ...args,
+        customer: normalizeCustomerContact(args.customer),
         ...(destination ? { destination } : {})
       });
       const customerMessage = formatCustomerQuote(quote);
@@ -968,6 +986,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       type: 'object',
       properties: {
         customerMessage: { type: 'string', description: 'Pre-formatted confirmation and payment link for customer' },
+        ...actionPresentationOutputProperties,
         actionId: { type: 'string', description: 'Stable Zayuno action reference' },
         providerSlug: { type: 'string' },
         providerName: { type: ['string', 'null'] },
@@ -993,20 +1012,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
     },
     handler: async (args, client) => {
       const idempotencyKey = args.idempotencyKey || getOrCreateActionIdempotencyKey(args.quoteId);
-      const rawPhone = String(args.customer?.phone || '').trim();
-      let phone = rawPhone;
-      if (/^\d{9}$/.test(phone)) {
-        phone = `+998${phone}`;
-      } else if (/^998\d{9}$/.test(phone)) {
-        phone = `+${phone}`;
-      }
-      const customer = phone
-        ? {
-            name: args.customer?.name?.trim() || 'Mijoz',
-            phone,
-            ...(args.customer?.email ? { email: args.customer.email } : {}),
-          }
-        : undefined;
+      const customer = normalizeCustomerContact(args.customer);
       let destination = args.destination;
       if (typeof destination === 'string') {
         destination = { raw: destination };
@@ -1032,7 +1038,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
   // 12. get_action
   {
     name: 'get_action',
-    description: 'Retrieve live status for an active or completed action. Returns pre-formatted customerMessage in natural Uzbek. The AI assistant must present customerMessage directly to the customer and never expose raw status enums or action IDs.',
+    description: 'Retrieve live status for an active or completed action. Returns pre-formatted customerMessage in natural Uzbek, including the public order reference when supplied. Present customerMessage directly; never expose raw status enums or internal provider IDs.',
     annotations: {
       readOnlyHint: true,
       openWorldHint: false,
@@ -1057,6 +1063,7 @@ export const ZAYUNO_MCP_TOOLS: McpToolDefinition[] = [
       type: 'object',
       properties: {
         customerMessage: { type: 'string', description: 'Pre-formatted action status in natural Uzbek' },
+        ...actionPresentationOutputProperties,
         actionId: { type: 'string', description: 'Stable Zayuno action reference' },
         providerSlug: { type: 'string' },
         providerName: { type: ['string', 'null'] },

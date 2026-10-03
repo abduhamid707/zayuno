@@ -9,6 +9,8 @@ import { prisma } from '../packages/database/src/client';
 import { normalizeProviderCategory } from '../packages/contracts/src/provider';
 import { formatCustomerActionStatus, formatCustomerQuote, formatCustomerPaymentOptions } from '../packages/shared/src/customer-presenter';
 import { getAgentErrorPresentation } from '../packages/shared/src/errors';
+import { toPublicAction } from '../packages/shared/src/public-action';
+import { ZAYUNO_MCP_TOOLS } from '../apps/mcp/src/tools';
 
 async function main() {
   const offerings: any[] = [
@@ -76,6 +78,22 @@ async function main() {
   assert.match(formatCustomerActionStatus(created), /kuryerga/);
   const live = await adapter.getAction({ providerSlug: 'restaurant', actionId: created.externalActionId! });
   assert.match(formatCustomerActionStatus(live), /yetkazish vaqti/);
+  const publicAction = toPublicAction(created);
+  assert.equal(publicAction.fulfillmentStatus, 'WaitCooking');
+  assert.equal(publicAction.paymentMethod, 'CASH');
+  assert.equal((publicAction as any).metadata, undefined);
+  assert.equal((publicAction as any).externalActionId, undefined);
+  const mcpStatus = await ZAYUNO_MCP_TOOLS.find(tool => tool.name === 'get_action')!.handler({ actionId: publicAction.actionId }, { getAction: async () => publicAction } as any);
+  assert.match(mcpStatus.customerMessage, /tayyorlash navbatida/);
+  assert.match(mcpStatus.customerMessage, /kuryerga/);
+  assert.match(mcpStatus.customerMessage, /yetkazish vaqti/);
+  assert.equal(mcpStatus.fulfillmentStatus, 'WaitCooking');
+  let quotedCustomer: any; let createdCustomer: any;
+  const mcpArgs = { providerSlug: 'restaurant', quoteId: quote.id, userConfirmed: true, customer: { phone: '901234567' }, destination: quoteInput.destination };
+  await ZAYUNO_MCP_TOOLS.find(tool => tool.name === 'request_quote')!.handler(mcpArgs, { requestQuote: async (input: any) => { quotedCustomer = input.customer; return quote; } } as any);
+  await ZAYUNO_MCP_TOOLS.find(tool => tool.name === 'create_action')!.handler(mcpArgs, { createAction: async (input: any) => { createdCustomer = input.customer; return publicAction; } } as any);
+  assert.deepEqual(quotedCustomer, createdCustomer, 'MCP quote and create must normalize contacts identically');
+  assert.equal(createdCustomer.phone, '+998901234567');
   assert.equal((await adapter.getLocations()).at(0)?.serviceRadiusKm, undefined);
   await assert.rejects(adapter.createAction({ ...actionInput, paymentMethod: 'PAYME' }));
   assert.match(formatCustomerPaymentOptions([{ type: 'CASH_ON_DELIVERY', isOnline: false }]), /naqd/);

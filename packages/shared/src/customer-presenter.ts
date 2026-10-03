@@ -149,7 +149,7 @@ export function hasVerifiedPaymentStatus(action: any, providerInfo?: any): boole
   if (isDemoOrSandboxAction(action, providerInfo)) return false;
   const actionMetadata = (action?.metadata as Record<string, any>) || {};
   const providerMetadata = (providerInfo?.metadata as Record<string, any>) || {};
-  return actionMetadata.paymentStatusVerified === true || providerMetadata.paymentStatusVerified === true;
+  return action?.paymentStatusVerified === true || actionMetadata.paymentStatusVerified === true || providerMetadata.paymentStatusVerified === true;
 }
 
 /**
@@ -306,12 +306,12 @@ export function formatCustomerActionStatus(action: any, providerInfo?: any): str
     CookingStarted: 'Buyurtma tayyorlanmoqda', CookingCompleted: 'Buyurtma tayyor',
     Waiting: 'Buyurtma tayyor, kuryer kutilmoqda', OnWay: 'Buyurtma yo‘lda', Delivered: 'Buyurtma yetkazildi', Closed: 'Buyurtma yakunlandi',
   };
-  const stage = action.metadata?.fulfillmentStatus;
+  const stage = action.fulfillmentStatus || action.metadata?.fulfillmentStatus;
   const cash = ['CASH', 'CASH_ON_DELIVERY'].includes(String(action.paymentMethod).toUpperCase());
-  const arrival = action.metadata?.estimatedArrivalAt;
+  const arrival = action.estimatedArrivalAt || action.metadata?.estimatedArrivalAt;
   const time = typeof arrival === 'string' ? arrival.match(/(?:T|\s)(\d{2}:\d{2})/)?.[1] : undefined;
   return [stages[stage] || formatCustomerStatus(action.status, action.paymentStatus),
-    stage && action.publicId && !/SANDBOX|DEMO|MOCK/i.test(action.publicId) ? `Buyurtma: ${action.publicId}` : '',
+    stage && (action.publicId || action.actionId) && !/SANDBOX|DEMO|MOCK/i.test(action.publicId || action.actionId) ? `Buyurtma: ${action.publicId || action.actionId}` : '',
     cash && action.paymentStatus !== 'PAID' ? 'Naqd — buyurtma yetkazilganda kuryerga to‘laysiz.' : '',
     time ? `Restoran belgilagan yetkazish vaqti: ${time}` : '', ...presentationDetails(action, providerInfo)].filter(Boolean).join('\n');
 }

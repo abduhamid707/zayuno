@@ -9,6 +9,7 @@
 - Shu API foydalanuvchisi va telefon uchun faol buyurtmada takrorlanayotgan mahsulotlar bo‘lsa, yangi quote alohida qo‘shimcha buyurtma yaratilishini aytadi. Mavjud buyurtmaga qo‘shish funksiyasi hali yo‘q.
 - Naqd to‘lov buyurtmani tayyorlash holatidan ajratildi: mijoz kuryerga yetkazilganda to‘lashini ko‘radi. `get_payment_options` shu ulanishda offline naqd usulini qaytaradi. Click/Payme checkout ulanmagan.
 - iiko tayyorlash navbati, pishirish, tayyor va yo‘lda holatlari alohida ko‘rsatiladi. Umumiy status enumlari saqlanadi; batafsil holat `metadata.fulfillmentStatus`da.
+- Public API va MCP javobida `fulfillmentStatus`, `paymentMethod`, `paymentInstructions`, `paymentStatusVerified` va `estimatedArrivalAt` saqlanadi. Ichki metadata, telefon/manzil va provider IDlari bu javobga chiqarilmaydi.
 - ETA iiko delivery restrictionsdan olinadi; oldingi doimiy 40 daqiqa olib tashlandi. POS uchun rejalangan vaqt filial vaqt zonasiga mos yuboriladi. Statusda iiko qaytargan `completeBefore` ko‘rsatiladi.
 - Soxta 10 km radius va restoran nomidan tuzilgan manzil olib tashlandi. Quote manzil va savat uchun iiko ruxsatini tekshiradi.
 - POS izohi qisqa: `Zayuno #XXXXXXXX`. To‘lov, filial va bekor qilish capability xatolari tegishli keyingi qadamni beradi.
