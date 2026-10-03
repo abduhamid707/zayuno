@@ -2,6 +2,29 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ConversationState, SemanticIntent } from '@zayuno/contracts';
 import { projectOffering } from '@zayuno/shared';
 
+const normalize = (value: string) => value.toLowerCase().replace(/[‘’`ʻʼ]/g, "'").replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+/** A provider name or menu command is navigation, not a product search. */
+export function providerNavigation(prompt: string, providers: any[]): SemanticTurn | undefined {
+  const text = normalize(prompt);
+  for (const provider of providers) {
+    const names = [provider.name, provider.branding?.displayName, provider.slug].filter(Boolean);
+    for (const name of names) {
+      const label = normalize(name);
+      if (!label || !text.includes(label)) continue;
+      const rest = text.replace(label, '').replace(/\b(dan|ning|ni|ga|menyu(?:si|ni)?|menu|katalog(?:i|ini)?|catalog|ko rsat|ko rsating|och|oching|покажи|показать|меню|каталог)\b/gu, '').trim();
+      if (!rest) return { intent: 'SEARCH', providerSlug: provider.slug, query: '' };
+    }
+  }
+  return undefined;
+}
+
+export function searchTerms(prompt: string): string {
+  return prompt.replace(/[‘’`ʻʼ]/g, "'")
+    .replace(/\b(?:\d+\s*(?:ta|dona)|yemoqchiman|ichmoqchiman|buyurtma(?:\s+qil(?:moqchiman)?)?|kerak|menga|iltimos|ko'rsat(?:ing)?|qidir|topib\s+ber|yeyman|xohlayman)\b/giu, ' ')
+    .replace(/[.!?]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export interface SemanticTurn {
   intent: SemanticIntent;
   providerSlug?: string;
@@ -26,6 +49,9 @@ export class SemanticIntentResolver {
     }) : null;
   }
   async resolve(prompt: string, state: ConversationState, providers: any[]): Promise<SemanticTurn> {
+    const navigation = providerNavigation(prompt, providers);
+    if (navigation) return navigation;
+    if (/^(salom|assalomu alaykum|hello|hi|привет)[.!?\s]*$/iu.test(prompt.trim())) return { intent: 'SEARCH', query: '' };
     if (this.model) {
       try {
       const result = await this.model.generateContent({ contents: [{ role: 'user', parts: [{ text: JSON.stringify({
@@ -39,6 +65,8 @@ Resolve relative dates in Asia/Tashkent. Extract quantities only when they refer
 Use fields for customer.*, parameters.*, fulfillment, paymentMethod or locations.<declared role>.
 For initial discovery infer the best matching listed provider from its description and capabilities; do not invent a provider.
 If no listed provider supports the requested service or explicit brand, return SEARCH with unsupported=true and no providerSlug. Never substitute an unrelated provider or retain the previous provider for an unrelated new request.
+Selecting a provider by name opens its catalog: return SEARCH, its providerSlug and query="". Never search for the provider name or a previous greeting.
+Search query contains only product/service keywords: "osh yemoqchiman" => "osh". Remove wishes, quantities, provider names and command words. A menu request has query="".
 Search query should retain the offering title and remove quantity and variant instructions. If user wants another choice, set alternatives=true.
 Use current offerings for cheapest and alternative selection. If a generic field is requested, extract its value from natural language.`,
         now: new Date().toISOString(), timezone: 'Asia/Tashkent', prompt,
@@ -66,7 +94,7 @@ Use current offerings for cheapest and alternative selection. If a generic field
     const offering = state.offerings.find(o => normalized.includes(o.title.toLowerCase()));
     if (offering) return { intent: 'SELECT', offeringId: offering.id };
     const provider = providers.find(p => normalized.includes(p.name.toLowerCase()) || normalized.includes(p.slug.toLowerCase()));
-    if (provider) return { intent: 'SEARCH', providerSlug: provider.slug, query: prompt.replace(new RegExp(provider.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), '').trim() };
+    if (provider) return { intent: 'SEARCH', providerSlug: provider.slug, query: searchTerms(prompt.replace(new RegExp(provider.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), '')) };
     if (/eng arzon|cheapest|дешев/iu.test(prompt)) return { intent: 'SELECT', cheapest: true };
     if (/boshqasi|boshqasini|another|друг/iu.test(prompt)) return { intent: 'SELECT', alternatives: true };
     const field = state.missingFields[0];
@@ -74,6 +102,6 @@ Use current offerings for cheapest and alternative selection. If a generic field
       const value = field.type === 'number' || field.type === 'integer' ? Number(prompt) : prompt.trim();
       return { intent: 'PROVIDE_FIELD', fields: { [field.path]: value } };
     }
-    return { intent: 'SEARCH', query: prompt };
+    return { intent: 'SEARCH', query: searchTerms(prompt) };
   }
 }

@@ -49,7 +49,7 @@ async function main() {
   service.resolver.resolve = async () => ({ intent: 'SEARCH', query: 'osh', unsupported: true });
   const input = { prompt: 'Beshqozondan osh buyurtma qil', userId: 'unit-user', messageId: 'one' };
   let result = await service.turn(input, emptyConversationState(), async () => {});
-  assert.equal(result.content, 'Bu xizmat hozircha Zayunoga ulanmagan. Biz bilan qoling, iltimos. Sizga kelajakda ko‘proq yordam berishni juda xohlaymiz. So‘rovingizni saqladik — uni unutmaymiz. Sizning biz bilan qolishingiz biz uchun muhim 💙\n\nBizda hozir quyidagi xizmatlar mavjud:');
+  assert.equal(result.content, 'Bu xizmat hozircha Zayunoga ulanmagan. So‘rovingiz saqlandi. Quyidagi hamkorlardan birini tanlashingiz mumkin.');
   assert.deepEqual(result.interaction.providers.map((p: any) => p.slug), ['uzum']);
   listed = [sandbox];
   result = await service.turn(input, emptyConversationState(), async () => {});

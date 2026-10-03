@@ -4974,3 +4974,14 @@ To‘liq keyingi-agent prompt: `docs/AI_AGENT_DEMAND_MOBILE_HANDOFF.md`.
 - [x] MCPning mavjud server API credentiali bilan production discovery Мой ресторанni qaytardi; catalog 1 ta Zayuno DEMO taom 100 RUB; core quotes endpointi 100 RUB verified quote berdi (buyurtma yaratilmagan).
 - [x] admin.zayuno.uz bundle index-DPEv0zBN.js yangi native formani va ACTIVE xato ko‘rinishini saqlaydi; eski blanket warning yo‘q.
 **Yakun:** foydalanuvchi so‘ragan oqim tayyor va demo restoran aktiv. Faqat TASKS.md so‘nggi status commit qilinadi; boshqa agentlar/mobile/DemandDashboard/deploy fayllari o‘zgarishlari saqlangan. Lokal vaqtinchalik production verifikatsiya skripti o‘chirildi. **Amaliy limit:** native holat API orqali so‘ralganda yangilanadi; online Click/Payme integratsiyasi bu ish doirasida qo‘shilmadi; demo valyutasi RUB. **Keyingi qadam:** foydalanuvchi Zayuno appda Мой ресторан / Zayuno DEMO taomni qidirib sinaydi; test tugagach demo Suspend qilinishi mumkin. Boshqa restoran uchun docs/iiko-activation.md qadamlaridan foydalaniladi.
+
+## Mobile AI javoblari va hamkor tanlovini tuzatish — 2026-10-03
+- [x] Takroriy unavailable javobi, hamkor kartasi va taom so‘rovining sababini aniqlash.
+- [x] Server suhbat oqimi va zarur mobile tanlov uzatishini tuzatish; qisqa tabiiy javoblar.
+- [x] Hamkor tanlovi, osh so‘rovi, kontekst va haqiqiy bo‘sh natija uchun regressiya tekshiruvlari.
+- [ ] Faqat tegishli o‘zgarishlarni push/deploy qilish va production javoblarini tekshirish.
+**Holat:** foydalanuvchi mobile screenshotlarda barcha tanlovlar bir xil uzun unavailable javobiga tushayotganini ko‘rsatdi va server/mobile tuzatishga ruxsat berdi. Mavjud boshqa mobile/admin ishlari saqlanadi. Keyingi qadam: semantic resolver, chat service va provider card selection tracing.
+- [x] Sabab tasdiqlandi: mobile card faqat name yuborgan, SEARCH query oldingi salom/provider title ni saqlagan; fallback wish jumlasini to‘liq qidirgan. Uzun unavailable matni hardcoded.
+- [x] Server: deterministic provider/menu navigation, card selections modeldan mustaqil, bo‘sh query catalog ochadi; category va haqiqiy SEARCH bilan osh mavjud hamkor topiladi. Qisqa unavailable va mijoz ma’lumotlari savollari. Mobile: providerSlug/kind yuboradi va pending trayni qo‘shmaydi.
+- [x] Regressiya: test-consumer-discovery-regression, provider-cache-and-consumer-chat, action-guardrails PASS. API build va mobile typecheck PASS (yakuniy kod bilan qayta tekshirildi).
+**Fayllar:** consumer-chat.service.ts, semantic-intent.ts, mobile app/(app)/index.tsx faqat provider click hunk, tests/test-consumer-discovery-regression.ts, test-consumer-demand.ts assertion, TASKS.md. Qolgan: selective commit/push, deploy va production chat readback. Boshqa dirty mobile/admin fayllar commitga kirmaydi.

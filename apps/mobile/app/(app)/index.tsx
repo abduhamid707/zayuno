@@ -315,7 +315,14 @@ export default function HomeScreen() {
         name: provider.name,
         cuisine: provider.cuisine,
       });
-      sendMessageRef.current(provider.name);
+      sendMessageRef.current("", [{
+        id: `provider:${provider.slug}`,
+        kind: "provider",
+        providerSlug: provider.slug,
+        title: provider.name,
+        prompt: provider.name,
+        groupId: "providers",
+      }], []);
     },
     [trackSuggestion],
   );

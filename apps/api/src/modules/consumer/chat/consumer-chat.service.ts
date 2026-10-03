@@ -15,7 +15,7 @@ import { UnmetDemandService } from '../../analytics/unmet-demand.service';
 import { ConsumerDemandService, DemandOutcome } from '../../analytics/consumer-demand.service';
 import { classifyDemand } from '../../analytics/demand-classification';
 import { ConversationStore } from './conversation-store';
-import { SemanticIntentResolver, SemanticTurn } from './semantic-intent';
+import { SemanticIntentResolver, SemanticTurn, searchTerms } from './semantic-intent';
 
 type ChatRequest = { prompt: string; userId: string; userEmail?: string; conversationId?: string; messageId?: string;
   messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -83,11 +83,13 @@ export class ConsumerChatService {
       if (!providers.some(p => p.slug === state.providerSlug)) throw new BadRequestException('Provider unavailable; existing action is preserved for reconciliation.');
       return this.submit(state, input.userId, save);
     }
-    let turn = await this.resolver.resolve(input.prompt, state, providers);
     const selection = input.selections?.[0];
+    // Structured choices already identify canonical data; do not ask the model
+    // to reinterpret a card label or send stale composer/cart text as a search.
+    let turn: SemanticTurn = selection ? { intent: 'CONTINUE' } : await this.resolver.resolve(input.prompt, state, providers);
     if (selection) {
       if (selection.groupId?.startsWith('order:') && selection.groupId !== `order:${state.quote?.id}`) throw new BadRequestException('Confirmation refers to a different quote.');
-      if (selection.kind === 'provider') turn = { intent: 'SEARCH', providerSlug: selection.providerSlug, query: state.query || '' };
+      if (selection.kind === 'provider') turn = { intent: 'SEARCH', providerSlug: selection.providerSlug, query: '' };
       else if (selection.kind === 'offering') turn = { intent: 'SELECT', providerSlug: selection.providerSlug, offeringId: selection.offeringId || selection.id, quantity: selection.quantity };
       else if (selection.kind === 'variant') turn = { intent: 'SELECT', variantId: selection.variantId || selection.id };
       else if (selection.kind === 'option' && selection.groupId) turn = { intent: 'PROVIDE_FIELD', fields: { [`selectedOptions.${selection.groupId}`]: selection.id } };
@@ -103,9 +105,30 @@ export class ConsumerChatService {
       const currentProvider = providers.find(p => p.slug === state.providerSlug);
       const currentCategory = currentProvider ? classifyDemand(`${currentProvider.name} ${currentProvider.description || ''}`)?.category : undefined;
       if (!turn.providerSlug && facts?.category && facts.category !== 'other' && currentCategory && currentCategory !== 'other' && currentCategory !== facts.category) turn.unsupported = true;
-      if (turn.unsupported || unavailableBrand) {
+      const candidates = facts?.category && facts.category !== 'other' ? providers.filter(p => this.demandCategory(p) === facts.category) : [];
+      if (unavailableBrand || (turn.unsupported && !candidates.length)) {
         this.reset(state);
         return this.unavailable(input, providers, 'NO_PROVIDER');
+      }
+      if (candidates.length && (!state.providerSlug || turn.unsupported) && !facts?.brands.length) {
+        const query = searchTerms(turn.query || input.prompt);
+        const results = await Promise.allSettled(candidates.slice(0, 6).map(async p => {
+          if (!p.capabilities.includes(ProviderCapability.SEARCH)) return p;
+          const offerings = await this.catalogService.searchOfferings(p.slug, query, undefined, undefined, 10, {}, state.environment);
+          return offerings.some(o => o.isAvailable !== false) ? p : undefined;
+        }));
+        const matches = results.flatMap(result => result.status === 'fulfilled' && result.value ? [result.value] : []);
+        if (!matches.length && results.some(result => result.status === 'rejected')) {
+          throw (results.find(result => result.status === 'rejected') as PromiseRejectedResult).reason;
+        }
+        if (matches.length === 1) turn = { ...turn, providerSlug: matches[0].slug, query, unsupported: false };
+        else {
+          this.reset(state);
+          state.query = query;
+          if (!matches.length) return this.unavailable(input, candidates, 'NO_MATCHING_OFFER');
+          await this.captureDemand(input, providers, 'AVAILABLE');
+          return this.providerChoices(matches, `«${query}» uchun quyidagi hamkorlarni tanlashingiz mumkin.`);
+        }
       }
     }
     if (turn.intent === 'CANCEL') {
@@ -127,7 +150,7 @@ export class ConsumerChatService {
     if (turn.providerSlug && turn.providerSlug !== state.providerSlug) {
       const provider = providers.find(item => item.slug === turn.providerSlug);
       if (!provider) return this.unavailable(input, providers, 'NO_PROVIDER');
-      const query = turn.query || state.query;
+      const query = turn.query ?? state.query;
       this.reset(state);
       state.providerSlug = provider.slug;
       state.manifest = manifestOf(provider);
@@ -135,7 +158,7 @@ export class ConsumerChatService {
     }
     let provider = providers.find(item => item.slug === state.providerSlug);
     if (!provider) {
-      state.query = turn.query || input.prompt;
+      state.query = turn.query ?? input.prompt;
       if (classifyDemand(input.prompt, providers)) return this.unavailable(input, providers, 'NO_PROVIDER');
       return this.providerChoices(providers);
     }
@@ -155,15 +178,16 @@ export class ConsumerChatService {
     }
     await save();
     if (turn.intent === 'SEARCH' || (!state.selectedOffering && !state.offerings.length && state.manifest?.requirements?.QUOTE?.inputMode !== 'PARAMETERS')) {
-      state.query = turn.query ?? state.query ?? input.prompt;
-      state.capability = provider.capabilities.includes(ProviderCapability.SEARCH) ? 'SEARCH' : 'CATALOG';
+      state.query = searchTerms(turn.query ?? state.query ?? input.prompt);
+      const useSearch = !!state.query && provider.capabilities.includes(ProviderCapability.SEARCH);
+      state.capability = useSearch ? 'SEARCH' : 'CATALOG';
       const missing = conversationRequirements(state, state.capability);
       if (missing.length) {
         await this.captureDemand(input, providers, 'AVAILABLE');
         return this.ask(state, missing);
       }
       try {
-      if (provider.capabilities.includes(ProviderCapability.SEARCH)) {
+      if (useSearch || !provider.capabilities.includes(ProviderCapability.CATALOG) && provider.capabilities.includes(ProviderCapability.SEARCH)) {
         state.offerings = await this.catalogService.searchOfferings(provider.slug, state.query || '', undefined, state.locationId, 30, state.parameters, state.environment);
       } else if (provider.capabilities.includes(ProviderCapability.CATALOG)) {
         const catalog = await this.catalogService.getCatalog(provider.slug, state.locationId, undefined, state.parameters, state.environment);
@@ -175,15 +199,17 @@ export class ConsumerChatService {
         throw error;
       }
       state.offerings = state.offerings.filter(offering => offering.isAvailable !== false);
-      if (!state.offerings.length && state.manifest?.requirements?.QUOTE?.inputMode !== 'PARAMETERS') return this.unavailable(input, providers, 'NO_MATCHING_OFFER');
+      if (!state.offerings.length && state.manifest?.requirements?.QUOTE?.inputMode !== 'PARAMETERS') return this.unavailable(input, [provider], 'NO_MATCHING_OFFER');
       await this.captureDemand(input, providers, 'AVAILABLE');
       // Resolve the original selection against fresh canonical data, not guessed IDs.
-      const grounded = await this.resolver.resolve(input.prompt, state, [provider]);
-      if (grounded.offeringId || grounded.cheapest) this.applyTurn(state, grounded);
-      if (!state.selectedOffering) return this.offeringChoices(state);
+      if (!selection && state.query) {
+        const grounded = await this.resolver.resolve(input.prompt, state, [provider]);
+        if (grounded.offeringId || grounded.cheapest) this.applyTurn(state, grounded);
+      }
+      if (!state.selectedOffering) return this.offeringChoices(state, provider);
     }
     if (turn.intent === 'SEARCH') await this.captureDemand(input, providers, 'AVAILABLE');
-    if (!state.selectedOffering && state.manifest?.requirements?.QUOTE?.inputMode !== 'PARAMETERS' && state.manifest?.requirements?.QUOTE?.inputMode !== 'EITHER') return this.offeringChoices(state);
+    if (!state.selectedOffering && state.manifest?.requirements?.QUOTE?.inputMode !== 'PARAMETERS' && state.manifest?.requirements?.QUOTE?.inputMode !== 'EITHER') return this.offeringChoices(state, provider);
     if (!provider.capabilities.includes(ProviderCapability.QUOTE) || !provider.capabilities.includes(ProviderCapability.ACTION_CREATE)) {
       return { content: state.selectedOffering ? [state.selectedOffering.title, state.selectedOffering.description].filter(Boolean).join('\n') : 'Hamkor faqat ma’lumot taqdim etadi.',
         interaction: state.selectedOffering ? this.primitives([{ type: 'OfferingCard', offering: state.selectedOffering }]) : undefined };
@@ -309,7 +335,13 @@ export class ConsumerChatService {
     const variant = field.path === 'selectedVariant';
     const optionGroup = state.selectedOffering?.optionGroups?.find(group => field.path === `selectedOptions.${group.id}`);
     const choices = variant ? state.selectedOffering?.variants : optionGroup?.options;
-    return { content: `${prefix ? prefix + '\n\n' : ''}${field.title} — ${field.enum ? 'variantni tanlang yoki yozing.' : 'kiriting.'}`,
+    const questions: Record<string, string> = {
+      'customer.name': 'Buyurtmani kimning nomiga yozamiz?', 'customer.phone': 'Bog‘lanish uchun telefon raqamingizni yozing.',
+      'customer.email': 'Email manzilingizni yozing.', 'locations.DESTINATION': 'Qayerga yetkazamiz? Manzilni yozing.',
+      'paymentMethod': 'Qanday to‘laysiz? Mavjud usullardan birini tanlang.', 'fulfillment': 'Buyurtmani qanday olasiz?',
+      'quantity': 'Nechta olamiz?', 'selectedVariant': 'Qaysi variantni olamiz?',
+    };
+    return { content: `${prefix ? prefix + '\n\n' : ''}${questions[field.path] || `${field.title} — ${field.enum ? 'variantni tanlang yoki yozing.' : 'kiriting.'}`}`,
       interaction: this.primitives([{ type: variant ? 'VariantSelector' : optionGroup ? 'OptionSelector' : field.type === 'location' ? 'LocationInput' : field.format === 'date' || field.format === 'date-time' ? 'DateInput' : 'FieldInput',
         field, choices: choices?.filter(choice => choice.isAvailable !== false), currency: state.selectedOffering?.currency, providerSlug: state.providerSlug }]) };
   }
@@ -318,8 +350,12 @@ export class ConsumerChatService {
     return { content: formatCustomerQuote(state.quote, provider), interaction: this.primitives([
       { type: 'QuoteSummary', quote: state.quote }, { type: 'ConfirmationCard', quoteId: state.quote!.id }]) };
   }
-  private providerChoices(providers: any[]): ChatResult {
-    return { content: providers.length ? 'Sizga yordam berishga tayyormiz. Hozir quyidagi hamkorlar bilan ishlay olamiz — qaysi birini tanlaymiz?' : 'Xush kelibsiz! Hozir xizmatlarimizni ulash ustida ishlayapmiz. Biz bilan qoling, iltimos — sizga ko‘proq yordam berishni xohlaymiz 💙 Qanday xizmat kerakligini yozishingiz mumkin.',
+  private demandCategory(provider: any): string | undefined {
+    const categories: Record<string, string> = { FOOD_AND_DRINK: 'food', RECRUITMENT: 'jobs', RETAIL: 'retail', TRANSPORT: 'transport', TRAVEL: 'travel', HEALTHCARE: 'healthcare' };
+    return categories[provider.category] || classifyDemand(`${provider.name} ${provider.description || ''}`)?.category;
+  }
+  private providerChoices(providers: any[], content?: string): ChatResult {
+    return { content: content || (providers.length ? 'Salom! Nima kerak? Hamkorni tanlang yoki so‘rovingizni yozing.' : 'Salom! Qanday xizmat kerak?'),
       interaction: { version: 1, kind: 'provider_list', providers: providers.map(provider => ({ id: provider.slug, slug: provider.slug,
         name: provider.branding?.displayName || provider.name, logoUrl: provider.branding?.logoUrl || provider.logoUrl,
         ...provider.branding, cuisine: provider.description, prompt: provider.name })) } };
@@ -330,16 +366,14 @@ export class ConsumerChatService {
   }
   private async unavailable(input: ChatRequest, providers: any[], reason: string): Promise<ChatResult> {
     const recorded = await this.captureDemand(input, providers, 'UNFULFILLED', reason);
-    const opening = reason === 'NO_MATCHING_OFFER' ? 'Hozir sizga mos taklif topilmadi.'
+    const opening = reason === 'NO_MATCHING_OFFER' ? 'Bu so‘rov bo‘yicha mahsulot topilmadi. Menyuni oching yoki boshqa mahsulot nomini yozing.'
       : reason === 'CAPABILITY_UNSUPPORTED' ? 'Bu hamkor orqali hozir ushbu amalni bajara olmaymiz.'
       : 'Bu xizmat hozircha Zayunoga ulanmagan.';
-    const message = process.env.CONSUMER_UNAVAILABLE_MESSAGE?.trim().slice(0, 800)
-      || 'Biz bilan qoling, iltimos. Sizga kelajakda ko‘proq yordam berishni juda xohlaymiz.';
-    return { content: `${opening} ${message}${recorded ? ' So‘rovingizni saqladik — uni unutmaymiz.' : ''} Sizning biz bilan qolishingiz biz uchun muhim 💙${providers.length ? '\n\nBizda hozir quyidagi xizmatlar mavjud:' : ''}`,
+    return { content: `${opening}${recorded ? ' So‘rovingiz saqlandi.' : ''}${reason === 'NO_PROVIDER' && providers.length ? ' Quyidagi hamkorlardan birini tanlashingiz mumkin.' : ''}`,
       interaction: providers.length ? this.providerChoices(providers).interaction : undefined };
   }
-  private offeringChoices(state: ConversationState): ChatResult {
-    return { content: state.offerings.length ? 'Mos taklifni tanlang yoki qanday variant kerakligini yozing.' : 'So‘rovni aniqlashtiring.',
+  private offeringChoices(state: ConversationState, provider?: any): ChatResult {
+    return { content: state.offerings.length ? (state.query ? 'Mana topilgan takliflar. Qaysi birini tanlaymiz?' : this.demandCategory(provider || {}) === 'food' ? `${provider.name} menyusi. Nima buyurtma qilamiz?` : 'Katalog tayyor. Qaysi taklifni ko‘ramiz?') : 'Nimani qidiryapsiz?',
       interaction: this.primitives(state.offerings.slice(0, 20).map(offering => ({ type: 'OfferingCard', offering, providerSlug: state.providerSlug }))) };
   }
 }
