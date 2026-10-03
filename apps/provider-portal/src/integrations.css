@@ -1,4 +1,66 @@
 /* This stylesheet is scoped to the integrations content. */
+.ig-iiko-card, .ig-provider-platform {
+  padding: 24px !important;
+  border: 1px solid var(--ws-border);
+  border-radius: 16px !important;
+  background: var(--ws-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ig-iiko-expanded { grid-column: 1 / -1; }
+.ig-platform-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.ig-platform-top, .ig-market-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ig-market-title { justify-content: flex-start; }
+.ig-platform-logo { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; background: var(--ws-brand-glow); color: var(--ws-brand-light); font-size: 24px; font-weight: 800; }
+.ig-iiko-logo { color: #fb923c; background: rgba(251,146,60,.1); }
+.ig-badge { padding: 5px 9px; border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--ws-success); background: var(--ws-success-bg); }
+.ig-platform-copy h3 { margin: 0 0 8px; font-size: 20px; font-weight: 700; color: var(--ws-text-primary); }
+.ig-platform-copy p { margin: 0; color: var(--ws-text-secondary); font-size: 14px; line-height: 1.65; }
+.ig-platform-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.ig-platform-tags span { font-size: 11px; color: var(--ws-text-secondary); padding: 4px 8px; border: 1px solid var(--ws-border); border-radius: 6px; }
+.integrations-view .ig-button { display: inline-flex; justify-content: center; align-items: center; gap: 10px; min-height: 46px; padding: 10px 18px; background: var(--ws-brand); color: #fff; border: 1px solid transparent; border-radius: 9px; font-weight: 600; font-size: 14px; cursor: pointer; }
+.integrations-view .ig-button-secondary { background: var(--ws-surface); border-color: var(--ws-border); color: var(--ws-text-primary); }
+.integrations-view button:disabled { opacity: .5; cursor: not-allowed !important; }
+.integrations-view button:focus-visible, .integrations-view summary:focus-visible { outline: 2px solid var(--ws-brand-light); outline-offset: 4px; }
+.ig-iiko-setup { border-top: 1px solid var(--ws-border); padding-top: 24px; display: grid; gap: 22px; }
+.ig-setup-heading { display: flex; align-items: center; justify-content: space-between; }
+.ig-setup-heading h4 { margin: 0; font-size: 18px; color: var(--ws-text-primary); }
+.ig-close { display: grid; place-items: center; background: transparent; color: var(--ws-text-secondary); border: 1px solid var(--ws-border); border-radius: 9px; cursor: pointer; }
+.ig-steps { list-style: none; display: flex; padding: 0; margin: 0; gap: 24px; flex-wrap: wrap; }
+.ig-steps li { display: flex; align-items: center; gap: 8px; color: var(--ws-text-muted); font-size: 13px; }
+.ig-steps li > span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--ws-border); font-size: 12px; }
+.ig-steps .ig-step-current { color: var(--ws-brand-light); }
+.ig-step-current > span { background: var(--ws-brand); color: white; }
+.ig-steps .ig-step-done { color: var(--ws-success); }
+.ig-form-description { display: flex; gap: 12px; color: var(--ws-brand-light); }
+.ig-form-description strong { color: var(--ws-text-primary); font-size: 14px; }
+.ig-form-description p, .ig-advanced p { color: var(--ws-text-secondary); font-size: 13px; line-height: 1.6; margin: 4px 0 0; }
+.ig-field { display: grid; align-content: start; gap: 8px; color: var(--ws-text-secondary); font-size: 13px; }
+.ig-field input, .ig-field select { width: 100%; min-height: 46px; padding: 11px 13px; color: var(--ws-text-primary); background: var(--ws-bg); border: 1px solid var(--ws-border); border-radius: 9px; font: inherit; }
+.ig-field input:focus, .ig-field select:focus { outline: 2px solid var(--ws-border-focus); outline-offset: 1px; }
+.ig-field small { font-size: 12px; line-height: 1.5; color: var(--ws-text-muted); }
+.ig-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 20px; }
+.ig-advanced { border: 1px solid var(--ws-border); border-radius: 10px; padding: 14px 16px; }
+.ig-advanced summary, .ig-planned summary { cursor: pointer; color: var(--ws-text-secondary); font-size: 13px; }
+.ig-advanced .ig-form-grid { margin-top: 18px; }
+.ig-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.ig-form-footer small { display: flex; gap: 7px; align-items: center; font-size: 12px; color: var(--ws-text-muted); }
+.ig-form-note { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ws-text-secondary); }
+.ig-iiko-summary { display: grid; gap: 8px; padding: 16px; background: var(--ws-bg); border-radius: 10px; color: var(--ws-text-primary); font-size: 13px; }
+.ig-iiko-summary > span, .ig-iiko-summary > small { color: var(--ws-text-secondary); }
+.ig-feedback { margin: 0; padding: 14px; border-radius: 9px; font-size: 13px; line-height: 1.6; }
+.ig-feedback-error { background: var(--ws-danger-bg); color: var(--ws-danger); }
+.ig-feedback-success { background: var(--ws-success-bg); color: var(--ws-success); }
+.ig-planned { padding: 18px 0; border-top: 1px solid var(--ws-border); }
+@media (max-width: 640px) {
+  .ig-platform-grid { grid-template-columns: 1fr !important; }
+  .ig-form-grid { grid-template-columns: 1fr; }
+  .ig-form-footer { flex-direction: column; align-items: stretch; }
+  .ig-steps { gap: 10px; }
+  .ig-steps li { font-size: 11px; }
+  .ig-iiko-card, .ig-provider-platform { padding: 18px !important; }
+}
 .integrations-view {
   width: 100%;
   min-width: 0;

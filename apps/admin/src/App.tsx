@@ -45,7 +45,6 @@ import {
   Radio,
   Info,
 } from 'lucide-react';
-import { IikoAdminConnection } from './IikoAdminConnection';
 import { adminAnalytics } from './lib/analytics';
 
 const API_BASE =
@@ -1396,8 +1395,6 @@ export default function App() {
           {/* 3. PROVIDERS TAB */}
           {activeTab === 'providers' && (
             <div className="space-y-6">
-              <IikoAdminConnection apiBase={API_BASE} token={token}
-                onConnected={() => { void queryClient.invalidateQueries({ queryKey: ['admin-providers'] }); }} />
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-bold text-white">

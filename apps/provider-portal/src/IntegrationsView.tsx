@@ -81,12 +81,14 @@ export function IntegrationsView({
   providerSlug,
   token,
   apiBaseUrl = '',
-  onProviderConnected
+  onProviderConnected,
+  onCreateProfile
 }: {
   providerSlug?: string;
   token?: string;
   apiBaseUrl?: string;
   onProviderConnected?: () => void;
+  onCreateProfile?: () => void;
 }) {
   const [instances, setInstances] = useState<ConnectorInstanceDto[]>([]);
   const [definitions, setDefinitions] = useState<ConnectorDefinitionDto[]>([]);
@@ -471,11 +473,11 @@ export function IntegrationsView({
             <Store size={22} />
           </div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--ws-text-primary)' }}>
-            Savdo platformangizni ulang
+            Biznesingizni Zayuno bilan bog‘lang
           </h2>
         </div>
         <p style={{ margin: 0, fontSize: 14, color: 'var(--ws-text-secondary)', lineHeight: 1.6 }}>
-          Do‘koningiz katalogi va narxlarini Zayunoga yuklang. Xaridorlar tovarning platformadagi sahifasiga o‘tishi mumkin.
+          Platformani tanlang, hisobingizni ulang va menyu yoki katalogingizni xaridorlarga oching.
         </p>
         {providerSlug && <p className="ig-provider-context">Boshqarilayotgan hisob: <strong>{providerSlug}</strong></p>}
       </div>
@@ -494,34 +496,42 @@ export function IntegrationsView({
         </div>
       )}
 
+
+      {/* Available Platforms Showcase */}
+      <div style={{ marginBottom: 36 }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600, color: 'var(--ws-text-primary)' }}>
+          Platformani tanlang
+        </h3>
+        {definitionsLoading && <p className="ig-state-note" role="status">Platformalar yuklanmoqda…</p>}
+        {definitionsError && <p className="ig-state-note ig-state-error" role="alert">{definitionsError}</p>}
+        <div className="ig-platform-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
       <IikoConnection token={token} apiBaseUrl={apiBaseUrl} providerSlug={providerSlug} onConnected={onProviderConnected} />
+          {activeDefinitions.map(def => (
+            <section key={def.id} className="ig-provider-platform">
+              <div className="ig-platform-top">
+                <span className="ig-platform-logo">{def.id === 'uzum' ? 'U' : <Store size={24} />}</span>
+                <span className="ig-badge">ULASH MUMKIN</span>
+              </div>
+              <div className="ig-platform-copy">
+                <h3>{def.name}</h3>
+                <p>{def.id === 'uzum' ? 'Do‘koningiz tovarlari va narxlarini Zayuno katalogiga yuklang.' : def.description}</p>
+                <div className="ig-platform-tags"><span>Savdo</span><span>Katalog va narxlar</span></div>
+              </div>
+              <button className="ig-button" disabled={!token}
+                onClick={() => providerSlug ? handleOpenConnect(def) : onCreateProfile?.()}>
+                {providerSlug ? 'Do‘konni ulash' : 'Biznes profilini yaratish'}<ArrowRight size={17} />
+              </button>
+              {!providerSlug && <small className="ig-form-note">Uzum ulash uchun avval biznes profilini yarating.</small>}
+            </section>
+          ))}
+        </div>
+      </div>
 
       {/* Active Connectors List */}
       <div style={{ marginBottom: 32 }}>
         <div className="ig-section-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Ulangan do'konlaringiz</h3>
-          <button
-            disabled={!token || !providerSlug || activeDefinitions.length === 0}
-            onClick={() => {
-              const defaultDef = activeDefinitions.find(d => d.id === 'uzum') || activeDefinitions[0] || null;
-              handleOpenConnect(defaultDef);
-            }}
-            style={{
-              background: 'var(--ws-brand)',
-              color: '#fff',
-              border: 'none',
-              padding: '9px 16px',
-              borderRadius: 8,
-              fontWeight: 600,
-              fontSize: 14,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8
-            }}
-          >
-            <Store size={16} /> Yangi do‘kon ulash
-          </button>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Ulangan savdo hisoblari</h3>
+
         </div>
 
         {loading ? (
@@ -529,20 +539,11 @@ export function IntegrationsView({
         ) : instances.length === 0 ? (
           <div style={{ background: 'var(--ws-surface)', border: '1px dashed var(--ws-border)', borderRadius: 12, padding: 40, textAlign: 'center' }}>
             <Store size={40} style={{ color: 'var(--ws-text-muted)', marginBottom: 12 }} />
-            <h4 style={{ margin: '0 0 6px 0', fontSize: 16, color: 'var(--ws-text-primary)' }}>Hozircha hech qanday do'kon ulanmagan</h4>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: 16, color: 'var(--ws-text-primary)' }}>Savdo hisoblaringiz shu yerda ko‘rinadi</h4>
             <p style={{ margin: '0 0 16px 0', fontSize: 14, color: 'var(--ws-text-secondary)' }}>
-              Tayyor platforma (masalan Uzum Market) sotuvchilar hisobingizni ulab, tovarlaringizni AI xaridorlariga oching.
+              Yuqoridagi platformalardan birini tanlab do‘koningizni ulang. iiko restoraningiz holati uning kartasida ko‘rinadi.
             </p>
-            <button
-              disabled={!token || !providerSlug || activeDefinitions.length === 0}
-              onClick={() => {
-              const defaultDef = activeDefinitions.find(d => d.id === 'uzum') || activeDefinitions[0] || null;
-                handleOpenConnect(defaultDef);
-              }}
-              style={{ background: 'var(--ws-brand)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
-            >
-              Yangi do‘kon ulash
-            </button>
+
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -653,68 +654,7 @@ export function IntegrationsView({
         )}
       </div>
 
-      {/* Available Platforms Showcase */}
-      <div style={{ marginBottom: 36 }}>
-        <h3 style={{ margin: '0 0 16px 0', fontSize: 18, fontWeight: 600, color: 'var(--ws-text-primary)' }}>
-          Qo‘llab-quvvatlanadigan platformalar
-        </h3>
-        {definitionsLoading && <p className="ig-state-note" role="status">Platformalar yuklanmoqda…</p>}
-        {definitionsError && <p className="ig-state-note ig-state-error" role="alert">{definitionsError}</p>}
-        {!definitionsLoading && !definitionsError && activeDefinitions.length === 0 && <p className="ig-state-note">Hozircha ulash mumkin bo‘lgan platforma yo‘q.</p>}
-        <div className="ig-platform-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-          {activeDefinitions.map(def => (
-                <div
-                  key={def.id}
-                  style={{
-                    border: '2px solid var(--ws-brand)',
-                    borderRadius: 10,
-                    padding: 16,
-                    background: 'var(--ws-surface-elevated)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--ws-text-primary)' }}>{def.name}</span>
-                      <span
-                        style={{
-                          background: 'var(--ws-success-bg)',
-                          color: 'var(--ws-success)',
-                          fontSize: 11,
-                          fontWeight: 700,
-                          padding: '2px 6px',
-                          borderRadius: 4
-                        }}
-                      >
-                        ULASH MUMKIN
-                      </span>
-                    </div>
-                    <p style={{ margin: '0 0 14px 0', fontSize: 13, color: 'var(--ws-text-secondary)', lineHeight: 1.5 }}>
-                      {def.id === 'uzum' ? 'Uzum do‘konidagi tovarlar va narxlarni API kaliti orqali yuklang.' : def.description}
-                    </p>
-                  </div>
-                  <button
-                      disabled={!token || !providerSlug}
-                      onClick={() => handleOpenConnect(def as any)}
-                      style={{
-                        width: '100%',
-                        background: 'var(--ws-brand)',
-                        color: '#fff',
-                        border: 'none',
-                        padding: '7px 0',
-                        borderRadius: 6,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Ulash
-                    </button>
-                </div>
-          ))}
-        </div>
+      <details className="ig-planned"><summary>Keyingi integratsiyalar</summary>
         <h3 className="ig-planned-heading" style={{ margin: '28px 0 16px', fontSize: 18, fontWeight: 600, color: 'var(--ws-text-primary)' }}>Rejadagi platformalar</h3>
         <div className="ig-platform-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
           {PLANNED_DEFINITIONS.filter(planned => !activeDefinitions.some(def => def.id === planned.id)).map(def => (
@@ -727,7 +667,7 @@ export function IntegrationsView({
             </div>
           ))}
         </div>
-      </div>
+      </details>
 
       {/* Catalog Preview Modal */}
       {previewInstanceId && (

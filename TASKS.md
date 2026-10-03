@@ -1,5 +1,16 @@
 # Joriy ish — OTA, Demand Eksporti, HTTP Guard va Izolyatsiyalangan Testlar (2026-10-01)
 
+## Integratsiyalar UI va admin ulash formasini olib tashlash (2026-10-03)
+
+- [x] Admin sahifasidagi iiko ulash formasini olib tashlash.
+- [x] Hamkor integratsiyalarini platforma kartalari va bosqichli iiko forma bilan tartiblash.
+- [ ] Admin/portal build va UI ko‘rinishini tekshirish, tegishli o‘zgarishlarni push qilish.
+
+**Holat:** foydalanuvchi ulanish faqat hamkor portalida bo‘lishini so‘radi. Admin App.tsxda boshqa agentning DemandDashboard o‘zgarishlari bor; ularni saqlash va commitga qo‘shmaslik kerak. Keyingi qadam: iiko formani platforma tanlovidan ochish, advanced credentiallarni yig‘ish, bir xil input/button uslubi va responsive layout yaratish.
+
+**Bajarilgan:** admin iiko ulash formasi va ishlatilmaydigan komponent olib tashlandi; mavjud providerlarni tekshirish boshqaruvi qoldi. Hamkor sahifasida iiko/Uzum kartalari birinchi, takroriy ulash tugmalari olib tashlandi, rejalangan platformalar yig‘ildi. iiko API kalit → restoran/menyu tanlash bosqichlari, v2 uchun yig‘iladigan maydonlar, mos input/select/button uslubi va mobil layout qo‘shildi. Uzum profilsiz hisobda biznes profil yaratishga yo‘naltiradi. Admin/portal build PASS. Lokal mock bilan Chrome tekshiruvi: kartalar, discovery, valid ulash tugmasi va 390px overflow yo‘qligi PASS; haqiqiy credential yoki order ishlatilmadi. O‘zgargan fayllar: admin App.tsx va IikoAdminConnection.tsx; portal App.tsx, IntegrationsView.tsx, IikoConnection.tsx, integrations.css. **Keyingi qadam:** selektiv commit/push va UI auto-deploy natijasi.
+
+
 > **Maqsad:** Qolgan kamchiliklarni to'liq bartaraf etish: OTA scriptida qat'iy tekshiruvlar (missing ID failure, missing manifest failure, to'g'ri .env.local ustuvorligi), DemandDashboard daily CSV eksportida hisoblanmagan ko'rsatkichlarni bo'sh qoldirish, brauzer orqali admin QA, jonli HTTP role testlari (401/403/200), izolyatsiyalangan Redis bilan universal-orchestrator regression testi va TASKS.md'dagi holatni real dalillarga moslashtirish.
 
 ## Checklist:

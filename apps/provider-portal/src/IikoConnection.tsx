@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { ArrowRight, Check, ChevronLeft, KeyRound, ShieldCheck, UtensilsCrossed, X } from 'lucide-react';
 
 type Discovery = {
   organizations: Array<{ id: string; name: string; currency?: string | null; address?: string | null }>;
@@ -11,6 +12,7 @@ type Status = { connected: boolean; slug?: string; name?: string; status?: strin
 export function IikoConnection({ token, apiBaseUrl, providerSlug, onConnected }: {
   token?: string; apiBaseUrl: string; providerSlug?: string; onConnected?: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
   const [credentials, setCredentials] = useState({ apiLogin: '', apiKey: '', appId: '', clientSecret: '' });
   const [discovery, setDiscovery] = useState<Discovery | null>(null);
@@ -63,6 +65,7 @@ export function IikoConnection({ token, apiBaseUrl, providerSlug, onConnected }:
     try {
       const data = await request('/discover', credentialPayload()) as Discovery;
       setDiscovery(data);
+      setName(data.organizations[0]?.name || '');
       setOrganizationId(data.organizations[0]?.id || '');
       setExternalMenuId(data.externalMenus[0]?.id || '');
       setTerminalGroupId(data.terminalGroups.find(group => group.organizationId === data.organizations[0]?.id)?.id || '');
@@ -83,6 +86,7 @@ export function IikoConnection({ token, apiBaseUrl, providerSlug, onConnected }:
       setNotice(data.message || 'iiko ulandi. Admin tasdig‘ini kuting.');
       setCredentials({ apiLogin: '', apiKey: '', appId: '', clientSecret: '' });
       setDiscovery(null);
+      setExpanded(false);
       onConnected?.();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Ulash muvaffaqiyatsiz.'); }
     finally { setBusy(false); }
@@ -96,75 +100,89 @@ export function IikoConnection({ token, apiBaseUrl, providerSlug, onConnected }:
   };
 
   const field = (label: string, key: keyof typeof credentials, hint?: string) => (
-    <label style={{ display: 'grid', gap: 5, fontSize: 13, color: 'var(--ws-text-secondary)' }}>
-      {label}<input type="password" autoComplete="off" value={credentials[key]}
-        onChange={event => setCredentials(previous => ({ ...previous, [key]: event.target.value }))}
-        style={{ padding: 10, borderRadius: 7, border: '1px solid var(--ws-border)', background: 'var(--ws-surface)', color: 'var(--ws-text-primary)' }} />
+    <label className="ig-field">
+      <span>{label}</span><input type="password" autoComplete="off" value={credentials[key]} disabled={busy}
+        onChange={event => { setCredentials(previous => ({ ...previous, [key]: event.target.value })); setDiscovery(null); }} />
       {hint && <small>{hint}</small>}
     </label>
   );
 
-  return <section style={{ border: '1px solid var(--ws-border)', borderRadius: 12, padding: 20, marginBottom: 24,
-    background: 'var(--ws-surface-elevated)', display: 'grid', gap: 14 }}>
-    <div>
-      <h3 style={{ margin: '0 0 4px', color: 'var(--ws-text-primary)' }}>iiko Cloud · restoran ulanishi</h3>
-      <p style={{ margin: 0, color: 'var(--ws-text-secondary)', fontSize: 13 }}>
-        Restoran menyusi va buyurtmalarini Zayuno’ga ulang. Kalitlar faqat serverda shifrlangan holda saqlanadi.
-      </p>
+  return <section className={`ig-iiko-card ${expanded ? 'ig-iiko-expanded' : ''}`}>
+    <div className="ig-platform-top">
+      <div className="ig-platform-logo ig-iiko-logo"><UtensilsCrossed size={24} /></div>
+      <span className={`ig-badge ${status?.connected ? 'ig-badge-connected' : ''}`}>
+        {status?.connected ? 'ULANGAN' : 'ULASH MUMKIN'}
+      </span>
     </div>
-    {!token ? <p>iiko ulash uchun hisobingizga kiring.</p> : <>
-      {status?.connected && <div style={{ border: '1px solid var(--ws-border)', padding: 12, borderRadius: 8,
-        color: 'var(--ws-text-primary)', fontSize: 13 }}>
-        <strong>{status.name || status.slug}</strong> · {status.status === 'ACTIVE' && status.isPublished ? 'Faol' : 'Admin tasdig‘ini kutmoqda'}
-        <div>{status.organizationName} · {status.menuName} · {status.productCount ?? 0} mahsulot</div>
-        <button type="button" onClick={check} disabled={busy} style={{ marginTop: 8, padding: '6px 10px' }}>
-          {busy ? 'Tekshirilmoqda…' : 'Menyu va POS holatini tekshirish'}
-        </button>
-        {checkResult && <p role="status">{checkResult.connected
-          ? `${checkResult.productCount ?? 0} mahsulot · POS ${checkResult.terminalOnline ? 'online' : 'offline'}`
-          : 'Restoran, POS guruhi yoki menyu topilmadi.'}</p>}
-      </div>}
-      {(!status?.connected || status.status === 'DRAFT' || status.status === 'DISABLED') && <>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
-          {field('iikoWeb apiLogin / API kalit', 'apiLogin', 'v2 App ID va Client Secret bilan ham shu kalitni ishlatishingiz mumkin.')}
-          {field('Alohida API key (v2, ixtiyoriy)', 'apiKey', 'apiLogin’dan boshqa kalit berilgan bo‘lsa kiriting.')}
-          {field('App ID (v2)', 'appId')}
-          {field('Client Secret (v2)', 'clientSecret')}
-        </div>
-        <button type="button" disabled={busy || (!credentials.apiLogin && !credentials.apiKey)} onClick={discover}
-          style={{ justifySelf: 'start', padding: '9px 16px', borderRadius: 7, border: 0,
-            background: 'var(--ws-brand)', color: '#fff', cursor: 'pointer' }}>
-          {busy ? 'Tekshirilmoqda…' : 'Restoranlarni tekshirish'}
-        </button>
-        {discovery && <div style={{ display: 'grid', gap: 10 }}>
-          <label>Restoran
-            <select value={organizationId} onChange={event => { const id = event.target.value; setOrganizationId(id);
+    <div className="ig-platform-copy">
+      <h3>iiko Cloud</h3>
+      <p>Restoran menyusi, narxlar va buyurtmalarni bitta ulanish orqali boshqaring.</p>
+      <div className="ig-platform-tags"><span>Restoranlar</span><span>Menyu va buyurtmalar</span></div>
+    </div>
+    {status?.connected && <div className="ig-iiko-summary">
+      <strong>{status.name || status.slug}</strong>
+      <span>{status.status === 'ACTIVE' && status.isPublished ? 'Faol' : 'Tasdiqlash kutilmoqda'}</span>
+      <small>{status.organizationName} · {status.menuName} · {status.productCount ?? 0} ta mahsulot</small>
+      <button className="ig-button ig-button-secondary" type="button" onClick={check} disabled={busy}>
+        {busy ? 'Tekshirilmoqda…' : 'Ulanishni tekshirish'}
+      </button>
+      {checkResult && <p role="status">{checkResult.connected
+        ? `${checkResult.productCount ?? 0} ta mahsulot · Kassa ${checkResult.terminalOnline ? 'online' : 'offline'}`
+        : 'Restoran, kassa guruhi yoki menyu topilmadi.'}</p>}
+    </div>}
+    {!expanded && (!status?.connected || status.status === 'DRAFT' || status.status === 'DISABLED') &&
+      <button className="ig-button" type="button" onClick={() => setExpanded(true)} disabled={!token}>
+        {status?.connected ? 'Ulanish sozlamalari' : 'Restoranni ulash'}<ArrowRight size={17} />
+      </button>}
+    {!token && <small className="ig-form-note">Ulash uchun hisobingizga kiring.</small>}
+    {expanded && <div className="ig-iiko-setup">
+      <div className="ig-setup-heading"><h4>Restoranni ulash</h4>
+        <button className="ig-close" type="button" aria-label="Ulash formasini yopish" disabled={busy} onClick={() => setExpanded(false)}><X size={20} /></button>
+      </div>
+      <ol className="ig-steps" aria-label="Ulash bosqichlari">
+        <li className={!discovery ? 'ig-step-current' : 'ig-step-done'}><span>{discovery ? <Check size={14} /> : '1'}</span> API kalit</li>
+        <li className={discovery ? 'ig-step-current' : ''}><span>2</span> Restoran va menyu</li>
+        <li><span>3</span> Tasdiqlash</li>
+      </ol>
+      {!discovery ? <>
+        <div className="ig-form-description"><KeyRound size={20} /><div><strong>iiko hisobingizni bog‘lang</strong>
+          <p>iikoWeb → Live API Settings bo‘limidagi integratsiya API kalitini kiriting.</p></div></div>
+        {field('API kalit (apiLogin)', 'apiLogin')}
+        <details className="ig-advanced"><summary>App ID va Client Secret bilan ulash (v2)</summary>
+          <p>Ilovangiz v2 avtorizatsiyasidan foydalansa, shu ma’lumotlarni ham kiriting.</p>
+          <div className="ig-form-grid">{field('App ID', 'appId')}{field('Client Secret', 'clientSecret')}
+            {field('Alohida API key (ixtiyoriy)', 'apiKey', 'apiLogin’dan boshqa kalit berilgan bo‘lsa kiriting.')}</div>
+        </details>
+        <div className="ig-form-footer"><small><ShieldCheck size={16} /> Kalitlaringiz shifrlanib saqlanadi.</small>
+          <button className="ig-button" type="button" disabled={busy || (!credentials.apiLogin.trim() && !credentials.apiKey.trim())} onClick={discover}>
+            {busy ? 'Tekshirilmoqda…' : 'Davom etish'}<ArrowRight size={17} /></button></div>
+      </> : <>
+        <div className="ig-form-description"><Check size={20} /><div><strong>Hisob topildi</strong><p>Restoran, kassa guruhi va Zayuno’da ko‘rinadigan menyuni tanlang.</p></div></div>
+        <div className="ig-form-grid">
+          <label className="ig-field"><span>Restoran</span>
+            <select disabled={busy} value={organizationId} onChange={event => { const id = event.target.value; setOrganizationId(id);
+              setName(discovery.organizations.find(item => item.id === id)?.name || '');
               setTerminalGroupId(discovery.terminalGroups.find(group => group.organizationId === id)?.id || ''); }}>
-              {discovery.organizations.map(item => <option key={item.id} value={item.id}>{item.name} · {item.currency || '?'}</option>)}
-            </select>
-          </label>
-          <label>POS guruhi
-            <select value={terminalGroupId} onChange={event => setTerminalGroupId(event.target.value)}>
-              {discovery.terminalGroups.filter(item => item.organizationId === organizationId).map(item =>
-                <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-          </label>
-          <label>Tashqi menyu
-            <select value={externalMenuId} onChange={event => setExternalMenuId(event.target.value)}>
-              {discovery.externalMenus.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-          </label>
-          <label>Restoran nomi <input value={name} onChange={event => setName(event.target.value)} maxLength={100} /></label>
-          <label>Zayuno manzili <input value={slug} onChange={event => setSlug(event.target.value.toLowerCase())}
-            maxLength={63} disabled={!!providerSlug} placeholder="mening-restoranim" /></label>
-          <label>Xizmat ko‘rsatish mamlakati (2 harfli kod) <input value={countryCode}
-            onChange={event => setCountryCode(event.target.value.toUpperCase())} maxLength={2} placeholder="UZ" /></label>
-          <small style={{ color: 'var(--ws-text-muted)' }}>Ulashdan keyin restoran admin tekshiruviga yuboriladi. Xaridorlarga darhol chiqmaydi.</small>
-          <button type="button" disabled={busy || !organizationId || !terminalGroupId || !externalMenuId || !name.trim() || !slug.trim()}
-            onClick={connect} style={{ justifySelf: 'start', padding: '9px 16px', borderRadius: 7, border: 0,
-              background: 'var(--ws-brand)', color: '#fff', cursor: 'pointer' }}>iiko restoranini ulash</button>
-        </div>}
+              {discovery.organizations.map(item => <option key={item.id} value={item.id}>{item.name} · {item.currency || '?'}</option>)}</select></label>
+          <label className="ig-field"><span>Kassa guruhi</span><select disabled={busy} value={terminalGroupId} onChange={event => setTerminalGroupId(event.target.value)}>
+            <option value="" disabled>Kassa guruhini tanlang</option>
+            {discovery.terminalGroups.filter(item => item.organizationId === organizationId).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+          <label className="ig-field"><span>Tashqi menyu</span><select disabled={busy} value={externalMenuId} onChange={event => setExternalMenuId(event.target.value)}>
+            <option value="" disabled>Menyuni tanlang</option>
+            {discovery.externalMenus.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+          <label className="ig-field"><span>Restoran nomi</span><input disabled={busy} value={name} onChange={event => setName(event.target.value)} maxLength={100} /></label>
+          <label className="ig-field"><span>Zayuno manzili</span><input value={slug} onChange={event => setSlug(event.target.value.toLowerCase())}
+            maxLength={63} disabled={busy || !!providerSlug} placeholder="mening-restoranim" /><small>Faqat lotin harflari, raqamlar va tire.</small></label>
+          <label className="ig-field"><span>Xizmat ko‘rsatish mamlakati</span><input disabled={busy} value={countryCode}
+            onChange={event => setCountryCode(event.target.value.toUpperCase())} maxLength={2} placeholder="UZ" /><small>O‘zbekiston uchun UZ.</small></label>
+        </div>
+        <p className="ig-form-note">Restoran tekshiruvga yuboriladi. Tasdiqlangach xaridorlarga ko‘rinadi.</p>
+        <div className="ig-form-footer"><button className="ig-button ig-button-secondary" type="button" disabled={busy} onClick={() => setDiscovery(null)}><ChevronLeft size={17} />Orqaga</button>
+          <button className="ig-button" type="button" disabled={busy || !organizationId || !terminalGroupId || !externalMenuId || !name.trim() || !slug.trim() || countryCode.length !== 2}
+            onClick={connect}>{busy ? 'Ulanmoqda…' : 'Ulash va tekshiruvga yuborish'}<ArrowRight size={17} /></button></div>
       </>}
-      {error && <p role="alert" style={{ color: 'var(--ws-danger)' }}>{error}</p>}
-      {notice && <p role="status" style={{ color: 'var(--ws-success)' }}>{notice}</p>}
-    </>}
+    </div>}
+    {error && <p className="ig-feedback ig-feedback-error" role="alert">{error}</p>}
+    {notice && <p className="ig-feedback ig-feedback-success" role="status">{notice}</p>}
   </section>;
 }

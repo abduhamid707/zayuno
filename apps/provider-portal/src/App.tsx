@@ -890,6 +890,7 @@ export default function App() {
             token={token}
             apiBaseUrl={API_BASE}
             onProviderConnected={() => { void refetchProvider(); }}
+            onCreateProfile={() => navigateTo('onboarding')}
           />
         )}
         {activeTab === 'onboarding' && (
